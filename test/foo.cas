@@ -1,0 +1,18 @@
+-- main
+CALL 16
+STORE 0 I32 8
+EXIT
+
+-- foo
+BUMPSP 4 -- return size = 4 bytes
+BUMPSP 8 -- 2 stack variables, each 4 bytes
+STORE 4 CONSTI32 19
+CALL 67
+STORE 8 I32 20
+ADDI32 I32 4 I32 8 0
+RET
+
+-- bar
+BUMPSP 4 -- return size = 4 bytes
+STORE 0 CONSTI32 8
+RET
