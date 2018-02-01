@@ -41,8 +41,8 @@ Lexer::Lexer(string fileName) {
                 istreambuf_iterator<char>());
 
     srcInfo = {fileName, fileBytes, {0}};
-    lastLoc = {0, 0, 0};
-    loc = {0, 0, 0};
+    lastLoc = {0, 1, 1};
+    loc = {0, 1, 1};
 
     popFront();
     popFront();

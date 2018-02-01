@@ -75,7 +75,7 @@ ostream &operator<<(ostream &os, HighlightedRegion region) {
     for (auto i = startSrc; i < region.region.srcInfo.source.length() && region.region.srcInfo.source[i] != '\n'; i++) {
         Colored<string> colored;
         if (i == region.region.start.byteIndex) {
-            os << "\e[" << Color::BG_MAGENTA << "m";
+            os << "\e[" << Color::BG_MAGENTA << ";" << Color::FG_LIGHT_GREY << "m";
         }
         if (i == region.region.end.byteIndex) {
             os << Colored<string>{"", {}};
@@ -125,10 +125,73 @@ ostream &operator<<(ostream &os, Color color) {
     }
 }
 
-// todo(chad): make this shorter -- maybe need an id on srcInfo
-// so we can just hash 3 ints without it being a string at all
-string Region::hash() {
+ostream &operator<<(ostream &os, NodeTypekind kind) {
+    switch (kind) {
+        case NodeTypekind::NONE: {
+            return os << "none";
+        }
+        case NodeTypekind::INT_LITERAL: {
+            return os << "an integer literal";
+        }
+        case NodeTypekind::I32: {
+            return os << "an i32";
+        }
+        case NodeTypekind::I64: {
+            return os << "an i64";
+        }
+        case NodeTypekind::FLOAT_LITERAL: {
+            return os << "an float literal";
+        }
+        case NodeTypekind::STRING: {
+            return os << "an string";
+        }
+        case NodeTypekind::BOOLEAN: {
+            return os << "an bool";
+        }
+        case NodeTypekind::F32: {
+            return os << "an f32";
+        }
+        case NodeTypekind::F64: {
+            return os << "an f64";
+        }
+        case NodeTypekind::FN: {
+            return os << "a fn";
+        }
+        case NodeTypekind::STRUCT: {
+            return os << "a struct";
+        }
+        case NodeTypekind::SYMBOL: {
+            return os << "a symbol";
+        }
+        case NodeTypekind::POINTER: {
+            return os << "a pointer";
+        }
+        default: assert(false);
+    }
+}
+
+/////////////
+//  ATOMS  //
+/////////////
+AtomTable *AtomTable::current = nullptr;
+
+AtomTable::AtomTable() {
+    current = this;
+}
+
+int64_t AtomTable::insert(Region r) {
     ostringstream s("");
-    s << srcInfo.fileName << start.byteIndex << end.byteIndex;
-    return s.str();
+    s << SourceRegion{r};
+    auto sourceStr = s.str();
+
+    auto found = atoms.find(sourceStr);
+    if (found != atoms.end()) {
+        return found->second;
+    }
+
+    auto tableIndex = (int64_t) AtomTable::current->backwardAtoms.size();
+    AtomTable::current->atoms.insert({sourceStr, tableIndex});
+    AtomTable::current->backwardAtoms.push_back(sourceStr);
+    return tableIndex;
+
 }

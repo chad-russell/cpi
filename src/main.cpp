@@ -17,7 +17,10 @@ int64_t nodeId;
 int main() {
     nodeId = 0;
 
-    auto parser = new Parser(new Lexer("/Users/chadrussell/Projects/cpi/test/foo.cpi"));
+    AtomTable();
+
+    auto lexer = new Lexer("/Users/chadrussell/Projects/cpi/test/foo.cpi");
+    auto parser = new Parser(lexer);
     parser->parseRoot();
 
     auto semantic = new Semantic();
@@ -35,17 +38,21 @@ int main() {
     //     cout << AssemblyLexer::instructionStrings[inst] << endl;
     // }
 
-    auto printer = new MnemonicPrinter();
-    // printer->instructions = lexer->instructions;
-    printer->instructions = gen->instructions;
-    cout << printer->debugString() << endl;
+//    auto printer = new MnemonicPrinter();
+//    // printer->instructions = lexer->instructions;
+//    printer->instructions = gen->instructions;
+//    cout << printer->debugString() << endl;
 
     auto interp = new Interpreter();
-    interp->stepCount = -1;
-    // interp->instructions = lexer->instructions;
+//    interp->stepCount = -1;
+
+//     interp->instructions = lexer->instructions;
     interp->instructions = gen->instructions;
-    // interp->sourceMap = lexer->sourceMap;
-    // interp->srcInfo = lexer->srcInfo;
+
+//    interp->sourceMap = lexer->sourceMap;
+    interp->sourceMap = gen->sourceMap;
+
+    interp->srcInfo = lexer->srcInfo;
     interp->interpret();
     cout << interp->readFromStack<int32_t>(0) << endl;
 

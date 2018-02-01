@@ -5,6 +5,7 @@
 #include <cassert>
 #include <vector>
 #include <iostream>
+#include <unordered_map>
 
 using namespace std;
 
@@ -16,6 +17,53 @@ bool startsWith(string s, string pre);
 bool endsWith(string s, string suf);
 
 int bytesInCodepoint(char firstByte);
+
+enum class NodeType {
+    FN_DECL,
+    SYMBOL,
+    DECL,
+    ASSIGN,
+    BINOP,
+    PIPE,
+    DOT,
+    FN_CALL,
+    INT_LITERAL,
+    FLOAT_LITERAL,
+    STRING_LITERAL,
+    NIL_LITERAL,
+    BOOLEAN_LITERAL,
+    UNARY_NEG,
+    RET,
+    IF,
+    WHILE,
+    DECL_PARAM,
+    PARAM,
+    TYPE,
+    DEREF,
+    ADDRESS_OF,
+    STRUCT_LITERAL,
+    UNARY_NOT,
+    MODULE,
+    IMPORT,
+    CAST,
+    ASSERT,
+};
+
+enum class NodeTypekind {
+    NONE,
+    INT_LITERAL,
+    I32,
+    I64,
+    FLOAT_LITERAL,
+    STRING,
+    BOOLEAN,
+    F32,
+    F64,
+    FN,
+    STRUCT,
+    SYMBOL,
+    POINTER,
+};
 
 template<typename T> 
 vector<unsigned char> toBytes(const T object) {
@@ -62,16 +110,14 @@ struct SourceInfo {
 
 struct Location {
     unsigned long byteIndex;
-    unsigned long line;
-    unsigned long col;
+    unsigned long line = 1;
+    unsigned long col = 1;
 };
 
 struct Region {
     SourceInfo srcInfo;
     Location start;
     Location end;
-
-    string hash();
 };
 
 struct SourceRegion {
@@ -125,6 +171,7 @@ ostream &operator<<(ostream &os, SourceInfoRegion srcInfo);
 ostream &operator<<(ostream &os, SourceRegion region);
 ostream &operator<<(ostream &os, HighlightedRegion region);
 ostream &operator<<(ostream &os, Color color);
+ostream &operator<<(ostream &os, NodeTypekind kind);
 
 template<typename T>
 ostream &operator<<(ostream &os, Colored<T> colored) {
@@ -134,5 +181,20 @@ ostream &operator<<(ostream &os, Colored<T> colored) {
     }
     return os << "m" << colored.value << "\e[0m";
 }
+
+
+/////////////
+//  ATOMS  //
+/////////////
+class AtomTable {
+public:
+    static AtomTable *current;
+    unordered_map<string, int64_t> atoms = {};
+    vector<string> backwardAtoms = {};
+
+    int64_t insert(Region r);
+
+    AtomTable();
+};
 
 #endif

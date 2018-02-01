@@ -25,9 +25,13 @@ void Parser::reportError(string error) {
 
 LexerToken Parser::expect(LexerTokenType type, string expectation) {
     if (lexer->front.type != type) {
-        ostringstream s("expected ");
-        s << expectation;
-        reportError(s.str());
+        ostringstream s("");
+        s << "expected " << expectation;
+        auto errStr = s.str();
+        last = lexer->front;
+        reportError(errStr);
+
+        exit(1);
     }
 
     auto saved = lexer->front;
@@ -35,17 +39,17 @@ LexerToken Parser::expect(LexerTokenType type, string expectation) {
     return saved;
 }
 
-void Parser::scopeInsert(Region region, Node *node) {
-    Scope _scope = scopes.top();
+void Parser::scopeInsert(int64_t atomId, Node *node) {
+    Scope *_scope = scopes.top();
 
-    auto found = _scope.symbols.find(region.hash());
-    if (found != _scope.symbols.end()) {
+    auto found = _scope->symbols.find(atomId);
+    if (found != _scope->symbols.end()) {
         ostringstream s("redeclaration of symbol ");
-        s << SourceRegion{region};
+        s << AtomTable::current->backwardAtoms[atomId];
         reportError(s.str());
     }
 
-    _scope.symbols[region.hash()] = node;
+    _scope->symbols[atomId] = node;
 }
 
 void Parser::parseRoot() {
@@ -74,8 +78,7 @@ Node *Parser::parseTopLevel() {
         }
 
         reportError("Expected top level function declaration");
-        assert(false);        
-} 
+}
 
 Node *Parser::parseFnDecl() {
     auto decl = new Node(lexer->srcInfo, &allNodes, NodeType::FN_DECL, scopes.top());
@@ -89,7 +92,7 @@ Node *Parser::parseFnDecl() {
 
     // name
     auto name = parseSymbol();
-    decl->fnDeclData.name = name->region;
+    decl->fnDeclData.atomId = AtomTable::current->insert(name->region);
 
     ostringstream nameStringstream("");
     nameStringstream << SourceRegion{name->region};
@@ -98,7 +101,7 @@ Node *Parser::parseFnDecl() {
         mainFn = decl;
     }
 
-    scopeInsert(name->region, decl);
+    scopeInsert(decl->fnDeclData.atomId, decl);
 
     // params
     expect(LexerTokenType::LPAREN, "(");
@@ -107,6 +110,11 @@ Node *Parser::parseFnDecl() {
 
     expect(LexerTokenType::RPAREN, ")");
 
+    // return type
+    if (lexer->front.type != LexerTokenType::LCURLY) {
+        decl->fnDeclData.returnType = parseType();
+    }
+
     // body
     expect(LexerTokenType::LCURLY, "{");
 
@@ -114,13 +122,16 @@ Node *Parser::parseFnDecl() {
 
     while (!lexer->isEmpty() && lexer->front.type != LexerTokenType::RCURLY) {
         auto scopedStmt = parseScopedStmt();
-        decl->fnDeclData.body.push_back(scopedStmt);
+        if (scopedStmt != nullptr) {
+            scopedStmt->sourceMapStatement = true;
+            decl->fnDeclData.body.push_back(scopedStmt);
+        }
     }
     auto end = expect(LexerTokenType::RCURLY, "}");
 
     // put params in scope
     for (auto param : decl->fnDeclData.params) {
-        scopeInsert(param->declParamData.name, param);
+        scopeInsert(param->declParamData.atomId, param);
     }
 
     decl->region.end = end.region.end;
@@ -134,13 +145,15 @@ Node *Parser::parseSymbol() {
     LexerToken front = expect(LexerTokenType::SYMBOL, "identifier");
     auto sym = new Node(lexer->srcInfo, &allNodes, NodeType::SYMBOL, scopes.top());
     sym->region = front.region;
+    sym->symbolData.atomId = AtomTable::current->insert(sym->region);
     return sym;
 }
 
 Node *Parser::parseScopedStmt() {
     // comment
-    while (lexer->front.type == LexerTokenType::COMMENT) {
+    if (lexer->front.type == LexerTokenType::COMMENT) {
         popFront();
+        return nullptr;
     }
 
     // ret
@@ -170,16 +183,15 @@ Node *Parser::parseScopedStmt() {
         }
 
         auto decl = new Node(lexer->srcInfo, &allNodes, NodeType::DECL, scopes.top());
+        currentFnDecl->fnDeclData.locals.push_back(decl);
 
-        decl->delcData.lvalue = lvalue;
-        decl->delcData.initialValue = rvalue;
-        decl->delcData.type = type;
+        decl->declData.lvalue = lvalue;
+        decl->declData.initialValue = rvalue;
+        decl->declData.type = type;
 
         decl->region = {lexer->srcInfo, saved, last.region.end};
 
-        currentFnDecl->fnDeclData.body.push_back(decl);
-
-        scopeInsert(lvalue->region, decl);
+        scopeInsert(lvalue->symbolData.atomId, decl);
 
         return decl;
     }
@@ -204,7 +216,8 @@ Node *Parser::parseScopedStmt() {
         return ass;
     }
 
-    assert(false);
+    reportError("expected a declaration or an assignment");
+    exit(1);
 }
 
 Node *Parser::parseRet() {
@@ -240,8 +253,6 @@ Node *Parser::parseLvalue() {
             s << savedType;
             s << " is not an lvalue!";
             reportError(s.str());
-
-            assert(false);
         }
     }
 }
@@ -255,14 +266,17 @@ Node *Parser::parseType() {
     popFront();
 
     switch (saved.type) {
-    case LexerTokenType::I32: {
-        type->typeData.kind = NodeTypekind::I32;
-    } break;
-    default: {
-        ostringstream s("unknown type '");
-        s << SourceRegion{saved.region} << "'";
-        reportError(s.str());
-    }
+        case LexerTokenType::I32: {
+            type->typeData.kind = NodeTypekind::I32;
+        } break;
+        case LexerTokenType::I64: {
+            type->typeData.kind = NodeTypekind::I64;
+        } break;
+        default: {
+            ostringstream s("");
+            s << "unknown type '" << SourceRegion{saved.region} << "'";
+            reportError(s.str());
+        }
     }
 
     return type;

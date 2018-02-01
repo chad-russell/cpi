@@ -5,8 +5,10 @@
 class Semantic {
 public:
     bool encounteredErrors;
-    fnDeclData currentFnDecl;
+    FnDeclData currentFnDecl;
     Node *targetType;
+
+    void reportError(vector<Node *> affectedNodes, Error error);
 
     void resolveTypes(Node *node);
 };

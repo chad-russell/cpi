@@ -22,7 +22,7 @@ struct Parser {
     void popFront();
     void reportError(string error);
     LexerToken expect(LexerTokenType type, string expectation);
-    void scopeInsert(Region region, Node *node);
+    void scopeInsert(int64_t atomId, Node *node);
 
     void parseRoot();
     Node *parseTopLevel();

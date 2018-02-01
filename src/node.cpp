@@ -35,14 +35,14 @@ Scope::Scope(Scope *parent_) {
     parent = parent_;
 }
 
-Node *Scope::find(Region r) {
-    auto found = symbols.find(r.hash());
+Node *Scope::find(int64_t atomId) {
+    auto found = symbols.find(atomId);
     if (found != symbols.end()) {
         return found->second;
     }
 
     if (parent != nullptr) {
-        auto foundNode = parent->find(r);
+        auto foundNode = parent->find(atomId);
         if (foundNode != nullptr) {
             return foundNode;
         }

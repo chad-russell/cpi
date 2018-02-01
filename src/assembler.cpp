@@ -257,7 +257,7 @@ void AssemblyLexer::eat() {
 
     if (frontChar == '\n') {
         loc.line += 1;
-        loc.col = 0;
+        loc.col = 1;
 
         srcInfo.lines.push_back(loc.byteIndex + 1);
     }

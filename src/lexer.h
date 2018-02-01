@@ -93,8 +93,8 @@ public:
     bool prefix(string pre);
     bool prefixKeyword(string pre);
     void reportError(Error error);
-    bool isBooleanBinop(LexerTokenType type);
-    bool isBinop(LexerTokenType type);
+//    bool isBooleanBinop(LexerTokenType type);
+//    bool isBinop(LexerTokenType type);
     bool tryEat(LexerToken*token, string pre, LexerTokenType type);
     bool tryEatKeyword(LexerToken*token, string pre, LexerTokenType type);
 };

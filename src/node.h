@@ -6,191 +6,149 @@
 #include "lexer.h"
 #include "util.h"
 
-enum class NodeType {
-    FN_DECL,
-    SYMBOL,
-    DECL,
-    ASSIGN,
-    BINOP,
-    PIPE,
-    DOT,
-    FN_CALL,
-    INT_LITERAL,
-    FLOAT_LITERAL,
-    STRING_LITERAL,
-    NIL_LITERAL,
-    BOOLEAN_LITERAL,
-    UNARY_NEG,
-    RET,
-    IF,
-    WHILE,
-    DECL_PARAM,
-    PARAM,
-    TYPE,
-    DEREF,
-    ADDRESS_OF,
-    STRUCT_LITERAL,
-    UNARY_NOT,
-    MODULE,
-    IMPORT,
-    CAST,
-    ASSERT,
-};
-
-enum class NodeTypekind {
-    NONE,
-    INT_LITERAL,
-    I32,
-    I64,
-    FLOAT_LITERAL,
-    STRING,
-    BOOLEAN,
-    F32,
-    F64,
-    FN,
-    STRUCT,
-    SYMBOL,
-    POINTER,
-};
-
 class Node;
 
-struct fnTypeData {
+struct FnTypeData {
     vector<Node *> params;
     Node *returnType = nullptr;
 };
 
-struct structTypeData {
+struct StructTypeData {
     bool isLiteral;
-    Region name;
+    int64_t atomId;
     vector<Node *> params;
 };
 
-struct pointerTypeData {
+struct PointerTypeData {
     bool isNilLiteral;
     Node *underlyingType;
 };
 
-struct symbolTypeData {
-    Region region;
+struct SymbolTypeData {
+    int64_t atomId;
 };
 
-struct typeData {
+struct TypeData {
     NodeTypekind kind;
-    // union {
-        fnTypeData fnTypeData;
-        structTypeData structTypeData;
-        pointerTypeData pointerTypeData;
-        symbolTypeData symbolTypeData; 
-    // };
+//     union {
+        FnTypeData fnTypeData;
+        StructTypeData structTypeData;
+        PointerTypeData pointerTypeData;
+        SymbolTypeData symbolTypeData;
+//     };
 };
 
-struct declParamData {
-    Region name;
+struct DeclParamData {
+    int64_t atomId;
     Node *type;
     Node *initialValue;
 };
 
-struct fnParamData {
+struct FnParamData {
     Node *name;
     Node *value;
 };
 
-struct moduleData {
-    Region name;
+struct ModuleData {
+    int64_t atomId;
     vector<Node *> decls;
 };
 
-struct importData {
+struct ImportData {
     Node *target;
 };
 
-struct fnDeclData {
-    Region name;
+struct FnDeclData {
+    int64_t atomId;
     vector<Node *> params;
     Node * returnType;
     vector<Node *> body;
     vector<Node *> locals;
     vector<Node *> returns;
+    int64_t stackSize;
     bool isLiteral;
 };
 
-struct declData {
+struct DeclData {
     Node *lvalue;
     Node *type;
     Node *initialValue;
 };
 
-struct assignData {
+struct AssignData {
     Node *lhs;
     Node *rhs;
 };
 
-struct intLiteralData {
+struct IntLiteralData {
     int64_t value;
 };
 
-struct floatLiteralData {
+struct FloatLiteralData {
     double value;
 };
 
-struct boolLiteralData {
+struct BoolLiteralData {
     bool value;
 };
 
-struct fnCallData {
+struct FnCallData {
     Node *fn;
     vector<Node *> params;
 };
 
-struct dotData {
+struct DotData {
     Node *lhs;
     Node *rhs;
 };
 
-struct binopData {
+struct BinopData {
     LexerTokenType type;
     Node *lhs;
     Node *rhs;
 };
 
-struct pipeData {
+struct PipeData {
     Node *lhs;
     Node *rhs;
 };
 
-struct structLiteralData {
+struct StructLiteralData {
     vector<Node *> params;
 };
 
-struct ifData {
+struct IfData {
     Node *condition;
     vector<Node *> stmts;
     vector<Node *> elseStmts;
 };
 
-struct whileData {
+struct WhileData {
     Node *condition;
     vector<Node *> stmts;
 };
 
-struct castData {
+struct CastData {
     Node *type;
     Node *value;
 };
 
-struct retData {
+struct RetData {
     Node *value;
+};
+
+struct SymbolData {
+    int64_t atomId;
 };
 
 class Scope {
 public:
-    unordered_map<string, Node *> symbols;
+    unordered_map<int64_t, Node *> symbols;
     Scope *parent;
 
     Scope(Scope *parent);
 
-    Node *find(Region r);
+    Node *find(int64_t atomId);
 };
 
 class Node {
@@ -202,29 +160,40 @@ public:
     Node *typeInfo;
     Node *resolved;
     NodeType type;
+
     // union {
         Node *nodeData;
-        moduleData moduleData;
-        fnDeclData fnDeclData;
-        declData delcData;
-        assignData assignData;
-        intLiteralData intLiteralData;
-        floatLiteralData floatLiteralData;
-        boolLiteralData boolLiteralData;
-        fnCallData fnCallData;
-        dotData dotData;
-        binopData binopData;
-        pipeData pipeData;
-        declParamData declParamData;
-        fnParamData fnParamData;
-        typeData typeData;
-        structLiteralData structLiteralData;
-        ifData ifData;
-        whileData whileData;
-        importData importData;
-        castData castData;
-        retData retData;
+        ModuleData moduleData;
+        FnDeclData fnDeclData;
+        DeclData declData;
+        AssignData assignData;
+        IntLiteralData intLiteralData;
+        FloatLiteralData floatLiteralData;
+        BoolLiteralData boolLiteralData;
+        FnCallData fnCallData;
+        DotData dotData;
+        BinopData binopData;
+        PipeData pipeData;
+        DeclParamData declParamData;
+        FnParamData fnParamData;
+        TypeData typeData;
+        StructLiteralData structLiteralData;
+        IfData ifData;
+        WhileData whileData;
+        ImportData importData;
+        CastData castData;
+        RetData retData;
+        SymbolData symbolData;
     // };
+
+    bool isUsedInError = false;
+    bool semantic = false;
+    bool gen = false;
+    bool sourceMapStatement = false;
+
+    // todo(chad): better way to store this?
+    vector<unsigned char> bytecode;
+    int64_t localOffset;
 
     Node(NodeTypekind typekind);
     Node(SourceInfo srcInfo, vector<Node *> *allNodes, NodeType type_, Scope *scope_);
