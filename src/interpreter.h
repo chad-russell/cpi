@@ -79,11 +79,9 @@ public:
 
     bool terminated = false;
 
-    int32_t stepCount = 1;
-
-    SourceInfo srcInfo;
-    vector<unsigned long> sourceMap;
-    vector<int32_t> breakpoints = {};
+    SourceMap sourceMap;
+    vector<unsigned long> breakpoints = {};
+    bool continuing = false;
 
     Interpreter(): Interpreter(1024) {}
 

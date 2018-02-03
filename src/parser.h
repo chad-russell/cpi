@@ -8,6 +8,21 @@
 #include "lexer.h"
 #include "node.h"
 
+enum class ShuntingYardType {
+    NODE,
+    OP
+};
+
+struct ShuntingYardData {
+    Node *node;
+    LexerTokenType type;
+};
+
+struct ShuntingYard {
+    ShuntingYardType type;
+    ShuntingYardData data;
+};
+
 struct Parser {
     Lexer *lexer;
     LexerToken last;
@@ -24,6 +39,11 @@ struct Parser {
     LexerToken expect(LexerTokenType type, string expectation);
     void scopeInsert(int64_t atomId, Node *node);
 
+    bool isBinop(LexerTokenType type);
+    bool isBooleanBinop(LexerTokenType type);
+    int8_t operatorPrecedence(LexerTokenType type);
+    Node *unwindPolish(stack<ShuntingYard> *values);
+
     void parseRoot();
     Node *parseTopLevel();
     Node *parseFnDecl();
@@ -33,6 +53,7 @@ struct Parser {
     Node *parseLvalue();
     Node *parseType();
     Node *parseLvalueOrLiteral();
+    Node *parseRvalueSimple();
     Node *parseRvalue();
     Node *parseIntLiteral();
     Node *parseFloatLiteral();

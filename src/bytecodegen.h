@@ -7,7 +7,7 @@
 class BytecodeGen {
 public:
     vector<unsigned char> instructions;
-    vector<unsigned long> sourceMap;
+    SourceMap sourceMap;
 
     void gen(Node *node);
 };

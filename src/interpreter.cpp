@@ -5,111 +5,109 @@
 using namespace std;
 
 void Interpreter::interpret() {
-    while (pc < instructions.size() && !terminated) {
-        stepCount -= 1;
+    auto mp = new MnemonicPrinter();
+    mp->instructions = this->instructions;
 
-        auto found = find(breakpoints.begin(), breakpoints.end(), pc);
-        if (stepCount == 0 || found < breakpoints.end()) {
-            stepCount = 1;
+    while (pc < instructions.size() && !terminated) {
+        auto stmtStopIf = find_if(sourceMap.statements.begin(), sourceMap.statements.end(),
+                                  [this](const SourceMapStatement &s) { return s.instIndex == pc; });
+        auto stmtStop = stmtStopIf != sourceMap.statements.end();
+
+        auto breakStopIf = find(breakpoints.begin(), breakpoints.end(), pc);
+        auto breakStop = breakStopIf != breakpoints.end();
+
+        auto shouldStop = (stmtStop && !continuing) || breakStop;
+
+        auto srcInfo = sourceMap.sourceInfo;
+
+        while (shouldStop && !terminated) {
+            continuing = false;
 
             cout << "> ";
 
             string line;
             getline(cin, line);
             while (line != "" && !terminated) {
-                        if (line == "stack") {
-                            cout << "[";
-                            for (auto i = 0; i < sp; i++) {
-                                cout << static_cast<int32_t>(stack[i]);
-                                if (i < sp - 1) { cout << ", "; }
-                            }
-                            cout << "]";
-                            cout << endl;
-                        } else if (line == "frame") {
-                            cout << "[";
-                            for (auto i = bp; i < sp; i++) {
-                                cout << static_cast<int32_t>(stack[i]);
-                                if (i < sp - 1) { cout << ", "; }
-                            }
-                            cout << "]";
-                            cout << endl;
-                        } else if (startsWith(line, "break ")) {
-                            int32_t bNum;
-                            sscanf(line.c_str(), "break %d", &bNum);
-                            breakpoints.push_back(bNum);
-                        } else if (line == "breakRemove") {
-                            breakpoints = {};
-                        } else if (line == "inst") {
-                            if (sourceMap.size() > 0) {
-                                auto index = 0;
-                                while (index + 5 < sourceMap.size()) {
-                                    if (sourceMap[index + 4] == pc) {
+                if (line == "stack") {
+                    cout << "[";
+                    for (auto i = 0; i < sp; i++) {
+                        cout << static_cast<int32_t>(stack[i]);
+                        if (i < sp - 1) { cout << ", "; }
+                    }
+                    cout << "]";
+                    cout << endl;
+                } else if (line == "frame") {
+                    cout << "[";
+                    for (auto i = bp; i < sp; i++) {
+                        cout << static_cast<int32_t>(stack[i]);
+                        if (i < sp - 1) { cout << ", "; }
+                    }
+                    cout << "]";
+                    cout << endl;
+                } else if (startsWith(line, "break ")) {
+                    int32_t bNum;
+                    sscanf(line.c_str(), "break %d", &bNum);
 
-                                        // get byte corresponding to start
-                                        auto startByte = srcInfo.lines[sourceMap[index]] +
-                                                         sourceMap[index + 1];
-
-                                        // get byte corresponding to end
-                                        auto endByte = srcInfo.lines[sourceMap[index + 2]] +
-                                                       sourceMap[index + 3];
-
-                                        cout << srcInfo.source.substr(startByte, endByte - startByte) << endl;
-                                    }
-
-                                    index += 5;
-                                }
-                            } else {
-                                cout << AssemblyLexer::instructionStrings[instructions[pc]] << endl;
-                            }
-                        } else if (line == "lines") {
-                            auto index = 0;
-
-                            vector<unsigned long> linesToPrint;
-
-                            while (index + 5 < sourceMap.size()) {
-                                if (sourceMap[index + 4] == pc) {
-                                    linesToPrint.push_back(sourceMap[index]);
-                                }
-                                index += 5;
-                            }
-
-                            if (linesToPrint.size() == 0) {
-                                break;
-                            }
-
-                            auto endLine = linesToPrint.at(linesToPrint.size() - 1) + 3;
-                            if (endLine > srcInfo.lines.size() - 1) {
-                                endLine = srcInfo.lines.size() - 1;
-                            }
-
-                            for (auto l = linesToPrint[0]; l < endLine; l++) {
-                                // get byte corresponding to start
-                                auto startByte = srcInfo.lines[l];
-
-                                // get byte corresponding to end
-                                unsigned long endByte;
-                                if (srcInfo.lines.size() < l + 1) {
-                                    endByte = srcInfo.source.size();
-                                } else {
-                                    endByte = srcInfo.lines[l + 1] - 1;
-                                }
-
-                                cout << srcInfo.source.substr(startByte, endByte - startByte) << endl;
-                            }
-
-                            index += 5;
-                        } else if (line == "continue") {
-                            stepCount = -1;
-                            break;
-                        } else if (line == "terminate" || line == "q" || line == "quit") {
-                            terminated = true;
-                            break;
-                        } else {
-                            cout << "unrecognized command" << endl;
+                    // find the statement which is on this line
+                    for (auto stmt : sourceMap.statements) {
+                        if (stmt.startLine == bNum) {
+                            breakpoints.push_back(stmt.instIndex);
                         }
+                    }
+                } else if (line == "breakRemove") {
+                    breakpoints = {};
+                } else if (line == "location") {
+                    for (auto stmt : sourceMap.statements) {
+                        if (stmt.instIndex == pc) {
+                            cout << stmt.startLine << endl;
+                        }
+                    }
+                } else if (line == "stmt" || line == "line") {
+                    for (auto stmt : sourceMap.statements) {
+                        if (stmt.instIndex == pc) {
+                            // get byte corresponding to start
+                            auto startByte = stmt.startByte;
 
-                        cout << "> ";
-                        getline(cin, line);
+                            // get byte corresponding to end
+                            auto endByte = stmt.endByte;
+
+                            cout << srcInfo.source.substr(startByte, endByte - startByte) << endl;
+                        }
+                    }
+                } else if (line == "asm") {
+                    // print all insts between this stmt and the next one
+                    auto firstIndex = pc;
+                    auto lastIndex = pc;
+                    for (auto i = 0; i < sourceMap.statements.size(); i++) {
+                        auto stmt = sourceMap.statements[i];
+                        if (stmt.instIndex == pc) {
+                            if (sourceMap.statements.size() > i) {
+                                lastIndex = (int32_t) sourceMap.statements[i + 1].instIndex;
+                            } else {
+                                lastIndex = (int32_t) instructions.size();
+                            }
+
+                            break;
+                        }
+                    }
+
+                    cout << mp->debugString(firstIndex, lastIndex);
+                } else if (line == "step") {
+                    shouldStop = false;
+                    break;
+                } else if (line == "continue") {
+                    shouldStop = false;
+                    continuing = true;
+                    break;
+                } else if (line == "terminate" || line == "q" || line == "quit") {
+                    terminated = true;
+                    break;
+                } else {
+                    cout << "unrecognized command" << endl;
+                }
+
+                cout << "> ";
+                getline(cin, line);
             }
         }
 
@@ -117,6 +115,8 @@ void Interpreter::interpret() {
             step();
         }
     }
+
+    delete mp;
 }
 
 void Interpreter::step() {

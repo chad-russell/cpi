@@ -30,14 +30,21 @@ void BytecodeGen::gen(Node *node) {
     node->gen = true;
 
     if (node->sourceMapStatement) {
-        vector<unsigned long> moreSourceMap = {node->region.start.line, node->region.start.col,
-                                               node->region.end.line, node->region.end.col,
-                                               instructions.size()};
-        sourceMap.insert(sourceMap.end(), moreSourceMap.begin(), moreSourceMap.end());
+        sourceMap.statements.push_back(SourceMapStatement{
+                node->region.start.line,
+                node->region.start.byteIndex,
+                node->region.end.byteIndex,
+                instructions.size()
+        });
     }
 
     switch (node->type) {
         case NodeType::FN_DECL: {
+
+            auto stackSize = static_cast<int32_t>(node->fnDeclData.stackSize);
+            append(instructions, Instruction::BUMPSP);
+            append(instructions, toBytes(stackSize));
+
             for (auto stmt : node->fnDeclData.body) {
                 gen(stmt);
                 append(instructions, stmt->bytecode);
@@ -54,9 +61,19 @@ void BytecodeGen::gen(Node *node) {
             append(node->bytecode, Instruction::EXIT);
         } break;
         case NodeType::INT_LITERAL: {
-            append(node->bytecode, Instruction::CONSTI32);
-            auto litData = static_cast<int32_t>(node->intLiteralData.value);
-            append(node->bytecode, toBytes(litData));
+            switch (node->typeInfo->typeData.kind) {
+                case NodeTypekind::I32: {
+                    append(node->bytecode, Instruction::CONSTI32);
+                    auto litData = static_cast<int32_t>(node->intLiteralData.value);
+                    append(node->bytecode, toBytes(litData));
+                } break;
+                case NodeTypekind::I64: {
+                    append(node->bytecode, Instruction::CONSTI64);
+                    auto litData = node->intLiteralData.value;
+                    append(node->bytecode, toBytes(litData));
+                } break;
+                default: assert(false);
+            }
         } break;
         case NodeType::DECL: {
             auto data = node->declData;
@@ -76,8 +93,44 @@ void BytecodeGen::gen(Node *node) {
         case NodeType::SYMBOL: {
             auto resolved = resolveNode(node);
             auto localOffset = resolved->localOffset;
-            append(node->bytecode, Instruction::I32);
+            switch (resolved->typeInfo->typeData.kind) {
+                case NodeTypekind::I32: {
+                    append(node->bytecode, Instruction::I32);
+                } break;
+                case NodeTypekind::I64: {
+                    append(node->bytecode, Instruction::I64);
+                } break;
+                default: assert(false);
+            }
             append(node->bytecode, toBytes(static_cast<int32_t>(localOffset)));
+        } break;
+        case NodeType::BINOP: {
+            gen(node->binopData.lhs);
+            gen(node->binopData.rhs);
+
+            switch (node->binopData.type) {
+                case LexerTokenType::ADD: {
+                    auto kind = node->typeInfo->typeData.kind;
+                    switch (kind) {
+                        case NodeTypekind::I32: {
+                            append(instructions, Instruction::ADDI32);
+                            append(node->bytecode, Instruction::I32);
+                        } break;
+                        case NodeTypekind::I64: {
+                            append(instructions, Instruction::ADDI64);
+                            append(node->bytecode, Instruction::I64);
+                        } break;
+                        default: assert(false);
+                    }
+
+                    append(instructions, node->binopData.lhs->bytecode);
+                    append(instructions, node->binopData.rhs->bytecode);
+
+                    append(instructions, toBytes(static_cast<int32_t>(node->localOffset)));
+                    append(node->bytecode, toBytes(static_cast<int32_t>(node->localOffset)));
+                } break;
+                default: assert(false);
+            }
         } break;
         default: assert(false);
     }

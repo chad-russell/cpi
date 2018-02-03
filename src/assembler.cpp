@@ -20,7 +20,7 @@ AssemblyLexer::AssemblyLexer(string fileName)  {
     fileBytes.assign((istreambuf_iterator<char>(t)),
                 istreambuf_iterator<char>());
 
-    srcInfo = {fileName, fileBytes, {0}};
+    sourceMap.sourceInfo = {fileName, fileBytes, {0}};
     lastLoc = {0, 0, 0};
     loc = {0, 0, 0};
 
@@ -110,15 +110,15 @@ void AssemblyLexer::popFront() {
     Token newNext;
 
     // ignore whitespace
-    while (loc.byteIndex < srcInfo.source.length() && isspace(srcInfo.source[loc.byteIndex])) {
+    while (loc.byteIndex < sourceMap.sourceInfo.source.length() && isspace(sourceMap.sourceInfo.source[loc.byteIndex])) {
         eat();
     }
     lastLoc = loc;
 
     // Comment
-    if (startsWith(srcInfo.source, loc.byteIndex, "--")) {
+    if (startsWith(sourceMap.sourceInfo.source, loc.byteIndex, "--")) {
         // eat until newline
-        while (loc.byteIndex < srcInfo.source.length() && srcInfo.source[loc.byteIndex] != '\n') {
+        while (loc.byteIndex < sourceMap.sourceInfo.source.length() && sourceMap.sourceInfo.source[loc.byteIndex] != '\n') {
             eat();
         }
 
@@ -130,13 +130,13 @@ void AssemblyLexer::popFront() {
     }
 
     // ignore whitespace (again)
-    while (loc.byteIndex < srcInfo.source.length() && isspace(srcInfo.source[loc.byteIndex])) {
+    while (loc.byteIndex < sourceMap.sourceInfo.source.length() && isspace(sourceMap.sourceInfo.source[loc.byteIndex])) {
         eat();
     }
     lastLoc = loc;
 
     // look for EOF
-    if (loc.byteIndex >= srcInfo.source.length()) {
+    if (loc.byteIndex >= sourceMap.sourceInfo.source.length()) {
         newNext.type = TokenType::EOF_;
         argCount = 0;
         popFrontFinalize(newNext, {});
@@ -148,7 +148,7 @@ void AssemblyLexer::popFront() {
     for (auto memberName : tokenTypeStrings) {
         auto member = nameToTokenType.at(memberName);
 
-        if (startsWith(srcInfo.source, loc.byteIndex, memberName)) {
+        if (startsWith(sourceMap.sourceInfo.source, loc.byteIndex, memberName)) {
             auto startIndex = loc.byteIndex;
 
             newNext.type = member;
@@ -157,7 +157,7 @@ void AssemblyLexer::popFront() {
                 eat();
             }
 
-            auto newInst = nameToInstruction.at(srcInfo.source.substr(startIndex, memberName.length()));
+            auto newInst = nameToInstruction.at(sourceMap.sourceInfo.source.substr(startIndex, memberName.length()));
             popFrontFinalize(newNext, {static_cast<unsigned char>(newInst)});
 
             return;
@@ -166,12 +166,12 @@ void AssemblyLexer::popFront() {
 
     // maybe it's an integer or floating point literal
     auto startIndex = loc.byteIndex;
-    while (srcInfo.source[loc.byteIndex] == '-'
-        || isnumber(srcInfo.source[loc.byteIndex]) 
-        || srcInfo.source[loc.byteIndex] == '.') {
+    while (sourceMap.sourceInfo.source[loc.byteIndex] == '-'
+        || isnumber(sourceMap.sourceInfo.source[loc.byteIndex]) 
+        || sourceMap.sourceInfo.source[loc.byteIndex] == '.') {
         eat();
     }
-    auto toParse = srcInfo.source.substr(startIndex, loc.byteIndex - startIndex);
+    auto toParse = sourceMap.sourceInfo.source.substr(startIndex, loc.byteIndex - startIndex);
     if (toParse.find('.') != string::npos) {
         auto parsed = stod(toParse);
 
@@ -223,25 +223,27 @@ void AssemblyLexer::popFront() {
     cout << "could not parse token at byteIndex "
          << loc.byteIndex
          << "("
-         << srcInfo.source.substr(loc.byteIndex, 10)
+         << sourceMap.sourceInfo.source.substr(loc.byteIndex, 10)
          << ")...";
 
     assert(false);
 }
 
 void AssemblyLexer::popFrontFinalize(Token newNext, vector<unsigned char> newInst) {
-    newNext.region = {srcInfo, lastLoc, loc};
+    newNext.region = {sourceMap.sourceInfo, lastLoc, loc};
     next = newNext;
     instructions.insert(instructions.end(), newInst.begin(), newInst.end());
 
     if (argCount == 0) {
-        vector<unsigned long> moreSourceMap = {savedLoc.line, savedLoc.col,
-                                               newNext.region.end.line, newNext.region.end.col,
-                                               lastInstStart};
-        sourceMap.insert(sourceMap.end(), moreSourceMap.begin(), moreSourceMap.end());
+        sourceMap.statements.push_back(SourceMapStatement{
+                savedLoc.line,
+                savedLoc.byteIndex,
+                newNext.region.end.byteIndex,
+                lastInstStart
+        });
 
         // ignore whitespace
-        while (loc.byteIndex < srcInfo.source.length() && isspace(srcInfo.source[loc.byteIndex])) {
+        while (loc.byteIndex < sourceMap.sourceInfo.source.length() && isspace(sourceMap.sourceInfo.source[loc.byteIndex])) {
             eat();
         }
         savedLoc = loc;
@@ -253,13 +255,13 @@ void AssemblyLexer::popFrontFinalize(Token newNext, vector<unsigned char> newIns
 }
 
 void AssemblyLexer::eat() {
-    auto frontChar = srcInfo.source[loc.byteIndex];
+    auto frontChar = sourceMap.sourceInfo.source[loc.byteIndex];
 
     if (frontChar == '\n') {
         loc.line += 1;
         loc.col = 1;
 
-        srcInfo.lines.push_back(loc.byteIndex + 1);
+        sourceMap.sourceInfo.lines.push_back(loc.byteIndex + 1);
     }
     else {
         loc.col += 1;
@@ -375,6 +377,18 @@ string MnemonicPrinter::debugString() {
     return instructionString;
 }
 
+string MnemonicPrinter::debugString(int32_t startPc, int32_t endPc) {
+    instructionString = "";
+
+    pc = startPc;
+    while (pc < endPc) {
+        step();
+    }
+
+    return instructionString;
+}
+
+
 void MnemonicPrinter::step() {
     auto inst = AssemblyLexer::instructionStrings[instructions[pc]];
     pc += 1;
@@ -488,7 +502,8 @@ void MnemonicPrinter::readTypeAndInt()
         || endsWith(inst, "I64")) {
         instructionString.append(to_string(consume<int32_t>()));
     } else {
-        assert(false);
+        instructionString.append("<<<ERROR>>>");
+//        assert(false);
     }
 }
 

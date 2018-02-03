@@ -78,6 +78,7 @@ Node *Parser::parseTopLevel() {
         }
 
         reportError("Expected top level function declaration");
+        exit(1);
 }
 
 Node *Parser::parseFnDecl() {
@@ -196,6 +197,30 @@ Node *Parser::parseScopedStmt() {
         return decl;
     }
 
+    // declaration-assignment combo
+    if (lexer->front.type == LexerTokenType::COLON_EQ) {
+        // cannot declaration-assign anything but a symbol
+        if (lvalue->type != NodeType::SYMBOL) {
+            ostringstream s("cannot assign to ");
+            s << lvalue->type;
+        }
+
+        popFront();
+        auto rvalue = parseRvalue();
+
+        auto decl = new Node(lexer->srcInfo, &allNodes, NodeType::DECL, scopes.top());
+        currentFnDecl->fnDeclData.locals.push_back(decl);
+
+        decl->declData.lvalue = lvalue;
+        decl->declData.initialValue = rvalue;
+
+        decl->region = {lexer->srcInfo, saved, last.region.end};
+
+        scopeInsert(lvalue->symbolData.atomId, decl);
+
+        return decl;
+    }
+
     // assignment
     if (lexer->front.type == LexerTokenType::EQ) {
         // cannot assign anything but a symbol
@@ -253,6 +278,7 @@ Node *Parser::parseLvalue() {
             s << savedType;
             s << " is not an lvalue!";
             reportError(s.str());
+            exit(1);
         }
     }
 }
@@ -297,8 +323,48 @@ Node *Parser::parseLvalueOrLiteral() {
     return symbol;
 }
 
-Node *Parser::parseRvalue() {
+Node *Parser::parseRvalueSimple() {
     return parseLvalueOrLiteral();
+}
+
+Node *Parser::parseRvalue() {
+    stack<ShuntingYard> operatingStack;
+    stack<ShuntingYard> output;
+
+    ShuntingYardData dataInit;
+    dataInit.node = parseRvalueSimple();
+
+    auto sh = ShuntingYard{ShuntingYardType::NODE, dataInit};
+    output.push(sh);
+
+    auto type = lexer->front.type;
+    while (isBinop(type)) {
+        popFront();
+
+        // keep popping while we find operators with a smaller precedence than what we're pushing
+        while (!operatingStack.empty()
+                && operatingStack.top().type == ShuntingYardType::OP
+                && operatorPrecedence(operatingStack.top().data.type) >= operatorPrecedence(type)) {
+            output.push(operatingStack.top());
+            operatingStack.pop();
+        }
+
+        sh = ShuntingYard{ShuntingYardType::OP, {nullptr, type}};
+        operatingStack.push(sh);
+
+        ShuntingYardData dataNode = {parseRvalueSimple()};
+        sh = ShuntingYard{ShuntingYardType::NODE, {dataNode}};
+        output.push(sh);
+
+        type = lexer->front.type;
+    }
+
+    while (!operatingStack.empty()) {
+        output.push(operatingStack.top());
+        operatingStack.pop();
+    }
+
+    return unwindPolish(&output);
 }
 
 Node *Parser::parseIntLiteral() {
@@ -333,4 +399,76 @@ Node *Parser::parseFloatLiteral() {
     node->floatLiteralData.value = stod(s.str());
 
     return node;
+}
+
+bool Parser::isBinop(LexerTokenType type) {
+    return isBooleanBinop(type)
+           || type == LexerTokenType::ADD
+           || type == LexerTokenType::SUB
+           || type == LexerTokenType::MUL
+           || type == LexerTokenType::DIV
+           || type == LexerTokenType::VERTICAL_BAR;
+}
+
+bool Parser::isBooleanBinop(LexerTokenType type) {
+    return type == LexerTokenType::EQ_EQ
+           || type == LexerTokenType::NE
+           || type == LexerTokenType::LT
+           || type == LexerTokenType::GT
+           || type == LexerTokenType::LE
+           || type == LexerTokenType::GE
+           || type == LexerTokenType::AND
+           || type == LexerTokenType::OR;
+}
+
+int8_t Parser::operatorPrecedence(LexerTokenType type) {
+    switch (type) {
+        case LexerTokenType::OR:
+        case LexerTokenType::AND:
+            return 1;
+
+        case LexerTokenType::EQ_EQ:
+        case LexerTokenType::NE:
+        case LexerTokenType::LE:
+        case LexerTokenType::GE:
+        case LexerTokenType::LT:
+        case LexerTokenType::GT:
+            return 2;
+
+        case LexerTokenType::SUB:
+        case LexerTokenType::ADD:
+            return 3;
+
+        case LexerTokenType::DIV:
+        case LexerTokenType::MUL:
+            return 4;
+
+        case LexerTokenType::VERTICAL_BAR:
+            return 5;
+
+        default: assert(false);
+    }
+}
+
+Node *Parser::unwindPolish(stack<ShuntingYard> *values) {
+    auto top = values->top();
+    values->pop();
+
+    if (top.type == ShuntingYardType::NODE) {
+        return top.data.node;
+    } else {
+        Node *binop = new Node(lexer->srcInfo, &allNodes, NodeType::BINOP, scopes.top());
+
+        binop->binopData.type = top.data.type;
+        binop->binopData.rhs = unwindPolish(values);
+        binop->binopData.lhs = unwindPolish(values);
+
+        binop->region = {lexer->srcInfo,
+                         binop->binopData.lhs->region.start,
+                         binop->binopData.rhs->region.end};
+
+        currentFnDecl->fnDeclData.locals.push_back(binop);
+
+        return binop;
+    }
 }

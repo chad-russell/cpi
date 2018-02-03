@@ -29,6 +29,8 @@ struct SymbolTypeData {
 };
 
 struct TypeData {
+    // todo(chad): size?
+
     NodeTypekind kind;
 //     union {
         FnTypeData fnTypeData;

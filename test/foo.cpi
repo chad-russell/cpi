@@ -1,5 +1,4 @@
-fn main() i32 {
-    a : i32 = 19
-    b : i32 = a
-    ret b
+fn main() {
+    a := 19 + 1
+    ret a
 }

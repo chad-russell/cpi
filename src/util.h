@@ -182,6 +182,17 @@ ostream &operator<<(ostream &os, Colored<T> colored) {
     return os << "m" << colored.value << "\e[0m";
 }
 
+struct SourceMapStatement {
+    unsigned long startLine;
+    unsigned long startByte;
+    unsigned long endByte;
+    unsigned long instIndex;
+};
+
+struct SourceMap {
+    SourceInfo sourceInfo;
+    vector<SourceMapStatement> statements;
+};
 
 /////////////
 //  ATOMS  //

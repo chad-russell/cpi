@@ -118,14 +118,12 @@ public:
     Location lastLoc;
     Location loc;
 
-    SourceInfo srcInfo;
-
     vector<unsigned char> instructions;
 
     Location savedLoc;
     unsigned long lastInstStart;
     int argCount;
-    vector<unsigned long> sourceMap;
+    SourceMap sourceMap;
 
     const static vector<string> tokenTypeStrings;
     unordered_map<string, TokenType> nameToTokenType;
@@ -155,6 +153,7 @@ public:
     string instructionString = "";
 
     string debugString();
+    string debugString(int32_t startPc, int32_t endPc);
     void step();
     void readTypeAndIntOrFloat();
     void readTypeAndInt();
