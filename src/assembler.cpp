@@ -9,6 +9,21 @@
 
 using namespace std;
 
+unordered_map<string, TokenType> AssemblyLexer::nameToTokenType = {};
+unordered_map<string, Instruction> AssemblyLexer::nameToInstruction = {};
+
+void AssemblyLexer::populateMaps() {
+    for (unsigned char i = 0; i < AssemblyLexer::tokenTypeStrings.size(); i++) {
+        nameToTokenType.insert({AssemblyLexer::tokenTypeStrings[i],
+                                static_cast<TokenType>(i)});
+    }
+
+    for (unsigned char i = 0; i < AssemblyLexer::instructionStrings.size(); i++) {
+        nameToInstruction.insert({AssemblyLexer::instructionStrings[i],
+                                  static_cast<Instruction>(i)});
+    }
+}
+
 AssemblyLexer::AssemblyLexer(string fileName)  {
     ifstream t(fileName);
     string fileBytes;
@@ -23,18 +38,6 @@ AssemblyLexer::AssemblyLexer(string fileName)  {
     sourceMap.sourceInfo = {fileName, fileBytes, {0}};
     lastLoc = {0, 0, 0};
     loc = {0, 0, 0};
-
-    nameToTokenType = {};
-    for (unsigned char i = 0; i < AssemblyLexer::tokenTypeStrings.size(); i++) {
-        nameToTokenType.insert({AssemblyLexer::tokenTypeStrings[i],
-                                static_cast<TokenType>(i)});
-    }
-
-    nameToInstruction = {};
-    for (unsigned char i = 0; i < AssemblyLexer::instructionStrings.size(); i++) {
-        nameToInstruction.insert({AssemblyLexer::instructionStrings[i],
-                                  static_cast<Instruction>(i)});
-    }
 
     popFront();
     popFront();
@@ -460,7 +463,8 @@ void MnemonicPrinter::step() {
     } else if (startsWith(inst, "BUMPSP") || startsWith(inst, "JUMP") || startsWith(inst, "CALL")) {
         instructionString.append(inst);
         instructionString.append(" ");
-        instructionString.append(to_string(consume<int32_t>()));
+        auto callPc = consume<int32_t>();
+        instructionString.append(to_string(callPc));
     } else {
         instructionString.append(inst);
     }

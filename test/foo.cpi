@@ -1,4 +1,11 @@
 fn main() {
-    a := 19 + 1
-    ret a
+    ret 3 + foo()
+}
+
+fn foo() {
+    ret 3 + bar()
+}
+
+fn bar() {
+    ret 3
 }

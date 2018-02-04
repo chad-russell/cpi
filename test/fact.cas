@@ -8,13 +8,13 @@ EXIT
 -- fact
 BUMPSP 4 -- return size = 4 bytes
 BUMPSP 4 -- 1 local, 4 bytes
+BUMPSP 4 -- one param
 SLEI32 I32 -12 CONSTI32 1 4
-JUMPIF I8 4 70 81
+JUMPIF I8 4 75 86
 -- A
 STORE 0 CONSTI32 1
 RET
 -- B
-BUMPSP 4 -- one param
 SUBI32 I32 -12 CONSTI32 1 8
 CALL 31
 MULI32 I32 -12 I32 20 0

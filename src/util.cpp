@@ -193,5 +193,4 @@ int64_t AtomTable::insert(Region r) {
     AtomTable::current->atoms.insert({sourceStr, tableIndex});
     AtomTable::current->backwardAtoms.push_back(sourceStr);
     return tableIndex;
-
 }

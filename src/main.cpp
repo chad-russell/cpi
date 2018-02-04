@@ -52,6 +52,7 @@ int main(int argc, char **argv) {
     nodeId = 0;
 
     AtomTable();
+    AssemblyLexer::populateMaps();
 
     // ./cpi [-o outputFile] [--print-asm] [--debug] inputFile
     static struct option longOptions[] = {
@@ -109,8 +110,21 @@ int main(int argc, char **argv) {
         semantic->resolveTypes(parser->mainFn);
 
         auto gen = new BytecodeGen();
+        gen->isMainFn = true;
         gen->sourceMap.sourceInfo = lexer->srcInfo;
         gen->gen(parser->mainFn);
+        while (!gen->toProcess.empty()) {
+            gen->isMainFn = false;
+            gen->gen(gen->toProcess.front());
+            gen->toProcess.pop();
+        }
+        for (auto fixup : gen->fixups) {
+            // look, ma! I'm a linker!
+            auto node = fixup.second;
+            assert(node->type == NodeType::FN_DECL);
+
+            memcpy(&gen->instructions[fixup.first], &node->fnDeclData.instOffset, sizeof(int32_t));
+        }
 
         interp->instructions = gen->instructions;
         interp->sourceMap = gen->sourceMap;
@@ -155,6 +169,12 @@ int main(int argc, char **argv) {
         }
         interp->instructions = instructions;
         interp->interpret();
+
+//        cout << "STACK:" << endl;
+//        for (auto i = 0; i < interp->stack.size(); i++) {
+//            cout << static_cast<int32_t>(interp->stack[i]) << ", ";
+//        }
+//        cout << endl;
         cout << interp->readFromStack<int32_t>(0) << endl;
     }
 

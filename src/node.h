@@ -68,6 +68,7 @@ struct FnDeclData {
     vector<Node *> locals;
     vector<Node *> returns;
     int64_t stackSize;
+    unsigned long instOffset;
     bool isLiteral;
 };
 

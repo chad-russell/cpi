@@ -62,7 +62,7 @@ enum class TokenType : unsigned char {
 
 enum class Instruction : unsigned char {
     // I8 math
-    ADDI8, SUBI8, MULI8, UDIVI8, SDIVI8, UREMI8, SREMI8, 
+    ADDI8, SUBI8, MULI8, UDIVI8, SDIVI8, UREMI8, SREMI8,
     EQI8, NEQI8, UGTI8, SGTI8, UGEI8, SGEI8, ULTI8, SLTI8, ULEI8, SLEI8,
 
     // I16 math
@@ -126,12 +126,13 @@ public:
     SourceMap sourceMap;
 
     const static vector<string> tokenTypeStrings;
-    unordered_map<string, TokenType> nameToTokenType;
+    static unordered_map<string, TokenType> nameToTokenType;
 
     const static vector<string> instructionStrings;
-    unordered_map<string, Instruction> nameToInstruction;
+    static unordered_map<string, Instruction> nameToInstruction;
 
     AssemblyLexer(string fileName);
+    static void populateMaps();
 
     bool empty();
 

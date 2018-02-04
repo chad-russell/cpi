@@ -115,11 +115,11 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
     // lock it down instead of leaving it open
     if (data->returnType != nullptr
         && data->returnType->typeData.kind == NodeTypekind::INT_LITERAL) {
-        data->returnType->typeData.kind = NodeTypekind::I32;
+        data->returnType->typeData.kind = NodeTypekind::I64;
     }
     if (data->returnType != nullptr
         && data->returnType ->typeData.kind == NodeTypekind::FLOAT_LITERAL) {
-        data->returnType->typeData.kind = NodeTypekind::F32;
+        data->returnType->typeData.kind = NodeTypekind::F64;
     }
 
     node->typeInfo->typeData.fnTypeData.returnType = data->returnType;
@@ -201,7 +201,8 @@ void resolveSymbol(Semantic *semantic, Node *node) {
         return;
     }
 
-    assert(node->resolved->type == NodeType::DECL);
+    assert(node->resolved->type == NodeType::DECL
+           || node->resolved->type == NodeType::FN_DECL);
     semantic->resolveTypes(node->resolved);
     node->typeInfo = node->resolved->typeInfo;
 }
@@ -245,6 +246,13 @@ void resolveBinop(Semantic *semantic, Node *node) {
     node->typeInfo = node->binopData.lhs->typeInfo;
 }
 
+void resolveFnCall(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->fnCallData.fn);
+    auto resolvedFn = resolve(node->fnCallData.fn);
+    assert(resolvedFn->type == NodeType::FN_DECL);
+    node->typeInfo = resolvedFn->typeInfo->typeData.fnTypeData.returnType;
+}
+
 void Semantic::resolveTypes(Node *node) {
     if (node == nullptr) { return; }
 
@@ -275,6 +283,9 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::BINOP: {
             resolveBinop(this, node);
+        } break;
+        case NodeType::FN_CALL: {
+            resolveFnCall(this, node);
         } break;
         default: assert(false);
     }

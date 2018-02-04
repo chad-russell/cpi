@@ -40,7 +40,7 @@ LexerToken Parser::expect(LexerTokenType type, string expectation) {
 }
 
 void Parser::scopeInsert(int64_t atomId, Node *node) {
-    Scope *_scope = scopes.top();
+    auto _scope = scopes.top();
 
     auto found = _scope->symbols.find(atomId);
     if (found != _scope->symbols.end()) {
@@ -49,7 +49,7 @@ void Parser::scopeInsert(int64_t atomId, Node *node) {
         reportError(s.str());
     }
 
-    _scope->symbols[atomId] = node;
+    _scope->symbols.insert({atomId, node});
 }
 
 void Parser::parseRoot() {
@@ -137,6 +137,7 @@ Node *Parser::parseFnDecl() {
 
     decl->region.end = end.region.end;
 
+    scopes.pop();
     currentFnDecl = savedCurrentFnDecl;
 
     return decl;
@@ -258,8 +259,47 @@ Node *Parser::parseRet() {
     return ret;
 }
 
-Node *parseLvalueHelper(Node *symbol, Location saved) {
-    return symbol;
+Node *Parser::buildDots(stack<Node *> rvalues) {
+    auto top = rvalues.top();
+
+    assert(!rvalues.empty());
+
+    if (rvalues.size() == 1) {
+        return top;
+    }
+    else if (top->type == NodeType::FN_CALL) {
+        rvalues.pop();
+
+        // create a new node (but reuse memory from top)
+        top->type = NodeType::FN_CALL;
+
+        top->fnCallData.fn = buildDots(rvalues);
+
+        top->region = {lexer->srcInfo, top->fnCallData.fn->region.start, top->region.end};
+        return top;
+    }
+
+    top = rvalues.top();
+    reportError("expected function call or symbol");
+    exit(-1);
+}
+
+Node *Parser::parseLvalueHelper(Node *symbol, Location saved) {
+    stack<Node *> rvalues;
+    rvalues.push(symbol);
+
+    while (lexer->front.type == LexerTokenType::LPAREN) {
+        auto fnCall = parseFnCall();
+        rvalues.push(fnCall);
+    }
+
+    if (rvalues.size() == 1) {
+        return rvalues.top();
+    }
+
+    auto dot = buildDots(rvalues);
+    dot->region = {lexer->srcInfo, saved, last.region.end};
+    return dot;
 }
 
 Node *Parser::parseLvalue() {
@@ -308,7 +348,27 @@ Node *Parser::parseType() {
     return type;
 }
 
+Node *parseLvalueHelper(Parser *parser, Node *symbol, Location start) {
+    stack<Node *> rvalues;
+    rvalues.push(symbol);
+
+    while (parser->lexer->front.type == LexerTokenType::LPAREN) {
+        auto fnCall = parser->parseFnCall();
+        rvalues.push(fnCall);
+    }
+
+    if (rvalues.size() == 1) {
+        return rvalues.top();
+    }
+
+    // build dots
+    auto dot = parser->buildDots(rvalues);
+    dot->region = Region{parser->lexer->srcInfo, start, parser->last.region.end};
+    return dot;
+}
+
 Node *Parser::parseLvalueOrLiteral() {
+    auto saved = lexer->front.region.start;
     Node *symbol;
 
     if (lexer->front.type == LexerTokenType::INT_LITERAL) {
@@ -320,7 +380,7 @@ Node *Parser::parseLvalueOrLiteral() {
     }
 
     assert(symbol != nullptr);
-    return symbol;
+    return parseLvalueHelper(symbol, saved);
 }
 
 Node *Parser::parseRvalueSimple() {
@@ -471,4 +531,15 @@ Node *Parser::unwindPolish(stack<ShuntingYard> *values) {
 
         return binop;
     }
+}
+
+Node *Parser::parseFnCall() {
+    auto call = new Node(lexer->srcInfo, &allNodes, NodeType::FN_CALL, scopes.top());
+
+    popFront();
+//    parse_params(parser, call->data.fn_call_data.params);
+    expect(LexerTokenType::RPAREN, ")");
+
+    call->region.end = last.region.end;
+    return call;
 }

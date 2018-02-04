@@ -57,6 +57,9 @@ struct Parser {
     Node *parseRvalue();
     Node *parseIntLiteral();
     Node *parseFloatLiteral();
+    Node *parseLvalueHelper(Node *symbol, Location saved);
+    Node *parseFnCall();
+    Node *buildDots(stack<Node *> rvalues);
 };
 
 #endif // PARSER_H
