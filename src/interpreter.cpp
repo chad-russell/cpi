@@ -4,6 +4,20 @@
 
 using namespace std;
 
+void printCurrentStmt(Interpreter *interp) {
+    for (auto stmt : interp->sourceMap.statements) {
+        if (stmt.instIndex == interp->pc) {
+            // get byte corresponding to start
+            auto startByte = stmt.startByte;
+
+            // get byte corresponding to end
+            auto endByte = stmt.endByte;
+
+            cout << interp->sourceMap.sourceInfo.source.substr(startByte, endByte - startByte) << endl;
+        }
+    }
+}
+
 void Interpreter::interpret() {
     auto mp = new MnemonicPrinter();
     mp->instructions = this->instructions;
@@ -20,9 +34,11 @@ void Interpreter::interpret() {
 
         auto srcInfo = sourceMap.sourceInfo;
 
-        while (shouldStop && !terminated) {
+        while (shouldStop && !terminated && depth < overDepth) {
             continuing = false;
+            overDepth = (2 << 15) + 1;
 
+            printCurrentStmt(this);
             cout << "> ";
 
             string line;
@@ -63,36 +79,25 @@ void Interpreter::interpret() {
                         }
                     }
                 } else if (line == "stmt" || line == "line") {
-                    for (auto stmt : sourceMap.statements) {
-                        if (stmt.instIndex == pc) {
-                            // get byte corresponding to start
-                            auto startByte = stmt.startByte;
-
-                            // get byte corresponding to end
-                            auto endByte = stmt.endByte;
-
-                            cout << srcInfo.source.substr(startByte, endByte - startByte) << endl;
-                        }
-                    }
+                    printCurrentStmt(this);
                 } else if (line == "asm") {
                     // print all insts between this stmt and the next one
                     auto firstIndex = pc;
                     auto lastIndex = pc;
-                    for (auto i = 0; i < sourceMap.statements.size(); i++) {
-                        auto stmt = sourceMap.statements[i];
+                    for (auto statement : sourceMap.statements) {
+                        auto stmt = statement;
                         if (stmt.instIndex == pc) {
-                            if (sourceMap.statements.size() > i) {
-                                lastIndex = (int32_t) sourceMap.statements[i + 1].instIndex;
-                            } else {
-                                lastIndex = (int32_t) instructions.size();
-                            }
-
+                            lastIndex = (int32_t) statement.instEndIndex;
                             break;
                         }
                     }
 
                     cout << mp->debugString(firstIndex, lastIndex);
                 } else if (line == "step") {
+                    shouldStop = false;
+                    break;
+                } else if (line == "over") {
+                    overDepth = depth + 1;
                     shouldStop = false;
                     break;
                 } else if (line == "continue") {
@@ -133,7 +138,9 @@ void interpretExit(Interpreter *interp) {
 
 // calli
 void interpretCalli(Interpreter *interp) {
-    interp->callIndex(interp->read<int32_t>());
+    auto fnTableIndex = interp->read<int32_t>();
+    auto callIndex = interp->fnTable[fnTableIndex];
+    interp->callIndex(callIndex);
 }
 
 // call
@@ -142,6 +149,8 @@ void interpretCall(Interpreter *interp) {
 }
 
 void Interpreter::callIndex(int index) {
+    depth += 1;
+
     pushToStack(bp);
     pushToStack(pc);
     bp = sp;
@@ -160,6 +169,7 @@ void interpretRet(Interpreter *interp) {
     interp->sp = interp->bp - 8;
     interp->pc = interp->readFromStack<int32_t>(interp->bp - 4);
     interp->bp = interp->readFromStack<int32_t>(interp->bp - 8);
+    interp->depth -= 1;
 }
 
 // jumpif

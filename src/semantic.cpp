@@ -8,6 +8,7 @@ int64_t typeSize(Node *type) {
     switch (type->typeData.kind) {
         case NodeTypekind::INT_LITERAL:
         case NodeTypekind::I32:
+        case NodeTypekind::FN:
             return 4;
         case NodeTypekind::I64:
             return 8;
@@ -248,9 +249,18 @@ void resolveBinop(Semantic *semantic, Node *node) {
 
 void resolveFnCall(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->fnCallData.fn);
-    auto resolvedFn = resolve(node->fnCallData.fn);
-    assert(resolvedFn->type == NodeType::FN_DECL);
-    node->typeInfo = resolvedFn->typeInfo->typeData.fnTypeData.returnType;
+    auto resolvedFnType = resolve(node->fnCallData.fn->typeInfo)->typeData;
+    assert(resolvedFnType.kind == NodeTypekind::FN);
+    node->typeInfo = resolvedFnType.fnTypeData.returnType;
+}
+
+void resolveAssign(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->assignData.lhs);
+    semantic->resolveTypes(node->assignData.rhs);
+    if (!typesMatch(node->assignData.lhs->typeInfo, node->assignData.rhs->typeInfo)) {
+        semantic->reportError({node, node->assignData.lhs, node->assignData.rhs},
+                              Error{node->region, "assignment type mismatch"});
+    }
 }
 
 void Semantic::resolveTypes(Node *node) {
@@ -286,6 +296,9 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::FN_CALL: {
             resolveFnCall(this, node);
+        } break;
+        case NodeType::ASSIGN: {
+            resolveAssign(this, node);
         } break;
         default: assert(false);
     }

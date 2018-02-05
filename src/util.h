@@ -9,7 +9,8 @@
 
 using namespace std;
 
-extern int64_t nodeId;
+extern unsigned long nodeId;
+extern unsigned long fnTableId;
 
 bool startsWith(string s, unsigned long startPos, string pre);
 bool startsWith(string s, string pre);
@@ -183,10 +184,12 @@ ostream &operator<<(ostream &os, Colored<T> colored) {
 }
 
 struct SourceMapStatement {
+    unsigned long instIndex;
+    unsigned long instEndIndex;
+
     unsigned long startLine;
     unsigned long startByte;
     unsigned long endByte;
-    unsigned long instIndex;
 };
 
 struct SourceMap {

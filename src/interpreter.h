@@ -68,9 +68,11 @@ void interpretExit(Interpreter *interp);
 class Interpreter {
 public:
     vector<unsigned char> instructions;
-    int32_t pc = 0;
+    unordered_map<uint32_t, uint32_t> fnTable;
 
     vector<unsigned char> stack;
+
+    int32_t pc = 0;
     int32_t sp = 0;
     int32_t bp = 0;
 
@@ -82,6 +84,10 @@ public:
     SourceMap sourceMap;
     vector<unsigned long> breakpoints = {};
     bool continuing = false;
+
+    // used for stepping 'over' functions (as opposed to normal step which goes 'into')
+    uint16_t depth = 0;
+    int32_t overDepth = (2 << 15) + 1;
 
     Interpreter(): Interpreter(1024) {}
 

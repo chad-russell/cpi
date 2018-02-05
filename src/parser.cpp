@@ -44,8 +44,10 @@ void Parser::scopeInsert(int64_t atomId, Node *node) {
 
     auto found = _scope->symbols.find(atomId);
     if (found != _scope->symbols.end()) {
-        ostringstream s("redeclaration of symbol ");
+        ostringstream s("");
+        s << "redeclaration of symbol '";
         s << AtomTable::current->backwardAtoms[atomId];
+        s << "'";
         reportError(s.str());
     }
 
@@ -85,6 +87,9 @@ Node *Parser::parseFnDecl() {
     auto decl = new Node(lexer->srcInfo, &allNodes, NodeType::FN_DECL, scopes.top());
     decl->region.start = lexer->front.region.start;
 
+    decl->fnDeclData.tableIndex = fnTableId;
+    fnTableId += 1;
+
     auto savedCurrentFnDecl = currentFnDecl;
     currentFnDecl = decl;
 
@@ -92,17 +97,19 @@ Node *Parser::parseFnDecl() {
     expect(LexerTokenType::FN, "fn");
 
     // name
-    auto name = parseSymbol();
-    decl->fnDeclData.atomId = AtomTable::current->insert(name->region);
+    if (lexer->front.type != LexerTokenType::LPAREN) {
+        auto name = parseSymbol();
+        decl->fnDeclData.atomId = AtomTable::current->insert(name->region);
 
-    ostringstream nameStringstream("");
-    nameStringstream << SourceRegion{name->region};
-    auto nameString = nameStringstream.str();
-    if (nameString == "main") {
-        mainFn = decl;
+        ostringstream nameStringstream("");
+        nameStringstream << SourceRegion{name->region};
+        auto nameString = nameStringstream.str();
+        if (nameString == "main") {
+            mainFn = decl;
+        }
+
+        scopeInsert(decl->fnDeclData.atomId, decl);
     }
-
-    scopeInsert(decl->fnDeclData.atomId, decl);
 
     // params
     expect(LexerTokenType::LPAREN, "(");
@@ -161,6 +168,11 @@ Node *Parser::parseScopedStmt() {
     // ret
     if (lexer->front.type == LexerTokenType::RET) {
         return parseRet();
+    }
+
+    // fn decl
+    if (lexer->front.type == LexerTokenType::FN) {
+        return parseFnDecl();
     }
 
     auto saved = lexer->front.region.start;
@@ -310,6 +322,9 @@ Node *Parser::parseLvalue() {
             auto symbol = parseSymbol();
             return parseLvalueHelper(symbol, saved);
         }
+        case LexerTokenType::FN: {
+            return parseFnDecl();
+        }
         default: {
             auto savedType = lexer->front.type;
             popFront();
@@ -371,10 +386,17 @@ Node *Parser::parseLvalueOrLiteral() {
     auto saved = lexer->front.region.start;
     Node *symbol;
 
-    if (lexer->front.type == LexerTokenType::INT_LITERAL) {
+    if (lexer->front.type == LexerTokenType::LPAREN) {
+        popFront();
+        symbol = parseRvalue();
+        expect(LexerTokenType::RPAREN, ")");
+    } else if (lexer->front.type == LexerTokenType::INT_LITERAL) {
         symbol = parseIntLiteral();
     } else if (lexer->front.type == LexerTokenType::FLOAT_LITERAL) {
         symbol = parseFloatLiteral();
+    } else if (lexer->front.type == LexerTokenType::FN) {
+        symbol = parseFnDecl();
+        symbol->fnDeclData.isLiteral = true;
     } else {
         symbol = parseSymbol();
     }
@@ -391,7 +413,7 @@ Node *Parser::parseRvalue() {
     stack<ShuntingYard> operatingStack;
     stack<ShuntingYard> output;
 
-    ShuntingYardData dataInit;
+    ShuntingYardData dataInit{};
     dataInit.node = parseRvalueSimple();
 
     auto sh = ShuntingYard{ShuntingYardType::NODE, dataInit};

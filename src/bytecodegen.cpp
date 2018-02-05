@@ -55,21 +55,40 @@ void BytecodeGen::binopHelper(string instructionStr, Node *node) {
 }
 
 void BytecodeGen::gen(Node *node) {
+    // avoids generating code for a fn decl within another fn decl
+    // todo(chad): make sure this is the right way to do this
+    if (node->type == NodeType::FN_DECL && !processFnDecls) {
+        if (node->fnDeclData.isLiteral && node->bytecode.empty()) {
+            // placeholder
+            append(node->bytecode, Instruction::CONSTI32);
+            append(node->bytecode, toBytes(static_cast<int32_t>(node->fnDeclData.tableIndex)));
+        }
+
+        toProcess.push(node);
+        return;
+    }
+
     if (node->gen) { return; }
     node->gen = true;
 
     if (node->sourceMapStatement) {
         sourceMap.statements.push_back(SourceMapStatement{
+                instructions.size(),
+                instructions.size(),
+
                 node->region.start.line,
                 node->region.start.byteIndex,
-                node->region.end.byteIndex,
-                instructions.size()
+                node->region.end.byteIndex
         });
     }
 
     switch (node->type) {
         case NodeType::FN_DECL: {
+            processFnDecls = false;
+
             node->fnDeclData.instOffset = instructions.size();
+
+            fnTable.insert({node->fnDeclData.tableIndex, node->fnDeclData.instOffset});
 
             auto stackSize = static_cast<int32_t>(node->fnDeclData.stackSize);
             append(instructions, Instruction::BUMPSP);
@@ -129,7 +148,21 @@ void BytecodeGen::gen(Node *node) {
 
             append(node->bytecode, Instruction::STORE);
             append(node->bytecode, toBytes(static_cast<int32_t>(localOffset)));
+            assert(!data.initialValue->bytecode.empty());
             append(node->bytecode, data.initialValue->bytecode);
+        } break;
+        case NodeType::ASSIGN: {
+            auto data = node->assignData;
+
+            gen(data.rhs);
+
+            auto resolvedDecl = resolve(data.lhs);
+            auto localOffset = resolvedDecl->localOffset;
+
+            append(node->bytecode, Instruction::STORE);
+            append(node->bytecode, toBytes(static_cast<int32_t>(localOffset)));
+            assert(!data.rhs->bytecode.empty());
+            append(node->bytecode, data.rhs->bytecode);
         } break;
         case NodeType::SYMBOL: {
             auto resolved = resolveNode(node);
@@ -175,12 +208,18 @@ void BytecodeGen::gen(Node *node) {
 
             // todo(chad): store params onto the stack
 
-            append(instructions, Instruction::CALL);
-
             auto resolvedFn = resolve(node->fnCallData.fn);
-            fixups.insert({instructions.size(), resolvedFn});
-
-            append(instructions, toBytes(static_cast<int32_t>(999)));
+            if (resolvedFn->type == NodeType::FN_DECL) {
+                append(instructions, Instruction::CALL);
+                fixups.insert({instructions.size(), resolvedFn});
+                append(instructions, toBytes(static_cast<int32_t>(999)));
+            } else if (resolvedFn->type == NodeType::DECL) {
+                append(instructions, Instruction::CALLI);
+                append(instructions, Instruction::I32);
+                append(instructions, toBytes(static_cast<int32_t>(resolvedFn->localOffset)));
+            } else {
+                assert(false);
+            }
 
             append(node->bytecode, Instruction::I64);
             // + 8 for the saving of the return address and base pointer
@@ -189,5 +228,19 @@ void BytecodeGen::gen(Node *node) {
             toProcess.push(resolvedFn);
         } break;
         default: assert(false);
+    }
+
+    if (node->sourceMapStatement) {
+        sourceMap.statements.back().instEndIndex = instructions.size() + node->bytecode.size();
+    }
+}
+
+void BytecodeGen::fixup() {
+    // fixup statically known function instruction offsets
+    for (auto fixup : fixups) {
+        auto node = fixup.second;
+        assert(node->type == NodeType::FN_DECL);
+
+        memcpy(&instructions[fixup.first], &node->fnDeclData.instOffset, sizeof(int32_t));
     }
 }

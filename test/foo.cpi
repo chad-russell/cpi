@@ -1,11 +1,4 @@
 fn main() {
-    ret 3 + foo()
-}
-
-fn foo() {
-    ret 3 + bar()
-}
-
-fn bar() {
-    ret 3
+    a := fn() { ret 3 }
+    ret a()
 }

@@ -3,6 +3,7 @@
 #include <iostream>
 #include <getopt.h>
 #include <fstream>
+#include <sstream>
 
 #include "assembler.h"
 #include "interpreter.h"
@@ -14,7 +15,8 @@
 
 using namespace std;
 
-int64_t nodeId;
+unsigned long nodeId;
+unsigned long fnTableId;
 
 static int printAsmFlag = 0;
 static int debugFlag = 0;
@@ -39,7 +41,7 @@ enum class InputType {
     CBC
 };
 
-InputType inputTypeFromExtension(string fileName) {
+InputType inputTypeFromExtension(const string &fileName) {
     if (endsWith(fileName, ".cpi")) { return InputType::CPI; }
     if (endsWith(fileName, ".cas")) { return InputType::CAS; }
     if (endsWith(fileName, ".cbc")) { return InputType::CBC; }
@@ -99,7 +101,8 @@ int main(int argc, char **argv) {
 
     auto interp = new Interpreter();
 
-    std::vector<unsigned char> instructions;
+    vector<unsigned char> instructions;
+    unordered_map<uint32_t, uint32_t> fnTable;
 
     if (inputType == InputType::CPI) {
         auto lexer = new Lexer(inputFile);
@@ -112,24 +115,23 @@ int main(int argc, char **argv) {
         auto gen = new BytecodeGen();
         gen->isMainFn = true;
         gen->sourceMap.sourceInfo = lexer->srcInfo;
+        gen->processFnDecls = true;
+
         gen->gen(parser->mainFn);
         while (!gen->toProcess.empty()) {
             gen->isMainFn = false;
+            gen->processFnDecls = true;
             gen->gen(gen->toProcess.front());
             gen->toProcess.pop();
         }
-        for (auto fixup : gen->fixups) {
-            // look, ma! I'm a linker!
-            auto node = fixup.second;
-            assert(node->type == NodeType::FN_DECL);
-
-            memcpy(&gen->instructions[fixup.first], &node->fnDeclData.instOffset, sizeof(int32_t));
-        }
+        gen->fixup();
 
         interp->instructions = gen->instructions;
+        interp->fnTable = gen->fnTable;
         interp->sourceMap = gen->sourceMap;
 
         instructions = gen->instructions;
+        fnTable = gen->fnTable;
     }
     else if (inputType == InputType::CAS) {
         auto assemblyLexer = new AssemblyLexer(inputFile);
@@ -138,28 +140,47 @@ int main(int argc, char **argv) {
         }
 
         interp->instructions = assemblyLexer->instructions;
+        interp->fnTable = assemblyLexer->fnTable;
         interp->sourceMap = assemblyLexer->sourceMap;
 
         instructions = assemblyLexer->instructions;
+        fnTable = assemblyLexer->fnTable;
     }
     else {
         ifstream t(inputFile);
         string fileBytes;
 
         t.seekg(0, ios::end);
-        fileBytes.reserve(t.tellg());
+        fileBytes.reserve(static_cast<unsigned long>(t.tellg()));
         t.seekg(0, ios::beg);
 
         fileBytes.assign((istreambuf_iterator<char>(t)),
                          istreambuf_iterator<char>());
 
-        instructions = vector<unsigned char>(fileBytes.length());
-        copy(fileBytes.begin(), fileBytes.end(), instructions.begin());
+        auto bytes = vector<unsigned char>(fileBytes.length());
+        copy(fileBytes.begin(), fileBytes.end(), bytes.begin());
+
+        auto offset = 0;
+        auto count = bytesTo<uint32_t>(bytes, 0);
+        offset += sizeof(uint32_t);
+        for (auto i = 0; i < count; i++) {
+            auto fnIndex = bytesTo<uint32_t>(bytes, offset);
+            offset += sizeof(uint32_t);
+
+            auto instIndex = bytesTo<uint32_t>(bytes, offset);
+            offset += sizeof(uint32_t);
+
+            fnTable.insert({fnIndex, instIndex});
+        }
+
+        instructions = vector<unsigned char>(bytes.size() - offset);
+        memcpy(&instructions[0], &bytes[offset], bytes.size() - offset);
     }
 
     if (printAsmFlag != 0) {
         auto printer = new MnemonicPrinter();
         printer->instructions = instructions;
+        printer->fnTable = fnTable;
         cout << printer->debugString() << endl;
     }
 
@@ -168,6 +189,7 @@ int main(int argc, char **argv) {
             interp->continuing = true;
         }
         interp->instructions = instructions;
+        interp->fnTable = fnTable;
         interp->interpret();
 
 //        cout << "STACK:" << endl;
@@ -190,8 +212,29 @@ int main(int argc, char **argv) {
         if (writeAssembly) {
             auto printer = new MnemonicPrinter();
             printer->instructions = instructions;
+            printer->fnTable = fnTable;
             out << printer->debugString();
         } else {
+            // .cbc
+
+            // fn table
+            auto fnTableSizeBytes = toBytes(static_cast<uint32_t>(fnTable.size()));
+            for (auto b : fnTableSizeBytes) {
+                out << b;
+            }
+            for (auto t : fnTable) {
+                auto firstBytes = toBytes(t.first);
+                auto secondBytes = toBytes(t.second);
+
+                for (auto b : firstBytes) {
+                    out << b;
+                }
+                for (auto b : secondBytes) {
+                    out << b;
+                }
+            }
+
+            // instructions
             for (auto inst : instructions) {
                 out << inst;
             }

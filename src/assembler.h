@@ -119,6 +119,7 @@ public:
     Location loc;
 
     vector<unsigned char> instructions;
+    unordered_map<uint32_t, uint32_t> fnTable;
 
     Location savedLoc;
     unsigned long lastInstStart;
@@ -133,6 +134,7 @@ public:
 
     AssemblyLexer(string fileName);
     static void populateMaps();
+    void readFnTable();
 
     bool empty();
 
@@ -141,8 +143,6 @@ public:
     void popFrontFinalize(Token newNext, vector<unsigned char> newInst);
 
     void eat();
-    void eat(int chars);
-
 private:
     int getArgCount(TokenType tt);
 };
@@ -150,11 +150,13 @@ private:
 class MnemonicPrinter {
 public:
     vector<unsigned char> instructions;
-    int pc = 0;
+    unordered_map<uint32_t, uint32_t> fnTable;
+
+    uint32_t pc = 0;
     string instructionString = "";
 
     string debugString();
-    string debugString(int32_t startPc, int32_t endPc);
+    string debugString(uint32_t startPc, uint32_t endPc);
     void step();
     void readTypeAndIntOrFloat();
     void readTypeAndInt();

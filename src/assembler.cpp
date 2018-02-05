@@ -1,8 +1,7 @@
 #include <string>
 #include <fstream>
-#include <streambuf>
 #include <iostream>
-#include <cassert>
+#include <sstream>
 
 #include "util.h"
 #include "assembler.h"
@@ -24,12 +23,30 @@ void AssemblyLexer::populateMaps() {
     }
 }
 
+void AssemblyLexer::readFnTable() {
+    auto firstLinePos = sourceMap.sourceInfo.source.find('\n');
+    auto firstLine = sourceMap.sourceInfo.source.substr(0, firstLinePos);
+
+    istringstream iss(firstLine);
+    int32_t count;
+    iss >> count;
+    for (auto i = 0; i < count; i++) {
+        uint32_t fnIndex, instIndex;
+        iss >> fnIndex;
+        iss >> instIndex;
+        fnTable.insert({fnIndex, instIndex});
+    }
+
+    sourceMap.sourceInfo.source = sourceMap.sourceInfo.source.substr(firstLine.length() + 1,
+                                                                     sourceMap.sourceInfo.source.size() - firstLine.length());
+}
+
 AssemblyLexer::AssemblyLexer(string fileName)  {
     ifstream t(fileName);
     string fileBytes;
 
     t.seekg(0, ios::end);   
-    fileBytes.reserve(t.tellg());
+    fileBytes.reserve(static_cast<unsigned long>(t.tellg()));
     t.seekg(0, ios::beg);
 
     fileBytes.assign((istreambuf_iterator<char>(t)),
@@ -38,6 +55,8 @@ AssemblyLexer::AssemblyLexer(string fileName)  {
     sourceMap.sourceInfo = {fileName, fileBytes, {0}};
     lastLoc = {0, 0, 0};
     loc = {0, 0, 0};
+
+    readFnTable();
 
     popFront();
     popFront();
@@ -239,10 +258,12 @@ void AssemblyLexer::popFrontFinalize(Token newNext, vector<unsigned char> newIns
 
     if (argCount == 0) {
         sourceMap.statements.push_back(SourceMapStatement{
+                lastInstStart,
+                instructions.size(),
+
                 savedLoc.line,
                 savedLoc.byteIndex,
-                newNext.region.end.byteIndex,
-                lastInstStart
+                newNext.region.end.byteIndex
         });
 
         // ignore whitespace
@@ -373,6 +394,16 @@ const vector<string> AssemblyLexer::instructionStrings = {
 string MnemonicPrinter::debugString() {
     instructionString = "";
 
+    instructionString.append(to_string(fnTable.size()));
+    instructionString.append(" ");
+    for (auto t : fnTable) {
+        instructionString.append(to_string(t.first));
+        instructionString.append(" ");
+        instructionString.append(to_string(t.second));
+        instructionString.append(" ");
+    }
+    instructionString.append("\n");
+
     while (pc < instructions.size()) {
         step();
     }
@@ -380,7 +411,7 @@ string MnemonicPrinter::debugString() {
     return instructionString;
 }
 
-string MnemonicPrinter::debugString(int32_t startPc, int32_t endPc) {
+string MnemonicPrinter::debugString(uint32_t startPc, uint32_t endPc) {
     instructionString = "";
 
     pc = startPc;

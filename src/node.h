@@ -67,9 +67,11 @@ struct FnDeclData {
     vector<Node *> body;
     vector<Node *> locals;
     vector<Node *> returns;
+
     int64_t stackSize;
     unsigned long instOffset;
     bool isLiteral;
+    unsigned long tableIndex;
 };
 
 struct DeclData {
@@ -156,7 +158,7 @@ public:
 
 class Node {
 public:
-    int64_t id;
+    unsigned long id;
 
     Region region;
     Scope *scope;
