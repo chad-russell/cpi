@@ -38,7 +38,8 @@ enum class TokenType : unsigned char {
     AND8, AND16, AND32, AND64, OR8, OR16, OR32, OR64, XOR8, XOR16, XOR32, XOR64,
 
     // general instructions
-    STORE, 
+    STORE,
+    STORECONST,
     BUMPSP, 
     JUMPIF, 
     JUMP, 
@@ -89,7 +90,8 @@ enum class Instruction : unsigned char {
     AND8, AND16, AND32, AND64, OR8, OR16, OR32, OR64, XOR8, XOR16, XOR32, XOR64,
 
     // general instructions
-    STORE, 
+    STORE,
+    STORECONST,
     BUMPSP, 
     JUMPIF, 
     JUMP, 
@@ -106,25 +108,25 @@ enum class Instruction : unsigned char {
 };
 
 struct Token {
-    TokenType type;
-    Region region;
+    TokenType type = {};
+    Region region = {};
 };
 
 class AssemblyLexer {
 public:
-    Token front;
-    Token next;
+    Token front = {};
+    Token next = {};
 
-    Location lastLoc;
-    Location loc;
+    Location lastLoc = {};
+    Location loc = {};
 
-    vector<unsigned char> instructions;
-    unordered_map<uint32_t, uint32_t> fnTable;
+    vector<unsigned char> instructions = {};
+    unordered_map<uint32_t, uint32_t> fnTable = {};
 
-    Location savedLoc;
+    Location savedLoc = {};
     unsigned long lastInstStart;
     int argCount;
-    SourceMap sourceMap;
+    SourceMap sourceMap = {};
 
     const static vector<string> tokenTypeStrings;
     static unordered_map<string, TokenType> nameToTokenType;
@@ -149,8 +151,8 @@ private:
 
 class MnemonicPrinter {
 public:
-    vector<unsigned char> instructions;
-    unordered_map<uint32_t, uint32_t> fnTable;
+    vector<unsigned char> instructions = {};
+    unordered_map<uint32_t, uint32_t> fnTable = {};
 
     uint32_t pc = 0;
     string instructionString = "";

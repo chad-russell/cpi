@@ -14,23 +14,23 @@ enum class ShuntingYardType {
 };
 
 struct ShuntingYardData {
-    Node *node;
-    LexerTokenType type;
+    Node *node = nullptr;
+    LexerTokenType type = {};
 };
 
 struct ShuntingYard {
-    ShuntingYardType type;
-    ShuntingYardData data;
+    ShuntingYardType type = {};
+    ShuntingYardData data = {};
 };
 
 struct Parser {
-    Lexer *lexer;
+    Lexer *lexer = nullptr;
     LexerToken last;
-    Node *mainFn;
-    vector<Node *> allNodes;
-    stack<Scope *> scopes;
-    vector<Node *> fnDecls;
-    Node *currentFnDecl;
+    Node *mainFn = nullptr;
+    vector<Node *> allNodes = {};
+    stack<Scope *> scopes = {};
+    vector<Node *> fnDecls = {};
+    Node *currentFnDecl = nullptr;
 
     Parser(Lexer *lexer_);
 
@@ -43,9 +43,11 @@ struct Parser {
     bool isBooleanBinop(LexerTokenType type);
     int8_t operatorPrecedence(LexerTokenType type);
     Node *unwindPolish(stack<ShuntingYard> *values);
+    void addLocal(Node *local);
 
     void parseRoot();
     Node *parseTopLevel();
+    vector<Node *> parseDeclParams();
     Node *parseFnDecl();
     Node *parseSymbol();
     Node *parseScopedStmt();
@@ -58,6 +60,7 @@ struct Parser {
     Node *parseIntLiteral();
     Node *parseFloatLiteral();
     Node *parseLvalueHelper(Node *symbol, Location saved);
+    void parseParams(vector<Node *> *params);
     Node *parseFnCall();
     Node *buildDots(stack<Node *> rvalues);
 };

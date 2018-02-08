@@ -112,8 +112,8 @@ void Lexer::popFront() {
     if (tryEat(&next, "]", LexerTokenType::RSQUARE)) { return; }
     if (tryEat(&next, "-", LexerTokenType::SUB)) { return; }
     if (tryEat(&next, "+", LexerTokenType::ADD)) { return; }
-    if (tryEat(&next, "^", LexerTokenType::DEREF)) { return; }
     if (tryEat(&next, "*", LexerTokenType::MUL)) { return; }
+    if (tryEat(&next, "^", LexerTokenType::DEREF)) { return; }
     if (tryEat(&next, "/", LexerTokenType::DIV)) { return; }
     if (tryEat(&next, "==", LexerTokenType::EQ_EQ)) { return; }
     if (tryEat(&next, "!=", LexerTokenType::NE)) { return; }
@@ -367,6 +367,7 @@ const vector<string> Lexer::lexerTokenTypeStrings = {
     "ADD",
     "MUL",
     "DIV",
+    "DEREF",
     "EQ_EQ",
     "NE",
     "LE",

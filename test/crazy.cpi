@@ -1,0 +1,54 @@
+fn foo() {
+    ret bar
+}
+
+fn main() {
+    f := fn() {
+        ret fn() {
+            ret foo
+        }
+    }
+
+    -- 3
+    a1 := f()()()()
+
+    -- 3
+    a2 := apply(inc, 1) + apply_overboard(inc, 0)
+
+    -- 3
+    a3 := ^^^^^^&&&^&&&&^&^^&&3
+
+    -- 3
+    a4_helper := &&&&&&&&&&&&a3
+    a4 := ^^^^^^^^^^^^a4_helper
+
+    -- 3
+    a5 := a5_fn()
+
+    -- 12
+    ret a1 + a2 + a3 + a4 + a5
+}
+
+fn a5_fn() {
+    f := fn() i32 { ret 3 }
+    p := &f
+    ret (^p)()
+}
+
+fn bar() i32 {
+    ret 3
+}
+
+fn inc(n: i32) {
+    ret n + 1
+}
+
+fn apply(a: fn(n: i32) i32, b: i32) {
+    ret a(b)
+}
+
+fn apply_overboard(a: fn(n: i32) i32, b: i32) {
+    ret fn(f: fn(n: i32) i32, g: i32) {
+        ret f(g)
+    }(a, b)
+}

@@ -218,26 +218,13 @@ int main(int argc, char **argv) {
             // .cbc
 
             // fn table
-            auto fnTableSizeBytes = toBytes(static_cast<uint32_t>(fnTable.size()));
-            for (auto b : fnTableSizeBytes) {
-                out << b;
-            }
+            out << toBytes(static_cast<uint32_t>(fnTable.size()));
             for (auto t : fnTable) {
-                auto firstBytes = toBytes(t.first);
-                auto secondBytes = toBytes(t.second);
-
-                for (auto b : firstBytes) {
-                    out << b;
-                }
-                for (auto b : secondBytes) {
-                    out << b;
-                }
+                out << toBytes(t.first) << toBytes(t.second);
             }
 
             // instructions
-            for (auto inst : instructions) {
-                out << inst;
-            }
+            out << instructions;
         }
 
         out.close();

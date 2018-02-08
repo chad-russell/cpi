@@ -1,6 +1,7 @@
 #include "interpreter.h"
 
 #include <iostream>
+#include <string.h>
 
 using namespace std;
 
@@ -199,42 +200,33 @@ void interpretJumpIf(Interpreter *interp) {
     interp->pc = index;
 }
 
-// e.g. (store 0 i32 3)
 void interpretStore(Interpreter *interp) {
-    auto storeOffset = interp->consume<int32_t>();
+    auto storeOffset = interp->bp + interp->read<int32_t>();
+    auto readOffset = interp->bp + interp->read<int32_t>();
+    auto size = interp->consume<int32_t>();
 
-    switch (static_cast<int>(interp->instructions.at(interp->pc))) {
-    case static_cast<int>(Instruction::I8):
-    case static_cast<int>(Instruction::CONSTI8): {
-        auto value = interp->read<int8_t>();
-        interp->copyToStack(value, interp->bp + storeOffset);
-    } break;
-    case static_cast<int>(Instruction::I16):
-    case static_cast<int>(Instruction::CONSTI16): {
-        auto value = interp->read<int16_t>();
-        interp->copyToStack(value, interp->bp + storeOffset);
-    } break;
-    case static_cast<int>(Instruction::I32):
-    case static_cast<int>(Instruction::CONSTI32): {
-        auto value = interp->read<int32_t>();
-        interp->copyToStack(value, interp->bp + storeOffset);
-    } break;
-    case static_cast<int>(Instruction::I64):
-    case static_cast<int>(Instruction::CONSTI64): {
-        auto value = interp->read<int64_t>();
-        interp->copyToStack(value, interp->bp + storeOffset);
-    } break;
-    case static_cast<int>(Instruction::F32):
-    case static_cast<int>(Instruction::CONSTF32): {
-        auto value = interp->read<float>();
-        interp->copyToStack(value, interp->bp + storeOffset);
-    } break;
-    case static_cast<int>(Instruction::F64):
-    case static_cast<int>(Instruction::CONSTF64): {
-        auto value = interp->read<double>();
-        interp->copyToStack(value, interp->bp + storeOffset);
-    } break;
-    default:
+    memcpy(&interp->stack[storeOffset], &interp->stack[readOffset], static_cast<size_t>(size));
+}
+
+void interpretStoreConst(Interpreter *interp) {
+    auto storeOffset = interp->bp + interp->read<int32_t>();
+
+    auto inst = AssemblyLexer::instructionStrings[interp->instructions[interp->pc]];
+
+    interp->pc += 1;
+    if (endsWith(inst, "CONSTI8")) {
+        int8_t value = interp->consume<int8_t>();
+        memcpy(&interp->stack[storeOffset], &value, sizeof(int8_t));
+    } else if (endsWith(inst, "CONSTI16")) {
+        int16_t value = interp->consume<int16_t>();
+        memcpy(&interp->stack[storeOffset], &value, sizeof(int16_t));
+    } else if (endsWith(inst, "CONSTI32")) {
+        int32_t value = interp->consume<int32_t>();
+        memcpy(&interp->stack[storeOffset], &value, sizeof(int32_t));
+    } else if (endsWith(inst, "CONSTI64")) {
+        int64_t value = interp->consume<int64_t>();
+        memcpy(&interp->stack[storeOffset], &value, sizeof(int64_t));
+    } else {
         assert(false);
     }
 }

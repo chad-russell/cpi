@@ -104,8 +104,8 @@ string suffixForType() {
 }
 
 struct SourceInfo {
-    string fileName;
-    string source;
+    string fileName = "";
+    string source = "";
     vector<unsigned long> lines = {};
 };
 
@@ -116,33 +116,33 @@ struct Location {
 };
 
 struct Region {
-    SourceInfo srcInfo;
-    Location start;
-    Location end;
+    SourceInfo srcInfo = {};
+    Location start = {};
+    Location end = {};
 };
 
 struct SourceRegion {
-    Region region;
+    Region region = {};
 };
 
 struct HighlightedRegion {
-    Region region;
+    Region region = {};
 };
 
 struct SourceInfoRegion {
-    Region region;
+    Region region = {};
 };
 
 struct Note {
-    Region region;
-    string message;
+    Region region = {};
+    string message = "";
 };
 
 struct Error {
-    Region region;
-    string message;
+    Region region = {};
+    string message = "";
 
-    vector<Note> notes;
+    vector<Note> notes = {};
 };
 
 enum class Color {
@@ -173,6 +173,7 @@ ostream &operator<<(ostream &os, SourceRegion region);
 ostream &operator<<(ostream &os, HighlightedRegion region);
 ostream &operator<<(ostream &os, Color color);
 ostream &operator<<(ostream &os, NodeTypekind kind);
+ostream &operator<<(ostream &os, vector<unsigned char> v);
 
 template<typename T>
 ostream &operator<<(ostream &os, Colored<T> colored) {
@@ -193,8 +194,8 @@ struct SourceMapStatement {
 };
 
 struct SourceMap {
-    SourceInfo sourceInfo;
-    vector<SourceMapStatement> statements;
+    SourceInfo sourceInfo = {};
+    vector<SourceMapStatement> statements = {};
 };
 
 /////////////

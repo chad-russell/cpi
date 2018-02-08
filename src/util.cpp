@@ -170,6 +170,13 @@ ostream &operator<<(ostream &os, NodeTypekind kind) {
     }
 }
 
+ostream &operator<<(ostream &os, vector<unsigned char> v) {
+    for (auto c : v) {
+        os << c;
+    }
+    return os;
+}
+
 /////////////
 //  ATOMS  //
 /////////////

@@ -18,6 +18,7 @@ enum class LexerTokenType : int32_t {
     ADD,
     MUL,
     DIV,
+    DEREF,
     EQ_EQ,
     NE,
     LE,
@@ -38,7 +39,6 @@ enum class LexerTokenType : int32_t {
     FN,
     TYPE,
     STRUCT,
-    DEREF,
     SYMBOL,
     INT_LITERAL,
     FLOAT_LITERAL,
@@ -66,19 +66,19 @@ enum class LexerTokenType : int32_t {
 };
 
 struct LexerToken{
-    LexerTokenType type;
-    Region region;
+    LexerTokenType type = {};
+    Region region = {};
 };
 
 class Lexer {
 public:
-    LexerToken front;
-    LexerToken next;
+    LexerToken front = {};
+    LexerToken next = {};
 
-    Location lastLoc;
-    Location loc;
+    Location lastLoc = {};
+    Location loc = {};
 
-    SourceInfo srcInfo;
+    SourceInfo srcInfo = {};
 
     const static vector<string> lexerTokenTypeStrings;
 

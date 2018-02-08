@@ -6,10 +6,11 @@ int64_t typeSize(Node *type) {
     assert(type->type == NodeType::TYPE);
 
     switch (type->typeData.kind) {
-        case NodeTypekind::INT_LITERAL:
         case NodeTypekind::I32:
         case NodeTypekind::FN:
+        case NodeTypekind::POINTER:
             return 4;
+        case NodeTypekind::INT_LITERAL:
         case NodeTypekind::I64:
             return 8;
         case NodeTypekind::NONE:
@@ -165,15 +166,25 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
     if (data->returnType == nullptr) {
         ostringstream s("");
         s << "could not resolve return type for fn '"
-          << AtomTable::current->backwardAtoms[data->atomId]
+          << AtomTable::current->backwardAtoms[data->name->symbolData.atomId]
           << "'";
 
         semantic->reportError({node}, Error{node->region, s.str()});
     }
 
     for (auto local : data->locals) {
+        auto resolved = resolve(local);
+        if (resolved != local && resolved->isLocal) { continue; }
+
         local->localOffset = semantic->currentFnDecl->stackSize;
         semantic->currentFnDecl->stackSize += typeSize(local->typeInfo);
+    }
+
+    auto paramOffset = -12;
+    for (auto declParam : node->fnDeclData.params) {
+        // we push the params onto the stack in reverse order
+        declParam->localOffset = paramOffset;
+        paramOffset -= typeSize(declParam->typeInfo);
     }
 
     semantic->currentFnDecl = savedFnDecl;
@@ -203,7 +214,9 @@ void resolveSymbol(Semantic *semantic, Node *node) {
     }
 
     assert(node->resolved->type == NodeType::DECL
-           || node->resolved->type == NodeType::FN_DECL);
+           || node->resolved->type == NodeType::FN_DECL
+           || node->resolved->type == NodeType::DECL_PARAM);
+
     semantic->resolveTypes(node->resolved);
     node->typeInfo = node->resolved->typeInfo;
 }
@@ -235,6 +248,25 @@ void resolveDecl(Semantic *semantic, Node *node) {
     node->typeInfo = node->declData.type;
 }
 
+void resolveType(Semantic *semantic, Node *node) {
+    switch (node->typeData.kind) {
+        case NodeTypekind::NONE:
+        case NodeTypekind::INT_LITERAL:
+        case NodeTypekind::I32:
+        case NodeTypekind::I64:
+            break;
+        case NodeTypekind::FN: {
+            for (auto param : node->typeData.fnTypeData.params) {
+                semantic->resolveTypes(param);
+            }
+            semantic->resolveTypes(node->typeData.fnTypeData.returnType);
+        } break;
+        default: assert(false);
+    }
+
+    node->typeInfo = node;
+}
+
 void resolveBinop(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->binopData.lhs);
     semantic->resolveTypes(node->binopData.rhs);
@@ -247,11 +279,111 @@ void resolveBinop(Semantic *semantic, Node *node) {
     node->typeInfo = node->binopData.lhs->typeInfo;
 }
 
+bool assignParams(Semantic *semantic,
+                  Node *errorReportTarget,
+                  const vector<Node *> &declParams,
+                  vector<Node *> &givenParams) {
+    vector<bool> openParams = {};
+    vector<Node *> newParams = {};
+
+    for (auto i = 0; i < declParams.size(); i++) {
+        openParams.push_back(true);
+        newParams.push_back(nullptr);
+    }
+
+    auto encounteredError = false;
+
+    for (auto passedParam : givenParams) {
+        if (passedParam->type == NodeType::PARAM && passedParam->paramData.name != nullptr) {
+            // look up that name in the declaration
+            auto found = false;
+            for (unsigned long j = 0; j < declParams.size(); j++) {
+                auto declParam = declParams[j];
+                assert(declParam->type == NodeType::DECL_PARAM);
+
+                if (declParam->declParamData.name->symbolData.atomId == passedParam->paramData.name->symbolData.atomId) {
+                    found = true;
+                    auto openParam = openParams.at(j);
+                    if (!openParam) {
+                        encounteredError = true;
+                        semantic->reportError({errorReportTarget},
+                                              Error{errorReportTarget->region, "passed a parameter twice"});
+                    }
+                    passedParam->typeInfo = declParam->declParamData.type;
+                    newParams[j] = passedParam;
+                    openParams[j] = false;
+                }
+            }
+            if (!found) {
+                encounteredError = true;
+                semantic->reportError({errorReportTarget}, Error{"unable to find one of the parameters"});
+            }
+        }
+        else {
+            // put it in next open slot
+            unsigned long j = 0;
+            while (j < newParams.size() && !(openParams[j])) { j += 1; }
+            if (j >= newParams.size()) {
+                encounteredError = true;
+                semantic->reportError({errorReportTarget}, Error{"too many parameters passed!"});
+            }
+            else {
+                auto declParam = declParams[j];
+                assert(declParam->type == NodeType::DECL_PARAM);
+                passedParam->typeInfo = declParam->declParamData.type;
+
+                newParams[j] = passedParam;
+                openParams[j] = false;
+            }
+        }
+    }
+
+    for (unsigned long i = 0; i < newParams.size(); i++) {
+        auto declParam = declParams[i];
+
+        // if the decl parameter is unassigned but there is a default value, then fill in that param with the default
+        auto openParamsI = openParams[i];
+        if (declParam->declParamData.initialValue != nullptr && openParamsI) {
+            openParams[i] = false;
+            declParam->declParamData.initialValue->typeInfo = declParam->declParamData.type;
+            newParams[i] = declParam->declParamData.initialValue;
+        }
+    }
+
+    for (auto i = 0; i < declParams.size(); i++) {
+        auto declParam = declParams[i];
+
+        auto openParamsI = openParams[i];
+        if (openParamsI || newParams[i] == nullptr) {
+            encounteredError = true;
+            semantic->reportError({errorReportTarget}, Error{errorReportTarget->region, "unassigned parameter!"});
+        }
+    }
+
+    givenParams = newParams;
+
+    return encounteredError;
+}
+
 void resolveFnCall(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->fnCallData.fn);
     auto resolvedFnType = resolve(node->fnCallData.fn->typeInfo)->typeData;
     assert(resolvedFnType.kind == NodeTypekind::FN);
     node->typeInfo = resolvedFnType.fnTypeData.returnType;
+
+    auto declParams = resolvedFnType.fnTypeData.params;
+    auto encounteredError = assignParams(semantic, node, declParams, node->fnCallData.params);
+
+    if (encounteredError) { return; }
+
+    for (unsigned long i = 0; i < node->fnCallData.params.size(); i++) {
+        auto declParam = declParams[i];
+        auto newParam = node->fnCallData.params[i];
+        semantic->resolveTypes(newParam);
+        if (!typesMatch(declParam->typeInfo, newParam->typeInfo)) {
+            semantic->reportError({node, declParam, newParam}, Error{node->region, "type mismatch!"});
+        }
+    }
 }
 
 void resolveAssign(Semantic *semantic, Node *node) {
@@ -261,6 +393,30 @@ void resolveAssign(Semantic *semantic, Node *node) {
         semantic->reportError({node, node->assignData.lhs, node->assignData.rhs},
                               Error{node->region, "assignment type mismatch"});
     }
+}
+
+void resolveDeclParam(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->declParamData.type);
+    node->typeInfo = node->declParamData.type;
+}
+
+void resolveParam(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->paramData.value);
+    node->typeInfo = node->paramData.value->typeInfo;
+}
+
+void resolveDeref(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->nodeData);
+    auto pointerType = node->nodeData->typeInfo;
+    assert(pointerType->typeData.kind == NodeTypekind::POINTER);
+    node->typeInfo = pointerType->typeData.pointerTypeData.underlyingType;
+}
+
+void resolveAddressOf(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->nodeData);
+    auto pointerTypeInfo = new Node(NodeTypekind::POINTER);
+    pointerTypeInfo->typeData.pointerTypeData.underlyingType = node->nodeData->typeInfo;
+    node->typeInfo = pointerTypeInfo;
 }
 
 void Semantic::resolveTypes(Node *node) {
@@ -289,7 +445,7 @@ void Semantic::resolveTypes(Node *node) {
             resolveDecl(this, node);
         } break;
         case NodeType::TYPE: {
-            // nothing to do? or maybe we should figure out the size?
+            resolveType(this, node);
         } break;
         case NodeType::BINOP: {
             resolveBinop(this, node);
@@ -299,6 +455,18 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::ASSIGN: {
             resolveAssign(this, node);
+        } break;
+        case NodeType::DECL_PARAM: {
+            resolveDeclParam(this, node);
+        } break;
+        case NodeType::PARAM: {
+            resolveParam(this, node);
+        } break;
+        case NodeType::DEREF: {
+            resolveDeref(this, node);
+        } break;
+        case NodeType::ADDRESS_OF: {
+            resolveAddressOf(this, node);
         } break;
         default: assert(false);
     }

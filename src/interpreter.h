@@ -63,14 +63,15 @@ void interpretRet(Interpreter *interp);
 void interpretJumpIf(Interpreter *interp);
 void interpretJump(Interpreter *interp);
 void interpretStore(Interpreter *interp);
+void interpretStoreConst(Interpreter *interp);
 void interpretExit(Interpreter *interp);
 
 class Interpreter {
 public:
-    vector<unsigned char> instructions;
-    unordered_map<uint32_t, uint32_t> fnTable;
+    vector<unsigned char> instructions = {};
+    unordered_map<uint32_t, uint32_t> fnTable = {};
 
-    vector<unsigned char> stack;
+    vector<unsigned char> stack = {};
 
     int32_t pc = 0;
     int32_t sp = 0;
@@ -201,6 +202,7 @@ public:
             interpretMathBitwiseXor<32, int32_t>,
             interpretMathBitwiseXor<64, int64_t>,
             interpretStore,
+            interpretStoreConst,
             interpretBumpSP,
             interpretJumpIf,
             interpretJump,

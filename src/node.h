@@ -9,19 +9,19 @@
 class Node;
 
 struct FnTypeData {
-    vector<Node *> params;
+    vector<Node *> params = {};
     Node *returnType = nullptr;
 };
 
 struct StructTypeData {
     bool isLiteral;
-    int64_t atomId;
-    vector<Node *> params;
+    Node *name = nullptr;
+    vector<Node *> params = {};
 };
 
 struct PointerTypeData {
-    bool isNilLiteral;
-    Node *underlyingType;
+    bool isNilLiteral = false;
+    Node *underlyingType = nullptr;
 };
 
 struct SymbolTypeData {
@@ -41,48 +41,48 @@ struct TypeData {
 };
 
 struct DeclParamData {
-    int64_t atomId;
-    Node *type;
-    Node *initialValue;
+    Node *name = nullptr;
+    Node *type = nullptr;
+    Node *initialValue = nullptr;
 };
 
-struct FnParamData {
-    Node *name;
-    Node *value;
+struct ParamData {
+    Node *name = nullptr;
+    Node *value = nullptr;
 };
 
 struct ModuleData {
-    int64_t atomId;
-    vector<Node *> decls;
+    Node *name = nullptr;
+    vector<Node *> decls = {};
 };
 
 struct ImportData {
-    Node *target;
+    Node *target = nullptr;
 };
 
 struct FnDeclData {
-    int64_t atomId;
-    vector<Node *> params;
-    Node * returnType;
-    vector<Node *> body;
-    vector<Node *> locals;
-    vector<Node *> returns;
+    Node *name = nullptr;
+    vector<Node *> params = {};
+    Node * returnType = nullptr;
+    vector<Node *> body = {};
+    vector<Node *> locals = {};
+    vector<Node *> returns = {};
 
-    int64_t stackSize;
+    int32_t stackSize = 0;
     unsigned long instOffset;
     bool isLiteral;
     unsigned long tableIndex;
 };
 
 struct DeclData {
-    Node *lvalue;
-    Node *type;
-    Node *initialValue;
+    Node *lvalue = nullptr;
+    Node *type = nullptr;
+    Node *initialValue = nullptr;
 };
 
 struct AssignData {
-    Node *lhs;
-    Node *rhs;
+    Node *lhs = nullptr;
+    Node *rhs = nullptr;
 };
 
 struct IntLiteralData {
@@ -98,48 +98,48 @@ struct BoolLiteralData {
 };
 
 struct FnCallData {
-    Node *fn;
-    vector<Node *> params;
+    Node *fn = nullptr;
+    vector<Node *> params = {};
 };
 
 struct DotData {
-    Node *lhs;
-    Node *rhs;
+    Node *lhs = nullptr;
+    Node *rhs = nullptr;
 };
 
 struct BinopData {
     LexerTokenType type;
-    Node *lhs;
-    Node *rhs;
+    Node *lhs = nullptr;
+    Node *rhs = nullptr;
 };
 
 struct PipeData {
-    Node *lhs;
-    Node *rhs;
+    Node *lhs = nullptr;
+    Node *rhs = nullptr;
 };
 
 struct StructLiteralData {
-    vector<Node *> params;
+    vector<Node *> params = {};
 };
 
 struct IfData {
-    Node *condition;
-    vector<Node *> stmts;
-    vector<Node *> elseStmts;
+    Node *condition = nullptr;
+    vector<Node *> stmts = {};
+    vector<Node *> elseStmts = {};
 };
 
 struct WhileData {
-    Node *condition;
-    vector<Node *> stmts;
+    Node *condition = nullptr;
+    vector<Node *> stmts = {};
 };
 
 struct CastData {
-    Node *type;
-    Node *value;
+    Node *type = nullptr;
+    Node *value = nullptr;
 };
 
 struct RetData {
-    Node *value;
+    Node *value = nullptr;
 };
 
 struct SymbolData {
@@ -148,22 +148,24 @@ struct SymbolData {
 
 class Scope {
 public:
-    unordered_map<int64_t, Node *> symbols;
-    Scope *parent;
+    unordered_map<int64_t, Node *> symbols = {};
+    Scope *parent = {};
 
     Scope(Scope *parent);
 
     Node *find(int64_t atomId);
 };
 
+int64_t typeSize(Node *type);
+
 class Node {
 public:
     unsigned long id;
 
-    Region region;
-    Scope *scope;
-    Node *typeInfo;
-    Node *resolved;
+    Region region = {};
+    Scope *scope = nullptr;
+    Node *typeInfo = nullptr;
+    Node *resolved = nullptr;
     NodeType type;
 
     // union {
@@ -180,7 +182,7 @@ public:
         BinopData binopData;
         PipeData pipeData;
         DeclParamData declParamData;
-        FnParamData fnParamData;
+        ParamData paramData;
         TypeData typeData;
         StructLiteralData structLiteralData;
         IfData ifData;
@@ -198,7 +200,8 @@ public:
 
     // todo(chad): better way to store this?
     vector<unsigned char> bytecode;
-    int64_t localOffset;
+    bool isLocal = false;
+    int32_t localOffset = 0;
 
     Node(NodeTypekind typekind);
     Node(SourceInfo srcInfo, vector<Node *> *allNodes, NodeType type_, Scope *scope_);

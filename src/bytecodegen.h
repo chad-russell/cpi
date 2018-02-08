@@ -9,24 +9,29 @@
 
 class BytecodeGen {
 public:
-    vector<unsigned char> instructions;
-    unordered_map<uint32_t, uint32_t> fnTable;
+    vector<unsigned char> instructions = {};
+    unordered_map<uint32_t, uint32_t> fnTable = {};
 
-    SourceMap sourceMap;
+    SourceMap sourceMap = {};
     int64_t currentFnStackSize;
 
-    queue<Node *> toProcess;
+    queue<Node *> toProcess = {};
     bool processFnDecls = false;
 
     bool isMainFn;
 
     // for going back at the end and setting call/jump locations
-    unordered_map<int64_t, Node *> fixups;
+    unordered_map<int64_t, Node *> fixups = {};
 
     void binopHelper(string instructionStr, Node *node);
 
     void gen(Node *node);
     void fixup();
+
+    void copyBytes(vector<unsigned char> &instructions, int64_t offset, int64_t i, int64_t size);
+    void storeValue(vector<unsigned char> &instructions, Node *node, int32_t offset);
 };
+
+bool isConstant(Node *node);
 
 #endif // BYTECODEGEN_H

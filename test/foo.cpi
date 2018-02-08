@@ -1,4 +1,4 @@
 fn main() {
-    a := fn() { ret 3 }
-    ret a()
+    f := fn() { ret 345 }
+    ret (^^^&^&&&f)()
 }

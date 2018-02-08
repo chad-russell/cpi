@@ -105,21 +105,21 @@ int AssemblyLexer::getArgCount(TokenType tt) {
         || startsWith(ttName, "XOR16")
         || startsWith(ttName, "XOR32")
         || startsWith(ttName, "XOR64")
+        || tt == TokenType::STORE
         || tt == TokenType::JUMPIF) {
         return 3;
-    } else if (tt == TokenType::STORE) {
-        return 2;
     } else if (startsWith(ttName, "CONST")
-        || startsWith(ttName, "I")
-        || startsWith(ttName, "F")
-        || tt == TokenType::BUMPSP
-        || tt == TokenType::JUMP
-        || tt == TokenType::CALL
-        || tt == TokenType::CALLI) {
+               || startsWith(ttName, "I")
+               || startsWith(ttName, "F")
+               || tt == TokenType::BUMPSP
+               || tt == TokenType::JUMP
+               || tt == TokenType::CALL
+               || tt == TokenType::CALLI
+               || tt == TokenType::STORECONST) {
         return 1;
-    } else if (tt == TokenType::RET 
-        || tt == TokenType::EXIT
-        || tt == TokenType::COMMENT) {
+    } else if (tt == TokenType::RET
+               || tt == TokenType::EXIT
+               || tt == TokenType::COMMENT) {
         return 0;
     }
 
@@ -323,7 +323,8 @@ const vector<string> AssemblyLexer::tokenTypeStrings = {
     "AND8", "AND16", "AND32", "AND64", "OR8", "OR16", "OR32", "OR64", "XOR8", "XOR16", "XOR32", "XOR64",
 
     // general instructions
-    "STORE", 
+    "STORE",
+    "STORECONST",
     "BUMPSP", 
     "JUMPIF", 
     "JUMP", 
@@ -374,8 +375,9 @@ const vector<string> AssemblyLexer::instructionStrings = {
     "AND8", "AND16", "AND32", "AND64", "OR8", "OR16", "OR32", "OR64", "XOR8", "XOR16", "XOR32", "XOR64",
 
     // general instructions
-    "STORE", 
-    "BUMPSP", 
+    "STORE",
+    "STORECONST",
+    "BUMPSP",
     "JUMPIF", 
     "JUMP", 
     "CALLI", 
@@ -421,7 +423,6 @@ string MnemonicPrinter::debugString(uint32_t startPc, uint32_t endPc) {
 
     return instructionString;
 }
-
 
 void MnemonicPrinter::step() {
     auto inst = AssemblyLexer::instructionStrings[instructions[pc]];
@@ -474,11 +475,21 @@ void MnemonicPrinter::step() {
         readTypeAndIntOrFloat();
         instructionString.append(" ");
         readTypeAndIntOrFloat();
-    } else if (startsWith(inst, "STORE")) {
-        instructionString.append("STORE ");
-        instructionString.append(to_string(consume<int32_t>()));
+    } else if (startsWith(inst, "STORECONST")) {
+        instructionString.append(inst);
         instructionString.append(" ");
-        readTypeAndIntOrFloat();
+        readTypeAndInt();
+        instructionString.append(" ");
+        readTypeAndInt();
+        instructionString.append(" ");
+    } else if (startsWith(inst, "STORE")) {
+        instructionString.append(inst);
+        instructionString.append(" ");
+        readTypeAndInt();
+        instructionString.append(" ");
+        readTypeAndInt();
+        instructionString.append(" ");
+        instructionString.append(to_string(consume<int32_t>()));
     } else if (startsWith(inst, "JUMPIF")) {
         instructionString.append(inst);
         instructionString.append(" ");
