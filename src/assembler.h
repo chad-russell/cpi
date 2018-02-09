@@ -38,9 +38,9 @@ enum class TokenType : unsigned char {
     AND8, AND16, AND32, AND64, OR8, OR16, OR32, OR64, XOR8, XOR16, XOR32, XOR64,
 
     // general instructions
-    STORE,
     STORECONST,
-    BUMPSP, 
+    STORE,
+    BUMPSP,
     JUMPIF, 
     JUMP, 
     CALLI, 
@@ -90,9 +90,9 @@ enum class Instruction : unsigned char {
     AND8, AND16, AND32, AND64, OR8, OR16, OR32, OR64, XOR8, XOR16, XOR32, XOR64,
 
     // general instructions
-    STORE,
     STORECONST,
-    BUMPSP, 
+    STORE,
+    BUMPSP,
     JUMPIF, 
     JUMP, 
     CALLI, 

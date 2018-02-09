@@ -190,6 +190,7 @@ int main(int argc, char **argv) {
         }
         interp->instructions = instructions;
         interp->fnTable = fnTable;
+
         interp->interpret();
 
 //        cout << "STACK:" << endl;

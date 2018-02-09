@@ -194,6 +194,7 @@ void AssemblyLexer::popFront() {
         eat();
     }
     auto toParse = sourceMap.sourceInfo.source.substr(startIndex, loc.byteIndex - startIndex);
+
     if (toParse.find('.') != string::npos) {
         auto parsed = stod(toParse);
 
@@ -323,9 +324,9 @@ const vector<string> AssemblyLexer::tokenTypeStrings = {
     "AND8", "AND16", "AND32", "AND64", "OR8", "OR16", "OR32", "OR64", "XOR8", "XOR16", "XOR32", "XOR64",
 
     // general instructions
-    "STORE",
     "STORECONST",
-    "BUMPSP", 
+    "STORE",
+    "BUMPSP",
     "JUMPIF", 
     "JUMP", 
     "CALLI", 
@@ -375,8 +376,8 @@ const vector<string> AssemblyLexer::instructionStrings = {
     "AND8", "AND16", "AND32", "AND64", "OR8", "OR16", "OR32", "OR64", "XOR8", "XOR16", "XOR32", "XOR64",
 
     // general instructions
-    "STORE",
     "STORECONST",
+    "STORE",
     "BUMPSP",
     "JUMPIF", 
     "JUMP", 

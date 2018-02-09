@@ -297,6 +297,10 @@ Node *Parser::parseScopedStmt() {
         ass->assignData.rhs = rvalue;
         ass->region = {lexer->srcInfo, saved, last.region.end};
 
+        if (lvalue->type == NodeType::DEREF) {
+            addLocal(rvalue);
+        }
+
         return ass;
     }
 

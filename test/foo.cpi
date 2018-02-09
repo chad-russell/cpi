@@ -1,4 +1,12 @@
 fn main() {
-    f := fn() { ret 345 }
-    ret (^^^&^&&&f)()
+    f := fn() { ret 1 }
+    g := fn() { ret 2 }
+
+    pf := &&f
+    pg := &&g
+
+    ^pg = ^pf
+    ^^pg = fn() { ret 999 }
+
+    ret g()
 }

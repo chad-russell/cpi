@@ -9,24 +9,22 @@ fn main() {
         }
     }
 
-    -- 3
     a1 := f()()()()
 
-    -- 3
     a2 := apply(inc, 1) + apply_overboard(inc, 0)
 
-    -- 3
     a3 := ^^^^^^&&&^&&&&^&^^&&3
 
-    -- 3
-    a4_helper := &&&&&&&&&&&&a3
+    a4_helper := &&&&^&&&&&&&&&a3
     a4 := ^^^^^^^^^^^^a4_helper
 
-    -- 3
     a5 := a5_fn()
 
-    -- 12
-    ret a1 + a2 + a3 + a4 + a5
+    a6 := (^^&&a5_fn)()
+
+    a7 := (^&(fn() i32 { ret 3 }))()
+
+    ret a1 + a2 + a3 + a4 + a5 + a6 + a7
 }
 
 fn a5_fn() {

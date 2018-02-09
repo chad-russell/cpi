@@ -148,7 +148,6 @@ void BytecodeGen::gen(Node *node) {
 
             auto localOffset = node->localOffset;
 
-            // findme
             storeValue(node->bytecode, data.initialValue, localOffset);
         } break;
         case NodeType::ASSIGN: {
@@ -159,9 +158,24 @@ void BytecodeGen::gen(Node *node) {
             auto resolvedDecl = resolve(data.lhs);
             if (resolvedDecl->type == NodeType::DECL) {
                 auto localOffset = static_cast<int32_t>(resolvedDecl->localOffset);
-                storeValue(node->bytecode, node, localOffset);
+                storeValue(node->bytecode, data.rhs, localOffset);
             } else if (resolvedDecl->type == NodeType::DEREF) {
-                assert(false);
+                // store rvalue into it's slot
+                gen(data.lhs);
+
+                storeValue(node->bytecode, data.rhs, data.rhs->localOffset);
+
+                auto localOffset = static_cast<int32_t>(resolve(resolvedDecl->nodeData)->localOffset);
+
+                append(node->bytecode, Instruction::STORE);
+
+                append(node->bytecode, Instruction::I32);
+                append(node->bytecode, toBytes(static_cast<int32_t>(localOffset)));
+
+                append(node->bytecode, Instruction::CONSTI32);
+                append(node->bytecode, toBytes(static_cast<int32_t>(data.rhs->localOffset)));
+
+                append(node->bytecode, toBytes(static_cast<int32_t>(typeSize(resolvedDecl->nodeData->typeInfo))));
             } else {
                 assert(false);
             }
@@ -194,6 +208,8 @@ void BytecodeGen::gen(Node *node) {
                 } break;
                 default: assert(false);
             }
+
+            node->localOffset = resolved->localOffset;
         } break;
         case NodeType::BINOP: {
             gen(node->binopData.lhs);
@@ -366,7 +382,7 @@ void BytecodeGen::storeValue(vector<unsigned char> &instructions, Node *node, in
             append(instructions, toBytes(offset));
 
             append(instructions, Instruction::CONSTI32);
-            append(instructions, toBytes(resolve(node->nodeData)->localOffset));
+            append(instructions, toBytes(node->nodeData->localOffset));
         } break;
         case NodeType::DEREF: {
             append(instructions, Instruction::STORE);
@@ -392,10 +408,11 @@ void BytecodeGen::storeValue(vector<unsigned char> &instructions, Node *node, in
 }
 
 bool isConstant(Node *node) {
-    switch (node->type) {
+    switch (resolve(node)->type) {
         case NodeType::INT_LITERAL:
         case NodeType::ADDRESS_OF:
         case NodeType::DEREF:
+        case NodeType::FN_DECL:
             return true;
         default: return false;
     }
