@@ -37,7 +37,49 @@ fn main() {
 
     a11 := testStruct2();
 
-    ret a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11;
+    a12 := testNestedCall();
+
+    a13 := testDerefParam();
+
+    a14 := testBug1();
+
+    ret a14;
+}
+
+fn testBug1() {
+    p: point;
+    p.x = 123;
+
+    q := &&p;
+    qq1 := ^q;
+    qq1.x = 3;
+
+    -- todo(chad): once we have assert, assert that p.x and q.x are also 13
+    ;
+    ret qq1.x;
+}
+
+fn deref(i: *i32) {
+    ret ^i;
+}
+
+type point struct {
+    x: i32,
+    y: i32
+}
+
+fn point_get_x(p: point) { ret p.x; }
+
+fn point_id(p: point) { ret p; }
+
+fn testNestedCall() {
+    p: point;
+    p.x = 3;
+    ret point_get_x(point_id(point_id(point_id(point_id(point_id(point_id(p)))))));
+}
+
+fn testDerefParam() {
+    ret deref(&3);
 }
 
 type S struct {

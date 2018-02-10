@@ -517,6 +517,14 @@ Node *Parser::parseType() {
 
             type->region.end = lexer->lastLoc;
         } break;
+        case LexerTokenType::MUL: {
+            popFront();
+
+            type->typeData.kind = NodeTypekind::POINTER;
+            type->typeData.pointerTypeData.underlyingType = parseType();
+
+            type->region.end = lexer->lastLoc;
+        } break;
         default: {
             ostringstream s("");
             s << "unknown type '" << SourceRegion{saved.region} << "'";

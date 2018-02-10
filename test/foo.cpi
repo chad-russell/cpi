@@ -1,19 +1,7 @@
-type point struct {
-    x: i32,
-    y: i32
-}
-
-fn point_id(p: point) {
-    ret p;
-}
-
-fn get_x(p: point) {
-    ret p.x;
+fn deref(i: *i32) {
+    ret ^i;
 }
 
 fn main() {
-    p: point;
-    p.x = 999;
-    ret get_x(point_id(p));
+    ret deref(&3);
 }
-

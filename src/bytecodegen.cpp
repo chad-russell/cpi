@@ -192,7 +192,8 @@ void BytecodeGen::gen(Node *node) {
                     append(instructions, Instruction::ADDI32);
 
                     append(instructions, Instruction::I32);
-                    append(instructions, toBytes(resolvedDecl->dotData.autoDerefStorage->localOffset));
+                    append(instructions, toBytes(resolvedDecl->localOffset));
+//                    append(instructions, toBytes(resolvedDecl->dotData.autoDerefStorage->localOffset));
 
                     append(instructions, Instruction::CONSTI32);
                     append(instructions, toBytes(offsetWords));
@@ -283,9 +284,6 @@ void BytecodeGen::gen(Node *node) {
             }
 
             if (totalParamsSize > 0) {
-                append(instructions, Instruction::BUMPSP);
-                append(instructions, toBytes(totalParamsSize));
-
                 // push the params (in reverse order!)
                 auto paramAccum = 0;
                 for (auto i = static_cast<int32_t>(paramCount - 1); i >= 0; i--) {
@@ -295,6 +293,9 @@ void BytecodeGen::gen(Node *node) {
                     storeValue(instructions, resolve(paramValue), static_cast<int32_t>(currentFnStackSize + paramAccum));
                     paramAccum += paramSize;
                 }
+
+                append(instructions, Instruction::BUMPSP);
+                append(instructions, toBytes(totalParamsSize));
             }
 
             auto resolvedFn = resolve(node->fnCallData.fn);
