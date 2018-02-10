@@ -20,6 +20,8 @@ Node::Node(NodeTypekind typekind) {
     typeData.kind = typekind;
 }
 
+Node::Node() { }
+
 int32_t Node::fullOffset() {
     return localOffset + localStorageOffset;
 }

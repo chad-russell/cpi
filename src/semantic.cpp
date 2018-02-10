@@ -317,6 +317,25 @@ void resolveBinop(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->binopData.lhs);
     semantic->resolveTypes(node->binopData.rhs);
 
+    if (node->binopData.lhs->type == NodeType::DOT) {
+        auto newLocalStorage = new Node();
+        newLocalStorage->type = NodeType::TYPE;
+        newLocalStorage->typeInfo = node->binopData.lhs->typeInfo;
+        node->binopData.lhs->dotData.nodeLocalStorage = newLocalStorage;
+
+        newLocalStorage->isLocal = true;
+        semantic->currentFnDecl->locals.push_back(newLocalStorage);
+    }
+    if (node->binopData.rhs->type == NodeType::DOT) {
+        auto newLocalStorage = new Node();
+        newLocalStorage->type = NodeType::TYPE;
+        newLocalStorage->typeInfo = node->binopData.rhs->typeInfo;
+        node->binopData.rhs->dotData.nodeLocalStorage = newLocalStorage;
+
+        newLocalStorage->isLocal = true;
+        semantic->currentFnDecl->locals.push_back(newLocalStorage);
+    }
+
     if (!typesMatch(node->binopData.lhs->typeInfo, node->binopData.rhs->typeInfo)) {
         semantic->reportError({node, node->binopData.lhs, node->binopData.rhs},
                               Error{node->region, "type mismatch - both sides of binary operation need to be the same type"});
@@ -527,6 +546,8 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
             node->typeInfo = foundParam->typeInfo;
         }
     }
+
+    semantic->resolveTypes(node->dotData.nodeLocalStorage);
 
     // if the lhs is a pointer, then our dot needs a pointer-sized local
     if (node->dotData.lhs->typeInfo->typeData.kind == NodeTypekind::POINTER) {

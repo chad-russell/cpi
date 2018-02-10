@@ -109,6 +109,8 @@ struct DotData {
 
     bool autoDeref = false;
     Node *autoDerefStorage = nullptr;
+
+    Node *nodeLocalStorage = nullptr;
 };
 
 struct BinopData {
@@ -215,6 +217,7 @@ public:
 
     int32_t fullOffset();
 
+    Node();
     Node(NodeTypekind typekind);
     Node(SourceInfo srcInfo, vector<Node *> *allNodes, NodeType type_, Scope *scope_);
 };
