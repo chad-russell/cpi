@@ -204,11 +204,11 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
         semantic->currentFnDecl->stackSize += typeSize(local->typeInfo);
     }
 
-    auto paramOffset = -12;
+    auto paramOffset = -8;
     for (auto declParam : node->fnDeclData.params) {
         // we push the params onto the stack in reverse order
-        declParam->localOffset = paramOffset;
         paramOffset -= typeSize(declParam->typeInfo);
+        declParam->localOffset = paramOffset;
     }
 
     semantic->currentFnDecl = savedFnDecl;
