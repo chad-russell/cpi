@@ -203,11 +203,11 @@ void interpretJumpIf(Interpreter *interp) {
 void interpretStore(Interpreter *interp) {
     auto maybeStoreOffset = interp->tryRead<int32_t>();
     assert(maybeStoreOffset.isPresent);
-    auto storeOffset = interp->bp + maybeStoreOffset.value;
+    auto storeOffset = maybeStoreOffset.value;
 
     auto maybeReadOffset = interp->tryRead<int32_t>();
     assert(maybeReadOffset.isPresent);
-    auto readOffset = interp->bp + maybeReadOffset.value;
+    auto readOffset = maybeReadOffset.value;
 
     auto size = interp->consume<int32_t>();
 
@@ -215,7 +215,7 @@ void interpretStore(Interpreter *interp) {
 }
 
 void interpretStoreConst(Interpreter *interp) {
-    auto storeOffset = interp->bp + interp->read<int32_t>();
+    auto storeOffset = interp->read<int32_t>();
 
     auto inst = AssemblyLexer::instructionStrings[interp->instructions[interp->pc]];
 
@@ -228,6 +228,9 @@ void interpretStoreConst(Interpreter *interp) {
         memcpy(&interp->stack[storeOffset], &value, sizeof(int16_t));
     } else if (endsWith(inst, "CONSTI32")) {
         int32_t value = interp->consume<int32_t>();
+        if (startsWith(inst, "REL")) {
+            value += interp->bp;
+        }
         memcpy(&interp->stack[storeOffset], &value, sizeof(int32_t));
     } else if (endsWith(inst, "CONSTI64")) {
         int64_t value = interp->consume<int64_t>();

@@ -29,9 +29,7 @@ fn main() {
     ^a8_helper1 = ^a8_helper2;
     a8 := (^^a8_helper1)();
 
-    a9 := bad();
-    a9_p := &&&a9;
-    ^^^a9_p = 3;
+    a9 := testA9();
 
     a10 := testStruct1();
 
@@ -43,7 +41,18 @@ fn main() {
 
     a14 := testBug1();
 
-    ret a14;
+    ret a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14;
+}
+
+fn testA9Helper() {
+    a9 := bad();
+    a9_p := &&&a9;
+    ^^^a9_p = 3;
+    ret ^^^a9_p;
+}
+
+fn testA9() {
+    ret testA9Helper();
 }
 
 fn testBug1() {
@@ -55,6 +64,7 @@ fn testBug1() {
     qq1.x = 3;
 
     -- todo(chad): once we have assert, assert that p.x and q.x are also 13
+    ; -- todo(chad): also, get rid of this dumb thing where comments have to have semicolons... :(
     ;
     ret qq1.x;
 }

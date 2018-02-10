@@ -109,6 +109,7 @@ int AssemblyLexer::getArgCount(TokenType tt) {
         || tt == TokenType::JUMPIF) {
         return 3;
     } else if (startsWith(ttName, "CONST")
+               || startsWith(ttName, "REL")
                || startsWith(ttName, "I")
                || startsWith(ttName, "F")
                || tt == TokenType::BUMPSP
@@ -340,6 +341,8 @@ const vector<string> AssemblyLexer::tokenTypeStrings = {
     // types
     "I8", "I16", "I32", "I64", "F32", "F64",
 
+    "RELCONSTI32", "RELI32", "RELCONSTI64", "RELI64",
+
     // end of instruction duplication, the rest are only tokens
     "COMMENT", 
     "EOF_", 
@@ -391,6 +394,8 @@ const vector<string> AssemblyLexer::instructionStrings = {
 
     // types
     "I8", "I16", "I32", "I64", "F32", "F64",
+
+    "RELCONSTI32", "RELI32", "RELCONSTI64", "RELI64"
 };
 
 

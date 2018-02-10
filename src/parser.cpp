@@ -451,7 +451,8 @@ Node *Parser::parseLvalue() {
     if (lexer->front.type == LexerTokenType::DEREF) {
         popFront();
         auto deref = new Node(lexer->srcInfo, &allNodes, NodeType::DEREF, scopes.top());
-        deref->nodeData = parseLvalue();
+        deref->derefData.target = parseLvalue();
+        deref->derefData.isRvalue = false;
         return deref;
     }
 
@@ -576,10 +577,13 @@ Node *Parser::parseRvalueSimple() {
         popFront();
         auto deref = new Node(lexer->srcInfo, &allNodes, NodeType::DEREF, scopes.top());
 
-        deref->nodeData = parseRvalueSimple();
-        addLocal(deref->nodeData);
+        deref->derefData.target = parseRvalueSimple();
+        deref->derefData.isRvalue = true;
 
-        deref->region = Region{lexer->srcInfo, saved, deref->nodeData->region.end};
+        addLocal(deref->derefData.target);
+        addLocal(deref);
+
+        deref->region = Region{lexer->srcInfo, saved, deref->derefData.target->region.end};
         return deref;
     }
 

@@ -1,7 +1,89 @@
+fn main() {
+    a2 := apply(inc, 1) + apply_overboard(inc, 0);
+    ret a2 + ^&deref(^&&3);
+}
+
+type point struct {
+    x: i32,
+    y: i32
+}
+
+fn testBug1() {
+    p: point;
+    p.x = 123;
+
+    q := &&p;
+    qq1 := ^q;
+    qq1.x = 3;
+
+    ret qq1.x;
+}
+
+fn testDerefParam() {
+    ret deref(&3);
+}
+
 fn deref(i: *i32) {
     ret ^i;
 }
 
-fn main() {
-    ret deref(&3);
+fn testStruct2() {
+	f: S;
+	f.y = 3;
+	ret f.y;
+}
+
+fn inc(n: i32) {
+    ret n + 1;
+}
+
+fn apply(a: fn(n: i32) i32, b: i32) {
+    ret a(b);
+}
+
+fn foo() {
+    ret bar;
+}
+
+fn bar() {
+    ret 3;
+}
+
+fn apply_overboard(a: fn(n: i32) i32, b: i32) {
+    ret fn(f: fn(n: i32) i32, g: i32) {
+        ret f(g);
+    }(a, b);
+}
+
+fn a5_fn() {
+    f := fn() i32 { ret 3; };
+    p := &f;
+    ret (^p)();
+}
+
+fn bad() i32 { ret 999; }
+
+fn testA9Helper() {
+    a9 := bad();
+    a9_p := &&&a9;
+    ^^^a9_p = 3;
+    ret ^^^a9_p;
+}
+
+fn testA9() {
+    ret testA9Helper();
+}
+
+type S struct {
+	x: struct {
+		p1: i32,
+		p2: i32
+	},
+	y: i32
+}
+
+fn testStruct1() {
+	f: S;
+	f.y = 3;
+	ret ^^&&(f.y);
 }

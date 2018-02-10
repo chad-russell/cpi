@@ -115,8 +115,12 @@ struct DotData {
 
 struct BinopData {
     LexerTokenType type;
+
     Node *lhs = nullptr;
     Node *rhs = nullptr;
+
+    Node *lhsTemporary;
+    Node *rhsTemporary;
 };
 
 struct PipeData {
@@ -150,6 +154,11 @@ struct RetData {
 
 struct SymbolData {
     int64_t atomId;
+};
+
+struct DerefData {
+    Node *target = nullptr;
+    bool isRvalue;
 };
 
 class Scope {
@@ -197,6 +206,7 @@ public:
         CastData castData;
         RetData retData;
         SymbolData symbolData;
+        DerefData derefData;
     // };
 
     bool isUsedInError = false;

@@ -194,10 +194,10 @@ int main(int argc, char **argv) {
         interp->interpret();
 
 //        cout << "STACK:" << endl;
-//        for (auto i = 0; i < interp->stack.size(); i++) {
+//        for (auto i = 0; i < 64; i++) {
 //            cout << static_cast<int32_t>(interp->stack[i]) << ", ";
 //        }
-//        cout << endl;
+//        cout << endl << endl;
         cout << interp->readFromStack<int32_t>(0) << endl;
     }
 

@@ -54,6 +54,8 @@ enum class TokenType : unsigned char {
     // types
     I8, I16, I32, I64, F32, F64,
 
+    RELCONSTI32, RELI32, RELCONSTI64, RELI64,
+
     // end of instruction duplication, the rest are only tokens
     COMMENT, 
     EOF_, 
@@ -105,6 +107,9 @@ enum class Instruction : unsigned char {
 
     // types
     I8, I16, I32, I64, F32, F64,
+
+    // relative literals
+    RELCONSTI32, RELI32, RELCONSTI64, RELI64,
 };
 
 struct Token {

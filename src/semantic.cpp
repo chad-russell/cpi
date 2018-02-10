@@ -100,10 +100,6 @@ Node *localTarget(Node *local) {
         return localTarget(resolved->dotData.lhs);
     }
 
-    if (resolved->type == NodeType::DEREF) {
-        resolved = localTarget(resolved->nodeData);
-    }
-
     return resolved;
 }
 
@@ -313,9 +309,20 @@ void resolveType(Semantic *semantic, Node *node) {
     node->typeInfo = node;
 }
 
+Node *makeTemporary(Semantic *semantic, Node *n) {
+    auto node = new Node();
+    node->typeInfo = n->typeInfo;
+    node->isLocal = true;
+    semantic->currentFnDecl->locals.push_back(node);
+    return node;
+}
+
 void resolveBinop(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->binopData.lhs);
     semantic->resolveTypes(node->binopData.rhs);
+
+    node->binopData.lhsTemporary = makeTemporary(semantic, node->binopData.lhs);
+    node->binopData.rhsTemporary = makeTemporary(semantic, node->binopData.rhs);
 
     if (node->binopData.lhs->type == NodeType::DOT) {
         auto newLocalStorage = new Node();
@@ -476,8 +483,8 @@ void resolveParam(Semantic *semantic, Node *node) {
 }
 
 void resolveDeref(Semantic *semantic, Node *node) {
-    semantic->resolveTypes(node->nodeData);
-    auto pointerType = node->nodeData->typeInfo;
+    semantic->resolveTypes(node->derefData.target);
+    auto pointerType = node->derefData.target->typeInfo;
     assert(pointerType->typeData.kind == NodeTypekind::POINTER);
     node->typeInfo = pointerType->typeData.pointerTypeData.underlyingType;
 }

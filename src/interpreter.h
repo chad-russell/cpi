@@ -250,19 +250,40 @@ public:
   template <typename T>
   Optional<T> tryRead() {
       auto instructionPcString = AssemblyLexer::instructionStrings[instructions[pc]];
-      string prefix = "CONST";
+
+      string prefix = "RELCONST";
       auto testInstructionString = prefix.append(suffixForType<T>());
       if (instructionPcString == testInstructionString) {
           pc += 1;
-          return Optional<T>{true, consume<T>(), true};
+          auto consumed = consume<T>();
+          consumed += static_cast<T>(bp);
+          return Optional<T>{true, consumed};
+      }
+
+      prefix = "REL";
+      testInstructionString = prefix.append(suffixForType<T>());
+      if (instructionPcString == testInstructionString) {
+          pc += 1;
+          auto consumed = consume<int32_t>();
+          auto value = readFromStack<T>(consumed + bp);
+          return Optional<T>{true, value};
+      }
+
+      prefix = "CONST";
+      testInstructionString = prefix.append(suffixForType<T>());
+      if (instructionPcString == testInstructionString) {
+          pc += 1;
+          auto consumed = consume<T>();
+          return Optional<T>{true, consumed};
       }
 
       instructionPcString = AssemblyLexer::instructionStrings[instructions[pc]];
       testInstructionString = suffixForType<T>();
       if (instructionPcString == instructionPcString) {
           pc += 1;
-          auto offset = consume<int32_t>();
-          return Optional<T>{true, readFromStack<T>(bp + offset), false};
+          auto consumed = consume<int32_t>();
+          auto value = readFromStack<T>(consumed);
+          return Optional<T>{true, value};
       }
 
       return {false, {}};
