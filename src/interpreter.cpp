@@ -201,8 +201,14 @@ void interpretJumpIf(Interpreter *interp) {
 }
 
 void interpretStore(Interpreter *interp) {
-    auto storeOffset = interp->bp + interp->read<int32_t>();
-    auto readOffset = interp->bp + interp->read<int32_t>();
+    auto maybeStoreOffset = interp->tryRead<int32_t>();
+    assert(maybeStoreOffset.isPresent);
+    auto storeOffset = interp->bp + maybeStoreOffset.value;
+
+    auto maybeReadOffset = interp->tryRead<int32_t>();
+    assert(maybeReadOffset.isPresent);
+    auto readOffset = interp->bp + maybeReadOffset.value;
+
     auto size = interp->consume<int32_t>();
 
     memcpy(&interp->stack[storeOffset], &interp->stack[readOffset], static_cast<size_t>(size));

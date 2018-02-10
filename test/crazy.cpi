@@ -1,52 +1,87 @@
 fn foo() {
-    ret bar
+    ret bar;
 }
 
 fn main() {
     f := fn() {
         ret fn() {
-            ret foo
-        }
-    }
+            ret foo;
+        };
+    };
 
-    a1 := f()()()()
+    a1 := f()()()();
 
-    a2 := apply(inc, 1) + apply_overboard(inc, 0)
+    a2 := apply(inc, 1) + apply_overboard(inc, 0);
 
-    a3 := ^^^^^^&&&^&&&&^&^^&&3
+    a3 := ^^^^^^&&&^&&&&^&^^&&3;
 
-    a4_helper := &&&&^&&&&&&&&&a3
-    a4 := ^^^^^^^^^^^^a4_helper
+    a4_helper := &&&&^&&&&&&&&&a3;
+    a4 := ^^^^^^^^^^^^a4_helper;
 
-    a5 := a5_fn()
+    a5 := a5_fn();
 
-    a6 := (^^&&a5_fn)()
+    a6 := (^^&&a5_fn)();
 
-    a7 := (^&(fn() i32 { ret 3 }))()
+    a7 := (^&(fn() i32 { ret 3; }))();
 
-    ret a1 + a2 + a3 + a4 + a5 + a6 + a7
+    a8_helper1 := &&bad;
+    a8_helper2 := &&bar;
+    ^a8_helper1 = ^a8_helper2;
+    a8 := (^^a8_helper1)();
+
+    a9 := bad();
+    a9_p := &&&a9;
+    ^^^a9_p = 3;
+
+    a10 := testStruct1();
+
+    a11 := testStruct2();
+
+    ret a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11;
 }
 
+type S struct {
+	x: struct {
+		p1: i32,
+		p2: i32
+	},
+	y: i32
+}
+
+fn testStruct1() {
+	f: S;
+	f.y = 3;
+	ret ^^&&(f.y);
+}
+
+fn testStruct2() {
+	f: S;
+	f.y = 3;
+	ret f.y;
+}
+
+fn bad() i32 { ret 999; }
+
 fn a5_fn() {
-    f := fn() i32 { ret 3 }
-    p := &f
-    ret (^p)()
+    f := fn() i32 { ret 3; };
+    p := &f;
+    ret (^p)();
 }
 
 fn bar() i32 {
-    ret 3
+    ret 3;
 }
 
 fn inc(n: i32) {
-    ret n + 1
+    ret n + 1;
 }
 
 fn apply(a: fn(n: i32) i32, b: i32) {
-    ret a(b)
+    ret a(b);
 }
 
 fn apply_overboard(a: fn(n: i32) i32, b: i32) {
     ret fn(f: fn(n: i32) i32, g: i32) {
-        ret f(g)
-    }(a, b)
+        ret f(g);
+    }(a, b);
 }

@@ -486,10 +486,13 @@ void MnemonicPrinter::step() {
     } else if (startsWith(inst, "STORE")) {
         instructionString.append(inst);
         instructionString.append(" ");
+
         readTypeAndInt();
         instructionString.append(" ");
+
         readTypeAndInt();
         instructionString.append(" ");
+
         instructionString.append(to_string(consume<int32_t>()));
     } else if (startsWith(inst, "JUMPIF")) {
         instructionString.append(inst);

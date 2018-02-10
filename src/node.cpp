@@ -20,6 +20,10 @@ Node::Node(NodeTypekind typekind) {
     typeData.kind = typekind;
 }
 
+int32_t Node::fullOffset() {
+    return localOffset + localStorageOffset;
+}
+
 Node *resolve(Node *n) {
     if (n == nullptr) { return nullptr; }
     if (n->resolved == nullptr) { return n; }

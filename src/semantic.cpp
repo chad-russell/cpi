@@ -2,10 +2,20 @@
 
 #include <sstream>
 
-int64_t typeSize(Node *type) {
+int32_t typeSize(Node *type) {
     assert(type->type == NodeType::TYPE);
 
     switch (type->typeData.kind) {
+        case NodeTypekind::SYMBOL:
+            return typeSize(type->resolved);
+        case NodeTypekind::STRUCT: {
+            auto total = 0;
+            for (auto param : type->typeData.structTypeData.params) {
+                param->localOffset = total;
+                total += typeSize(param->declParamData.type);
+            }
+            return total;
+        }
         case NodeTypekind::I32:
         case NodeTypekind::FN:
         case NodeTypekind::POINTER:
@@ -81,6 +91,20 @@ void Semantic::reportError(vector<Node *> nodes, Error error) {
     }
 
     cout << s.str() << endl;
+}
+
+Node *localTarget(Node *local) {
+    auto resolved = resolve(local);
+
+    if (resolved->type == NodeType::DOT) {
+        return localTarget(resolved->dotData.lhs);
+    }
+
+    if (resolved->type == NodeType::DEREF) {
+        resolved = localTarget(resolved->nodeData);
+    }
+
+    return resolved;
 }
 
 void resolveFnDecl(Semantic *semantic, Node *node) {
@@ -173,7 +197,7 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
     }
 
     for (auto local : data->locals) {
-        auto resolved = resolve(local);
+        auto resolved = localTarget(local);
         if (resolved != local && resolved->isLocal) { continue; }
 
         local->localOffset = semantic->currentFnDecl->stackSize;
@@ -225,14 +249,14 @@ void resolveDecl(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->declData.type);
     semantic->resolveTypes(node->declData.initialValue);
 
-    if (node->declData.initialValue->typeInfo == nullptr) {
+    if (node->declData.initialValue != nullptr && node->declData.initialValue->typeInfo == nullptr) {
         semantic->reportError({node, node->declData.initialValue},
                               Error{node->declData.initialValue->region, "could not resolve type of initial value for this declaration"});
         return;
     }
 
     // if there is an initial value and a declared type, they should match
-    if (node->declData.initialValue->typeInfo != nullptr
+    if (node->declData.initialValue != nullptr && node->declData.initialValue->typeInfo != nullptr
             && node->declData.type != nullptr
             && !typesMatch(node->declData.initialValue->typeInfo, node->declData.type)) {
         ostringstream s("");
@@ -260,6 +284,28 @@ void resolveType(Semantic *semantic, Node *node) {
                 semantic->resolveTypes(param);
             }
             semantic->resolveTypes(node->typeData.fnTypeData.returnType);
+        } break;
+        case NodeTypekind::STRUCT: {
+            for (auto param : node->typeData.structTypeData.params) {
+                semantic->resolveTypes(param);
+            }
+        } break;
+        case NodeTypekind::SYMBOL: {
+            node->resolved = node->scope->find(node->typeData.symbolTypeData.atomId);
+
+            if (node->resolved == nullptr) {
+                ostringstream s("");
+                s << "undeclared identifier " << AtomTable::current->backwardAtoms[node->typeData.symbolTypeData.atomId];
+                semantic->reportError({node}, Error{node->region, s.str()});
+                return;
+            }
+
+            assert(node->resolved->type == NodeType::TYPE);
+
+            semantic->resolveTypes(node->resolved);
+        } break;
+        case NodeTypekind::POINTER: {
+            semantic->resolveTypes(node->typeData.pointerTypeData.underlyingType);
         } break;
         default: assert(false);
     }
@@ -396,6 +442,11 @@ void resolveAssign(Semantic *semantic, Node *node) {
 }
 
 void resolveDeclParam(Semantic *semantic, Node *node) {
+    assert(!(node->declParamData.type == nullptr && node->declParamData.initialValue == nullptr));
+    semantic->resolveTypes(node->declParamData.initialValue);
+    if (node->declParamData.type == nullptr) {
+        node->declParamData.type = node->declParamData.initialValue->typeInfo;
+    }
     semantic->resolveTypes(node->declParamData.type);
     node->typeInfo = node->declParamData.type;
 }
@@ -417,6 +468,81 @@ void resolveAddressOf(Semantic *semantic, Node *node) {
     auto pointerTypeInfo = new Node(NodeTypekind::POINTER);
     pointerTypeInfo->typeData.pointerTypeData.underlyingType = node->nodeData->typeInfo;
     node->typeInfo = pointerTypeInfo;
+}
+
+Node *findParam(Semantic *semantic, Node *node) {
+    auto resolvedTypeInfo = resolve(node->dotData.lhs)->typeInfo;
+    assert(resolvedTypeInfo != nullptr);
+
+    auto typeData = &resolve(resolvedTypeInfo)->typeData;
+    while (typeData->kind == NodeTypekind::POINTER) {
+        typeData = &resolve(typeData->pointerTypeData.underlyingType)->typeData;
+    }
+    if (typeData->kind != NodeTypekind::STRUCT) {
+        semantic->reportError({node}, Error{node->region, "cannot perform dot operation on this!"});
+    }
+    auto structData = typeData->structTypeData;
+
+    Node *foundParam = nullptr;
+    for (auto param : structData.params) {
+        if (param->declParamData.name->symbolData.atomId == node->dotData.rhs->symbolData.atomId) {
+            foundParam = param;
+            break;
+        }
+    }
+
+    node->dotData.resolved = foundParam;
+
+    return foundParam;
+}
+
+void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
+    auto resolvedLhs = resolve(lhs);
+
+    if (resolvedLhs->type == NodeType::DOT) {
+        resolveDot(semantic, resolvedLhs, resolvedLhs->dotData.lhs, resolvedLhs->dotData.rhs);
+        resolveDot(semantic, node, resolvedLhs->dotData.resolved, rhs);
+
+        node->dotData.resolved = rhs->resolved;
+        node->typeInfo = rhs->typeInfo;
+    }
+    else {
+        semantic->resolveTypes(resolvedLhs);
+
+        if (resolvedLhs->typeInfo == nullptr) {
+            semantic->reportError({node, resolvedLhs}, Error{resolvedLhs->region, "cannot resolve type of lhs of dot operation"});
+            return;
+        }
+
+        auto foundParam = findParam(semantic, node);
+        semantic->resolveTypes(foundParam);
+
+        if (foundParam == nullptr) {
+            semantic->reportError({node}, Error{node->region, "invalid rhs in dot expression"});
+        } else {
+            rhs->resolved = foundParam;
+            rhs->typeInfo = foundParam->typeInfo;
+
+            node->dotData.resolved = foundParam;
+            node->typeInfo = foundParam->typeInfo;
+        }
+    }
+
+    // if the lhs is a pointer, then our dot needs a pointer-sized local
+    if (node->dotData.lhs->typeInfo->typeData.kind == NodeTypekind::POINTER) {
+        node->dotData.autoDeref = true;
+
+        auto local = new Node(NodeTypekind::POINTER);
+        local->typeInfo = local;
+        local->isLocal = true;
+        semantic->currentFnDecl->locals.push_back(local);
+
+        node->dotData.autoDerefStorage = local;
+    }
+}
+
+void resolveDot(Semantic *semantic, Node *node) {
+    resolveDot(semantic, node, resolve(node->dotData.lhs), node->dotData.rhs);
 }
 
 void Semantic::resolveTypes(Node *node) {
@@ -467,6 +593,9 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::ADDRESS_OF: {
             resolveAddressOf(this, node);
+        } break;
+        case NodeType::DOT: {
+            resolveDot(this, node);
         } break;
         default: assert(false);
     }

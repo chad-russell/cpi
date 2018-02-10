@@ -26,7 +26,8 @@ bool isSpecial(char c) {
            || c == '`'
            || c == '!'
            || c == '|'
-           || c == ',';
+           || c == ','
+           || c == ';';
 }
 
 Lexer::Lexer(string fileName) {
@@ -104,6 +105,7 @@ void Lexer::popFront() {
     // save location. next LexerToken effectively starts here
     lastLoc = loc;
 
+    if (tryEat(&next, ";", LexerTokenType::SEMICOLON)) { return; }
     if (tryEat(&next, "{", LexerTokenType::LCURLY)) { return; }
     if (tryEat(&next, "}", LexerTokenType::RCURLY)) { return; }
     if (tryEat(&next, "(", LexerTokenType::LPAREN)) { return; }
@@ -412,7 +414,8 @@ const vector<string> Lexer::lexerTokenTypeStrings = {
     "MODULE",
     "IMPORT",
     "CAST",
-    "ASSERT"};
+    "ASSERT",
+    "SEMICOLON"};
 
 ostream &operator<<(ostream &os, LexerTokenType tokenType) {
     return os << Lexer::lexerTokenTypeStrings[static_cast<int32_t>(tokenType)];

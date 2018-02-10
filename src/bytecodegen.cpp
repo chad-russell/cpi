@@ -52,8 +52,8 @@ void BytecodeGen::binopHelper(string instructionStr, Node *node) {
     append(instructions, node->binopData.lhs->bytecode);
     append(instructions, node->binopData.rhs->bytecode);
 
-    append(instructions, toBytes(static_cast<int32_t>(node->localOffset)));
-    append(node->bytecode, toBytes(static_cast<int32_t>(node->localOffset)));
+    append(instructions, toBytes(static_cast<int32_t>(node->fullOffset())));
+    append(node->bytecode, toBytes(static_cast<int32_t>(node->fullOffset())));
 }
 
 void BytecodeGen::gen(Node *node) {
@@ -113,7 +113,7 @@ void BytecodeGen::gen(Node *node) {
             // store 0 {whatever the node data is}
             gen(node->retData.value);
 
-            storeValue(node->bytecode, resolve(node->retData.value), 0);
+            storeValue(node->bytecode, node->retData.value, 0);
 
             if (isMainFn) {
                 append(node->bytecode, Instruction::EXIT);
@@ -157,15 +157,15 @@ void BytecodeGen::gen(Node *node) {
 
             auto resolvedDecl = resolve(data.lhs);
             if (resolvedDecl->type == NodeType::DECL) {
-                auto localOffset = static_cast<int32_t>(resolvedDecl->localOffset);
+                auto localOffset = static_cast<int32_t>(resolvedDecl->fullOffset());
                 storeValue(node->bytecode, data.rhs, localOffset);
             } else if (resolvedDecl->type == NodeType::DEREF) {
-                // store rvalue into it's slot
                 gen(data.lhs);
 
-                storeValue(node->bytecode, data.rhs, data.rhs->localOffset);
+                // store rvalue into it's slot
+                storeValue(node->bytecode, data.rhs, data.rhs->fullOffset());
 
-                auto localOffset = static_cast<int32_t>(resolve(resolvedDecl->nodeData)->localOffset);
+                auto localOffset = static_cast<int32_t>(resolve(resolvedDecl->nodeData)->fullOffset());
 
                 append(node->bytecode, Instruction::STORE);
 
@@ -173,19 +173,58 @@ void BytecodeGen::gen(Node *node) {
                 append(node->bytecode, toBytes(static_cast<int32_t>(localOffset)));
 
                 append(node->bytecode, Instruction::CONSTI32);
-                append(node->bytecode, toBytes(static_cast<int32_t>(data.rhs->localOffset)));
+                append(node->bytecode, toBytes(static_cast<int32_t>(data.rhs->fullOffset())));
 
                 append(node->bytecode, toBytes(static_cast<int32_t>(typeSize(resolvedDecl->nodeData->typeInfo))));
+            } else if (resolvedDecl->type == NodeType::DOT) {
+                gen(data.lhs);
+
+                // store the rvalue into it's slot
+                storeValue(node->bytecode, data.rhs, data.rhs->fullOffset());
+
+                auto foundParam = resolvedDecl->dotData.resolved;
+                auto offsetWords = foundParam->localOffset;
+                auto paramSize = typeSize(foundParam->typeInfo);
+
+                auto localOffset = static_cast<int32_t>(resolvedDecl->dotData.lhs->fullOffset());
+
+                if (resolvedDecl->dotData.autoDeref) {
+                    append(instructions, Instruction::ADDI32);
+
+                    append(instructions, Instruction::I32);
+                    append(instructions, toBytes(resolvedDecl->dotData.autoDerefStorage->fullOffset()));
+
+                    append(instructions, Instruction::CONSTI32);
+                    append(instructions, toBytes(offsetWords));
+
+                    append(instructions, toBytes(resolvedDecl->dotData.autoDerefStorage->fullOffset()));
+                }
+
+                append(node->bytecode, Instruction::STORE);
+
+                if (resolvedDecl->dotData.autoDeref) {
+                    append(node->bytecode, Instruction::I32);
+                    append(node->bytecode, toBytes(static_cast<int32_t>(resolvedDecl->dotData.autoDerefStorage->fullOffset())));
+                } else {
+                    append(node->bytecode, Instruction::CONSTI32);
+                    append(node->bytecode, toBytes(static_cast<int32_t>(localOffset + offsetWords)));
+                }
+
+                append(node->bytecode, Instruction::CONSTI32);
+                append(node->bytecode, toBytes(static_cast<int32_t>(data.rhs->fullOffset())));
+
+                append(node->bytecode, toBytes(static_cast<int32_t>(paramSize)));
             } else {
                 assert(false);
             }
         } break;
         case NodeType::SYMBOL: {
             auto resolved = resolveNode(node);
+            auto resolvedType = resolve(resolved->typeInfo);
             gen(resolved);
 
             auto localOffset = resolved->localOffset;
-            switch (resolved->typeInfo->typeData.kind) {
+            switch (resolvedType->typeData.kind) {
                 case NodeTypekind::FN: {
                     if (resolved->type == NodeType::FN_DECL) {
                         append(node->bytecode, Instruction::CONSTI32);
@@ -205,6 +244,9 @@ void BytecodeGen::gen(Node *node) {
                 case NodeTypekind::I64: {
                     append(node->bytecode, Instruction::I64);
                     append(node->bytecode, toBytes(static_cast<int32_t>(localOffset)));
+                } break;
+                case NodeTypekind::STRUCT: {
+                    // todo(chad): anything?
                 } break;
                 default: assert(false);
             }
@@ -263,15 +305,15 @@ void BytecodeGen::gen(Node *node) {
             } else if (resolvedFn->type == NodeType::DECL) {
                 append(instructions, Instruction::CALLI);
                 append(instructions, Instruction::I32);
-                append(instructions, toBytes(static_cast<int32_t>(resolvedFn->localOffset)));
+                append(instructions, toBytes(static_cast<int32_t>(resolvedFn->fullOffset())));
             } else if (resolvedFn->type == NodeType::DEREF) {
                 gen(resolvedFn);
 
-                storeValue(instructions, resolvedFn, node->fnCallData.fn->localOffset);
+                storeValue(instructions, resolvedFn, node->fnCallData.fn->fullOffset());
 
                 append(instructions, Instruction::CALLI);
                 append(instructions, Instruction::I32);
-                append(instructions, toBytes(static_cast<int32_t>(node->fnCallData.fn->localOffset)));
+                append(instructions, toBytes(static_cast<int32_t>(node->fnCallData.fn->fullOffset())));
             } else {
                 gen(resolvedFn);
                 append(instructions, Instruction::CALLI);
@@ -292,35 +334,106 @@ void BytecodeGen::gen(Node *node) {
                       typeSize(node->fnCallData.fn->typeInfo->typeData.fnTypeData.returnType));
 
             append(node->bytecode, Instruction::I32);
-            append(node->bytecode, toBytes(static_cast<int32_t>(node->localOffset)));
+            append(node->bytecode, toBytes(static_cast<int32_t>(node->fullOffset())));
 
             toProcess.push(resolvedFn);
         } break;
         case NodeType::DECL_PARAM: {
             append(node->bytecode, Instruction::I32);
-            append(node->bytecode, toBytes(static_cast<int32_t>(node->localOffset)));
+            append(node->bytecode, toBytes(static_cast<int32_t>(node->fullOffset())));
         } break;
         case NodeType::DEREF: {
             gen(node->nodeData);
 
             if (isConstant(node->nodeData)) {
-                auto constOffset = static_cast<int32_t>(node->nodeData->localOffset);
+                auto constOffset = static_cast<int32_t>(node->nodeData->fullOffset());
                 storeValue(instructions, node->nodeData, constOffset);
             }
 
             append(node->bytecode, Instruction::CONSTI32);
-            append(node->bytecode, toBytes(static_cast<int32_t>(resolve(node->nodeData)->localOffset)));
+            append(node->bytecode, toBytes(static_cast<int32_t>(resolve(node->nodeData)->fullOffset())));
+
+            node->localOffset = resolve(node->nodeData)->localOffset;
         } break;
         case NodeType::ADDRESS_OF: {
             gen(node->nodeData);
 
             if (isConstant(node->nodeData)) {
-                auto constOffset = static_cast<int32_t>(node->nodeData->localOffset);
+                auto constOffset = static_cast<int32_t>(node->nodeData->fullOffset());
                 storeValue(instructions, node->nodeData, constOffset);
             }
 
             append(node->bytecode, Instruction::CONSTI32);
-            append(node->bytecode, toBytes(static_cast<int32_t>(node->nodeData->localOffset)));
+            append(node->bytecode, toBytes(static_cast<int32_t>(node->nodeData->fullOffset())));
+        } break;
+        case NodeType::TYPE: {
+            // just a type declaration, nothing to do here!
+        } break;
+        case NodeType::DOT: {
+            auto data = node->dotData;
+
+            auto resolvedTypeInfo = resolve(resolve(data.lhs)->typeInfo);
+
+            if (resolvedTypeInfo->typeData.kind == NodeTypekind::STRUCT) {
+                // codegen the lhs
+                gen(data.lhs);
+
+                // find the offset in bytes of this param from the base of the struct
+                auto structParams = resolvedTypeInfo->typeData.structTypeData.params;
+                auto foundParam = data.resolved;
+                auto offsetWords = foundParam->localOffset;
+
+                node->localOffset = data.lhs->localOffset;
+                node->localStorageOffset = offsetWords;
+            }
+            else if (resolvedTypeInfo->typeData.kind == NodeTypekind::POINTER) {
+                gen(data.lhs);
+
+                auto pointerCount = 0;
+                while (resolvedTypeInfo->typeData.kind == NodeTypekind::POINTER) {
+                    resolvedTypeInfo = resolve(resolvedTypeInfo->typeData.pointerTypeData.underlyingType);
+                    pointerCount += 1;
+                }
+                assert(resolvedTypeInfo->typeData.kind == NodeTypekind::STRUCT);
+
+                auto storedInDerefStorage = false;
+                for (auto i = 0; i < pointerCount - 1; i++) {
+                    storedInDerefStorage = true;
+
+                    append(instructions, Instruction::STORE);
+
+                    append(instructions, Instruction::CONSTI32);
+                    append(instructions, toBytes(static_cast<int32_t>(data.autoDerefStorage->fullOffset())));
+
+                    append(instructions, Instruction::I32);
+                    if (i == 0) {
+                        append(instructions, toBytes(static_cast<int32_t>(data.lhs->fullOffset())));
+                    } else {
+                        append(instructions, toBytes(static_cast<int32_t>(data.autoDerefStorage->fullOffset())));
+                    }
+
+                    append(instructions, toBytes(static_cast<int32_t>(4)));
+                }
+
+                // find the offset in bytes of this param from the base of the struct
+                auto structParams = resolvedTypeInfo->typeData.structTypeData.params;
+                auto foundParam = data.resolved;
+                auto offsetWords = foundParam->localOffset;
+
+                if (storedInDerefStorage) {
+                    node->localOffset = data.autoDerefStorage->localOffset;
+                } else {
+                    node->localOffset = data.lhs->localOffset;
+                }
+
+                node->localStorageOffset = offsetWords;
+            }
+            else {
+                assert(false);
+            }
+
+            append(node->bytecode, Instruction::I32);
+            append(node->bytecode, toBytes(node->fullOffset()));
         } break;
         default: assert(false);
     }
@@ -382,7 +495,7 @@ void BytecodeGen::storeValue(vector<unsigned char> &instructions, Node *node, in
             append(instructions, toBytes(offset));
 
             append(instructions, Instruction::CONSTI32);
-            append(instructions, toBytes(node->nodeData->localOffset));
+            append(instructions, toBytes(node->nodeData->localOffset + node->nodeData->localStorageOffset));
         } break;
         case NodeType::DEREF: {
             append(instructions, Instruction::STORE);
@@ -392,7 +505,7 @@ void BytecodeGen::storeValue(vector<unsigned char> &instructions, Node *node, in
 
             append(instructions, Instruction::I32);
             auto resolvedDeref = resolve(node->nodeData);
-            append(instructions, toBytes(resolvedDeref->localOffset));
+            append(instructions, toBytes(resolvedDeref->fullOffset()));
 
             append(instructions, toBytes(static_cast<int32_t>(typeSize(node->nodeData->typeInfo))));
         } break;
@@ -401,6 +514,50 @@ void BytecodeGen::storeValue(vector<unsigned char> &instructions, Node *node, in
         case NodeType::BINOP:
         case NodeType::DECL: {
             copyBytes(instructions, offset, node->localOffset, typeSize(node->typeInfo));
+        } break;
+        case NodeType::DOT: {
+            auto foundParam = node->dotData.resolved;
+            auto offsetWords = foundParam->localOffset;
+            auto paramSize = typeSize(foundParam->typeInfo);
+
+            if (node->dotData.lhs->type == NodeType::DEREF) {
+                append(instructions, Instruction::STORE);
+
+                append(instructions, Instruction::I32);
+                append(instructions, toBytes(static_cast<int32_t>(offset)));
+
+                append(instructions, Instruction::CONSTI32);
+                append(instructions, toBytes(static_cast<int32_t>(node->dotData.lhs->localOffset + offsetWords)));
+
+                append(instructions, toBytes(static_cast<int32_t>(paramSize)));
+            } else {
+                if (node->dotData.autoDeref) {
+                    append(instructions, Instruction::ADDI32);
+
+                    append(instructions, Instruction::I32);
+                    append(instructions, toBytes(node->fullOffset()));
+
+                    append(instructions, Instruction::CONSTI32);
+                    append(instructions, toBytes(offsetWords));
+
+                    append(instructions, toBytes(node->fullOffset()));
+                }
+
+                append(instructions, Instruction::STORE);
+
+                append(instructions, Instruction::CONSTI32);
+                append(instructions, toBytes(static_cast<int32_t>(offset)));
+
+                if (node->dotData.autoDeref) {
+                    append(instructions, Instruction::I32);
+                    append(instructions, toBytes(node->fullOffset()));
+                } else {
+                    append(instructions, Instruction::CONSTI32);
+                    append(instructions, toBytes(static_cast<int32_t>(node->dotData.lhs->localOffset + offsetWords)));
+                }
+
+                append(instructions, toBytes(static_cast<int32_t>(paramSize)));
+            }
         } break;
         default:
             assert(false);

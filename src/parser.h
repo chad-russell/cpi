@@ -49,6 +49,7 @@ struct Parser {
     Node *parseTopLevel();
     vector<Node *> parseDeclParams();
     Node *parseFnDecl();
+    Node *parseTypeDecl();
     Node *parseSymbol();
     Node *parseScopedStmt();
     Node *parseRet();

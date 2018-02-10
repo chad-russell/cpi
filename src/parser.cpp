@@ -80,6 +80,11 @@ Node *Parser::parseTopLevel() {
             return parseFnDecl();
         }
 
+        // type definition
+        if (lexer->front.type == LexerTokenType::TYPE) {
+            return parseTypeDecl();
+        }
+
         reportError("Expected top level function declaration");
         exit(1);
 }
@@ -144,8 +149,6 @@ Node *Parser::parseFnDecl() {
     // name
     if (lexer->front.type != LexerTokenType::LPAREN) {
         auto name = parseSymbol();
-        // todo(chad): can we just delete this??
-//        decl->fnDeclData.name->symbolData.atomId = AtomTable::current->insert(name->region);
         decl->fnDeclData.name = name;
 
 
@@ -176,6 +179,7 @@ Node *Parser::parseFnDecl() {
 
     while (!lexer->isEmpty() && lexer->front.type != LexerTokenType::RCURLY) {
         auto scopedStmt = parseScopedStmt();
+        expect(LexerTokenType::SEMICOLON, "';'");
         if (scopedStmt != nullptr) {
             scopedStmt->sourceMapStatement = true;
             decl->fnDeclData.body.push_back(scopedStmt);
@@ -196,6 +200,35 @@ Node *Parser::parseFnDecl() {
     return decl;
 }
 
+Node *Parser::parseTypeDecl() {
+    auto saved = lexer->front.region.start;
+    expect(LexerTokenType::TYPE, "type");
+
+    auto typeName = parseSymbol();
+
+    // todo(chad): @Cleanup just parse a type here! should be able to declare any type
+    expect(LexerTokenType::STRUCT, "struct");
+
+    expect(LexerTokenType::LCURLY, "{");
+
+    auto typeDecl = new Node(lexer->srcInfo,
+                             &allNodes,
+                             NodeType::TYPE,
+                             scopes.top());
+    typeDecl->typeData.kind = NodeTypekind::STRUCT;
+    typeDecl->typeData.structTypeData.name = typeName;
+    typeDecl->typeData.structTypeData.params = parseDeclParams();
+    typeDecl->typeData.structTypeData.isLiteral = false;
+    scopeInsert(typeName->symbolData.atomId, typeDecl);
+
+    auto end = lexer->front.region.end;
+    expect(LexerTokenType::RCURLY, "}");
+
+    typeDecl->region = Region{lexer->srcInfo, saved, end};
+
+    return typeDecl;
+}
+
 Node *Parser::parseSymbol() {
     LexerToken front = expect(LexerTokenType::SYMBOL, "identifier");
     auto sym = new Node(lexer->srcInfo, &allNodes, NodeType::SYMBOL, scopes.top());
@@ -205,6 +238,8 @@ Node *Parser::parseSymbol() {
 }
 
 Node *Parser::parseScopedStmt() {
+    Node *stmt = nullptr;
+
     // comment
     if (lexer->front.type == LexerTokenType::COMMENT) {
         popFront();
@@ -219,6 +254,11 @@ Node *Parser::parseScopedStmt() {
     // fn decl
     if (lexer->front.type == LexerTokenType::FN) {
         return parseFnDecl();
+    }
+
+    // type definition
+    if (lexer->front.type == LexerTokenType::TYPE) {
+        return parseTypeDecl();
     }
 
     auto saved = lexer->front.region.start;
@@ -283,7 +323,7 @@ Node *Parser::parseScopedStmt() {
     // assignment
     if (lexer->front.type == LexerTokenType::EQ) {
         // cannot assign anything but a symbol
-        if (lvalue->type != NodeType::SYMBOL) {
+        if (lvalue->type != NodeType::SYMBOL && lvalue->type != NodeType::DEREF && lvalue->type != NodeType::DOT) {
             ostringstream s("cannot assign to ");
             s << lvalue->type;
         }
@@ -297,7 +337,7 @@ Node *Parser::parseScopedStmt() {
         ass->assignData.rhs = rvalue;
         ass->region = {lexer->srcInfo, saved, last.region.end};
 
-        if (lvalue->type == NodeType::DEREF) {
+        if (lvalue->type == NodeType::DEREF || lvalue->type == NodeType::DOT) {
             addLocal(rvalue);
         }
 
@@ -340,7 +380,26 @@ Node *Parser::buildDots(stack<Node *> rvalues) {
 
         top->region = {lexer->srcInfo, top->fnCallData.fn->region.start, top->region.end};
         return top;
+    } else if (top->type == NodeType::SYMBOL) {
+        rvalues.pop();
+
+        auto dot = new Node(lexer->srcInfo,
+                            &allNodes,
+                            NodeType::DOT,
+                            scopes.top());
+
+        dot->dotData.lhs = buildDots(rvalues);
+        dot->dotData.rhs = top;
+
+        dot->region = Region{lexer->srcInfo,
+                             dot->dotData.lhs->region.start,
+                             dot->dotData.rhs->region.end};
+
+        addLocal(dot->dotData.lhs);
+
+        return dot;
     }
+
 
     top = rvalues.top();
     reportError("expected function call or symbol");
@@ -356,6 +415,18 @@ Node *Parser::parseLvalueHelper(Node *symbol, Location saved) {
         rvalues.push(fnCall);
     }
 
+    // ('.' lvalue_simple)*
+    while (lexer->front.type == LexerTokenType::DOT) {
+        expect(LexerTokenType::DOT, ".");
+        auto sym = parseSymbol();
+        rvalues.push(sym);
+
+        while (lexer->front.type == LexerTokenType::LPAREN) {
+            auto fnCall = parseFnCall();
+            rvalues.push(fnCall);
+        }
+    }
+
     if (rvalues.size() == 1) {
         return rvalues.top();
     }
@@ -368,7 +439,15 @@ Node *Parser::parseLvalueHelper(Node *symbol, Location saved) {
 Node *Parser::parseLvalue() {
     auto saved = lexer->front.region.start;
 
-    // *(lvalue)
+    // '(' lvalue ')'
+    if (lexer->front.type == LexerTokenType::LPAREN) {
+        popFront();
+        auto symbol = parseLvalue();
+        expect(LexerTokenType::RPAREN, ")");
+        return parseLvalueHelper(symbol, saved);
+    }
+
+    // ^(lvalue)
     if (lexer->front.type == LexerTokenType::DEREF) {
         popFront();
         auto deref = new Node(lexer->srcInfo, &allNodes, NodeType::DEREF, scopes.top());
@@ -403,21 +482,40 @@ Node *Parser::parseType() {
     auto type = new Node(lexer->srcInfo, &allNodes, NodeType::TYPE, scopes.top());
     type->region = saved.region;
 
-    popFront();
-
     switch (saved.type) {
         case LexerTokenType::I32: {
+            popFront();
             type->typeData.kind = NodeTypekind::I32;
         } break;
         case LexerTokenType::I64: {
+            popFront();
             type->typeData.kind = NodeTypekind::I64;
         } break;
         case LexerTokenType::FN: {
+            popFront();
             type->typeData.kind = NodeTypekind::FN;
             expect(LexerTokenType::LPAREN, "(");
             type->typeData.fnTypeData.params = parseDeclParams();
             expect(LexerTokenType::RPAREN, ")");
             type->typeData.fnTypeData.returnType = parseType();
+        } break;
+        case LexerTokenType::SYMBOL: {
+            auto typeName = parseSymbol();
+            type->typeData.kind = NodeTypekind::SYMBOL;
+            type->typeData.symbolTypeData.atomId = typeName->symbolData.atomId;
+        } break;
+        case LexerTokenType::STRUCT: {
+            expect(LexerTokenType::STRUCT, "struct");
+
+            expect(LexerTokenType::LCURLY, "{");
+
+            type->typeData.kind = NodeTypekind::STRUCT;
+            type->typeData.structTypeData.isLiteral = true;
+            type->typeData.structTypeData.params = parseDeclParams();
+
+            expect(LexerTokenType::RCURLY, "}");
+
+            type->region.end = lexer->lastLoc;
         } break;
         default: {
             ostringstream s("");

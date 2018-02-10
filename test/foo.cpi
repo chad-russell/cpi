@@ -1,12 +1,17 @@
-fn main() {
-    f := fn() { ret 1 }
-    g := fn() { ret 2 }
+-- TODO(chad):
+-- * adding two dots (e.g. f.x + f.y)
+-- * passing structs as parameters to functions
 
-    pf := &&f
-    pg := &&g
-
-    ^pg = ^pf
-    ^^pg = fn() { ret 999 }
-
-    ret g()
+type point struct {
+    x: i32,
+    y: i32
 }
+
+fn main() {
+    p: point;
+    p.x = 999;
+    p.y = 111;
+    q := &p;
+    ret q.x + q.y;
+}
+

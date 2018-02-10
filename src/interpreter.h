@@ -10,6 +10,7 @@ class Optional {
 public:
     bool isPresent;
     T value;
+    bool wasConstantRead;
 };
 
 class Interpreter;
@@ -253,7 +254,7 @@ public:
       auto testInstructionString = prefix.append(suffixForType<T>());
       if (instructionPcString == testInstructionString) {
           pc += 1;
-          return Optional<T>{true, consume<T>()};
+          return Optional<T>{true, consume<T>(), true};
       }
 
       instructionPcString = AssemblyLexer::instructionStrings[instructions[pc]];
@@ -261,7 +262,7 @@ public:
       if (instructionPcString == instructionPcString) {
           pc += 1;
           auto offset = consume<int32_t>();
-          return Optional<T>{true, readFromStack<T>(bp + offset)};
+          return Optional<T>{true, readFromStack<T>(bp + offset), false};
       }
 
       return {false, {}};

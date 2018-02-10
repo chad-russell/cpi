@@ -105,6 +105,10 @@ struct FnCallData {
 struct DotData {
     Node *lhs = nullptr;
     Node *rhs = nullptr;
+    Node *resolved = nullptr;
+
+    bool autoDeref = false;
+    Node *autoDerefStorage = nullptr;
 };
 
 struct BinopData {
@@ -156,7 +160,7 @@ public:
     Node *find(int64_t atomId);
 };
 
-int64_t typeSize(Node *type);
+int32_t typeSize(Node *type);
 
 class Node {
 public:
@@ -201,7 +205,15 @@ public:
     // todo(chad): better way to store this?
     vector<unsigned char> bytecode;
     bool isLocal = false;
+
+    // the offset of the base type from the base pointer
     int32_t localOffset = 0;
+
+    // when we finally do a storage, what is the offset?
+    // (mostly for storing structs)
+    int32_t localStorageOffset = 0;
+
+    int32_t fullOffset();
 
     Node(NodeTypekind typekind);
     Node(SourceInfo srcInfo, vector<Node *> *allNodes, NodeType type_, Scope *scope_);
