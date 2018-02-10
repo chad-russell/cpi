@@ -1,19 +1,5 @@
--- TODO(chad):
--- * adding two dots (e.g. f.x + f.y)
--- * passing structs as parameters to functions
-
-type point struct {
-    x: i32,
-    y: i32
-}
-
 fn main() {
-    p: point;
-    p.x = 999;
-    p.y = 111;
-    q := &&&&&p;
-    qq := ^^q;
-
-    ret qq.x + qq.y;
+    a := &3;
+    b := &8;
+    ret ^a + ^b;
 }
-

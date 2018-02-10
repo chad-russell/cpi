@@ -8,6 +8,13 @@
 
 class Node;
 
+struct Local {
+    Node *target;
+    int32_t offset;
+
+    Local(Node *target) : target(target), offset(-1) {}
+};
+
 struct FnTypeData {
     vector<Node *> params = {};
     Node *returnType = nullptr;
@@ -65,7 +72,7 @@ struct FnDeclData {
     vector<Node *> params = {};
     Node * returnType = nullptr;
     vector<Node *> body = {};
-    vector<Node *> locals = {};
+    vector<Local *> locals = {};
     vector<Node *> returns = {};
 
     int32_t stackSize = 0;
@@ -204,8 +211,10 @@ public:
     bool gen = false;
     bool sourceMapStatement = false;
 
+    vector<Local *> locals = {};
+
     // todo(chad): better way to store this?
-    vector<unsigned char> bytecode;
+    vector<unsigned char> bytecode = {};
     bool isLocal = false;
 
     // the offset of the base type from the base pointer
@@ -214,8 +223,6 @@ public:
     // when we finally do a storage, what is the offset?
     // (mostly for storing structs)
     int32_t localStorageOffset = 0;
-
-    int32_t fullOffset();
 
     Node();
     Node(NodeTypekind typekind);

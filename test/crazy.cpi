@@ -37,7 +37,57 @@ fn main() {
 
     a11 := testStruct2();
 
-    ret a10;
+    a12 := testAddDots();
+
+    a13 := testParamPass();
+
+    a14 := testNestedFunc();
+
+    a15 := testDotLhs();
+
+    ret a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14;
+}
+
+fn testDotLhs() {
+    p: point;
+    p.x = 3;
+    q := &&&&p;
+    qq := ^^q;
+    qq.x = 3;
+    ret q.x;
+}
+
+fn testNestedFunc() {
+    p: point;
+    p.x = 999;
+    p.y = 3;
+
+    ret get_y(point_id(point_id(point_id(p))));
+}
+
+fn point_id(p: point) {
+    ret p;
+}
+
+type point struct {
+    x: i32,
+    y: i32
+}
+
+fn testAddDots() {
+    p: point;
+    p.x = 1;
+    p.y = 2;
+    q := &&&&&p;
+    qq := ^^q;
+
+    ret qq.x + qq.y;
+}
+
+fn testParamPass() {
+    p: point;
+    p.x = 3;
+    ret (fn(p: point) { ret p.x; })(p);
 }
 
 type S struct {
@@ -84,4 +134,12 @@ fn apply_overboard(a: fn(n: i32) i32, b: i32) {
     ret fn(f: fn(n: i32) i32, g: i32) {
         ret f(g);
     }(a, b);
+}
+
+fn get_x(p: point) {
+    ret p.x;
+}
+
+fn get_y(p: point) {
+    ret p.y;
 }

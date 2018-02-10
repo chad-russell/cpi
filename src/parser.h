@@ -43,7 +43,7 @@ struct Parser {
     bool isBooleanBinop(LexerTokenType type);
     int8_t operatorPrecedence(LexerTokenType type);
     Node *unwindPolish(stack<ShuntingYard> *values);
-    void addLocal(Node *local);
+    void addLocal(Node *target, Node *local);
 
     void parseRoot();
     Node *parseTopLevel();

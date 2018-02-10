@@ -283,7 +283,7 @@ Node *Parser::parseScopedStmt() {
         }
 
         auto decl = new Node(lexer->srcInfo, &allNodes, NodeType::DECL, scopes.top());
-        addLocal(decl);
+        addLocal(decl, decl);
 
         decl->declData.lvalue = lvalue;
         decl->declData.initialValue = rvalue;
@@ -308,7 +308,7 @@ Node *Parser::parseScopedStmt() {
         auto rvalue = parseRvalue();
 
         auto decl = new Node(lexer->srcInfo, &allNodes, NodeType::DECL, scopes.top());
-        addLocal(decl);
+        addLocal(decl, decl);
 
         decl->declData.lvalue = lvalue;
         decl->declData.initialValue = rvalue;
@@ -338,7 +338,7 @@ Node *Parser::parseScopedStmt() {
         ass->region = {lexer->srcInfo, saved, last.region.end};
 
         if (lvalue->type == NodeType::DEREF || lvalue->type == NodeType::DOT) {
-            addLocal(rvalue);
+            addLocal(ass, rvalue);
         }
 
         return ass;
@@ -376,7 +376,7 @@ Node *Parser::buildDots(stack<Node *> rvalues) {
         top->type = NodeType::FN_CALL;
 
         top->fnCallData.fn = buildDots(rvalues);
-        addLocal(top->fnCallData.fn);
+        addLocal(top, top->fnCallData.fn);
 
         top->region = {lexer->srcInfo, top->fnCallData.fn->region.start, top->region.end};
         return top;
@@ -395,7 +395,7 @@ Node *Parser::buildDots(stack<Node *> rvalues) {
                              dot->dotData.lhs->region.start,
                              dot->dotData.rhs->region.end};
 
-        addLocal(dot->dotData.lhs);
+        addLocal(dot, dot->dotData.lhs);
 
         return dot;
     }
@@ -559,7 +559,10 @@ Node *Parser::parseRvalueSimple() {
         auto addrOf = new Node(lexer->srcInfo, &allNodes, NodeType::ADDRESS_OF, scopes.top());
         addrOf->nodeData = parseRvalueSimple();
         addrOf->region = Region{lexer->srcInfo, saved, addrOf->nodeData->region.end};
-        addLocal(addrOf->nodeData);
+
+        addLocal(addrOf, addrOf->nodeData);
+        addLocal(addrOf, addrOf);
+
         return addrOf;
     }
 
@@ -569,7 +572,7 @@ Node *Parser::parseRvalueSimple() {
         auto deref = new Node(lexer->srcInfo, &allNodes, NodeType::DEREF, scopes.top());
 
         deref->nodeData = parseRvalueSimple();
-        addLocal(deref->nodeData);
+        addLocal(deref, deref->nodeData);
 
         deref->region = Region{lexer->srcInfo, saved, deref->nodeData->region.end};
         return deref;
@@ -718,17 +721,19 @@ Node *Parser::unwindPolish(stack<ShuntingYard> *values) {
                          binop->binopData.lhs->region.start,
                          binop->binopData.rhs->region.end};
 
-        addLocal(binop);
+        addLocal(binop, binop);
+        addLocal(binop, binop->binopData.lhs);
+        addLocal(binop, binop->binopData.rhs);
 
         return binop;
     }
 }
 
-void Parser::addLocal(Node *local) {
-    if (local->isLocal) { return; }
-    local->isLocal = true;
+void Parser::addLocal(Node *target, Node *local) {
+    auto newLocal = new Local{local};
 
-    currentFnDecl->fnDeclData.locals.push_back(local);
+    target->locals.push_back(newLocal);
+    currentFnDecl->fnDeclData.locals.push_back(newLocal);
 }
 
 void Parser::parseParams(vector<Node *> *params) {
@@ -768,7 +773,7 @@ Node *Parser::parseFnCall() {
 
     call->region.end = last.region.end;
 
-    addLocal(call);
+    addLocal(call, call);
 
     return call;
 }

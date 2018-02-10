@@ -93,20 +93,6 @@ void Semantic::reportError(vector<Node *> nodes, Error error) {
     cout << s.str() << endl;
 }
 
-Node *localTarget(Node *local) {
-    auto resolved = resolve(local);
-
-    if (resolved->type == NodeType::DOT) {
-        return localTarget(resolved->dotData.lhs);
-    }
-
-    if (resolved->type == NodeType::DEREF) {
-        resolved = localTarget(resolved->nodeData);
-    }
-
-    return resolved;
-}
-
 void resolveFnDecl(Semantic *semantic, Node *node) {
     auto data = &node->fnDeclData;
     auto savedFnDecl = semantic->currentFnDecl;
@@ -197,18 +183,15 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
     }
 
     for (auto local : data->locals) {
-        auto resolved = localTarget(local);
-        if (resolved != local && resolved->isLocal) { continue; }
-
-        local->localOffset = semantic->currentFnDecl->stackSize;
-        semantic->currentFnDecl->stackSize += typeSize(local->typeInfo);
+        local->offset = semantic->currentFnDecl->stackSize;
+        semantic->currentFnDecl->stackSize += typeSize(local->target->typeInfo);
     }
 
-    auto paramOffset = -12;
+    auto paramOffset = -8;
     for (auto declParam : node->fnDeclData.params) {
         // we push the params onto the stack in reverse order
-        declParam->localOffset = paramOffset;
         paramOffset -= typeSize(declParam->typeInfo);
+        declParam->localOffset = paramOffset;
     }
 
     semantic->currentFnDecl = savedFnDecl;
@@ -316,25 +299,6 @@ void resolveType(Semantic *semantic, Node *node) {
 void resolveBinop(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->binopData.lhs);
     semantic->resolveTypes(node->binopData.rhs);
-
-    if (node->binopData.lhs->type == NodeType::DOT) {
-        auto newLocalStorage = new Node();
-        newLocalStorage->type = NodeType::TYPE;
-        newLocalStorage->typeInfo = node->binopData.lhs->typeInfo;
-        node->binopData.lhs->dotData.nodeLocalStorage = newLocalStorage;
-
-        newLocalStorage->isLocal = true;
-        semantic->currentFnDecl->locals.push_back(newLocalStorage);
-    }
-    if (node->binopData.rhs->type == NodeType::DOT) {
-        auto newLocalStorage = new Node();
-        newLocalStorage->type = NodeType::TYPE;
-        newLocalStorage->typeInfo = node->binopData.rhs->typeInfo;
-        node->binopData.rhs->dotData.nodeLocalStorage = newLocalStorage;
-
-        newLocalStorage->isLocal = true;
-        semantic->currentFnDecl->locals.push_back(newLocalStorage);
-    }
 
     if (!typesMatch(node->binopData.lhs->typeInfo, node->binopData.rhs->typeInfo)) {
         semantic->reportError({node, node->binopData.lhs, node->binopData.rhs},
@@ -556,7 +520,7 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
         auto local = new Node(NodeTypekind::POINTER);
         local->typeInfo = local;
         local->isLocal = true;
-        semantic->currentFnDecl->locals.push_back(local);
+        semantic->currentFnDecl->locals.push_back(new Local{local});
 
         node->dotData.autoDerefStorage = local;
     }
