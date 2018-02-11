@@ -537,7 +537,6 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
     }
     else {
         semantic->resolveTypes(resolvedLhs);
-
         if (resolvedLhs->typeInfo == nullptr) {
             semantic->reportError({node, resolvedLhs}, Error{resolvedLhs->region, "cannot resolve type of lhs of dot operation"});
             return;

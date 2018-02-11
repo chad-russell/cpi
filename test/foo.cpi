@@ -1,20 +1,22 @@
-type linkedList struct {
+type weirdLinkedList struct {
     value: i32,
-    garbage1: i64,
-    garbage2: i64,
-    garbage3: i64,
-    garbage4: i64,
-    next: *linkedList
+    next: **weirdLinkedList
 }
 
 fn main() {
-    l: linkedList;
+    l: weirdLinkedList;
     l.value = 3;
-    l.next = &l;
+    l.next = &&l;
 
-    n1 := l.next;
-    n2 := n1.next;
-    ret n1.value;
+    ret l.next.next.value;
+}
+
+type S struct {
+	x: struct {
+		p1: i32,
+		p2: i32
+	},
+	y: i32
 }
 
 fn get_y_ptr(p: *point) { ret p.y; }

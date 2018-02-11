@@ -401,7 +401,6 @@ Node *Parser::buildDots(stack<Node *> rvalues) {
     }
 
 
-    top = rvalues.top();
     reportError("expected function call or symbol");
     exit(-1);
 }
