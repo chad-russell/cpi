@@ -356,18 +356,6 @@ void BytecodeGen::gen(Node *node) {
             if (isConstant(node->derefData.target)) {
                 storeValue(instructions, node->derefData.target, node->derefData.target->localOffset);
             }
-
-            if (node->derefData.isRvalue) {
-                append(instructions, Instruction::STORE);
-                append(instructions, Instruction::RELCONSTI32);
-                append(instructions, toBytes(node->localOffset));
-
-                append(instructions, Instruction::RELI32);
-                append(instructions, toBytes(node->derefData.target->localOffset));
-
-                assert(node->derefData.target->typeInfo->typeData.kind == NodeTypekind::POINTER);
-                append(instructions, toBytes(typeSize(node->typeInfo)));
-            }
         } break;
         case NodeType::ADDRESS_OF: {
             gen(node->nodeData);
@@ -397,8 +385,17 @@ void BytecodeGen::gen(Node *node) {
                 auto foundParam = data.resolved;
                 auto offsetWords = foundParam->localOffset;
 
-                node->localOffset = data.lhs->localOffset;
-                node->localStorageOffset = offsetWords;
+//                append(instructions, Instruction::STORE);
+//                append(instructions, Instruction::RELCONSTI32);
+//                append(instructions, toBytes(node->localOffset));
+//
+//                append(instructions, Instruction::RELI32);
+//                append(instructions, toBytes(data.lhs->localOffset + foundParam));
+
+//                assert(node->derefData.target->typeInfo->typeData.kind == NodeTypekind::POINTER);
+//                append(instructions, toBytes(typeSize(node->typeInfo)));
+
+//                node->localOffset = data.lhs->localOffset;
             }
             else if (resolvedTypeInfo->typeData.kind == NodeTypekind::POINTER) {
                 gen(data.lhs);
@@ -439,8 +436,6 @@ void BytecodeGen::gen(Node *node) {
                 } else {
                     node->localOffset = data.lhs->localOffset;
                 }
-
-                node->localStorageOffset = offsetWords;
             }
             else {
                 assert(false);
@@ -496,7 +491,7 @@ void BytecodeGen::storeValue(vector<unsigned char> &instructions, Node *node, in
             append(instructions, toBytes(offset));
 
             append(instructions, Instruction::RELCONSTI32);
-            append(instructions, toBytes(node->nodeData->localOffset + node->nodeData->localStorageOffset));
+            append(instructions, toBytes(node->nodeData->localOffset));
         } break;
         case NodeType::DEREF: {
             append(instructions, Instruction::STORE);
@@ -562,7 +557,7 @@ void BytecodeGen::storeValue(vector<unsigned char> &instructions, Node *node, in
                     append(instructions, toBytes(node->localOffset));
                 } else {
                     append(instructions, Instruction::RELCONSTI32);
-                    append(instructions, toBytes(static_cast<int32_t>(node->dotData.lhs->localOffset + offsetWords)));
+                    append(instructions, toBytes(node->dotData.lhs->localOffset + offsetWords));
                 }
 
                 append(instructions, toBytes(static_cast<int32_t>(paramSize)));

@@ -221,12 +221,6 @@ public:
     // the offset of the base type from the base pointer
     int32_t localOffset = 0;
 
-    // when we finally do a storage, what is the offset?
-    // (mostly for storing structs)
-    int32_t localStorageOffset = 0;
-
-    int32_t fullOffset();
-
     Node();
     Node(NodeTypekind typekind);
     Node(SourceInfo srcInfo, vector<Node *> *allNodes, NodeType type_, Scope *scope_);

@@ -51,6 +51,8 @@ fn main() {
 
     a19 := testSetter();
 
+    a20 := testLinkedList();
+
     ret a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14 + a15 + a16 + a17 + a18 + a19;
 }
 
@@ -64,8 +66,7 @@ fn testLinkedList() {
     l.value = 3;
     l.next = &l;
 
-    n := l.next;
-    ret n.value;
+    ret l.next.next.next.next.value;
 }
 
 fn set_y(p: *point, y: i32) {
@@ -77,7 +78,7 @@ fn testSetter() {
     p: point;
     p.x = bad();
     p.y = bad();
-    wtf := set_y(&p, 3);
+    wtf := set_y(^&&p, 3);
     ret p.y;
 }
 
