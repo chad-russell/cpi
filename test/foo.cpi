@@ -1,15 +1,34 @@
 type S struct {
-	x: struct {
-		p1: i32,
-		p2: i32
+	x: **struct {
+		p1: i64,
+		p2: i64
 	},
-	y: i32
+	y: fn() i64
 }
 
 fn main() {
-    p: point;
-    p.y = 14;
-    ret (^&p).y;
+    s: S;
+    sx: struct{p1: i64, p2: i64};
+
+    sx.p1 = 1;
+    sx.p2 = 999;
+
+    s.x = &&sx;
+
+    ret s.x.p2 + 1;
+}
+
+fn more_struct() {
+    s: S;
+    psx := &&s.x;
+    psx.p2 = 123;
+
+    new_sx : struct{ p1: i32, p2: i32 };
+    new_sx.p2 = 3;
+
+    ^^psx = new_sx;
+
+    ret s.x.p2;
 }
 
 fn p_p_id(n: **i32) { ret n; }
@@ -47,6 +66,10 @@ fn testBug1() {
 fn testDerefParam() {
     ret deref(&3);
 }
+
+fn deref_2_to_0(i: **i32) { ret ^deref_2_to_1(i); }
+
+fn deref_2_to_1(i: **i32) { ret p_id(^p_p_id(i)); }
 
 fn deref(i: *i32) {
     ret ^i;

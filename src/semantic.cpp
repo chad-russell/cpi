@@ -282,8 +282,11 @@ void resolveType(Semantic *semantic, Node *node) {
             semantic->resolveTypes(node->typeData.fnTypeData.returnType);
         } break;
         case NodeTypekind::STRUCT: {
+            int32_t total = 0;
             for (auto param : node->typeData.structTypeData.params) {
+                param->localOffset = total;
                 semantic->resolveTypes(param);
+                total += typeSize(param->declParamData.type);
             }
         } break;
         case NodeTypekind::SYMBOL: {
