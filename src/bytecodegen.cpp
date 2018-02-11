@@ -114,12 +114,12 @@ void BytecodeGen::gen(Node *node) {
 
             gen(node->retData.value);
 
-            storeValue(node->bytecode, node->retData.value, 0);
+            storeValue(instructions, node->retData.value, 0);
 
             if (isMainFn) {
-                append(node->bytecode, Instruction::EXIT);
+                append(instructions, Instruction::EXIT);
             } else {
-                append(node->bytecode, Instruction::RET);
+                append(instructions, Instruction::RET);
             }
         } break;
         case NodeType::INT_LITERAL: {
@@ -196,9 +196,8 @@ void BytecodeGen::gen(Node *node) {
                     append(instructions, Instruction::RELI32);
                     append(instructions, toBytes(resolvedDecl->localOffset));
 
-                    append(instructions, Instruction::RELCONSTI32);
+                    append(instructions, Instruction::CONSTI32);
                     append(instructions, toBytes(static_cast<int32_t>(4)));
-//                    append(instructions, toBytes(offsetWords));
 
                     append(instructions, toBytes(resolvedDecl->dotData.autoDerefStorage->localOffset));
                 }
@@ -446,16 +445,6 @@ void BytecodeGen::gen(Node *node) {
             else {
                 assert(false);
             }
-
-            if (node->dotData.nodeLocalStorage != nullptr) {
-                storeValue(instructions, node, node->dotData.nodeLocalStorage->localOffset);
-
-                append(node->bytecode, Instruction::RELI32);
-                append(node->bytecode, toBytes(node->dotData.nodeLocalStorage->localOffset));
-            } else {
-                append(node->bytecode, Instruction::RELI32);
-                append(node->bytecode, toBytes(node->fullOffset()));
-            }
         } break;
         default: assert(false);
     }
@@ -557,9 +546,8 @@ void BytecodeGen::storeValue(vector<unsigned char> &instructions, Node *node, in
                     append(instructions, Instruction::RELI32);
                     append(instructions, toBytes(node->localOffset));
 
-                    append(instructions, Instruction::RELCONSTI32);
+                    append(instructions, Instruction::CONSTI32);
                     append(instructions, toBytes(static_cast<int32_t>(4)));
-//                    append(instructions, toBytes(offsetWords));
 
                     append(instructions, toBytes(node->localOffset));
                 }

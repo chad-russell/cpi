@@ -45,7 +45,29 @@ fn main() {
 
     a16 := more_struct();
 
-    ret a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14 + a15 + a16;
+    a17 := test_S2_stuff();
+
+    ret a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14 + a15 + a16 + a17;
+}
+
+fn test_S2_stuff() {
+    s: S2;
+    sx: struct{p1: i32, p2: i32};
+
+    sx.p1 = 999;
+    sx.p2 = 2;
+
+    s.x = &&sx;
+
+    ret s.x.p2 + 1;
+}
+
+type S2 struct {
+	x: **struct {
+		p1: i32,
+		p2: i32
+	},
+	y: fn() i32
 }
 
 fn more_struct() {
