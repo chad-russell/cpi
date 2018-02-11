@@ -197,7 +197,7 @@ void BytecodeGen::gen(Node *node) {
                     append(instructions, toBytes(resolvedDecl->localOffset));
 
                     append(instructions, Instruction::CONSTI32);
-                    append(instructions, toBytes(static_cast<int32_t>(4)));
+                    append(instructions, toBytes(offsetWords));
 
                     append(instructions, toBytes(resolvedDecl->dotData.autoDerefStorage->localOffset));
                 }
@@ -547,7 +547,7 @@ void BytecodeGen::storeValue(vector<unsigned char> &instructions, Node *node, in
                     append(instructions, toBytes(node->localOffset));
 
                     append(instructions, Instruction::CONSTI32);
-                    append(instructions, toBytes(static_cast<int32_t>(4)));
+                    append(instructions, toBytes(offsetWords));
 
                     append(instructions, toBytes(node->localOffset));
                 }

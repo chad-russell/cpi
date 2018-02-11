@@ -1,9 +1,9 @@
-fn main() {
-    a := test_S2_stuff();
-    ret a;
+type linkedList struct {
+    value: i32,
+    next: *linkedList
 }
 
-fn test_S2_stuff() {
+fn main() {
     s: S2;
     sx: struct{p1: i32, p2: i32};
 
@@ -12,7 +12,12 @@ fn test_S2_stuff() {
 
     s.x = &&sx;
 
-    ret s.x.p2 + s.x.p2 + s.x.p2 + s.x.p2;
+    ret s.x.p2;
+}
+
+fn set_y(p: *point, y: i32) {
+    p.y = y;
+    ret y;
 }
 
 type S2 struct {

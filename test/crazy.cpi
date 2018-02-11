@@ -47,7 +47,49 @@ fn main() {
 
     a17 := test_S2_stuff();
 
-    ret a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14 + a15 + a16 + a17;
+    a18 := testSetFromParam();
+
+    a19 := testSetter();
+
+    ret a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14 + a15 + a16 + a17 + a18 + a19;
+}
+
+type linkedList struct {
+    value: i32,
+    next: *linkedList
+}
+
+fn testLinkedList() {
+    l: linkedList;
+    l.value = 3;
+    l.next = &l;
+
+    n := l.next;
+    ret n.value;
+}
+
+fn set_y(p: *point, y: i32) {
+    p.y = y;
+    ret y;
+}
+
+fn testSetter() {
+    p: point;
+    p.x = bad();
+    p.y = bad();
+    wtf := set_y(&p, 3);
+    ret p.y;
+}
+
+fn testSetFromParam() {
+    a : i32 = 999;
+    wtf := set(&a);
+    ret a;
+}
+
+fn set(n: *i32) {
+    ^n = 3;
+    ret 999;
 }
 
 fn test_S2_stuff() {
