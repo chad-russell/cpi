@@ -171,12 +171,13 @@ void BytecodeGen::gen(Node *node) {
                 append(node->bytecode, Instruction::STORE);
 
                 append(node->bytecode, Instruction::RELI32);
-                append(node->bytecode, toBytes(static_cast<int32_t>(localOffset)));
+                append(node->bytecode, toBytes(localOffset));
 
                 append(node->bytecode, Instruction::RELCONSTI32);
-                append(node->bytecode, toBytes(static_cast<int32_t>(data.rhs->localOffset)));
+                append(node->bytecode, toBytes(data.rhs->localOffset));
 
-                append(node->bytecode, toBytes(static_cast<int32_t>(typeSize(resolvedDecl->derefData.target->typeInfo))));
+                assert(resolvedDecl->derefData.target->typeInfo->typeData.kind == NodeTypekind::POINTER);
+                append(node->bytecode, toBytes(static_cast<int32_t>(typeSize(resolvedDecl->derefData.target->typeInfo->typeData.pointerTypeData.underlyingType))));
             } else if (resolvedDecl->type == NodeType::DOT) {
                 gen(data.lhs);
 
@@ -361,7 +362,8 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, Instruction::RELI32);
                 append(instructions, toBytes(node->derefData.target->localOffset));
 
-                append(instructions, toBytes(typeSize(node->derefData.target->typeInfo)));
+                assert(node->derefData.target->typeInfo->typeData.kind == NodeTypekind::POINTER);
+                append(instructions, toBytes(typeSize(node->derefData.target->typeInfo->typeData.pointerTypeData.underlyingType)));
             }
         } break;
         case NodeType::ADDRESS_OF: {

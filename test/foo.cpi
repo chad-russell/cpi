@@ -1,6 +1,31 @@
+type S struct {
+	x: struct {
+		p1: i32,
+		p2: i32
+	},
+	y: i32
+}
+
 fn main() {
-    a2 := apply(inc, 1) + apply_overboard(inc, 0);
-    ret a2 + ^&deref(^&&3);
+    p: point;
+    p.y = 14;
+    ret (^&p).y;
+}
+
+fn p_p_id(n: **i32) { ret n; }
+
+fn p_id(n: *i32) { ret n; }
+
+fn id(n: i32) { ret n; }
+
+fn point_get_y(p: point) { ret p.y; }
+
+fn point_id(p: point) { ret p; }
+
+fn testNestedCall() {
+    p: point;
+    p.y = 3;
+    ret point_get_y(point_id(point_id(point_id(point_id(point_id(point_id(p)))))));
 }
 
 type point struct {
@@ -10,13 +35,13 @@ type point struct {
 
 fn testBug1() {
     p: point;
-    p.x = 123;
+    p.y = 123;
 
     q := &&p;
     qq1 := ^q;
-    qq1.x = 3;
+    qq1.y = 3;
 
-    ret qq1.x;
+    ret qq1.y;
 }
 
 fn testDerefParam() {
@@ -72,14 +97,6 @@ fn testA9Helper() {
 
 fn testA9() {
     ret testA9Helper();
-}
-
-type S struct {
-	x: struct {
-		p1: i32,
-		p2: i32
-	},
-	y: i32
 }
 
 fn testStruct1() {

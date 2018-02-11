@@ -57,16 +57,16 @@ fn testA9() {
 
 fn testBug1() {
     p: point;
-    p.x = 123;
+    p.y = 123;
 
     q := &&p;
     qq1 := ^q;
-    qq1.x = 3;
+    qq1.y = 3;
 
-    -- todo(chad): once we have assert, assert that p.x and q.x are also 13
+    -- todo(chad): once we have assert, assert that p.y and q.y are also 13
     ; -- todo(chad): also, get rid of this dumb thing where comments have to have semicolons... :(
     ;
-    ret qq1.x;
+    ret qq1.y;
 }
 
 fn deref(i: *i32) {
@@ -78,13 +78,13 @@ type point struct {
     y: i32
 }
 
-fn point_get_x(p: point) { ret p.x; }
+fn point_get_x(p: point) { ret p.y; }
 
 fn point_id(p: point) { ret p; }
 
 fn testNestedCall() {
     p: point;
-    p.x = 3;
+    p.y = 3;
     ret point_get_x(point_id(point_id(point_id(point_id(point_id(point_id(p)))))));
 }
 
