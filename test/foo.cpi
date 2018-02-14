@@ -1,31 +1,11 @@
-type S2 struct {
-	x: **struct {
-		p1: i64,
-		p2: i64
-	},
-	y: fn() i64
-}
-
-type point struct {
-    x: i64,
-    y: i64
+type linkedList struct {
+    value: i64,
+    next: *linkedList
 }
 
 fn main() {
-    foo: Foo;
-    ret ^foo.bar.baz;
-}
-
-type Foo struct {
-    v: i32,
-    bar: *Bar
-}
-
-type Bar struct {
-    v: i32,
-    baz: *Baz
-}
-
-type Baz struct {
-    v: i32,
+    l: linkedList;
+    l.value = 3;
+    l.next = &l;
+    ret l.next.next.next.next.next.next;
 }

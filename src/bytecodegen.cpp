@@ -173,7 +173,7 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, toBytes(localOffset));
 
                 append(instructions, Instruction::RELCONSTI32);
-                append(instructions, toBytes(resolvedDecl->derefData.target->localOffset));
+                append(instructions, toBytes(data.rhs->localOffset));
 
                 assert(resolvedDecl->derefData.target->typeInfo->typeData.kind == NodeTypekind::POINTER);
                 append(instructions, toBytes32(typeSize(resolvedDecl->typeInfo)));
@@ -183,10 +183,18 @@ void BytecodeGen::gen(Node *node) {
 
                 gen(resolvedDecl);
 
+                auto foundParam = resolvedDecl->dotData.resolved;
+                auto offsetWords = foundParam->localOffset;
+
                 append(instructions, Instruction::STORE);
 
-                append(instructions, Instruction::RELCONSTI32);
-                append(instructions, toBytes(resolvedDecl->localOffset));
+                if (resolvedDecl->dotData.autoDeref) {
+                    append(instructions, Instruction::RELI32);
+                    append(instructions, toBytes(resolvedDecl->dotData.autoDerefStorage->localOffset));
+                } else {
+                    append(instructions, Instruction::RELCONSTI32);
+                    append(instructions, toBytes(resolvedDecl->dotData.lhs->localOffset + offsetWords));
+                }
 
                 append(instructions, Instruction::RELCONSTI32);
                 append(instructions, toBytes32(data.rhs->localOffset));
@@ -423,6 +431,7 @@ void BytecodeGen::gen(Node *node) {
 
                 // FINDME
                 node->localOffset = node->dotData.autoDerefStorage->localOffset;
+//                node->localOffset = node->dotData.lhs->localOffset;
             } else {
                 node->localOffset = node->dotData.lhs->localOffset + offsetWords;
             }
