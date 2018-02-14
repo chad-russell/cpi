@@ -94,7 +94,7 @@ public:
     uint16_t depth = 0;
     int32_t overDepth = (2 << 15) + 1;
 
-    Interpreter(): Interpreter(1024 * 4) {}
+    Interpreter(): Interpreter(1024 * 32) {}
 
     Interpreter(int32_t stackSize) {
         stack.reserve(stackSize);

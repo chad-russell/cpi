@@ -1,7 +1,3 @@
-fn foo() {
-    ret bar;
-}
-
 fn main() {
     f := fn() {
         ret fn() {
@@ -78,6 +74,64 @@ fn main() {
 
     a23 := test23();
     assert(a23 == 12);
+
+    test24();
+
+    ret 0;
+}
+
+fn foo() {
+    ret bar;
+}
+
+fn test24() {
+    type Foo struct {
+        value: i32,
+        bar: *Bar
+    };
+
+    type Bar struct {
+        value: i32,
+        baz: Baz
+    };
+
+    type Baz struct {
+        value: i32,
+        qux: *Qux
+    };
+
+    type Qux struct {
+        value: i32
+    };
+
+    foo: Foo;
+    foo.value = 555;
+
+    bar: Bar;
+    bar.value = 666;
+
+    baz: Baz;
+    baz.value = 777;
+
+    qux: Qux;
+    qux.value = 888;
+
+    baz.qux = &qux;
+    bar.baz = baz;
+    foo.bar = &bar;
+
+    qux.value = 3;
+
+    assert(foo.bar.baz.qux.value == 3);
+    assert(bar.baz.qux.value == 3);
+    assert(baz.qux.value == 3);
+    assert(qux.value == 3);
+
+    foo.bar.baz.qux.value = 6;
+    assert(qux.value == 6);
+
+    bar.baz.qux.value = 8;
+    assert(qux.value == 8);
 
     ret 0;
 }

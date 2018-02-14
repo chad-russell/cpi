@@ -1,7 +1,13 @@
 fn main() {
+    testWeirdLinkedList();
+    test24();
+    ret 3;
+}
+
+fn test24() {
     type Foo struct {
         value: i32,
-        bar: **Bar
+        bar: *Bar
     };
 
     type Bar struct {
@@ -11,7 +17,7 @@ fn main() {
 
     type Baz struct {
         value: i32,
-        qux: **Qux
+        qux: *Qux
     };
 
     type Qux struct {
@@ -19,16 +25,48 @@ fn main() {
     };
 
     foo: Foo;
+    foo.value = 555;
 
     bar: Bar;
+    bar.value = 666;
 
     baz: Baz;
     baz.value = 777;
 
-    bar.baz = baz;
-    foo.bar = &&bar;
+    qux: Qux;
+    qux.value = 888;
 
-    foo.bar.baz.value = 123;
-    a := &foo.bar.baz.value;
-    ret ^a;
+    baz.qux = &qux;
+    bar.baz = baz;
+    foo.bar = &bar;
+
+    qux.value = 3;
+
+    assert(foo.bar.baz.qux.value == 3);
+    assert(bar.baz.qux.value == 3);
+    assert(baz.qux.value == 3);
+    assert(qux.value == 3);
+
+    foo.bar.baz.qux.value = 6;
+    assert(qux.value == 6);
+
+    bar.baz.qux.value = 8;
+    assert(qux.value == 8);
+
+    ret 0;
+}
+
+type weirdLinkedList struct {
+    value: i64,
+    next: *******weirdLinkedList
+}
+
+fn testWeirdLinkedList() {
+    l: weirdLinkedList;
+    l.value = 999;
+    l.next = &&&&&&&l;
+
+    l.next.next.next.next.next.next.next.next.value = 3;
+
+    ret l.value + l.next.value + l.next.next.next.next.value;
 }
