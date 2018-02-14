@@ -112,8 +112,7 @@ struct DotData {
 
     Node *nodeLocalStorage = nullptr;
 
-    bool lhsAutoDeref = false;
-    bool poisonAutoDeref = false;
+    bool pointerIsRelative = false;
 };
 
 struct BinopData {

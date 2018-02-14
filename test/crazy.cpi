@@ -70,12 +70,14 @@ fn main() {
     a20 := testLinkedList();
     assert(a20 == 3);
 
-    testWeirdLinkedList();
+    a21 := testWeirdLinkedList();
+    assert(a21 == 9);
 
     a22 := testMoreDotsAndDerefs();
     assert(a22 == 3);
 
-    test23();
+    a23 := test23();
+    assert(a23 == 12);
 
     ret 0;
 }
@@ -89,11 +91,10 @@ fn testWeirdLinkedList() {
     l: weirdLinkedList;
     l.value = 999;
     l.next = &&&&&&&l;
+
     l.next.next.next.next.next.next.next.next.value = 3;
 
-    assert(3 == l.value);
-    assert(3 == l.next.value);
-    assert(3 == l.next.next.next.next.value);
+    ret l.value + l.next.value + l.next.next.next.next.value;
 }
 
 type pair struct {
@@ -319,8 +320,5 @@ fn test23() {
 
     foo.bar.baz.qux.value = 3;
 
-    assert(foo.bar.baz.qux.value == 3);
-    assert(bar.baz.qux.value == 3);
-    assert(baz.qux.value == 3);
-    assert(qux.value == 3);
+    ret foo.bar.baz.qux.value + bar.baz.qux.value + baz.qux.value + qux.value;
 }

@@ -189,12 +189,12 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, Instruction::STORE);
 
                 // TAG
-                if (resolvedDecl->dotData.poisonAutoDeref) {
+                if (resolvedDecl->dotData.pointerIsRelative) {
                     append(instructions, Instruction::RELI32);
                     append(instructions, toBytes(resolvedDecl->localOffset));
                 } else {
                     append(instructions, Instruction::RELCONSTI32);
-                    append(instructions, toBytes(resolvedDecl->dotData.lhs->localOffset + offsetWords));
+                    append(instructions, toBytes(resolvedDecl->localOffset));
                 }
 
                 append(instructions, Instruction::RELCONSTI32);
@@ -427,11 +427,14 @@ void BytecodeGen::gen(Node *node) {
                 hijackedOffsetLocation = node->dotData.autoDerefStorage->localOffset;
             }
 
+            auto lhsRel = node->dotData.lhs->type == NodeType::DOT && node->dotData.lhs->dotData.pointerIsRelative;
+            auto lhsIsAutoDeref = node->dotData.lhs->type == NodeType::DOT && node->dotData.lhs->dotData.autoDeref;
+
             // if we are doing a dot on another dot which was an autoderef, then we need to
             // load it again, as it will be a double-pointer from our perspective
-            auto lhsIsAutoDeref = node->dotData.lhs->type == NodeType::DOT && node->dotData.lhs->dotData.autoDeref;
-            if (lhsIsAutoDeref) {
-                node->dotData.lhsAutoDeref = true;
+            auto secondBranch = !node->dotData.autoDeref && lhsRel;
+            if (lhsRel && !secondBranch) {
+                node->dotData.pointerIsRelative = true;
 
                 append(instructions, Instruction::STORE);
 
@@ -444,11 +447,9 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, toBytes32(4));
             }
 
-            node->dotData.poisonAutoDeref = node->dotData.autoDeref || node->dotData.lhsAutoDeref;
-
             // TAG
             if (node->dotData.autoDeref) {
-                node->dotData.poisonAutoDeref = true;
+                node->dotData.pointerIsRelative = true;
 
                 append(instructions, Instruction::ADDI32);
 
@@ -461,8 +462,8 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, toBytes(node->dotData.autoDerefStorage->localOffset));
 
                 node->localOffset = node->dotData.autoDerefStorage->localOffset;
-            } /*else if (node->dotData.poisonAutoDeref) {
-                node->dotData.poisonAutoDeref = true;
+            } else if (lhsRel) {
+                node->dotData.pointerIsRelative = true;
 
                 append(instructions, Instruction::ADDI32);
 
@@ -475,10 +476,9 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, toBytes(hijackedOffsetLocation));
 
                 node->localOffset = hijackedOffsetLocation;
-            }*/ else {
-                node->dotData.poisonAutoDeref = false;
-
-                node->localOffset = hijackedOffsetLocation;
+            } else {
+                node->dotData.pointerIsRelative = false;
+                node->localOffset = hijackedOffsetLocation + offsetWords;
             }
         } break;
         case NodeType::ASSERT: {
@@ -565,20 +565,17 @@ void BytecodeGen::storeValue(vector<unsigned char> &instructions, Node *node, in
         case NodeType::DOT: {
             gen(node);
 
-            auto foundParam = node->dotData.resolved;
-            auto offsetWords = foundParam->localOffset;
-
             append(instructions, Instruction::STORE);
             append(instructions, Instruction::RELCONSTI32);
             append(instructions, toBytes32(offset));
 
             // TAG
-            if (node->dotData.poisonAutoDeref) {
+            if (node->dotData.pointerIsRelative) {
                 append(instructions, Instruction::RELI32);
                 append(instructions, toBytes(node->localOffset));
             } else {
                 append(instructions, Instruction::RELCONSTI32);
-                append(instructions, toBytes(node->dotData.lhs->localOffset + offsetWords));
+                append(instructions, toBytes(node->localOffset));
             }
 
             append(instructions, toBytes32(typeSize(node->typeInfo)));

@@ -59,9 +59,7 @@ bool typesMatch(Node *desired, Node *actual) {
         return false;
     }
 
-    if (desired->typeData.kind != actual->typeData.kind) { return false; }
-
-    return true;
+    return desired->typeData.kind == actual->typeData.kind;
 }
 
 void Semantic::reportError(vector<Node *> nodes, Error error) {
@@ -97,9 +95,9 @@ void Semantic::reportError(vector<Node *> nodes, Error error) {
 Node *localTarget(Node *local) {
     auto resolved = resolve(local);
 
-    if (resolved->type == NodeType::DOT) {
-        return localTarget(resolved->dotData.lhs);
-    }
+//    if (resolved->type == NodeType::DOT) {
+//        return localTarget(resolved->dotData.lhs);
+//    }
 
     return resolved;
 }
