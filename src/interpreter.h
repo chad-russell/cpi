@@ -458,7 +458,7 @@ template <typename T>
 void interpretCmpEq(Interpreter *interp) {
     auto a = interp->read<T>();
     auto b = interp->read<T>();
-    int8_t result = a == b ? (int8_t) 1 : (int8_t) 0;
+    int32_t result = a == b ? 1 : 0;
     auto storeOffset = interp->consume<int32_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }
@@ -467,7 +467,7 @@ template <typename T>
 void interpretCmpNeq(Interpreter *interp) {
     auto a = interp->read<T>();
     auto b = interp->read<T>();
-    int8_t result = a != b ? (int8_t) 1 : (int8_t) 0;
+    int32_t result = a != b ? 1 : 0;
     auto storeOffset = interp->consume<int32_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }
@@ -476,7 +476,7 @@ template <typename T>
 void interpretCmpGt(Interpreter *interp) {
     auto a = interp->read<T>();
     auto b = interp->read<T>();
-    int8_t result = a > b ? 1 : 0;
+    int32_t result = a > b ? 1 : 0;
     auto storeOffset = interp->consume<int32_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }
@@ -485,7 +485,7 @@ template <typename T>
 void interpretCmpGte(Interpreter *interp) {
     auto a = interp->read<T>();
     auto b = interp->read<T>();
-    int8_t result = a >= b ? 1 : 0;
+    int32_t result = a >= b ? 1 : 0;
     auto storeOffset = interp->consume<int32_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }
@@ -494,7 +494,7 @@ template <typename T>
 void interpretCmpLt(Interpreter *interp) {
     auto a = interp->read<T>();
     auto b = interp->read<T>();
-    int8_t result = a < b ? 1 : 0;
+    int32_t result = a < b ? 1 : 0;
     auto storeOffset = interp->consume<int32_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }
@@ -503,7 +503,7 @@ template <typename T>
 void interpretCmpLte(Interpreter *interp) {
     auto a = interp->read<T>();
     auto b = interp->read<T>();
-    int8_t result = a <= b ? 1 : 0;
+    int32_t result = a <= b ? 1 : 0;
     auto storeOffset = interp->consume<int32_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }
