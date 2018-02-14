@@ -11,7 +11,7 @@ fn main() {
 
     type Baz struct {
         value: i32,
-        qux: Qux
+        qux: *Qux
     };
 
     type Qux struct {
@@ -19,15 +19,15 @@ fn main() {
     };
 
     foo: Foo;
+
     bar: Bar;
+
     baz: Baz;
-    qux: Qux;
+    baz.value = 777;
 
     foo.bar = &bar;
+    bar.baz = baz;
 
-    foo.bar.baz.qux.value = 3;
-
-    assert(foo.bar.baz.qux.value == 3);
-
-    ret 0;
+    foo.bar.baz.value = 123;
+    ret bar.baz.value;
 }

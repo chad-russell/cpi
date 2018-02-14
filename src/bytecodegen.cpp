@@ -188,11 +188,8 @@ void BytecodeGen::gen(Node *node) {
 
                 append(instructions, Instruction::STORE);
 
-                if (resolvedDecl->dotData.poisonAutoDeref) {
-                    cout << "gonna fail now..." << endl;
-                }
-
-                if (resolvedDecl->dotData.autoDeref || resolvedDecl->dotData.lhsAutoDeref) {
+                // TAG
+                if (resolvedDecl->dotData.autoDeref || resolvedDecl->dotData.poisonAutoDeref) {
                     append(instructions, Instruction::RELI32);
                     append(instructions, toBytes(resolvedDecl->localOffset));
                 } else {
@@ -448,8 +445,8 @@ void BytecodeGen::gen(Node *node) {
             }
 
             node->dotData.poisonAutoDeref = node->dotData.autoDeref || node->dotData.lhsAutoDeref;
-            cout << "poisoned? " << node->dotData.poisonAutoDeref;
 
+            // TAG
             if (node->dotData.autoDeref) {
                 append(instructions, Instruction::ADDI32);
 
@@ -462,24 +459,20 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, toBytes(node->dotData.autoDerefStorage->localOffset));
 
                 node->localOffset = node->dotData.autoDerefStorage->localOffset;
+            } else if (node->dotData.poisonAutoDeref) {
+                append(instructions, Instruction::ADDI32);
+
+                append(instructions, Instruction::RELI32);
+                append(instructions, toBytes(hijackedOffsetLocation));
+
+                append(instructions, Instruction::CONSTI32);
+                append(instructions, toBytes(offsetWords));
+
+                append(instructions, toBytes(hijackedOffsetLocation));
+
+                node->localOffset = hijackedOffsetLocation;
             } else {
-                if (lhsIsAutoDeref) {
-                    cout << "gonna fail now... hmmmmm" << endl;
-
-                    append(instructions, Instruction::ADDI32);
-
-                    append(instructions, Instruction::RELI32);
-                    append(instructions, toBytes(hijackedOffsetLocation));
-
-                    append(instructions, Instruction::CONSTI32);
-                    append(instructions, toBytes(offsetWords));
-
-                    append(instructions, toBytes(hijackedOffsetLocation));
-
-                    node->localOffset = hijackedOffsetLocation;
-                } else {
-                    node->localOffset = hijackedOffsetLocation + offsetWords;
-                }
+                node->localOffset = hijackedOffsetLocation + offsetWords;
             }
         } break;
         case NodeType::ASSERT: {
@@ -573,11 +566,8 @@ void BytecodeGen::storeValue(vector<unsigned char> &instructions, Node *node, in
             append(instructions, Instruction::RELCONSTI32);
             append(instructions, toBytes32(offset));
 
-            if (node->dotData.poisonAutoDeref) {
-                cout << "gonna fail now..." << endl;
-            }
-
-            if (node->dotData.autoDeref || node->dotData.lhsAutoDeref) {
+            // TAG
+            if (node->dotData.autoDeref || node->dotData.poisonAutoDeref) {
                 append(instructions, Instruction::RELI32);
                 append(instructions, toBytes(node->localOffset));
             } else {
