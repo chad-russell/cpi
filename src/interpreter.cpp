@@ -5,18 +5,25 @@
 
 using namespace std;
 
-void printCurrentStmt(Interpreter *interp) {
+void printStmt(Interpreter *interp, int32_t pcStmtStart, bool withLineInfo = false) {
     for (auto stmt : interp->sourceMap.statements) {
-        if (stmt.instIndex == interp->pc) {
+        if (stmt.instIndex == pcStmtStart) {
             // get byte corresponding to start
             auto startByte = stmt.startByte;
 
             // get byte corresponding to end
             auto endByte = stmt.endByte;
 
+            if (withLineInfo) {
+                cout << "[" << stmt.startLine << "] ";
+            }
             cout << interp->sourceMap.sourceInfo.source.substr(startByte, endByte - startByte) << endl;
         }
     }
+}
+
+void printCurrentStmt(Interpreter *interp, bool withLineInfo = false) {
+    printStmt(interp, interp->pc, withLineInfo);
 }
 
 void Interpreter::interpret() {
@@ -27,6 +34,9 @@ void Interpreter::interpret() {
         auto stmtStopIf = find_if(sourceMap.statements.begin(), sourceMap.statements.end(),
                                   [this](const SourceMapStatement &s) { return s.instIndex == pc; });
         auto stmtStop = stmtStopIf != sourceMap.statements.end();
+        if (stmtStop) {
+            lastStmtPc = pc;
+        }
 
         auto breakStopIf = find(breakpoints.begin(), breakpoints.end(), pc);
         auto breakStop = breakStopIf != breakpoints.end();
@@ -83,8 +93,8 @@ void Interpreter::interpret() {
                     printCurrentStmt(this);
                 } else if (line == "asm") {
                     // print all insts between this stmt and the next one
-                    auto firstIndex = pc;
-                    auto lastIndex = pc;
+                    auto firstIndex = (uint32_t) pc;
+                    auto lastIndex = (uint32_t) pc;
                     for (auto statement : sourceMap.statements) {
                         auto stmt = statement;
                         if (stmt.instIndex == pc) {
@@ -126,15 +136,22 @@ void Interpreter::interpret() {
 }
 
 void Interpreter::step() {
-    int32_t inst = instructions[pc];
-    auto debugInst = static_cast<Instruction>(inst);
+    unsigned long inst = instructions[pc];
     pc += 1;
-
     table.at(inst)(this);
 }
 
 void interpretExit(Interpreter *interp) {
     interp->terminated = true;
+}
+
+void interpretAssert(Interpreter *interp) {
+    auto condition = interp->read<int32_t>();
+    if (condition == 0) {
+        cout << "ASSERTION FAILURE!!!!" << endl << "> ";
+        printStmt(interp, interp->lastStmtPc, true);
+        exit(0);
+    }
 }
 
 // calli
@@ -177,11 +194,11 @@ void interpretRet(Interpreter *interp) {
 void interpretJumpIf(Interpreter *interp) {
     bool cond;
 
-    auto constCond = interp->tryRead<int8_t>();
+    auto constCond = interp->tryRead<int32_t>();
     if (constCond.isPresent) {
         cond = constCond.value == 1;
     } else {
-        cond = interp->read<int8_t>() == 1;
+        cond = interp->read<int32_t>() == 1;
     }
 
     auto trueInst = interp->consume<int32_t>();
@@ -205,6 +222,11 @@ void interpretStore(Interpreter *interp) {
     assert(maybeStoreOffset.isPresent);
     auto storeOffset = maybeStoreOffset.value;
 
+    if (storeOffset >= interp->stack.size()) {
+        cout << "STACK OVERFLOW!!!!" << endl;
+        exit(1);
+    }
+
     auto maybeReadOffset = interp->tryRead<int32_t>();
     assert(maybeReadOffset.isPresent);
     auto readOffset = maybeReadOffset.value;
@@ -216,6 +238,11 @@ void interpretStore(Interpreter *interp) {
 
 void interpretStoreConst(Interpreter *interp) {
     auto storeOffset = interp->read<int32_t>();
+
+    if (storeOffset >= interp->stack.size()) {
+        cout << "STACK OVERFLOW!!!!" << endl;
+        exit(1);
+    }
 
     auto inst = AssemblyLexer::instructionStrings[interp->instructions[interp->pc]];
 

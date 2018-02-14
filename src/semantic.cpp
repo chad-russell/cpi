@@ -6,6 +6,16 @@ int32_t typeSize(Node *type) {
     assert(type->type == NodeType::TYPE);
 
     switch (type->typeData.kind) {
+        case NodeTypekind::NONE:
+            return 0;
+        case NodeTypekind::BOOLEAN:
+        case NodeTypekind::I32:
+        case NodeTypekind::FN:
+        case NodeTypekind::POINTER:
+            return 4;
+        case NodeTypekind::INT_LITERAL:
+        case NodeTypekind::I64:
+            return 8;
         case NodeTypekind::SYMBOL:
             return typeSize(type->resolved);
         case NodeTypekind::STRUCT: {
@@ -16,15 +26,6 @@ int32_t typeSize(Node *type) {
             }
             return total;
         }
-        case NodeTypekind::I32:
-        case NodeTypekind::FN:
-        case NodeTypekind::POINTER:
-            return 4;
-        case NodeTypekind::INT_LITERAL:
-        case NodeTypekind::I64:
-            return 8;
-        case NodeTypekind::NONE:
-            return 0;
         default: assert(false);
     }
 }
@@ -351,7 +352,12 @@ void resolveBinop(Semantic *semantic, Node *node) {
                               Error{node->region, "type mismatch - both sides of binary operation need to be the same type"});
     }
 
-    node->typeInfo = node->binopData.lhs->typeInfo;
+
+    if (isBooleanBinop(node->binopData.type)) {
+        node->typeInfo = new Node(NodeTypekind::BOOLEAN);
+    } else {
+        node->typeInfo = node->binopData.lhs->typeInfo;
+    }
 }
 
 bool assignParams(Semantic *semantic,
@@ -575,6 +581,14 @@ void resolveDot(Semantic *semantic, Node *node) {
     resolveDot(semantic, node, resolve(node->dotData.lhs), node->dotData.rhs);
 }
 
+void resolveAssert(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->nodeData);
+    if (node->nodeData->typeInfo->typeData.kind != NodeTypekind::BOOLEAN) {
+        semantic->reportError({node, node->nodeData},
+                              Error{node->nodeData->region, "condition for assert must be a boolean"});
+    }
+}
+
 void Semantic::resolveTypes(Node *node) {
     if (node == nullptr) { return; }
 
@@ -626,6 +640,9 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::DOT: {
             resolveDot(this, node);
+        } break;
+        case NodeType::ASSERT: {
+            resolveAssert(this, node);
         } break;
         default: assert(false);
     }

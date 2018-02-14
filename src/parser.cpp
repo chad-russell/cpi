@@ -264,6 +264,11 @@ Node *Parser::parseScopedStmt() {
     auto saved = lexer->front.region.start;
     auto lvalue = parseLvalue();
 
+    if (lvalue->type == NodeType::FN_CALL
+        || lvalue->type == NodeType::ASSERT) {
+        return lvalue;
+    }
+
     // declaration
     if (lexer->front.type == LexerTokenType::COLON) {
         // cannot declare anything but a symbol
@@ -460,9 +465,23 @@ Node *Parser::parseLvalue() {
             auto symbol = parseSymbol();
             return parseLvalueHelper(symbol, saved);
         }
-        case LexerTokenType::FN: {
-            return parseFnDecl();
-        }
+        case LexerTokenType::ASSERT: {
+            popFront();
+            auto assertNode = new Node(lexer->srcInfo, &allNodes, NodeType::ASSERT, scopes.top());
+            expect(LexerTokenType::LPAREN, "(");
+
+            // todo(chad): get rid of this.
+            assertNode->nodeData = parseRvalue();
+            addLocal(assertNode->nodeData);
+
+            assertNode->sourceMapStatement = true;
+            expect(LexerTokenType::RPAREN, ")");
+
+            assertNode->region.start = saved;
+            assertNode->region.end = lexer->front.region.start;
+
+            return assertNode;
+        } break;
         default: {
             auto savedType = lexer->front.type;
             popFront();
@@ -661,26 +680,6 @@ Node *Parser::parseFloatLiteral() {
     node->floatLiteralData.value = stod(s.str());
 
     return node;
-}
-
-bool Parser::isBinop(LexerTokenType type) {
-    return isBooleanBinop(type)
-           || type == LexerTokenType::ADD
-           || type == LexerTokenType::SUB
-           || type == LexerTokenType::MUL
-           || type == LexerTokenType::DIV
-           || type == LexerTokenType::VERTICAL_BAR;
-}
-
-bool Parser::isBooleanBinop(LexerTokenType type) {
-    return type == LexerTokenType::EQ_EQ
-           || type == LexerTokenType::NE
-           || type == LexerTokenType::LT
-           || type == LexerTokenType::GT
-           || type == LexerTokenType::LE
-           || type == LexerTokenType::GE
-           || type == LexerTokenType::AND
-           || type == LexerTokenType::OR;
 }
 
 int8_t Parser::operatorPrecedence(LexerTokenType type) {

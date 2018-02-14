@@ -9,55 +9,107 @@ fn main() {
         };
     };
 
-    a1 := f()()()();
+    assert(3 == f()()()());
 
-    a2 := apply(inc, 1) + apply_overboard(inc, 0);
+    assert(apply(inc, 1) + apply_overboard(inc, 0) == 3);
 
     a3 := ^^^^^^&&&^&&&&^&^^&&3;
+    assert(a3 == 3);
 
     a4_helper := &&&&^&&&&&&&&&a3;
     a4 := ^^^^^^^^^^^^a4_helper;
+    assert(a4 == 3);
 
     a5 := a5_fn();
+    assert(a5 == 3);
 
     a6 := (^^&&a5_fn)();
+    assert(a6 == 3);
 
-    a7 := (^&(fn() i32 { ret 3; }))();
+    a7 := (^&(fn() i64 { ret 3; }))();
+    assert(a7 == 3);
 
     a8_helper1 := &&bad;
     a8_helper2 := &&bar;
     ^a8_helper1 = ^a8_helper2;
     a8 := (^^a8_helper1)();
+    assert(a8 == 3);
 
     a9 := testA9();
+    assert(a9 == 3);
 
     a10 := testStruct1();
+    assert(a10 == 3);
 
     a11 := testStruct2();
+    assert(a11 == 3);
 
     a12 := testNestedCall();
+    assert(a12 == 3);
 
     a13 := testDerefParam();
+    assert(a13 == 3);
 
     a14 := testBug1();
+    assert(a14 == 3);
 
     a15 := testDoubleDeref();
+    assert(a15 == 3);
 
     a16 := more_struct();
+    assert(a16 == 3);
 
     a17 := test_S2_stuff();
+    assert(a17 == 3);
 
     a18 := testSetFromParam();
+    assert(a18 == 3);
 
     a19 := testSetter();
+    assert(a19 == 3);
 
     a20 := testLinkedList();
+    assert(a20 == 3);
 
-    ret a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14 + a15 + a16 + a17 + a18 + a19 + a20;
+    a21 := testWeirdLinkedList();
+    assert(a21 == 3);
+
+    a22 := testMoreDotsAndDerefs();
+    assert(a22 == 3);
+
+    ret 0;
+}
+
+type pair struct {
+    x: i64,
+    y: i64
+}
+
+fn testMoreDotsAndDerefs() {
+    p: pair;
+    p.x = 1;
+    p.y = 2;
+
+    ret (^^&&p).x + ^^&&(p.y);
+}
+
+type weirdLinkedList struct {
+    value: i64,
+    next: ***weirdLinkedList
+}
+
+fn testWeirdLinkedList() {
+    l: weirdLinkedList;
+    l.value = 999;
+    l.next = &&&l;
+
+    l.next.next.next.value = 3;
+
+    ret l.next.next.next.next.value;
 }
 
 type linkedList struct {
-    value: i32,
+    value: i64,
     next: *linkedList
 }
 
@@ -69,7 +121,7 @@ fn testLinkedList() {
     ret l.next.next.next.next.value;
 }
 
-fn set_y(p: *point, y: i32) {
+fn set_y(p: *point, y: i64) {
     p.y = y;
     ret y;
 }
@@ -78,24 +130,24 @@ fn testSetter() {
     p: point;
     p.x = bad();
     p.y = bad();
-    wtf := set_y(^&&p, 3);
+    set_y(^&&p, 3);
     ret p.y;
 }
 
 fn testSetFromParam() {
-    a : i32 = 999;
-    wtf := set(&a);
+    a : i64 = 999;
+    set(&a);
     ret a;
 }
 
-fn set(n: *i32) {
+fn set(n: *i64) {
     ^n = 3;
     ret 999;
 }
 
 fn test_S2_stuff() {
     s: S2;
-    sx: struct{p1: i32, p2: i32};
+    sx: struct{p1: i64, p2: i64};
 
     sx.p1 = 999;
     sx.p2 = 2;
@@ -107,10 +159,10 @@ fn test_S2_stuff() {
 
 type S2 struct {
 	x: **struct {
-		p1: i32,
-		p2: i32
+		p1: i64,
+		p2: i64
 	},
-	y: fn() i32
+	y: fn() i64
 }
 
 fn more_struct() {
@@ -118,7 +170,7 @@ fn more_struct() {
     psx := &&&s.x;
     psx.p2 = bad();
 
-    new_sx : struct{ p1: i32, p2: i32 };
+    new_sx : struct{ p1: i64, p2: i64 };
     new_sx.p2 = 3;
 
     ^^^psx = new_sx;
@@ -162,13 +214,13 @@ fn testBug1() {
     ret qq1.y;
 }
 
-fn deref(i: *i32) {
+fn deref(i: *i64) {
     ret ^i;
 }
 
 type point struct {
-    x: i32,
-    y: i32
+    x: i64,
+    y: i64
 }
 
 fn point_get_x(p: point) { ret p.y; }
@@ -187,10 +239,10 @@ fn testDerefParam() {
 
 type S struct {
 	x: struct {
-		p1: i32,
-		p2: i32
+		p1: i64,
+		p2: i64
 	},
-	y: i32
+	y: i64
 }
 
 fn testStruct1() {
@@ -205,28 +257,28 @@ fn testStruct2() {
 	ret f.y;
 }
 
-fn bad() i32 { ret 999; }
+fn bad() i64 { ret 999; }
 
 fn a5_fn() {
-    f := fn() i32 { ret 3; };
+    f := fn() i64 { ret 3; };
     p := &f;
     ret (^p)();
 }
 
-fn bar() i32 {
+fn bar() i64 {
     ret 3;
 }
 
-fn inc(n: i32) {
+fn inc(n: i64) {
     ret n + 1;
 }
 
-fn apply(a: fn(n: i32) i32, b: i32) {
+fn apply(a: fn(n: i64) i64, b: i64) {
     ret a(b);
 }
 
-fn apply_overboard(a: fn(n: i32) i32, b: i32) {
-    ret fn(f: fn(n: i32) i32, g: i32) {
+fn apply_overboard(a: fn(n: i64) i64, b: i64) {
+    ret fn(f: fn(n: i64) i64, g: i64) {
         ret f(g);
     }(a, b);
 }

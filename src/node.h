@@ -218,7 +218,7 @@ public:
     vector<unsigned char> bytecode;
     bool isLocal = false;
 
-    // the offset of the base type from the base pointer
+    // the offset of the storage for this node from the current pointer
     int32_t localOffset = 0;
 
     Node();

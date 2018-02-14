@@ -47,6 +47,7 @@ enum class TokenType : unsigned char {
     CALL, 
     RET, 
     EXIT,
+    ASSERT,
 
     // literals
     CONSTI8, CONSTI16, CONSTI32, CONSTI64, CONSTF32, CONSTF64,
@@ -101,6 +102,7 @@ enum class Instruction : unsigned char {
     CALL, 
     RET, 
     EXIT,
+    ASSERT,
 
     // literals
     CONSTI8, CONSTI16, CONSTI32, CONSTI64, CONSTF32, CONSTF64,

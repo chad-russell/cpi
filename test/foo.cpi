@@ -1,153 +1,31 @@
-type weirdLinkedList struct {
-    value: i32,
-    next: **weirdLinkedList
-}
-
-fn main() {
-    l: weirdLinkedList;
-    l.value = 3;
-    l.next = &&l;
-
-    ret l.next.next.value;
-}
-
-type S struct {
-	x: struct {
-		p1: i32,
-		p2: i32
-	},
-	y: i32
-}
-
-fn get_y_ptr(p: *point) { ret p.y; }
-
-fn testSetter() {
-    p: point;
-    p.x = bad();
-    p.y = bad();
-    wtf := set_y(&^&p, 3);
-    ret p.y;
-}
-
-fn set_y(p: *point, y: i32) {
-    p.y = y;
-    ret y;
-}
-
 type S2 struct {
 	x: **struct {
-		p1: i32,
-		p2: i32
+		p1: i64,
+		p2: i64
 	},
-	y: fn() i32
-}
-
-fn more_struct() {
-    s: S;
-    psx := &&s.x;
-    psx.p2 = 123;
-
-    new_sx : struct{ p1: i32, p2: i32 };
-    new_sx.p2 = 3;
-
-    ^^psx = new_sx;
-
-    ret s.x.p2;
-}
-
-fn p_p_id(n: **i32) { ret n; }
-
-fn p_id(n: *i32) { ret n; }
-
-fn id(n: i32) { ret n; }
-
-fn point_get_y(p: point) { ret p.y; }
-
-fn point_id(p: point) { ret p; }
-
-fn testNestedCall() {
-    p: point;
-    p.y = 3;
-    ret point_get_y(point_id(point_id(point_id(point_id(point_id(point_id(p)))))));
+	y: fn() i64
 }
 
 type point struct {
-    x: i32,
-    y: i32
+    x: i64,
+    y: i64
 }
 
-fn testBug1() {
-    p: point;
-    p.y = 123;
-
-    q := &&p;
-    qq1 := ^q;
-    qq1.y = 3;
-
-    ret qq1.y;
+fn main() {
+    foo: Foo;
+    ret ^foo.bar.baz;
 }
 
-fn testDerefParam() {
-    ret deref(&3);
+type Foo struct {
+    v: i32,
+    bar: *Bar
 }
 
-fn deref_2_to_0(i: **i32) { ret ^deref_2_to_1(i); }
-
-fn deref_2_to_1(i: **i32) { ret p_id(^p_p_id(i)); }
-
-fn deref(i: *i32) {
-    ret ^i;
+type Bar struct {
+    v: i32,
+    baz: *Baz
 }
 
-fn testStruct2() {
-	f: S;
-	f.y = 3;
-	ret f.y;
-}
-
-fn inc(n: i32) {
-    ret n + 1;
-}
-
-fn apply(a: fn(n: i32) i32, b: i32) {
-    ret a(b);
-}
-
-fn foo() {
-    ret bar;
-}
-
-fn bar() {
-    ret 3;
-}
-
-fn apply_overboard(a: fn(n: i32) i32, b: i32) {
-    ret fn(f: fn(n: i32) i32, g: i32) {
-        ret f(g);
-    }(a, b);
-}
-
-fn a5_fn() {
-    f := fn() i32 { ret 3; };
-    p := &f;
-    ret (^p)();
-}
-
-fn bad() i32 { ret 999; }
-
-fn testA9Helper() {
-    a9 := bad();
-    a9_p := &&&a9;
-    ^^^a9_p = 3;
-    ret ^^^a9_p;
-}
-
-fn testA9() {
-    ret testA9Helper();
-}
-
-fn testStruct1() {
-	f: S;
-	f.y = 3;
-	ret ^^&&(f.y);
+type Baz struct {
+    v: i32,
 }

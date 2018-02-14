@@ -116,7 +116,8 @@ int AssemblyLexer::getArgCount(TokenType tt) {
                || tt == TokenType::JUMP
                || tt == TokenType::CALL
                || tt == TokenType::CALLI
-               || tt == TokenType::STORECONST) {
+               || tt == TokenType::STORECONST
+               || tt == TokenType::ASSERT) {
         return 1;
     } else if (tt == TokenType::RET
                || tt == TokenType::EXIT
@@ -228,13 +229,13 @@ void AssemblyLexer::popFront() {
                     newInst = toBytes(static_cast<int16_t>(parsed));
                 } break;
                 case Instruction::CONSTI32: {
-                    newInst = toBytes(static_cast<int32_t>(parsed));
+                    newInst = toBytes32(parsed);
                 } break;
                 case Instruction::CONSTI64: {
                     newInst = toBytes(static_cast<int64_t>(parsed));
                 } break;
                 default: {
-                    newInst = toBytes(static_cast<int32_t>(parsed));
+                    newInst = toBytes32(parsed);
                 }
             }
 
@@ -334,6 +335,7 @@ const vector<string> AssemblyLexer::tokenTypeStrings = {
     "CALL", 
     "RET", 
     "EXIT",
+    "ASSERT",
 
     // literals
     "CONSTI8", "CONSTI16", "CONSTI32", "CONSTI64", "CONSTF32", "CONSTF64",
@@ -388,6 +390,7 @@ const vector<string> AssemblyLexer::instructionStrings = {
     "CALL", 
     "RET", 
     "EXIT",
+    "ASSERT",
 
     // literals
     "CONSTI8", "CONSTI16", "CONSTI32", "CONSTI64", "CONSTF32", "CONSTF64",
@@ -507,7 +510,7 @@ void MnemonicPrinter::step() {
         instructionString.append(to_string(consume<int32_t>()));
         instructionString.append(" ");
         instructionString.append(to_string(consume<int32_t>()));
-    } else if (startsWith(inst, "CALLI")) {
+    } else if (startsWith(inst, "CALLI") || startsWith(inst, "ASSERT")) {
         instructionString.append(inst);
         instructionString.append(" ");
         readTypeAndInt();
@@ -574,6 +577,7 @@ void MnemonicPrinter::readTypeAndFloat()
     } else if (endsWith(inst, "F64")) {
         instructionString.append(to_string(consume<double>()));
     } else {
-        assert(false);
+        instructionString.append("<<<error>>>");
+//        assert(false);
     }
 }

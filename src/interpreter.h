@@ -66,6 +66,7 @@ void interpretJump(Interpreter *interp);
 void interpretStore(Interpreter *interp);
 void interpretStoreConst(Interpreter *interp);
 void interpretExit(Interpreter *interp);
+void interpretAssert(Interpreter *interp);
 
 class Interpreter {
 public:
@@ -77,6 +78,8 @@ public:
     int32_t pc = 0;
     int32_t sp = 0;
     int32_t bp = 0;
+
+    int32_t lastStmtPc;
 
     typedef void (*interpFuncType)(Interpreter *);
     vector<interpFuncType> table;
@@ -91,7 +94,7 @@ public:
     uint16_t depth = 0;
     int32_t overDepth = (2 << 15) + 1;
 
-    Interpreter(): Interpreter(1024) {}
+    Interpreter(): Interpreter(1024 * 4) {}
 
     Interpreter(int32_t stackSize) {
         stack.reserve(stackSize);
@@ -210,7 +213,8 @@ public:
             interpretCalli,
             interpretCall,
             interpretRet,
-            interpretExit};
+            interpretExit,
+            interpretAssert};
   }
 
   void interpret();
@@ -454,7 +458,7 @@ template <typename T>
 void interpretCmpEq(Interpreter *interp) {
     auto a = interp->read<T>();
     auto b = interp->read<T>();
-    int8_t result = a == b ? 1 : 0;
+    int8_t result = a == b ? (int8_t) 1 : (int8_t) 0;
     auto storeOffset = interp->consume<int32_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }
@@ -463,7 +467,7 @@ template <typename T>
 void interpretCmpNeq(Interpreter *interp) {
     auto a = interp->read<T>();
     auto b = interp->read<T>();
-    int8_t result = a != b ? 1 : 0;
+    int8_t result = a != b ? (int8_t) 1 : (int8_t) 0;
     auto storeOffset = interp->consume<int32_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }

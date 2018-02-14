@@ -39,8 +39,6 @@ struct Parser {
     LexerToken expect(LexerTokenType type, string expectation);
     void scopeInsert(int64_t atomId, Node *node);
 
-    bool isBinop(LexerTokenType type);
-    bool isBooleanBinop(LexerTokenType type);
     int8_t operatorPrecedence(LexerTokenType type);
     Node *unwindPolish(stack<ShuntingYard> *values);
     void addLocal(Node *local);

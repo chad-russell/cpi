@@ -80,6 +80,11 @@ vector<unsigned char> toBytes(const T object) {
 }
 
 template<typename T>
+vector<unsigned char> toBytes32(const T object) {
+    return toBytes(static_cast<int32_t>(object));
+}
+
+template<typename T>
 T bytesTo(vector<unsigned char> bytes, int32_t start) {
     T object;
     unsigned char *begin_object = reinterpret_cast<unsigned char *>(&object);

@@ -390,7 +390,6 @@ const vector<string> Lexer::lexerTokenTypeStrings = {
     "FN",
     "TYPE",
     "STRUCT",
-    "DEREF",
     "SYMBOL",
     "INT_LITERAL",
     "FLOAT_LITERAL",
@@ -419,4 +418,24 @@ const vector<string> Lexer::lexerTokenTypeStrings = {
 
 ostream &operator<<(ostream &os, LexerTokenType tokenType) {
     return os << Lexer::lexerTokenTypeStrings[static_cast<int32_t>(tokenType)];
+}
+
+bool isBinop(LexerTokenType type) {
+    return isBooleanBinop(type)
+           || type == LexerTokenType::ADD
+           || type == LexerTokenType::SUB
+           || type == LexerTokenType::MUL
+           || type == LexerTokenType::DIV
+           || type == LexerTokenType::VERTICAL_BAR;
+}
+
+bool isBooleanBinop(LexerTokenType type) {
+    return type == LexerTokenType::EQ_EQ
+           || type == LexerTokenType::NE
+           || type == LexerTokenType::LT
+           || type == LexerTokenType::GT
+           || type == LexerTokenType::LE
+           || type == LexerTokenType::GE
+           || type == LexerTokenType::AND
+           || type == LexerTokenType::OR;
 }
