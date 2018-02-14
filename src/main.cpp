@@ -191,13 +191,14 @@ int main(int argc, char **argv) {
         interp->instructions = instructions;
         interp->fnTable = fnTable;
 
-        interp->interpret();
+        for (int i = 0; i < 100; i++) {
+            interp->terminated = false;
+            interp->pc = 0;
+            interp->sp = 0;
+            interp->bp = 0;
 
-//        cout << "STACK:" << endl;
-//        for (auto i = 0; i < 64; i++) {
-//            cout << static_cast<int32_t>(interp->stack[i]) << ", ";
-//        }
-//        cout << endl << endl;
+            interp->interpret();
+        }
         cout << interp->readFromStack<int32_t>(0) << endl;
     }
 

@@ -217,9 +217,11 @@ public:
             interpretAssert};
   }
 
-  void interpret();
-  void step();
-  void callIndex(int32_t index);
+    void interpret();
+    void step();
+    void callIndex(int32_t index);
+
+    void dumpStack();
 
   template <typename T>
   void copyToStack(T t, int32_t offset) {

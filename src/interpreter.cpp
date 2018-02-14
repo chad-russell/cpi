@@ -176,6 +176,14 @@ void Interpreter::callIndex(int index) {
     pc = index;
 }
 
+void Interpreter::dumpStack() {
+    cout << "INTERP STACK:" << endl;
+    for (auto i = 0; i < 64; i++) {
+        cout << static_cast<int32_t>(stack[i]) << ", ";
+    }
+    cout << endl << endl;
+}
+
 // bumpsp numBits
 void interpretBumpSP(Interpreter *interp) {
     auto numBytes = interp->consume<int32_t>();
