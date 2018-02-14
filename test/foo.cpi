@@ -1,57 +1,33 @@
-type linkedList struct {
-    value: i64,
-    next: *linkedList
-}
+fn main() {
+    type Foo struct {
+        value: i32,
+        bar: *Bar
+    };
 
-fn ll() {
-    l: linkedList;
-    l.value = 3;
-    l.next = &l;
-    ret l.next.next.next.next;
-}
+    type Bar struct {
+        value: i32,
+        baz: Baz
+    };
 
-fn fbb() {
+    type Baz struct {
+        value: i32,
+        qux: Qux
+    };
+
+    type Qux struct {
+        value: i32
+    };
+
     foo: Foo;
     bar: Bar;
     baz: Baz;
-
-    foo.value = 111;
-    bar.value = 222;
-    baz.value = 333;
+    qux: Qux;
 
     foo.bar = &bar;
-    bar.baz = &baz;
 
-    ret foo.bar.baz.value;
-}
+    foo.bar.baz.qux.value = 3;
 
-type weirdLinkedList struct {
-    value: i64,
-    next: ****weirdLinkedList
-}
+    assert(foo.bar.baz.qux.value == 3);
 
-fn wll() {
-    l: weirdLinkedList;
-    l.value = 999;
-    l.next = &&&&l;
-    l.next.next.next.next.value = 3;
-    ret l.next.next.next.next.value;
-}
-
-fn main() {
-    ret fbb();
-}
-
-type Foo struct {
-    value: i32,
-    bar: *Bar
-}
-
-type Bar struct {
-    value: i32,
-    baz: *Baz
-}
-
-type Baz struct {
-    value: i32
+    ret 0;
 }

@@ -188,9 +188,13 @@ void BytecodeGen::gen(Node *node) {
 
                 append(instructions, Instruction::STORE);
 
-                if (resolvedDecl->dotData.autoDeref) {
+                if (resolvedDecl->dotData.poisonAutoDeref) {
+                    cout << "gonna fail now..." << endl;
+                }
+
+                if (resolvedDecl->dotData.autoDeref || resolvedDecl->dotData.lhsAutoDeref) {
                     append(instructions, Instruction::RELI32);
-                    append(instructions, toBytes(resolvedDecl->dotData.autoDerefStorage->localOffset));
+                    append(instructions, toBytes(resolvedDecl->localOffset));
                 } else {
                     append(instructions, Instruction::RELCONSTI32);
                     append(instructions, toBytes(resolvedDecl->dotData.lhs->localOffset + offsetWords));
@@ -397,6 +401,7 @@ void BytecodeGen::gen(Node *node) {
             auto resolvedTypeInfo = resolve(resolve(node->dotData.lhs)->typeInfo);
 
             auto pointerCount = 0;
+
             while (resolvedTypeInfo->typeData.kind == NodeTypekind::POINTER) {
                 resolvedTypeInfo = resolve(resolvedTypeInfo->typeData.pointerTypeData.underlyingType);
                 pointerCount += 1;
@@ -417,33 +422,64 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, toBytes32(4));
             }
 
-            if (node->dotData.autoDeref) {
-                // gonna fail now...
-                if (node->dotData.lhs->type == NodeType::DOT && node->dotData.lhs->dotData.autoDeref) {
-                    append(instructions, Instruction::STORE);
-                    append(instructions, Instruction::RELCONSTI32);
-                    append(instructions, toBytes(node->dotData.lhs->dotData.autoDerefStorage->localOffset));
-                    append(instructions, Instruction::RELI32);
-                    append(instructions, toBytes(node->dotData.lhs->dotData.autoDerefStorage->localOffset));
-                    append(instructions, toBytes32(4));
-                }
+            // dot is one of the few places where we actually *set* the node->localOffset, instead of just storing to it.
+            // This is both for performance and to enable lvalue semantics. So we need to know where we are 'hijacking' our
+            // localOffset from.
+            auto hijackedOffsetLocation = node->dotData.lhs->localOffset;
+            if (pointerCount > 1) {
+                hijackedOffsetLocation = node->dotData.autoDerefStorage->localOffset;
+            }
 
-                append(instructions, Instruction::ADDI32);
+            // if we are doing a dot on another dot which was an autoderef, then we need to
+            // load it again, as it will be a double-pointer from our perspective
+            auto lhsIsAutoDeref = node->dotData.lhs->type == NodeType::DOT && node->dotData.lhs->dotData.autoDeref;
+            if (lhsIsAutoDeref) {
+                node->dotData.lhsAutoDeref = true;
+
+                append(instructions, Instruction::STORE);
+
+                append(instructions, Instruction::RELCONSTI32);
+                append(instructions, toBytes(hijackedOffsetLocation));
+
                 append(instructions, Instruction::RELI32);
-                if (pointerCount > 1) {
-                    append(instructions, toBytes(node->dotData.autoDerefStorage->localOffset));
-                } else {
-                    append(instructions, toBytes(node->dotData.lhs->localOffset));
-                }
+                append(instructions, toBytes(hijackedOffsetLocation));
+
+                append(instructions, toBytes32(4));
+            }
+
+            node->dotData.poisonAutoDeref = node->dotData.autoDeref || node->dotData.lhsAutoDeref;
+            cout << "poisoned? " << node->dotData.poisonAutoDeref;
+
+            if (node->dotData.autoDeref) {
+                append(instructions, Instruction::ADDI32);
+
+                append(instructions, Instruction::RELI32);
+                append(instructions, toBytes(hijackedOffsetLocation));
+
                 append(instructions, Instruction::CONSTI32);
                 append(instructions, toBytes(offsetWords));
+
                 append(instructions, toBytes(node->dotData.autoDerefStorage->localOffset));
 
-                // FINDME
                 node->localOffset = node->dotData.autoDerefStorage->localOffset;
-//                node->localOffset = node->dotData.lhs->localOffset;
             } else {
-                node->localOffset = node->dotData.lhs->localOffset + offsetWords;
+                if (lhsIsAutoDeref) {
+                    cout << "gonna fail now... hmmmmm" << endl;
+
+                    append(instructions, Instruction::ADDI32);
+
+                    append(instructions, Instruction::RELI32);
+                    append(instructions, toBytes(hijackedOffsetLocation));
+
+                    append(instructions, Instruction::CONSTI32);
+                    append(instructions, toBytes(offsetWords));
+
+                    append(instructions, toBytes(hijackedOffsetLocation));
+
+                    node->localOffset = hijackedOffsetLocation;
+                } else {
+                    node->localOffset = hijackedOffsetLocation + offsetWords;
+                }
             }
         } break;
         case NodeType::ASSERT: {
@@ -537,14 +573,13 @@ void BytecodeGen::storeValue(vector<unsigned char> &instructions, Node *node, in
             append(instructions, Instruction::RELCONSTI32);
             append(instructions, toBytes32(offset));
 
-            // gonna fail now
-            if (node->dotData.lhs->type == NodeType::DOT && node->dotData.lhs->dotData.autoDeref) {
+            if (node->dotData.poisonAutoDeref) {
+                cout << "gonna fail now..." << endl;
+            }
+
+            if (node->dotData.autoDeref || node->dotData.lhsAutoDeref) {
                 append(instructions, Instruction::RELI32);
                 append(instructions, toBytes(node->localOffset));
-            } else
-            if (node->dotData.autoDeref) {
-                append(instructions, Instruction::RELI32);
-                append(instructions, toBytes(node->dotData.autoDerefStorage->localOffset));
             } else {
                 append(instructions, Instruction::RELCONSTI32);
                 append(instructions, toBytes(node->dotData.lhs->localOffset + offsetWords));

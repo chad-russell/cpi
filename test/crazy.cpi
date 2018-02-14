@@ -50,8 +50,7 @@ fn main() {
     a13 := testDerefParam();
     assert(a13 == 3);
 
-    a14 := testBug1();
-    assert(a14 == 3);
+    testBug1();
 
     a15 := testDoubleDeref();
     assert(a15 == 3);
@@ -71,13 +70,30 @@ fn main() {
     a20 := testLinkedList();
     assert(a20 == 3);
 
-    a21 := testWeirdLinkedList();
-    assert(a21 == 3);
+    testWeirdLinkedList();
 
     a22 := testMoreDotsAndDerefs();
     assert(a22 == 3);
 
+    test23();
+
     ret 0;
+}
+
+type weirdLinkedList struct {
+    value: i64,
+    next: *******weirdLinkedList
+}
+
+fn testWeirdLinkedList() {
+    l: weirdLinkedList;
+    l.value = 999;
+    l.next = &&&&&&&l;
+    l.next.next.next.next.next.next.next.next.value = 3;
+
+    assert(3 == l.value);
+    assert(3 == l.next.value);
+    assert(3 == l.next.next.next.next.value);
 }
 
 type pair struct {
@@ -91,21 +107,6 @@ fn testMoreDotsAndDerefs() {
     p.y = 2;
 
     ret (^^&&p).x + ^^&&(p.y);
-}
-
-type weirdLinkedList struct {
-    value: i64,
-    next: ***weirdLinkedList
-}
-
-fn testWeirdLinkedList() {
-    l: weirdLinkedList;
-    l.value = 999;
-    l.next = &&&l;
-
-    l.next.next.next.value = 3;
-
-    ret l.next.next.next.next.value;
 }
 
 type linkedList struct {
@@ -208,10 +209,9 @@ fn testBug1() {
     qq1 := ^q;
     qq1.y = 3;
 
-    -- todo(chad): once we have assert, assert that p.y and q.y are also 13
-    ; -- todo(chad): also, get rid of this dumb thing where comments have to have semicolons... :(
-    ;
-    ret qq1.y;
+    assert(p.y == 3);
+    assert(q.y == 3);
+    assert(qq1.y == 3);
 }
 
 fn deref(i: *i64) {
@@ -281,4 +281,46 @@ fn apply_overboard(a: fn(n: i64) i64, b: i64) {
     ret fn(f: fn(n: i64) i64, g: i64) {
         ret f(g);
     }(a, b);
+}
+
+fn test23() {
+    type Foo struct {
+        value: i32,
+        bar: *Bar
+    };
+
+    type Bar struct {
+        value: i32,
+        baz: *Baz
+    };
+
+    type Baz struct {
+        value: i32,
+        qux: *Qux
+    };
+
+    type Qux struct {
+        value: i32
+    };
+
+    foo: Foo;
+    bar: Bar;
+    baz: Baz;
+    qux: Qux;
+
+    foo.value = 111;
+    bar.value = 222;
+    baz.value = 333;
+    qux.value = 444;
+
+    foo.bar = &bar;
+    bar.baz = &baz;
+    baz.qux = &qux;
+
+    foo.bar.baz.qux.value = 3;
+
+    assert(foo.bar.baz.qux.value == 3);
+    assert(bar.baz.qux.value == 3);
+    assert(baz.qux.value == 3);
+    assert(qux.value == 3);
 }
