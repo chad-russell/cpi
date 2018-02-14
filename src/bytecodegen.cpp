@@ -418,6 +418,16 @@ void BytecodeGen::gen(Node *node) {
             }
 
             if (node->dotData.autoDeref) {
+                // gonna fail now...
+                if (node->dotData.lhs->type == NodeType::DOT && node->dotData.lhs->dotData.autoDeref) {
+                    append(instructions, Instruction::STORE);
+                    append(instructions, Instruction::RELCONSTI32);
+                    append(instructions, toBytes(node->dotData.lhs->dotData.autoDerefStorage->localOffset));
+                    append(instructions, Instruction::RELI32);
+                    append(instructions, toBytes(node->dotData.lhs->dotData.autoDerefStorage->localOffset));
+                    append(instructions, toBytes32(4));
+                }
+
                 append(instructions, Instruction::ADDI32);
                 append(instructions, Instruction::RELI32);
                 if (pointerCount > 1) {
@@ -527,6 +537,11 @@ void BytecodeGen::storeValue(vector<unsigned char> &instructions, Node *node, in
             append(instructions, Instruction::RELCONSTI32);
             append(instructions, toBytes32(offset));
 
+            // gonna fail now
+            if (node->dotData.lhs->type == NodeType::DOT && node->dotData.lhs->dotData.autoDeref) {
+                append(instructions, Instruction::RELI32);
+                append(instructions, toBytes(node->localOffset));
+            } else
             if (node->dotData.autoDeref) {
                 append(instructions, Instruction::RELI32);
                 append(instructions, toBytes(node->dotData.autoDerefStorage->localOffset));
