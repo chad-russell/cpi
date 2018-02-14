@@ -354,9 +354,7 @@ void BytecodeGen::gen(Node *node) {
         case NodeType::DEREF: {
             gen(node->derefData.target);
 
-            if (isConstant(node->derefData.target)) {
-                storeValue(instructions, node->derefData.target, node->derefData.target->localOffset);
-            }
+            storeValue(instructions, node->derefData.target, node->derefData.target->localOffset);
 
             if (node->isLocal) {
                 append(instructions, Instruction::STORE);

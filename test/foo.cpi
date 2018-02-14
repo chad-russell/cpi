@@ -1,31 +1,7 @@
 fn main() {
-    a18 := testSetter();
-    assert(a18 == 3);
-
-    a19 := testSetter();
-    assert(a19 == 3);
-
-    a20 := testSetter();
-    assert(a20 == 3);
-
-    a22 := testSetter();
-    assert(a22 == 3);
-
-    a23 := testSetter();
-    assert(a23 == 3);
-
-    a21 := testWeirdLinkedList();
-    assert(a21 == 9);
-
-    test24();
-
-    ret 0;
-}
-
-fn test24() {
     type Foo struct {
         value: i32,
-        bar: **Bar
+        bar: *Bar
     };
 
     type Bar struct {
@@ -35,270 +11,11 @@ fn test24() {
 
     type Baz struct {
         value: i32,
-        qux: **Qux
-    };
-
-    type Qux struct {
-        value: i32
-    };
-
-    foo: Foo;
-    foo.value = 555;
-
-    bar: Bar;
-    bar.value = 666;
-
-    baz: Baz;
-    baz.value = 777;
-
-    qux: Qux;
-    qux.value = 888;
-
-    baz.qux = &&qux;
-    bar.baz = baz;
-    foo.bar = &&bar;
-
-    foo.bar.baz.qux.value = 6;
-    assert(foo.bar.baz.qux.value == 6);
-    assert(bar.baz.qux.value == 6);
-    assert(baz.qux.value == 6);
-    assert(qux.value == 6);
-
-    bar.baz.qux.value = 8;
-    assert(foo.bar.baz.qux.value == 8);
-    assert(bar.baz.qux.value == 8);
-    assert(baz.qux.value == 8);
-    assert(qux.value == 8);
-
-    qux.value = 3;
-    assert(foo.bar.baz.qux.value == 3);
-    assert(bar.baz.qux.value == 3);
-    assert(baz.qux.value == 3);
-    assert(qux.value == 3);
-
-    ret 0;
-}
-
-fn foo() {
-    ret bar;
-}
-
-type weirdLinkedList struct {
-    value: i64,
-    next: *********weirdLinkedList
-}
-
-fn testWeirdLinkedList() {
-    l: weirdLinkedList;
-    l.value = 999;
-    l.next = &&&&&&&&&l;
-
-    l.next.next.next.next.next.next.next.next.value = 3;
-
-    ret l.value + l.next.value + l.next.next.next.next.value;
-}
-
-type pair struct {
-    x: i64,
-    y: i64
-}
-
-fn testMoreDotsAndDerefs() {
-    p: pair;
-    p.x = 1;
-    p.y = 2;
-
-    ret (^^&&p).x + ^^&&(p.y);
-}
-
-type linkedList struct {
-    value: i64,
-    next: *linkedList
-}
-
-fn testLinkedList() {
-    l: linkedList;
-    l.value = 3;
-    l.next = &l;
-
-    ret l.next.next.next.next.value;
-}
-
-fn set_y(p: *point, y: i64) {
-    p.y = y;
-    ret y;
-}
-
-fn testSetter() {
-    ret 3;
-}
-
-fn testSetFromParam() {
-    a : i64 = 999;
-    set(&a);
-    ret a;
-}
-
-fn set(n: *i64) {
-    ^n = 3;
-    ret 999;
-}
-
-fn test_S2_stuff() {
-    s: S2;
-    sx: struct{p1: i64, p2: i64};
-
-    sx.p1 = 999;
-    sx.p2 = 2;
-
-    s.x = &&sx;
-
-    ret s.x.p2 + 1;
-}
-
-type S2 struct {
-	x: **struct {
-		p1: i64,
-		p2: i64
-	},
-	y: fn() i64
-}
-
-fn more_struct() {
-    s: S;
-    psx := &&&s.x;
-    psx.p2 = bad();
-
-    new_sx : struct{ p1: i64, p2: i64 };
-    new_sx.p2 = 3;
-
-    ^^^psx = new_sx;
-
-    ret s.x.p2;
-}
-
-fn testDoubleDeref() {
-    p: point;
-    p.y = 3;
-
-    q := &p;
-    q1 := ^q;
-    q2 := ^q;
-
-    ret p.y + q1.y - q2.y;
-}
-
-fn testA9Helper() {
-    a9 := bad();
-    a9_p := &&&a9;
-    ^^^a9_p = 3;
-    ret ^^^a9_p;
-}
-
-fn testA9() {
-    ret testA9Helper();
-}
-
-fn testBug1() {
-    p: point;
-    p.y = 123;
-
-    q := &&p;
-    qq1 := ^q;
-    qq1.y = 3;
-
-    assert(p.y == 3);
-    assert(q.y == 3);
-    assert(qq1.y == 3);
-}
-
-fn deref(i: *i64) {
-    ret ^i;
-}
-
-type point struct {
-    x: i64,
-    y: i64
-}
-
-fn point_get_x(p: point) { ret p.y; }
-
-fn point_id(p: point) { ret p; }
-
-fn testNestedCall() {
-    p: point;
-    p.y = 3;
-    ret point_get_x(point_id(point_id(point_id(point_id(point_id(point_id(p)))))));
-}
-
-fn testDerefParam() {
-    ret deref(&3);
-}
-
-type S struct {
-	x: struct {
-		p1: i64,
-		p2: i64
-	},
-	y: i64
-}
-
-fn testStruct1() {
-	f: S;
-	f.y = 3;
-	ret ^^&&(f.y);
-}
-
-fn testStruct2() {
-	f: S;
-	f.y = 3;
-	ret f.y;
-}
-
-fn bad() i64 { ret 999; }
-
-fn a5_fn() {
-    f := fn() i64 { ret 3; };
-    p := &f;
-    ret (^p)();
-}
-
-fn bar() i64 {
-    ret 3;
-}
-
-fn inc(n: i64) {
-    ret n + 1;
-}
-
-fn apply(a: fn(n: i64) i64, b: i64) {
-    ret a(b);
-}
-
-fn apply_overboard(a: fn(n: i64) i64, b: i64) {
-    ret fn(f: fn(n: i64) i64, g: i64) {
-        ret f(g);
-    }(a, b);
-}
-
-fn test23() {
-    type Foo struct {
-        value: i32,
-        bar: *Bar
-    };
-
-    type Bar struct {
-        value: i32,
-        baz: *Baz
-    };
-
-    type Baz struct {
-        value: i32,
         qux: *Qux
     };
 
     type Qux struct {
-        value: i32
+        value: **i64
     };
 
     foo: Foo;
@@ -306,16 +23,14 @@ fn test23() {
     baz: Baz;
     qux: Qux;
 
-    foo.value = 111;
-    bar.value = 222;
-    baz.value = 333;
-    qux.value = 444;
-
     foo.bar = &bar;
-    bar.baz = &baz;
+    baz.qux = &qux;
+    bar.baz = baz;
+    qux.value = &&444;
+
     baz.qux = &qux;
 
-    foo.bar.baz.qux.value = 3;
+    ^^foo.bar.baz.qux.value = 123;
 
-    ret foo.bar.baz.qux.value + bar.baz.qux.value + baz.qux.value + qux.value;
+    ret ^^foo.bar.baz.qux.value;
 }

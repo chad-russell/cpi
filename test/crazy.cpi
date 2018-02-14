@@ -77,6 +77,8 @@ fn main() {
 
     test24();
 
+    test25();
+
     ret 0;
 }
 
@@ -272,6 +274,8 @@ fn testBug1() {
     assert(p.y == 3);
     assert(q.y == 3);
     assert(qq1.y == 3);
+
+    ret 0;
 }
 
 fn deref(i: *i64) {
@@ -341,6 +345,54 @@ fn apply_overboard(a: fn(n: i64) i64, b: i64) {
     ret fn(f: fn(n: i64) i64, g: i64) {
         ret f(g);
     }(a, b);
+}
+
+fn test25() {
+    type Foo struct {
+        value: i32,
+        bar: *Bar
+    };
+
+    type Bar struct {
+        value: i32,
+        baz: *Baz
+    };
+
+    type Baz struct {
+        value: i32,
+        qux: *Qux
+    };
+
+    type Qux struct {
+        value: **i64
+    };
+
+    foo: Foo;
+    bar: Bar;
+    baz: Baz;
+    qux: Qux;
+
+    foo.value = 111;
+    bar.value = 222;
+    baz.value = 333;
+    qux.value = &&444;
+
+    foo.bar = &bar;
+    bar.baz = &baz;
+    baz.qux = &qux;
+
+    ^^foo.bar.baz.qux.value = 443;
+
+    assert(^^foo.bar.baz.qux.value == 443);
+    assert(^^bar.baz.qux.value == 443);
+    assert(^^baz.qux.value == 443);
+    assert(^^qux.value == 443);
+
+    ^^bar.baz.qux.value = 442;
+    assert(^^foo.bar.baz.qux.value == 442);
+    assert(^^bar.baz.qux.value == 442);
+    assert(^^baz.qux.value == 442);
+    assert(^^qux.value == 442);
 }
 
 fn test23() {

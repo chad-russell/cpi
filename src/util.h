@@ -85,7 +85,7 @@ vector<unsigned char> toBytes32(const T object) {
 }
 
 template<typename T>
-T bytesTo(vector<unsigned char> bytes, int32_t start) {
+T bytesTo(const vector<unsigned char> &bytes, int32_t start) {
     T object;
     unsigned char *begin_object = reinterpret_cast<unsigned char *>(&object);
     memcpy(begin_object, &bytes[start], sizeof(T));

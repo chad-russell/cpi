@@ -190,15 +190,7 @@ int main(int argc, char **argv) {
         }
         interp->instructions = instructions;
         interp->fnTable = fnTable;
-
-        for (int i = 0; i < 100; i++) {
-            interp->terminated = false;
-            interp->pc = 0;
-            interp->sp = 0;
-            interp->bp = 0;
-
-            interp->interpret();
-        }
+        interp->interpret();
         cout << interp->readFromStack<int32_t>(0) << endl;
     }
 

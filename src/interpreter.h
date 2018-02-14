@@ -255,44 +255,113 @@ public:
 
   template <typename T>
   Optional<T> tryRead() {
-      auto instructionPcString = AssemblyLexer::instructionStrings[instructions[pc]];
+      auto inst = static_cast<Instruction>(instructions[pc]);
 
-      string prefix = "RELCONST";
-      auto testInstructionString = prefix.append(suffixForType<T>());
-      if (instructionPcString == testInstructionString) {
+      // RELCONST
+      Instruction relConstInst;
+      if (is_same<T, int32_t>::value) {
+          relConstInst = Instruction::RELCONSTI32;
+      } else if (is_same<T, int64_t>::value) {
+          relConstInst = Instruction::RELCONSTI64;
+      } else {
+          assert(false);
+      }
+
+      if (inst == relConstInst) {
           pc += 1;
           auto consumed = consume<T>();
           consumed += static_cast<T>(bp);
           return Optional<T>{true, consumed};
       }
 
-      prefix = "REL";
-      testInstructionString = prefix.append(suffixForType<T>());
-      if (instructionPcString == testInstructionString) {
+      // REL
+      Instruction relInst;
+      if (is_same<T, int32_t>::value) {
+          relInst = Instruction::RELI32;
+      } else if (is_same<T, int64_t>::value) {
+          relInst = Instruction::RELI64;
+      } else {
+          assert(false);
+      }
+
+      if (inst == relInst) {
           pc += 1;
           auto consumed = consume<int32_t>();
           auto value = readFromStack<T>(consumed + bp);
           return Optional<T>{true, value};
       }
 
-      prefix = "CONST";
-      testInstructionString = prefix.append(suffixForType<T>());
-      if (instructionPcString == testInstructionString) {
+      // CONST
+      Instruction constInst;
+      if (is_same<T, int32_t>::value) {
+          constInst = Instruction::CONSTI32;
+      } else if (is_same<T, int64_t>::value) {
+          constInst = Instruction::CONSTI64;
+      } else {
+          assert(false);
+      }
+
+      if (inst == constInst) {
           pc += 1;
           auto consumed = consume<T>();
           return Optional<T>{true, consumed};
       }
 
-      instructionPcString = AssemblyLexer::instructionStrings[instructions[pc]];
-      testInstructionString = suffixForType<T>();
-      if (instructionPcString == instructionPcString) {
-          pc += 1;
-          auto consumed = consume<int32_t>();
-          auto value = readFromStack<T>(consumed);
-          return Optional<T>{true, value};
-      }
+      // todo(chad): dangerous?
+      // before this would fail if T was int64_t but the instruction we were reading was Instruction::I32 for example
+      // this just blindly reads
+      pc += 1;
+      auto consumed = consume<int32_t>();
+      auto value = readFromStack<T>(consumed);
+      return Optional<T>{true, value};
 
-      return {false, {}};
+//      instructionPcString = AssemblyLexer::instructionStrings[instructions[pc]];
+//      testInstructionString = suffixForType<T>();
+//      if (instructionPcString == instructionPcString) {
+//          pc += 1;
+//          auto consumed = consume<int32_t>();
+//          auto value = readFromStack<T>(consumed);
+//          return Optional<T>{true, value};
+//      }
+
+//      auto instructionPcString = AssemblyLexer::instructionStrings[instructions[pc]];
+//
+//      string prefix = "RELCONST";
+//      auto testInstructionString = prefix.append(suffixForType<T>());
+//      if (instructionPcString == testInstructionString) {
+//          pc += 1;
+//          auto consumed = consume<T>();
+//          consumed += static_cast<T>(bp);
+//          return Optional<T>{true, consumed};
+//      }
+//
+//      prefix = "REL";
+//      testInstructionString = prefix.append(suffixForType<T>());
+//      if (instructionPcString == testInstructionString) {
+//          pc += 1;
+//          auto consumed = consume<int32_t>();
+//          auto value = readFromStack<T>(consumed + bp);
+//          return Optional<T>{true, value};
+//      }
+//
+//      prefix = "CONST";
+//      testInstructionString = prefix.append(suffixForType<T>());
+//      if (instructionPcString == testInstructionString) {
+//          pc += 1;
+//          auto consumed = consume<T>();
+//          return Optional<T>{true, consumed};
+//      }
+//
+//      instructionPcString = AssemblyLexer::instructionStrings[instructions[pc]];
+//      testInstructionString = suffixForType<T>();
+//      if (instructionPcString == instructionPcString) {
+//          pc += 1;
+//          auto consumed = consume<int32_t>();
+//          auto value = readFromStack<T>(consumed);
+//          return Optional<T>{true, value};
+//      }
+//
+//      return {false, {}};
   }
 
   auto readBits8() {
