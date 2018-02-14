@@ -189,7 +189,7 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, Instruction::STORE);
 
                 // TAG
-                if (resolvedDecl->dotData.autoDeref || resolvedDecl->dotData.poisonAutoDeref) {
+                if (resolvedDecl->dotData.poisonAutoDeref) {
                     append(instructions, Instruction::RELI32);
                     append(instructions, toBytes(resolvedDecl->localOffset));
                 } else {
@@ -448,6 +448,8 @@ void BytecodeGen::gen(Node *node) {
 
             // TAG
             if (node->dotData.autoDeref) {
+                node->dotData.poisonAutoDeref = true;
+
                 append(instructions, Instruction::ADDI32);
 
                 append(instructions, Instruction::RELI32);
@@ -459,7 +461,9 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, toBytes(node->dotData.autoDerefStorage->localOffset));
 
                 node->localOffset = node->dotData.autoDerefStorage->localOffset;
-            } else if (node->dotData.poisonAutoDeref) {
+            } /*else if (node->dotData.poisonAutoDeref) {
+                node->dotData.poisonAutoDeref = true;
+
                 append(instructions, Instruction::ADDI32);
 
                 append(instructions, Instruction::RELI32);
@@ -471,8 +475,10 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, toBytes(hijackedOffsetLocation));
 
                 node->localOffset = hijackedOffsetLocation;
-            } else {
-                node->localOffset = hijackedOffsetLocation + offsetWords;
+            }*/ else {
+                node->dotData.poisonAutoDeref = false;
+
+                node->localOffset = hijackedOffsetLocation;
             }
         } break;
         case NodeType::ASSERT: {
@@ -567,7 +573,7 @@ void BytecodeGen::storeValue(vector<unsigned char> &instructions, Node *node, in
             append(instructions, toBytes32(offset));
 
             // TAG
-            if (node->dotData.autoDeref || node->dotData.poisonAutoDeref) {
+            if (node->dotData.poisonAutoDeref) {
                 append(instructions, Instruction::RELI32);
                 append(instructions, toBytes(node->localOffset));
             } else {
