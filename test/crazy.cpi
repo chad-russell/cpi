@@ -393,6 +393,8 @@ fn test25() {
     assert(^^bar.baz.qux.value == 442);
     assert(^^baz.qux.value == 442);
     assert(^^qux.value == 442);
+
+    ret 0;
 }
 
 fn test23() {

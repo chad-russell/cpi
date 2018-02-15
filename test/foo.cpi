@@ -1,36 +1,4 @@
 fn main() {
-    type Foo struct {
-        value: i32,
-        bar: *Bar
-    };
-
-    type Bar struct {
-        value: i32,
-        baz: Baz
-    };
-
-    type Baz struct {
-        value: i32,
-        qux: *Qux
-    };
-
-    type Qux struct {
-        value: **i64
-    };
-
-    foo: Foo;
-    bar: Bar;
-    baz: Baz;
-    qux: Qux;
-
-    foo.bar = &bar;
-    baz.qux = &qux;
-    bar.baz = baz;
-    qux.value = &&444;
-
-    baz.qux = &qux;
-
-    ^^foo.bar.baz.qux.value = 123;
-
-    ret ^^foo.bar.baz.qux.value;
+    ret 0;
 }
+
