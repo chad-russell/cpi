@@ -10,7 +10,6 @@ class Optional {
 public:
     bool isPresent;
     T value;
-    bool wasConstantRead;
 };
 
 class Interpreter;

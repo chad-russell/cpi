@@ -1,7 +1,5 @@
 #include "bytecodegen.h"
 
-#include <string.h>
-
 void append(vector<unsigned char> &instructions, vector<unsigned char> newInstructions) {
     instructions.insert(instructions.end(), newInstructions.begin(), newInstructions.end());
 }
@@ -426,12 +424,11 @@ void BytecodeGen::gen(Node *node) {
             }
 
             auto lhsRel = node->dotData.lhs->type == NodeType::DOT && node->dotData.lhs->dotData.pointerIsRelative;
-            auto lhsIsAutoDeref = node->dotData.lhs->type == NodeType::DOT && node->dotData.lhs->dotData.autoDeref;
+            auto lhsIsAutoDeref = node->dotData.lhs->type == NodeType::DOT && node->dotData.lhs->dotData.autoDerefStorage;
 
-            // if we are doing a dot on another dot which was an autoderef, then we need to
+            // if we are an autoderef doing a dot on a relative lhs, then we need to
             // load it again, as it will be a double-pointer from our perspective
-            auto secondBranch = !node->dotData.autoDeref && lhsRel;
-            if (lhsRel && !secondBranch) {
+            if (lhsRel && node->dotData.autoDerefStorage) {
                 node->dotData.pointerIsRelative = true;
 
                 append(instructions, Instruction::STORE);
@@ -446,7 +443,7 @@ void BytecodeGen::gen(Node *node) {
             }
 
             // TAG
-            if (node->dotData.autoDeref) {
+            if (node->dotData.autoDerefStorage) {
                 node->dotData.pointerIsRelative = true;
 
                 append(instructions, Instruction::ADDI32);

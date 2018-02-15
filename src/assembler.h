@@ -158,7 +158,7 @@ private:
 
 class MnemonicPrinter {
 public:
-    vector<unsigned char> instructions = {};
+    const vector<unsigned char> &instructions;
     unordered_map<uint32_t, uint32_t> fnTable = {};
 
     uint32_t pc = 0;
@@ -170,6 +170,8 @@ public:
     void readTypeAndIntOrFloat();
     void readTypeAndInt();
     void readTypeAndFloat();
+
+    MnemonicPrinter(const vector<unsigned char> &instructions) : instructions(instructions) {}
 
     template <typename T>
     T consume() {

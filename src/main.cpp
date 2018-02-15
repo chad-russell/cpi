@@ -23,15 +23,16 @@ static int debugFlag = 0;
 static int interpretFlag = 0;
 
 void printHelp() {
-    cout << "Usage: cpi [args] inputFile.[cpi,cas,cbc]"                         << endl << endl
-         << "==========="                                                       << endl
-         << "-- args --"                                                        << endl
-         << "==========="                                                       << endl
-         << "--print-asm   (-p):               Print assembly instructions"     << endl
-         << "--debug       (-d):               Start the program in debug mode" << endl
-         << "--output-file (-o) <filename>:    File to write to"                << endl
-         << "--interpret   (-i):               Run the interpreter"             << endl
-         << "--help        (-h):               Show help"                       << endl;
+    cout << "Usage: cpi [args] inputFile.[cpi,cas,cbc]"                                      << endl << endl
+         << "==========="                                                                    << endl
+         << "-- args --"                                                                     << endl
+         << "==========="                                                                    << endl
+         << "--print-asm   (-p):               Print assembly instructions"                  << endl
+         << "--debug       (-d):               Start the program in debug mode"              << endl
+         << "--output-file (-o) <filename>:    File to write to"                             << endl
+         << "--interpret   (-i):               Run the interpreter"                          << endl
+         << "--n-times     (-n):               Run interpreter n times (for benchmarking)"   << endl
+         << "--help        (-h):               Show help"                                    << endl;
     exit(1);
 }
 
@@ -63,15 +64,17 @@ int main(int argc, char **argv) {
             {"output-file", required_argument, nullptr,        'o'},
             {"interpret",   no_argument,       &interpretFlag, 'i'},
             {"help",        no_argument,       nullptr,        'h'},
+            {"n-times",     required_argument, nullptr,        'n'},
             {nullptr,       0,                 nullptr,        0}
     };
 
     char *outputFileName = nullptr;
+    int nTimes = 1;
 
     while (true) {
         int optionIndex;
 
-        auto c = getopt_long(argc, argv, "pdo:h", longOptions, &optionIndex);
+        auto c = getopt_long(argc, argv, "pdo:n:ih", longOptions, &optionIndex);
         if (c == -1) { break; }
         switch (c) {
             case 0: {
@@ -80,9 +83,10 @@ int main(int argc, char **argv) {
             case 'o': {
                 outputFileName = optarg;
             } break;
-            case 'i': {
-
-            }
+            case 'n': {
+                nTimes = atoi(optarg);
+            } break;
+            case 'i':
             case 'h':
             case '?':
             default: {
@@ -178,8 +182,7 @@ int main(int argc, char **argv) {
     }
 
     if (printAsmFlag != 0) {
-        auto printer = new MnemonicPrinter();
-        printer->instructions = instructions;
+        auto printer = new MnemonicPrinter(instructions);
         printer->fnTable = fnTable;
         cout << printer->debugString() << endl;
     }
@@ -190,7 +193,19 @@ int main(int argc, char **argv) {
         }
         interp->instructions = instructions;
         interp->fnTable = fnTable;
-        interp->interpret();
+
+        if (nTimes > 1) {
+            cout << "running interpreter " << nTimes << " times..." << endl;
+        }
+
+        for (int i = 0; i < nTimes; i++) {
+            interp->terminated = false;
+            interp->pc = 0;
+            interp->sp = 0;
+            interp->bp = 0;
+
+            interp->interpret();
+        }
         cout << interp->readFromStack<int32_t>(0) << endl;
     }
 
@@ -204,8 +219,7 @@ int main(int argc, char **argv) {
         std::ofstream out(outputFileName);
 
         if (writeAssembly) {
-            auto printer = new MnemonicPrinter();
-            printer->instructions = instructions;
+            auto printer = new MnemonicPrinter(instructions);
             printer->fnTable = fnTable;
             out << printer->debugString();
         } else {

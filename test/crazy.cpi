@@ -95,11 +95,12 @@ fn test24() {
 
     type Baz struct {
         value: i32,
-        qux: **Qux
+        qux: *****Qux
     };
 
     type Qux struct {
-        value: i32
+        value: i32,
+        foo: *Foo
     };
 
     foo: Foo;
@@ -114,7 +115,8 @@ fn test24() {
     qux: Qux;
     qux.value = 888;
 
-    baz.qux = &&qux;
+    qux.foo = &foo;
+    baz.qux = &&&&&qux;
     bar.baz = baz;
     foo.bar = &&bar;
 
@@ -135,6 +137,9 @@ fn test24() {
     assert(bar.baz.qux.value == 3);
     assert(baz.qux.value == 3);
     assert(qux.value == 3);
+
+    foo.bar.baz.qux.foo.bar.baz.qux.foo.bar.baz.qux.foo.bar.baz.qux.foo.bar.baz.qux.foo.bar.baz.qux.foo.bar.baz.qux.value = 39;
+    assert(foo.bar.baz.qux.foo.bar.baz.qux.foo.bar.baz.qux.foo.bar.baz.qux.foo.bar.baz.qux.foo.bar.baz.qux.foo.bar.baz.qux.foo.bar.baz.qux.foo.bar.baz.qux.foo.bar.baz.qux.value == 39);
 
     ret 0;
 }
@@ -381,6 +386,10 @@ fn test25() {
     bar.baz = &baz;
     baz.qux = &qux;
 
+    baz2: Baz;
+    baz2.value = 9876;
+    baz2.qux = &qux;
+
     ^^foo.bar.baz.qux.value = 443;
 
     assert(^^foo.bar.baz.qux.value == 443);
@@ -405,16 +414,16 @@ fn test23() {
 
     type Bar struct {
         value: i32,
-        baz: *Baz
+        baz: Baz
     };
 
     type Baz struct {
         value: i32,
-        qux: *Qux
+        qux: **Qux
     };
 
     type Qux struct {
-        value: i32
+        value: **i32
     };
 
     foo: Foo;
@@ -425,13 +434,13 @@ fn test23() {
     foo.value = 111;
     bar.value = 222;
     baz.value = 333;
-    qux.value = 444;
+    qux.value = &&444;
 
+    baz.qux = &&qux;
+    bar.baz = baz;
     foo.bar = &bar;
-    bar.baz = &baz;
-    baz.qux = &qux;
 
-    foo.bar.baz.qux.value = 3;
+    ^^bar.baz.qux.value = 3;
 
-    ret foo.bar.baz.qux.value + bar.baz.qux.value + baz.qux.value + qux.value;
+    ret ^^foo.bar.baz.qux.value + ^^bar.baz.qux.value + ^^baz.qux.value + ^^qux.value;
 }

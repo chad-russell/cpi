@@ -107,11 +107,7 @@ struct DotData {
     Node *rhs = nullptr;
     Node *resolved = nullptr;
 
-    bool autoDeref = false;
     Node *autoDerefStorage = nullptr;
-
-    Node *nodeLocalStorage = nullptr;
-
     bool pointerIsRelative = false;
 };
 

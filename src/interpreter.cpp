@@ -27,13 +27,14 @@ void printCurrentStmt(Interpreter *interp, bool withLineInfo = false) {
 }
 
 void Interpreter::interpret() {
-    auto mp = new MnemonicPrinter();
-    mp->instructions = this->instructions;
+    auto mp = new MnemonicPrinter(this->instructions);
 
     while (pc < instructions.size() && !terminated) {
-        auto stmtStopIf = find_if(sourceMap.statements.begin(), sourceMap.statements.end(),
-                                  [this](const SourceMapStatement &s) { return s.instIndex == pc; });
-        auto stmtStop = stmtStopIf != sourceMap.statements.end();
+        auto stmtStop = false;
+        for (auto&& s : sourceMap.statements) {
+            if (s.instIndex == pc) { stmtStop = true; }
+        }
+
         if (stmtStop) {
             lastStmtPc = pc;
         }
@@ -42,8 +43,6 @@ void Interpreter::interpret() {
         auto breakStop = breakStopIf != breakpoints.end();
 
         auto shouldStop = (stmtStop && !continuing) || breakStop;
-
-        auto srcInfo = sourceMap.sourceInfo;
 
         while (shouldStop && !terminated && depth < overDepth) {
             continuing = false;
@@ -226,9 +225,7 @@ void interpretJumpIf(Interpreter *interp) {
 }
 
 void interpretStore(Interpreter *interp) {
-    auto maybeStoreOffset = interp->tryRead<int32_t>();
-    assert(maybeStoreOffset.isPresent);
-    auto storeOffset = maybeStoreOffset.value;
+    auto storeOffset = interp->read<int32_t>();
 
     if (storeOffset >= interp->stack.size()) {
         cout << "STACK OVERFLOW!!!!" << endl;
@@ -252,22 +249,23 @@ void interpretStoreConst(Interpreter *interp) {
         exit(1);
     }
 
-    auto inst = AssemblyLexer::instructionStrings[interp->instructions[interp->pc]];
+    auto inst = static_cast<Instruction>(interp->instructions[interp->pc]);
+    auto instStr = AssemblyLexer::instructionStrings[interp->instructions[interp->pc]];
 
     interp->pc += 1;
-    if (endsWith(inst, "CONSTI8")) {
+    if (inst == Instruction::CONSTI8) {
         int8_t value = interp->consume<int8_t>();
         memcpy(&interp->stack[storeOffset], &value, sizeof(int8_t));
-    } else if (endsWith(inst, "CONSTI16")) {
+    } else if (inst == Instruction::CONSTI16) {
         int16_t value = interp->consume<int16_t>();
         memcpy(&interp->stack[storeOffset], &value, sizeof(int16_t));
-    } else if (endsWith(inst, "CONSTI32")) {
+    } else if (inst == Instruction::CONSTI32 || inst == Instruction::RELCONSTI32) {
         int32_t value = interp->consume<int32_t>();
-        if (startsWith(inst, "REL")) {
+        if (inst == Instruction::RELCONSTI32) {
             value += interp->bp;
         }
         memcpy(&interp->stack[storeOffset], &value, sizeof(int32_t));
-    } else if (endsWith(inst, "CONSTI64")) {
+    } else if (inst == Instruction::CONSTI64) {
         int64_t value = interp->consume<int64_t>();
         memcpy(&interp->stack[storeOffset], &value, sizeof(int64_t));
     } else {

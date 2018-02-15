@@ -330,7 +330,6 @@ void resolveBinop(Semantic *semantic, Node *node) {
         auto newLocalStorage = new Node();
         newLocalStorage->type = NodeType::TYPE;
         newLocalStorage->typeInfo = node->binopData.lhs->typeInfo;
-        node->binopData.lhs->dotData.nodeLocalStorage = newLocalStorage;
 
         newLocalStorage->isLocal = true;
         semantic->currentFnDecl->locals.push_back(newLocalStorage);
@@ -339,7 +338,6 @@ void resolveBinop(Semantic *semantic, Node *node) {
         auto newLocalStorage = new Node();
         newLocalStorage->type = NodeType::TYPE;
         newLocalStorage->typeInfo = node->binopData.rhs->typeInfo;
-        node->binopData.rhs->dotData.nodeLocalStorage = newLocalStorage;
 
         newLocalStorage->isLocal = true;
         semantic->currentFnDecl->locals.push_back(newLocalStorage);
@@ -560,12 +558,8 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
         }
     }
 
-    semantic->resolveTypes(node->dotData.nodeLocalStorage);
-
     // if the lhs is a pointer, then our dot needs a pointer-sized local
     if (node->dotData.lhs->typeInfo->typeData.kind == NodeTypekind::POINTER) {
-        node->dotData.autoDeref = true;
-
         auto local = new Node(NodeTypekind::POINTER);
         local->typeInfo = local;
         local->isLocal = true;
