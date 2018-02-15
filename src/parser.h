@@ -29,7 +29,6 @@ struct Parser {
     Node *mainFn = nullptr;
     vector<Node *> allNodes = {};
     stack<Scope *> scopes = {};
-    vector<Node *> fnDecls = {};
     Node *currentFnDecl = nullptr;
 
     Parser(Lexer *lexer_);
@@ -46,6 +45,7 @@ struct Parser {
     void parseRoot();
     Node *parseTopLevel();
     vector<Node *> parseDeclParams();
+    vector<Node *> parseValueParams();
     Node *parseFnDecl();
     Node *parseTypeDecl();
     Node *parseSymbol();
@@ -53,13 +53,13 @@ struct Parser {
     Node *parseRet();
     Node *parseLvalue();
     Node *parseType();
+    Node *parseStructLiteral();
     Node *parseLvalueOrLiteral();
     Node *parseRvalueSimple();
     Node *parseRvalue();
     Node *parseIntLiteral();
     Node *parseFloatLiteral();
     Node *parseLvalueHelper(Node *symbol, Location saved);
-    void parseParams(vector<Node *> *params);
     Node *parseFnCall();
     Node *buildDots(stack<Node *> rvalues);
 };

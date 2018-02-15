@@ -109,7 +109,7 @@ ostream &operator<<(ostream &os, NodeType type) {
     case NodeType::DECL_PARAM: {
         return os << "declaration parameter";
     } break;
-    case NodeType::PARAM: {
+    case NodeType::VALUE_PARAM: {
         return os << "param";
     } break;
     case NodeType::TYPE: {

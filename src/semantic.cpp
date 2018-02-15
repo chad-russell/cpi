@@ -20,10 +20,19 @@ int32_t typeSize(Node *type) {
             return typeSize(type->resolved);
         case NodeTypekind::STRUCT: {
             auto total = 0;
-            for (auto param : type->typeData.structTypeData.params) {
-                param->localOffset = total;
-                total += typeSize(param->declParamData.type);
+
+            if (type->typeData.structTypeData.isLiteral) {
+                for (auto param : type->typeData.structTypeData.params) {
+                    param->localOffset = total;
+                    total += typeSize(param->valueParamData.value->typeInfo);
+                }
+            } else {
+                for (auto param : type->typeData.structTypeData.params) {
+                    param->localOffset = total;
+                    total += typeSize(param->declParamData.type);
+                }
             }
+
             return total;
         }
         default: assert(false);
@@ -59,6 +68,12 @@ bool typesMatch(Node *desired, Node *actual) {
         return false;
     }
 
+    if (actual->typeData.kind == NodeTypekind::STRUCT
+            || desired->typeData.kind == NodeTypekind::STRUCT) {
+        // todo(chad): real type checking for structs
+        return true;
+    }
+
     return desired->typeData.kind == actual->typeData.kind;
 }
 
@@ -90,16 +105,6 @@ void Semantic::reportError(vector<Node *> nodes, Error error) {
     }
 
     cout << s.str() << endl;
-}
-
-Node *localTarget(Node *local) {
-    auto resolved = resolve(local);
-
-//    if (resolved->type == NodeType::DOT) {
-//        return localTarget(resolved->dotData.lhs);
-//    }
-
-    return resolved;
 }
 
 void resolveFnDecl(Semantic *semantic, Node *node) {
@@ -192,7 +197,7 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
     }
 
     for (auto local : data->locals) {
-        auto resolved = localTarget(local);
+        auto resolved = resolve(local);
         if (resolved != local && resolved->isLocal) { continue; }
 
         local->localOffset = semantic->currentFnDecl->stackSize;
@@ -371,14 +376,14 @@ bool assignParams(Semantic *semantic,
     auto encounteredError = false;
 
     for (auto passedParam : givenParams) {
-        if (passedParam->type == NodeType::PARAM && passedParam->paramData.name != nullptr) {
+        if (passedParam->type == NodeType::VALUE_PARAM && passedParam->valueParamData.name != nullptr) {
             // look up that name in the declaration
             auto found = false;
             for (unsigned long j = 0; j < declParams.size(); j++) {
                 auto declParam = declParams[j];
                 assert(declParam->type == NodeType::DECL_PARAM);
 
-                if (declParam->declParamData.name->symbolData.atomId == passedParam->paramData.name->symbolData.atomId) {
+                if (declParam->declParamData.name->symbolData.atomId == passedParam->valueParamData.name->symbolData.atomId) {
                     found = true;
                     auto openParam = openParams.at(j);
                     if (!openParam) {
@@ -483,8 +488,8 @@ void resolveDeclParam(Semantic *semantic, Node *node) {
 }
 
 void resolveParam(Semantic *semantic, Node *node) {
-    semantic->resolveTypes(node->paramData.value);
-    node->typeInfo = node->paramData.value->typeInfo;
+    semantic->resolveTypes(node->valueParamData.value);
+    node->typeInfo = node->valueParamData.value->typeInfo;
 }
 
 void resolveDeref(Semantic *semantic, Node *node) {
@@ -515,10 +520,19 @@ Node *findParam(Semantic *semantic, Node *node) {
     auto structData = typeData->structTypeData;
 
     Node *foundParam = nullptr;
-    for (auto param : structData.params) {
-        if (param->declParamData.name->symbolData.atomId == node->dotData.rhs->symbolData.atomId) {
-            foundParam = param;
-            break;
+    if (structData.isLiteral) {
+        for (auto param : structData.params) {
+            if (param->valueParamData.name->symbolData.atomId == node->dotData.rhs->symbolData.atomId) {
+                foundParam = param;
+                break;
+            }
+        }
+    } else {
+        for (auto param : structData.params) {
+            if (param->declParamData.name->symbolData.atomId == node->dotData.rhs->symbolData.atomId) {
+                foundParam = param;
+                break;
+            }
         }
     }
 
@@ -581,6 +595,16 @@ void resolveAssert(Semantic *semantic, Node *node) {
     }
 }
 
+void resolveStructLiteral(Semantic *semantic, Node *node) {
+    node->typeInfo = new Node(NodeTypekind::STRUCT);
+    node->typeInfo->typeData.structTypeData.isLiteral = true;
+
+    for (auto param : node->structLiteralData.params) {
+        semantic->resolveTypes(param->valueParamData.value);
+        node->typeInfo->typeData.structTypeData.params.push_back(param);
+    }
+}
+
 void Semantic::resolveTypes(Node *node) {
     if (node == nullptr) { return; }
 
@@ -621,7 +645,7 @@ void Semantic::resolveTypes(Node *node) {
         case NodeType::DECL_PARAM: {
             resolveDeclParam(this, node);
         } break;
-        case NodeType::PARAM: {
+        case NodeType::VALUE_PARAM: {
             resolveParam(this, node);
         } break;
         case NodeType::DEREF: {
@@ -635,6 +659,9 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::ASSERT: {
             resolveAssert(this, node);
+        } break;
+        case NodeType::STRUCT_LITERAL: {
+            resolveStructLiteral(this, node);
         } break;
         default: assert(false);
     }

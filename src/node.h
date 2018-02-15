@@ -46,6 +46,11 @@ struct DeclParamData {
     Node *initialValue = nullptr;
 };
 
+struct ValueParamData {
+    Node *name = nullptr;
+    Node *value = nullptr;
+};
+
 struct ParamData {
     Node *name = nullptr;
     Node *value = nullptr;
@@ -195,7 +200,7 @@ public:
         BinopData binopData;
         PipeData pipeData;
         DeclParamData declParamData;
-        ParamData paramData;
+        ValueParamData valueParamData;
         TypeData typeData;
         StructLiteralData structLiteralData;
         IfData ifData;

@@ -135,6 +135,9 @@ void BytecodeGen::gen(Node *node) {
                 default: assert(false);
             }
         } break;
+        case NodeType::STRUCT_LITERAL: {
+            // nothing to do here! wait until we actually need to store it somewhere
+        } break;
         case NodeType::DECL: {
             auto data = node->declData;
             if (data.initialValue == nullptr) { return; }
@@ -268,7 +271,7 @@ void BytecodeGen::gen(Node *node) {
             auto paramCount = node->fnCallData.params.size();
             int32_t totalParamsSize = 0;
             for (auto i = 0; i < paramCount; i++) {
-                auto paramValue = node->fnCallData.params[i]->paramData.value;
+                auto paramValue = node->fnCallData.params[i]->valueParamData.value;
                 resolve(paramValue);
                 totalParamsSize += typeSize(paramValue->typeInfo);
             }
@@ -277,12 +280,12 @@ void BytecodeGen::gen(Node *node) {
                 // push the params (in reverse order!)
                 auto paramAccum = 0;
                 for (auto i = static_cast<int32_t>(paramCount - 1); i >= 0; i--) {
-                    auto paramValue = node->fnCallData.params[i]->paramData.value;
+                    auto paramValue = node->fnCallData.params[i]->valueParamData.value;
                     gen(paramValue);
                 }
 
                 for (auto i = static_cast<int32_t>(paramCount - 1); i >= 0; i--) {
-                    auto paramValue = node->fnCallData.params[i]->paramData.value;
+                    auto paramValue = node->fnCallData.params[i]->valueParamData.value;
                     auto paramSize = typeSize(paramValue->typeInfo);
                     storeValue(instructions, resolve(paramValue), static_cast<int32_t>(currentFnStackSize + paramAccum));
                     paramAccum += paramSize;
@@ -390,6 +393,9 @@ void BytecodeGen::gen(Node *node) {
             auto offsetWords = foundParam->localOffset;
 
             gen(node->dotData.lhs);
+            if (isConstant(node->dotData.lhs)) {
+                storeValue(instructions, node->dotData.lhs, node->dotData.lhs->localOffset);
+            }
 
             auto resolvedTypeInfo = resolve(resolve(node->dotData.lhs)->typeInfo);
 
@@ -575,6 +581,15 @@ void BytecodeGen::storeValue(vector<unsigned char> &instructions, Node *node, in
 
             append(instructions, toBytes32(typeSize(node->typeInfo)));
         } break;
+        case NodeType::STRUCT_LITERAL: {
+            auto sizeSoFar = 0;
+            for (const auto& param : node->structLiteralData.params) {
+                gen(param->valueParamData.value);
+
+                storeValue(instructions, param->valueParamData.value, offset + sizeSoFar);
+                sizeSoFar += typeSize(param->valueParamData.value->typeInfo);
+            }
+        } break;
         default:
             assert(false);
     }
@@ -586,6 +601,7 @@ bool isConstant(Node *node) {
         case NodeType::ADDRESS_OF:
         case NodeType::DEREF:
         case NodeType::FN_DECL:
+        case NodeType::STRUCT_LITERAL:
             return true;
         default: return false;
     }

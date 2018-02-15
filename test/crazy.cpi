@@ -72,8 +72,7 @@ fn main() {
     a22 := testMoreDotsAndDerefs();
     assert(a22 == 3);
 
-    a23 := test23();
-    assert(a23 == 12);
+    test23();
 
     test24();
 
@@ -423,7 +422,8 @@ fn test23() {
     };
 
     type Qux struct {
-        value: **i32
+        value: **i32,
+        f: *fn() i32
     };
 
     foo: Foo;
@@ -435,6 +435,7 @@ fn test23() {
     bar.value = 222;
     baz.value = 333;
     qux.value = &&444;
+    qux.f = &fn() { ret 123; };
 
     baz.qux = &&qux;
     bar.baz = baz;
@@ -442,5 +443,10 @@ fn test23() {
 
     ^^bar.baz.qux.value = 3;
 
-    ret ^^foo.bar.baz.qux.value + ^^bar.baz.qux.value + ^^baz.qux.value + ^^qux.value;
+    assert((^bar.baz.qux.f)() == 123);
+
+    assert(3 == ^^foo.bar.baz.qux.value);
+    assert(3 == ^^bar.baz.qux.value);
+    assert(3 == ^^baz.qux.value);
+    assert(3 == ^^qux.value);
 }

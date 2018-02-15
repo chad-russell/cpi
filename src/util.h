@@ -38,7 +38,7 @@ enum class NodeType {
     IF,
     WHILE,
     DECL_PARAM,
-    PARAM,
+    VALUE_PARAM,
     TYPE,
     DEREF,
     ADDRESS_OF,
