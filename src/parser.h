@@ -50,6 +50,7 @@ struct Parser {
     Node *parseTypeDecl();
     Node *parseSymbol();
     Node *parseScopedStmt();
+    Node *parseIf();
     Node *parseRet();
     Node *parseLvalue();
     Node *parseType();

@@ -605,6 +605,20 @@ void resolveStructLiteral(Semantic *semantic, Node *node) {
     }
 }
 
+void resolveIf(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->ifData.condition);
+    if (node->ifData.condition->typeInfo->typeData.kind != NodeTypekind::BOOLEAN) {
+        semantic->reportError({node, node->ifData.condition}, Error{node->ifData.condition->region, "Condition for 'if' must be a boolean!"});
+    }
+
+    for (const auto& stmt : node->ifData.stmts) {
+        semantic->resolveTypes(stmt);
+    }
+    for (const auto& stmt : node->ifData.elseStmts) {
+        semantic->resolveTypes(stmt);
+    }
+}
+
 void Semantic::resolveTypes(Node *node) {
     if (node == nullptr) { return; }
 
@@ -662,6 +676,9 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::STRUCT_LITERAL: {
             resolveStructLiteral(this, node);
+        } break;
+        case NodeType::IF: {
+            resolveIf(this, node);
         } break;
         default: assert(false);
     }

@@ -135,6 +135,8 @@ void Interpreter::interpret() {
 }
 
 void Interpreter::step() {
+    stepCount++;
+
     unsigned long inst = instructions[pc];
     pc += 1;
     table.at(inst)(this);
@@ -199,24 +201,17 @@ void interpretRet(Interpreter *interp) {
 
 // jumpif
 void interpretJumpIf(Interpreter *interp) {
-    bool cond;
+    auto constCond = interp->read<int32_t>();
 
-    auto constCond = interp->tryRead<int32_t>();
-    if (constCond.isPresent) {
-        cond = constCond.value == 1;
+    auto trueInst = interp->read<int32_t>();
+    auto falseInst = interp->read<int32_t>();
+
+    if (constCond == 1) {
+        interp->pc = trueInst;
     } else {
-        cond = interp->read<int32_t>() == 1;
+        interp->pc = falseInst;
     }
-
-    auto trueInst = interp->consume<int32_t>();
-        auto falseInst = interp->consume<int32_t>();
-
-        if (cond) {
-            interp->pc = trueInst;
-        } else {
-            interp->pc = falseInst;
-        }
-    }
+}
 
     // jump
     void interpretJump(Interpreter *interp) {

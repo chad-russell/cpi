@@ -1,10 +1,4 @@
-type linked_list struct {
-    value: i32,
-    next: *linked_list
-}
 
 fn main() {
-    ll: *linked_list = &{value: 13, next: &0};
-    ll.next = ll;
-    ret ll.next.next.next.next.value;
+    ret fib(10);
 }

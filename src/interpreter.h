@@ -74,6 +74,8 @@ public:
 
     vector<unsigned char> stack = {};
 
+    uint64_t stepCount = 0;
+
     int32_t pc = 0;
     int32_t sp = 0;
     int32_t bp = 0;

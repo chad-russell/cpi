@@ -14,7 +14,7 @@ struct FnTypeData {
 };
 
 struct StructTypeData {
-    bool isLiteral;
+    bool isLiteral = false;
     Node *name = nullptr;
     vector<Node *> params = {};
 };

@@ -139,11 +139,16 @@ vector<Node *> Parser::parseValueParams() {
     while (!lexer->isEmpty() && lexer->front.type != LexerTokenType::RPAREN && lexer->front.type != LexerTokenType::RCURLY) {
         ValueParamData param{};
 
-        // lvalue
-        auto name = parseSymbol();
-        param.name = name;
+        Node *name = nullptr;
 
-        expect(LexerTokenType::COLON, ":");
+        // lvalue
+        if (lexer->front.type == LexerTokenType::SYMBOL && lexer->next.type == LexerTokenType::COLON) {
+            name = parseSymbol();
+            param.name = name;
+
+            expect(LexerTokenType::COLON, ":");
+        }
+
         param.value = parseRvalue();
 
         // comma (if not RPAREN or RCURLY)
@@ -155,7 +160,7 @@ vector<Node *> Parser::parseValueParams() {
 
         node->valueParamData = param;
 
-        node->region = {lexer->srcInfo, name->region.start, param.value->region.end};
+        node->region = {lexer->srcInfo, name ? name->region.start : param.value->region.start, param.value->region.end};
         params.push_back(node);
     }
 
@@ -253,6 +258,8 @@ Node *Parser::parseTypeDecl() {
     auto end = lexer->front.region.end;
     expect(LexerTokenType::RCURLY, "}");
 
+    // todo(chad): else  / else if
+
     typeDecl->region = Region{lexer->srcInfo, saved, end};
 
     return typeDecl;
@@ -288,6 +295,11 @@ Node *Parser::parseScopedStmt() {
     // type definition
     if (lexer->front.type == LexerTokenType::TYPE) {
         return parseTypeDecl();
+    }
+
+    // if
+    if (lexer->front.type == LexerTokenType::IF) {
+        return parseIf();
     }
 
     auto saved = lexer->front.region.start;
@@ -380,6 +392,25 @@ Node *Parser::parseScopedStmt() {
 
     reportError("expected a declaration or an assignment");
     exit(1);
+}
+
+Node *Parser::parseIf() {
+    auto saved = lexer->front.region.start;
+    popFront();
+
+    auto if_ = new Node(lexer->srcInfo, &allNodes, NodeType::IF, scopes.top());
+    if_->region.start = saved;
+    if_->ifData.condition = parseRvalue();
+
+    expect(LexerTokenType::LCURLY, "{");
+    while (lexer->front.type != LexerTokenType::RCURLY) {
+        if_->ifData.stmts.push_back(parseScopedStmt());
+    }
+
+    if_->region.end = lexer->front.region.end;
+    expect(LexerTokenType::RCURLY, "}");
+
+    return if_;
 }
 
 Node *Parser::parseRet() {
@@ -558,7 +589,6 @@ Node *Parser::parseType() {
             expect(LexerTokenType::LCURLY, "{");
 
             type->typeData.kind = NodeTypekind::STRUCT;
-            type->typeData.structTypeData.isLiteral = true;
             type->typeData.structTypeData.params = parseDeclParams();
 
             expect(LexerTokenType::RCURLY, "}");

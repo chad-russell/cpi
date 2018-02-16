@@ -488,6 +488,30 @@ void BytecodeGen::gen(Node *node) {
             append(instructions, Instruction::RELI32);
             append(instructions, toBytes(node->nodeData->localOffset));
         } break;
+        case NodeType::IF: {
+            gen(node->ifData.condition);
+
+            append(instructions, Instruction::JUMPIF);
+            append(instructions, node->ifData.condition->bytecode);
+
+            append(instructions, Instruction::CONSTI32);
+            auto trueBranchOverwrite = instructions.size();
+            append(instructions, toBytes32(888));
+
+            append(instructions, Instruction::CONSTI32);
+            auto falseBranchOverwrite = instructions.size();
+            append(instructions, toBytes32(999));
+
+            auto instSize = static_cast<int32_t>(instructions.size());
+            memcpy(&instructions[trueBranchOverwrite], &instSize, sizeof(int32_t));
+
+            for (const auto& stmt: node->ifData.stmts) {
+                gen(stmt);
+            }
+
+            instSize = static_cast<int32_t>(instructions.size());
+            memcpy(&instructions[falseBranchOverwrite], &instSize, sizeof(int32_t));
+        } break;
         default: assert(false);
     }
 

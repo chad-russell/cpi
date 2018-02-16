@@ -507,9 +507,9 @@ void MnemonicPrinter::step() {
         instructionString.append(" ");
         readTypeAndInt();
         instructionString.append(" ");
-        instructionString.append(to_string(consume<int32_t>()));
+        readTypeAndInt();
         instructionString.append(" ");
-        instructionString.append(to_string(consume<int32_t>()));
+        readTypeAndInt();
     } else if (startsWith(inst, "CALLI") || startsWith(inst, "ASSERT")) {
         instructionString.append(inst);
         instructionString.append(" ");
