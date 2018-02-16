@@ -92,6 +92,16 @@ T bytesTo(const vector<unsigned char> &bytes, int32_t start) {
     return object;
 }
 
+template<>
+inline int64_t bytesTo(const vector<unsigned char> &bytes, int32_t start) {
+    return *(reinterpret_cast<const int64_t *>(&bytes[start]));
+}
+
+template<>
+inline int32_t bytesTo(const vector<unsigned char> &bytes, int32_t start) {
+    return *(reinterpret_cast<const int32_t *>(&bytes[start]));
+}
+
 template<typename T>
 string suffixForType() {
     if (is_same<T, int8_t>::value) { return "I8"; }

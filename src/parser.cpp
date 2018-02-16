@@ -40,6 +40,10 @@ LexerToken Parser::expect(LexerTokenType type, string expectation) {
     return saved;
 }
 
+void Parser::expectSemicolon() {
+    expect(LexerTokenType::SEMICOLON, "';'");
+}
+
 void Parser::scopeInsert(int64_t atomId, Node *node) {
     auto _scope = scopes.top();
 
@@ -213,7 +217,6 @@ Node *Parser::parseFnDecl() {
 
     while (!lexer->isEmpty() && lexer->front.type != LexerTokenType::RCURLY) {
         auto scopedStmt = parseScopedStmt();
-        expect(LexerTokenType::SEMICOLON, "';'");
         if (scopedStmt != nullptr) {
             scopedStmt->sourceMapStatement = true;
             decl->fnDeclData.body.push_back(scopedStmt);
@@ -305,8 +308,8 @@ Node *Parser::parseScopedStmt() {
     auto saved = lexer->front.region.start;
     auto lvalue = parseLvalue();
 
-    if (lvalue->type == NodeType::FN_CALL
-        || lvalue->type == NodeType::ASSERT) {
+    if (lvalue->type == NodeType::FN_CALL || lvalue->type == NodeType::ASSERT) {
+        expectSemicolon();
         return lvalue;
     }
 
@@ -327,6 +330,8 @@ Node *Parser::parseScopedStmt() {
             popFront();
             rvalue = parseRvalue();
         }
+
+        expectSemicolon();
 
         auto decl = new Node(lexer->srcInfo, &allNodes, NodeType::DECL, scopes.top());
         addLocal(decl);
@@ -353,6 +358,8 @@ Node *Parser::parseScopedStmt() {
         popFront();
         auto rvalue = parseRvalue();
 
+        expectSemicolon();
+
         auto decl = new Node(lexer->srcInfo, &allNodes, NodeType::DECL, scopes.top());
         addLocal(decl);
 
@@ -376,6 +383,8 @@ Node *Parser::parseScopedStmt() {
 
         popFront();
         auto rvalue = parseRvalue();
+
+        expectSemicolon();
 
         auto ass = new Node(lexer->srcInfo, &allNodes, NodeType::ASSIGN, scopes.top());
 
@@ -407,8 +416,26 @@ Node *Parser::parseIf() {
         if_->ifData.stmts.push_back(parseScopedStmt());
     }
 
-    if_->region.end = lexer->front.region.end;
+    if_->region.end = lexer->front.region.start;
     expect(LexerTokenType::RCURLY, "}");
+
+    if (lexer->front.type == LexerTokenType::ELSE) {
+        popFront();
+
+        if (lexer->front.type == LexerTokenType::IF) {
+            if_->ifData.elseStmts.push_back(parseIf());
+            return if_;
+        }
+
+        expect(LexerTokenType::LCURLY, "{");
+
+        while (lexer->front.type != LexerTokenType::RCURLY) {
+            if_->ifData.elseStmts.push_back(parseScopedStmt());
+        }
+
+        if_->region.end = lexer->front.region.start;
+        expect(LexerTokenType::RCURLY, "}");
+    }
 
     return if_;
 }
@@ -422,6 +449,8 @@ Node *Parser::parseRet() {
     ret->region = {lexer->srcInfo, saved, ret->retData.value->region.end};
 
     currentFnDecl->fnDeclData.returns.push_back(ret);
+
+    expectSemicolon();
 
     return ret;
 }
@@ -734,7 +763,7 @@ Node *Parser::parseIntLiteral() {
 
     node->intLiteralData.value = stoi(s.str());
 
-    return node;    
+    return node;
 }
 
 Node *Parser::parseFloatLiteral() {

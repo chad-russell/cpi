@@ -236,19 +236,19 @@ public:
   }
 
   template <typename T>
-  T readFromStack(int32_t offset) {
+  inline T readFromStack(int32_t offset) {
       return bytesTo<T>(stack, offset);
   }
 
   template <typename T>
-  T consume() {
+  inline T consume() {
       auto value = bytesTo<T>(instructions, pc);
       pc += sizeof(T);
       return value;
   }
 
   template <typename T>
-  T read() {
+  inline T read() {
       auto found = tryRead<T>();
       assert(found.isPresent);
       return found.value;

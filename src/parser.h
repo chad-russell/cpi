@@ -36,6 +36,7 @@ struct Parser {
     void popFront();
     void reportError(string error);
     LexerToken expect(LexerTokenType type, string expectation);
+    void expectSemicolon();
     void scopeInsert(int64_t atomId, Node *node);
 
     int8_t operatorPrecedence(LexerTokenType type);

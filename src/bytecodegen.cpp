@@ -45,7 +45,12 @@ void BytecodeGen::binopHelper(string instructionStr, Node *node) {
     append(instructions, inst);
 
     auto bytecodeInst = AssemblyLexer::nameToInstruction[bytecodeStr];
-    append(node->bytecode, bytecodeInst);
+    if (startsWith(instructionStr, "EQ")) {
+        // if this is an EQ instruction, our bytecode is a boolean and therefore *always* an i32
+        append(node->bytecode, Instruction::RELI32);
+    } else {
+        append(node->bytecode, bytecodeInst);
+    }
 
     append(instructions, bytecodeInst);
     append(instructions, toBytes(node->binopData.lhsTemporary->localOffset));
@@ -509,8 +514,26 @@ void BytecodeGen::gen(Node *node) {
                 gen(stmt);
             }
 
+            unsigned long skipElseBranchOverwrite = 0;
+            auto hasElse = !node->ifData.elseStmts.empty();
+            if (hasElse) {
+                append(instructions, Instruction::JUMP);
+
+                skipElseBranchOverwrite = instructions.size();
+                append(instructions, toBytes32(999));
+            }
+
             instSize = static_cast<int32_t>(instructions.size());
             memcpy(&instructions[falseBranchOverwrite], &instSize, sizeof(int32_t));
+
+            if (hasElse) {
+                for (const auto& stmt: node->ifData.elseStmts) {
+                    gen(stmt);
+                }
+
+                instSize = static_cast<int32_t>(instructions.size());
+                memcpy(&instructions[skipElseBranchOverwrite], &instSize, sizeof(int32_t));
+            }
         } break;
         default: assert(false);
     }

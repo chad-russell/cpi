@@ -80,6 +80,25 @@ fn main() {
 
     assert(fib(10) == 89);
 
+    assert(stupid_sqrt(5) == 0);
+
+    assert(stupid_sqrt(9) == 3);
+
+    ret 0;
+}
+
+fn stupid_sqrt(n: i64) {
+    if n == 1 {
+        ret 1;
+    } else if n == 4 {
+        ret 2;
+    } else if n == 9 {
+        ret 3;
+    } else if n == 16 {
+        ret 4;
+    }
+
+    -- couldn't find a sqrt, oh well!
     ret 0;
 }
 
@@ -87,22 +106,22 @@ fn test24() {
     type Foo struct {
         value: i32,
         bar: **Bar
-    };
+    }
 
     type Bar struct {
         value: i32,
         baz: Baz
-    };
+    }
 
     type Baz struct {
         value: i32,
         qux: *****Qux
-    };
+    }
 
     type Qux struct {
         value: i32,
         foo: *Foo
-    };
+    }
 
     foo: Foo;
     foo.value = 555;
@@ -316,8 +335,8 @@ type S struct {
 }
 
 fn fib(n: i32) {
-    if n == 0 { ret 1 };
-    if n == 1 { ret 1 };
+    if n == 0 { ret 1; }
+    if n == 1 { ret 1; }
     ret fib(n - 1) + fib(n - 2);
 }
 
@@ -363,21 +382,21 @@ fn test25() {
     type Foo struct {
         value: i32,
         bar: *Bar
-    };
+    }
 
     type Bar struct {
         value: i32,
         baz: *Baz
-    };
+    }
 
     type Baz struct {
         value: i32,
         qux: *Qux
-    };
+    }
 
     type Qux struct {
         value: **i64
-    };
+    }
 
     foo: Foo;
     bar: Bar;
@@ -417,22 +436,22 @@ fn test23() {
     type Foo struct {
         value: i32,
         bar: *Bar
-    };
+    }
 
     type Bar struct {
         value: i32,
         baz: Baz
-    };
+    }
 
     type Baz struct {
         value: i32,
         qux: **Qux
-    };
+    }
 
     type Qux struct {
         value: **i32,
         f: *fn() i32
-    };
+    }
 
     foo: Foo;
     bar: Bar;
@@ -449,7 +468,10 @@ fn test23() {
     bar.baz = baz;
     foo.bar = &bar;
 
-    ^^bar.baz.qux.value = 3;
+    fn setComplexBarFromParam(bar: Bar) {
+        ^^bar.baz.qux.value = 3;
+    }
+    setComplexBarFromParam(bar);
 
     assert((^bar.baz.qux.f)() == 123);
 

@@ -213,9 +213,9 @@ void interpretJumpIf(Interpreter *interp) {
     }
 }
 
-    // jump
-    void interpretJump(Interpreter *interp) {
-        auto index = interp->consume<int32_t>();
+// jump
+void interpretJump(Interpreter *interp) {
+    auto index = interp->consume<int32_t>();
     interp->pc = index;
 }
 

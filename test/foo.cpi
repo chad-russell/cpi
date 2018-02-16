@@ -1,4 +1,5 @@
 
 fn main() {
-    ret fib(10);
+    n := 2;
+    ret stupid_sqrt(n);
 }

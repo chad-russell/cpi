@@ -147,7 +147,6 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "f64", LexerTokenType::F64)) { return;}
     if (tryEatKeyword(&next, "if", LexerTokenType::IF)) { return; }
     if (tryEatKeyword(&next, "while", LexerTokenType::WHILE)) { return; }
-    if (tryEatKeyword(&next, "elif", LexerTokenType::ELIF)) { return; }
     if (tryEatKeyword(&next, "else", LexerTokenType::ELSE)) { return; }
     if (tryEatKeyword(&next, "true", LexerTokenType::TRUE_)) { return; }
     if (tryEatKeyword(&next, "false", LexerTokenType::FALSE_)) { return; }
@@ -402,7 +401,6 @@ const vector<string> Lexer::lexerTokenTypeStrings = {
     "F64",
     "IF",
     "WHILE",
-    "ELIF",
     "ELSE",
     "TRUE_",
     "FALSE_",

@@ -51,7 +51,6 @@ enum class LexerTokenType : int32_t {
     F64,
     IF,
     WHILE,
-    ELIF,
     ELSE,
     TRUE_,
     FALSE_,
