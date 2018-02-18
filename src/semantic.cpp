@@ -3,6 +3,7 @@
 #include "interpreter.h"
 
 #include <sstream>
+#include <memory>
 
 int32_t typeSize(Node *type) {
     assert(type->type == NodeType::TYPE);

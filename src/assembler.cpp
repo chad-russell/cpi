@@ -191,7 +191,7 @@ void AssemblyLexer::popFront() {
     // maybe it's an integer or floating point literal
     auto startIndex = loc.byteIndex;
     while (sourceMap.sourceInfo.source[loc.byteIndex] == '-'
-        || isnumber(sourceMap.sourceInfo.source[loc.byteIndex]) 
+        || isdigit(sourceMap.sourceInfo.source[loc.byteIndex]) 
         || sourceMap.sourceInfo.source[loc.byteIndex] == '.') {
         eat();
     }

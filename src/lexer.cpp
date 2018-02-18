@@ -250,16 +250,16 @@ void Lexer::popFront() {
     }
 
     // int
-    if (isnumber(srcInfo.source[loc.byteIndex])) {
+    if (isdigit(srcInfo.source[loc.byteIndex])) {
         next.type = LexerTokenType::INT_LITERAL;
-        while (isnumber(srcInfo.source[loc.byteIndex]) || srcInfo.source[loc.byteIndex] == '_') {
+        while (isdigit(srcInfo.source[loc.byteIndex]) || srcInfo.source[loc.byteIndex] == '_') {
             eat();
         }
 
         if (srcInfo.source[loc.byteIndex] == '.') {
             next.type = LexerTokenType::FLOAT_LITERAL;
             eat();
-            while (isnumber(srcInfo.source[loc.byteIndex]) || srcInfo.source[loc.byteIndex] == '_') {
+            while (isdigit(srcInfo.source[loc.byteIndex]) || srcInfo.source[loc.byteIndex] == '_') {
                 eat();
             }
         }
