@@ -133,6 +133,7 @@ void Lexer::popFront() {
     if (tryEat(&next, "!", LexerTokenType::NOT)) { return; }
     if (tryEat(&next, "@", LexerTokenType::AT)) { return; }
     if (tryEat(&next, "|", LexerTokenType::VERTICAL_BAR)) { return; }
+    if (tryEatKeyword(&next, "run", LexerTokenType::RUN)) { return; }
     if (tryEatKeyword(&next, "and", LexerTokenType::AND)) { return; }
     if (tryEatKeyword(&next, "or", LexerTokenType::OR)) { return; }
     if (tryEatKeyword(&next, "fn", LexerTokenType::FN)) { return; }
@@ -412,7 +413,9 @@ const vector<string> Lexer::lexerTokenTypeStrings = {
     "IMPORT",
     "CAST",
     "ASSERT",
-    "SEMICOLON"};
+    "SEMICOLON",
+    "RUN"
+};
 
 ostream &operator<<(ostream &os, LexerTokenType tokenType) {
     return os << Lexer::lexerTokenTypeStrings[static_cast<int32_t>(tokenType)];

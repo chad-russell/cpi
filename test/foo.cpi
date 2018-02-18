@@ -1,5 +1,12 @@
+fn fib(n: i32) i32 {
+    if n == 0 { ret 1; }
+    if n == 1 { ret 1; }
+    ret fib(n - 1) + fib(n - 2);
+}
 
 fn main() {
-    n := 2;
-    ret stupid_sqrt(n);
+    n := run fn() {
+        ret fib(27);
+    }();
+    ret n;
 }

@@ -48,6 +48,7 @@ enum class NodeType {
     IMPORT,
     CAST,
     ASSERT,
+    RUN
 };
 
 enum class NodeTypekind {

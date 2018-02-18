@@ -540,24 +540,26 @@ void MnemonicPrinter::readTypeAndIntOrFloat()
 
 void MnemonicPrinter::readTypeAndInt()
 {
-    auto inst = AssemblyLexer::instructionStrings[instructions[pc]];
+    auto inst = instructions[pc];
+    auto debugInst = static_cast<Instruction>(instructions[pc]);
+    auto instStr = AssemblyLexer::instructionStrings[inst];
 
-    instructionString.append(inst);
+    instructionString.append(instStr);
     instructionString.append(" ");
     pc += 1;
 
-    if (endsWith(inst, "CONSTI8")) {
+    if (endsWith(instStr, "CONSTI8")) {
         instructionString.append(to_string(consume<int8_t>()));
-    } else if (endsWith(inst, "CONSTI16")) {
+    } else if (endsWith(instStr, "CONSTI16")) {
         instructionString.append(to_string(consume<int16_t>()));
-    } else if (endsWith(inst, "CONSTI32")) {
+    } else if (endsWith(instStr, "CONSTI32")) {
         instructionString.append(to_string(consume<int32_t>()));
-    } else if (endsWith(inst, "CONSTI64")) {
+    } else if (endsWith(instStr, "CONSTI64")) {
         instructionString.append(to_string(consume<int64_t>()));
-    } else if (endsWith(inst, "I8") 
-        || endsWith(inst, "I16") 
-        || endsWith(inst, "I32") 
-        || endsWith(inst, "I64")) {
+    } else if (endsWith(instStr, "I8")
+        || endsWith(instStr, "I16")
+        || endsWith(instStr, "I32")
+        || endsWith(instStr, "I64")) {
         instructionString.append(to_string(consume<int32_t>()));
     } else {
         instructionString.append("<<<ERROR>>>");

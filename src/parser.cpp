@@ -448,7 +448,9 @@ Node *Parser::parseRet() {
     ret->retData.value = parseRvalue();
     ret->region = {lexer->srcInfo, saved, ret->retData.value->region.end};
 
-    currentFnDecl->fnDeclData.returns.push_back(ret);
+    if (currentFnDecl) {
+        currentFnDecl->fnDeclData.returns.push_back(ret);
+    }
 
     expectSemicolon();
 
@@ -653,6 +655,22 @@ Node *Parser::parseStructLiteral() {
     return node;
 }
 
+Node *Parser::parseRun() {
+    Node *node = new Node(lexer->srcInfo, &allNodes, NodeType::RUN, scopes.top());
+    node->region.start = lexer->front.region.start;
+    popFront();
+
+    auto savedFnDecl = currentFnDecl;
+    currentFnDecl = nullptr;
+
+    node->nodeData = parseRvalue();
+
+    currentFnDecl = savedFnDecl;
+
+    node->region.end = node->nodeData->region.end;
+    return node;
+}
+
 Node *Parser::parseLvalueOrLiteral() {
     auto saved = lexer->front.region.start;
     Node *symbol;
@@ -670,6 +688,8 @@ Node *Parser::parseLvalueOrLiteral() {
         symbol->fnDeclData.isLiteral = true;
     } else if (lexer->front.type == LexerTokenType::LCURLY) {
         symbol = parseStructLiteral();
+    } else if (lexer->front.type == LexerTokenType::RUN) {
+        symbol = parseRun();
     } else {
         symbol = parseSymbol();
     }
@@ -839,7 +859,9 @@ void Parser::addLocal(Node *local) {
     if (local->isLocal) { return; }
     local->isLocal = true;
 
-    currentFnDecl->fnDeclData.locals.push_back(local);
+    if (currentFnDecl) {
+        currentFnDecl->fnDeclData.locals.push_back(local);
+    }
 }
 
 Node *Parser::parseFnCall() {

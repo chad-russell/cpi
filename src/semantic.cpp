@@ -1,4 +1,6 @@
 #include "semantic.h"
+#include "bytecodegen.h"
+#include "interpreter.h"
 
 #include <sstream>
 
@@ -68,9 +70,21 @@ bool typesMatch(Node *desired, Node *actual) {
         return false;
     }
 
-    if (actual->typeData.kind == NodeTypekind::STRUCT
-            || desired->typeData.kind == NodeTypekind::STRUCT) {
-        // todo(chad): real type checking for structs
+    if (actual->typeData.kind == NodeTypekind::STRUCT) {
+        if (desired->typeData.kind != NodeTypekind::STRUCT) {
+            return false;
+        }
+
+        if (actual->typeData.structTypeData.params.size() != desired->typeData.structTypeData.params.size()) {
+            return false;
+        }
+
+        for (auto i = 0; i < desired->typeData.structTypeData.params.size(); i++) {
+            if (!typesMatch(desired->typeData.structTypeData.params[i]->typeInfo, actual->typeData.structTypeData.params[i]->typeInfo)) {
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -619,6 +633,57 @@ void resolveIf(Semantic *semantic, Node *node) {
     }
 }
 
+void resolveRun(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->nodeData);
+
+    node->typeInfo = node->nodeData->typeInfo;
+
+    assert(node->nodeData->type == NodeType::FN_CALL);
+    auto ctFn = node->nodeData->fnCallData.fn;
+
+    auto ctSemantic = make_unique<Semantic>();
+    ctSemantic->resolveTypes(ctFn);
+
+    auto gen = make_unique<BytecodeGen>();
+    gen->isMainFn = true;
+    gen->sourceMap.sourceInfo = node->region.srcInfo;
+    gen->processFnDecls = true;
+
+    gen->gen(ctFn);
+    while (!gen->toProcess.empty()) {
+        gen->isMainFn = false;
+        gen->processFnDecls = true;
+        gen->gen(gen->toProcess.front());
+        gen->toProcess.pop();
+    }
+    gen->fixup();
+
+    auto interp = make_unique<Interpreter>();
+    interp->instructions = gen->instructions;
+    interp->fnTable = gen->fnTable;
+    interp->sourceMap = gen->sourceMap;
+    auto instructions = gen->instructions;
+    auto fnTable = gen->fnTable;
+
+    interp->continuing = true;
+    interp->instructions = instructions;
+    interp->fnTable = fnTable;
+    interp->interpret();
+
+    switch (node->typeInfo->typeData.kind) {
+        case NodeTypekind::I32:
+        case NodeTypekind::I64: {
+            auto resolved = new Node(node->region.srcInfo, nullptr, NodeType::INT_LITERAL, node->scope);
+            resolved->typeInfo = node->typeInfo;
+            resolved->intLiteralData.value = interp->readFromStack<int32_t>(0);
+            node->resolved = resolved;
+        } break;
+        default: {
+            assert(false && "unsupported typekind for CTE");
+        } break;
+    }
+}
+
 void Semantic::resolveTypes(Node *node) {
     if (node == nullptr) { return; }
 
@@ -679,6 +744,9 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::IF: {
             resolveIf(this, node);
+        } break;
+        case NodeType::RUN: {
+            resolveRun(this, node);
         } break;
         default: assert(false);
     }

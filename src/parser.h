@@ -56,6 +56,7 @@ struct Parser {
     Node *parseLvalue();
     Node *parseType();
     Node *parseStructLiteral();
+    Node *parseRun();
     Node *parseLvalueOrLiteral();
     Node *parseRvalueSimple();
     Node *parseRvalue();

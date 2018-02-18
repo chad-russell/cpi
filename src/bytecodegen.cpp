@@ -535,6 +535,10 @@ void BytecodeGen::gen(Node *node) {
                 memcpy(&instructions[skipElseBranchOverwrite], &instSize, sizeof(int32_t));
             }
         } break;
+        case NodeType::RUN: {
+            // work should already be done, just need to go with whatever it resolved itself to
+            gen(node->resolved);
+        } break;
         default: assert(false);
     }
 

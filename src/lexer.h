@@ -62,7 +62,8 @@ enum class LexerTokenType : int32_t {
     IMPORT,
     CAST,
     ASSERT,
-    SEMICOLON
+    SEMICOLON,
+    RUN
 };
 
 struct LexerToken{
