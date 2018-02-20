@@ -202,8 +202,20 @@ Node *Parser::parseFnDecl() {
 
     // params
     expect(LexerTokenType::LPAREN, "(");
-    decl->fnDeclData.params = parseDeclParams();
+    auto firstParams = parseDeclParams();
     expect(LexerTokenType::RPAREN, ")");
+
+    // more params?
+    if (lexer->front.type == LexerTokenType::LPAREN) {
+        popFront();
+        auto secondParams = parseDeclParams();
+        expect(LexerTokenType::RPAREN, ")");
+
+        decl->fnDeclData.ctParams = firstParams;
+        decl->fnDeclData.params = secondParams;
+    } else {
+        decl->fnDeclData.params = firstParams;
+    }
 
     // return type
     if (lexer->front.type != LexerTokenType::LCURLY) {
@@ -225,6 +237,9 @@ Node *Parser::parseFnDecl() {
     auto end = expect(LexerTokenType::RCURLY, "}");
 
     // put params in scope
+    for (auto param : decl->fnDeclData.ctParams) {
+        scopeInsert(param->declParamData.name->symbolData.atomId, param);
+    }
     for (auto param : decl->fnDeclData.params) {
         scopeInsert(param->declParamData.name->symbolData.atomId, param);
     }
@@ -472,7 +487,6 @@ Node *Parser::buildDots(stack<Node *> rvalues) {
         top->type = NodeType::FN_CALL;
 
         top->fnCallData.fn = buildDots(rvalues);
-        addLocal(top->fnCallData.fn);
 
         top->region = {lexer->srcInfo, top->fnCallData.fn->region.start, top->region.end};
         return top;
@@ -505,7 +519,8 @@ Node *Parser::parseLvalueHelper(Node *symbol, Location saved) {
     stack<Node *> rvalues;
     rvalues.push(symbol);
 
-    while (lexer->front.type == LexerTokenType::LPAREN) {
+    while (lexer->front.type == LexerTokenType::LPAREN
+            || lexer->front.type == LexerTokenType::NOT) {
         auto fnCall = parseFnCall();
         rvalues.push(fnCall);
     }
@@ -516,7 +531,8 @@ Node *Parser::parseLvalueHelper(Node *symbol, Location saved) {
         auto sym = parseSymbol();
         rvalues.push(sym);
 
-        while (lexer->front.type == LexerTokenType::LPAREN) {
+        while (lexer->front.type == LexerTokenType::LPAREN
+                || lexer->front.type == LexerTokenType::NOT) {
             auto fnCall = parseFnCall();
             rvalues.push(fnCall);
         }
@@ -546,7 +562,7 @@ Node *Parser::parseLvalue() {
     if (lexer->front.type == LexerTokenType::DEREF) {
         popFront();
         auto deref = new Node(lexer->srcInfo, &allNodes, NodeType::DEREF, scopes.top());
-        deref->derefData.target = parseLvalue();
+        deref->derefData.target = parseRvalueSimple();
         deref->derefData.isRvalue = false;
         return deref;
     }
@@ -867,7 +883,14 @@ void Parser::addLocal(Node *local) {
 Node *Parser::parseFnCall() {
     auto call = new Node(lexer->srcInfo, &allNodes, NodeType::FN_CALL, scopes.top());
 
-    popFront(); // "("
+    if (lexer->front.type == LexerTokenType::NOT) {
+        expect(LexerTokenType::NOT, "!");
+        expect(LexerTokenType::LPAREN, "(");
+        call->fnCallData.ctParams = parseValueParams();
+        expect(LexerTokenType::RPAREN, ")");
+    }
+
+    expect(LexerTokenType::LPAREN, "(");
     call->fnCallData.params = parseValueParams();
     expect(LexerTokenType::RPAREN, ")");
 

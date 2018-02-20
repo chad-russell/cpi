@@ -67,6 +67,7 @@ struct ImportData {
 
 struct FnDeclData {
     Node *name = nullptr;
+    vector<Node *> ctParams = {};
     vector<Node *> params = {};
     Node * returnType = nullptr;
     vector<Node *> body = {};
@@ -104,6 +105,7 @@ struct BoolLiteralData {
 
 struct FnCallData {
     Node *fn = nullptr;
+    vector<Node *> ctParams = {};
     vector<Node *> params = {};
 };
 

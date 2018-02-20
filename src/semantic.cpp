@@ -127,6 +127,15 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
     auto savedFnDecl = semantic->currentFnDecl;
     semantic->currentFnDecl = data;
 
+    for (auto param : data->ctParams) {
+        semantic->resolveTypes(param);
+    }
+
+    if (!data->ctParams.empty()) {
+        // if it's polymorphic, just check the ct params for now
+        return;
+    }
+
     for (auto param : data->params) {
         semantic->resolveTypes(param);
     }
@@ -448,8 +457,6 @@ bool assignParams(Semantic *semantic,
     }
 
     for (auto i = 0; i < declParams.size(); i++) {
-        auto declParam = declParams[i];
-
         auto openParamsI = openParams[i];
         if (openParamsI || newParams[i] == nullptr) {
             encounteredError = true;
@@ -464,21 +471,71 @@ bool assignParams(Semantic *semantic,
 
 void resolveFnCall(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->fnCallData.fn);
-    auto resolvedFnType = resolve(node->fnCallData.fn->typeInfo)->typeData;
+    auto resolvedFn = resolve(node->fnCallData.fn);
+
+    if (!node->fnCallData.ctParams.empty()) {
+        assert(resolvedFn->type == NodeType::FN_DECL);
+
+        auto ctDeclParams = resolvedFn->fnDeclData.ctParams;
+        auto ctGivenParams = node->fnCallData.ctParams;
+        auto encounteredError = assignParams(semantic, node, ctDeclParams, ctGivenParams);
+        assert(!encounteredError);
+
+        for (unsigned long i = 0; i < ctGivenParams.size(); i++) {
+            auto declParam = ctDeclParams[i];
+            auto givenParam = ctGivenParams[i];
+            semantic->resolveTypes(givenParam);
+            if (!typesMatch(declParam->typeInfo, givenParam->typeInfo)) {
+                semantic->reportError({node, declParam, givenParam}, Error{node->region, "type mismatch!"});
+            }
+        }
+
+        // make a new function!
+        // todo(chad): memoize this based on the ctParams
+        auto newResolvedFn = new Node();
+        newResolvedFn->id = nodeId;
+        nodeId += 1;
+        newResolvedFn->region = resolvedFn->region;
+        newResolvedFn->scope = resolvedFn->scope;
+        newResolvedFn->type = resolvedFn->type;
+
+        // Make sure the ctDeclParams resolve to their compile-time values
+        for (auto i = 0; i < ctGivenParams.size(); i++) {
+            auto ctParam = ctGivenParams[i];
+            assert(ctParam->type == NodeType::VALUE_PARAM);
+            ctDeclParams[i]->resolved = ctParam->valueParamData.value;
+        }
+
+        // set fnDeclData to the old version, but remove ctParams.
+        // Now that they've been put into scope and typechecked,
+        // we should not need them anymore.
+        newResolvedFn->fnDeclData = resolvedFn->fnDeclData;
+        newResolvedFn->fnDeclData.ctParams = {};
+
+//        newResolvedFn->typeInfo = new Node(NodeTypekind::FN);
+//        newResolvedFn->typeInfo
+
+        resolvedFn->resolved = newResolvedFn;
+        resolvedFn = newResolvedFn;
+        semantic->resolveTypes(newResolvedFn);
+    }
+
+    auto resolvedFnType = resolve(resolvedFn->typeInfo)->typeData;
     assert(resolvedFnType.kind == NodeTypekind::FN);
     node->typeInfo = resolvedFnType.fnTypeData.returnType;
 
     auto declParams = resolvedFnType.fnTypeData.params;
-    auto encounteredError = assignParams(semantic, node, declParams, node->fnCallData.params);
+    auto givenParams = node->fnCallData.params;
 
-    if (encounteredError) { return; }
+    auto encounteredError = assignParams(semantic, node, declParams, givenParams);
+    assert(!encounteredError);
 
-    for (unsigned long i = 0; i < node->fnCallData.params.size(); i++) {
+    for (unsigned long i = 0; i < givenParams.size(); i++) {
         auto declParam = declParams[i];
-        auto newParam = node->fnCallData.params[i];
-        semantic->resolveTypes(newParam);
-        if (!typesMatch(declParam->typeInfo, newParam->typeInfo)) {
-            semantic->reportError({node, declParam, newParam}, Error{node->region, "type mismatch!"});
+        auto givenParam = givenParams[i];
+        semantic->resolveTypes(givenParam);
+        if (!typesMatch(declParam->typeInfo, givenParam->typeInfo)) {
+            semantic->reportError({node, declParam, givenParam}, Error{node->region, "type mismatch!"});
         }
     }
 }

@@ -1,12 +1,5 @@
-fn fib(n: i32) i32 {
-    if n == 0 { ret 1; }
-    if n == 1 { ret 1; }
-    ret fib(n - 1) + fib(n - 2);
-}
+fn id(V: i32)(a: i32) { ret a + V; }
 
 fn main() {
-    n := run fn() {
-        ret fib(27);
-    }();
-    ret n;
+    ret id!(7)(3);
 }
