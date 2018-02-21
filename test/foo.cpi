@@ -1,13 +1,7 @@
-type Foo struct { x: i64, y: i64 }
-
-fn id(T: Type = typeof(t))(t: T) {
-    ret t;
+fn add_1(T : i32 = 13)() {
+    ret T + 1;
 }
 
 fn main() {
-    foo: Foo;
-    foo.x = 3;
-    foo.y = 4;
-
-    ret id(foo).x + id(8);
+    ret add_1!(18)();
 }

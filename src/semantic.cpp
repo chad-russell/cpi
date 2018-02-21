@@ -52,10 +52,6 @@ bool typesMatch(Node *desired, Node *actual) {
     assert(desired->type == NodeType::TYPE);
     assert(actual->type == NodeType::TYPE);
 
-    if (desired->typeData.kind == NodeTypekind::EXPOSED_TYPE) {
-        return true;
-    }
-
     // coercion from integer literal to any integer is valid
     // todo(chad): check for overflow?
     if (desired->typeData.kind == NodeTypekind::INT_LITERAL) {
@@ -345,7 +341,7 @@ void resolveType(Semantic *semantic, Node *node) {
             auto resolved = resolve(node);
             switch (resolved->type) {
                 case NodeType::DECL_PARAM: {
-                    assert(resolved->declParamData.type->typeData.kind == NodeTypekind::EXPOSED_TYPE);
+//                    assert(resolved->declParamData.type->typeData.kind == NodeTypekind::EXPOSED_TYPE);
                 } break;
                 case NodeType::TYPEOF:
                 case NodeType::TYPE:
@@ -662,6 +658,12 @@ void resolveDeclParam(Semantic *semantic, Node *node) {
     } else {
         node->typeInfo = node->declParamData.type;
     }
+
+    if (node->declParamData.type != nullptr && node->declParamData.initialValue != nullptr) {
+        if (!typesMatch(node->declParamData.initialValue->typeInfo, node->declParamData.type->typeInfo)) {
+            semantic->reportError({node}, Error{node->region, "Type mismatch decl param"});
+        }
+    }
 }
 
 void resolveParam(Semantic *semantic, Node *node) {
@@ -850,7 +852,9 @@ void resolveRun(Semantic *semantic, Node *node) {
 void resolveTypeof(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->nodeData);
     node->resolved = node->nodeData->typeInfo;
-    node->typeInfo = node->nodeData->typeInfo;
+
+    node->typeInfo = new Node(NodeTypekind::EXPOSED_TYPE);
+    node->typeInfo->typeData.exposedTypeData.value = node->nodeData->typeInfo;
 }
 
 void Semantic::resolveTypes(Node *node) {

@@ -130,7 +130,15 @@ vector<Node *> Parser::parseDeclParams() {
 
         node->declParamData = param;
 
-        node->region = {lexer->srcInfo, name->region.start, param.type ? param.type->region.end : name->region.end};
+        node->region.start = name->region.start;
+        if (param.initialValue != nullptr) {
+            node->region.end = param.initialValue->region.end;
+        } else if (param.type != nullptr) {
+            node->region.end = param.type->region.end;
+        } else {
+            node->region.end = name->region.end;
+        }
+
         params.push_back(node);
     }
 

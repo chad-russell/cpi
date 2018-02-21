@@ -174,6 +174,10 @@ struct SymbolTypeData {
     int64_t atomId;
 };
 
+struct ExposedTypeData {
+    Node *value;
+};
+
 struct TypeData {
     // todo(chad): size?
 
@@ -183,6 +187,7 @@ struct TypeData {
     StructTypeData structTypeData;
     PointerTypeData pointerTypeData;
     SymbolTypeData symbolTypeData;
+    ExposedTypeData exposedTypeData;
 //     };
 };
 
