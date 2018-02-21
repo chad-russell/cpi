@@ -46,7 +46,7 @@ struct Parser {
     void parseRoot();
     Node *parseTopLevel();
     vector<Node *> parseDeclParams();
-    vector<Node *> parseValueParams();
+    vector<Node *> parseValueParams(bool ct = false);
     Node *parseFnDecl();
     Node *parseTypeDecl();
     Node *parseSymbol();
@@ -60,6 +60,7 @@ struct Parser {
     Node *parseLvalueOrLiteral();
     Node *parseRvalueSimple();
     Node *parseRvalue();
+    Node *parseCTRvalue();
     Node *parseIntLiteral();
     Node *parseFloatLiteral();
     Node *parseLvalueHelper(Node *symbol, Location saved);

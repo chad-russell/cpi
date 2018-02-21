@@ -63,10 +63,11 @@ enum class LexerTokenType : int32_t {
     CAST,
     ASSERT,
     SEMICOLON,
-    RUN
+    RUN,
+    EXPOSED_TYPE,
 };
 
-struct LexerToken{
+struct LexerToken {
     LexerTokenType type = {};
     Region region = {};
 };

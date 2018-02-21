@@ -137,7 +137,7 @@ vector<Node *> Parser::parseDeclParams() {
     return params;
 }
 
-vector<Node *> Parser::parseValueParams() {
+vector<Node *> Parser::parseValueParams(bool ct) {
     vector<Node *> params;
 
     while (!lexer->isEmpty() && lexer->front.type != LexerTokenType::RPAREN && lexer->front.type != LexerTokenType::RCURLY) {
@@ -153,7 +153,7 @@ vector<Node *> Parser::parseValueParams() {
             expect(LexerTokenType::COLON, ":");
         }
 
-        param.value = parseRvalue();
+        param.value = ct ? parseCTRvalue() : parseRvalue();
 
         // comma (if not RPAREN or RCURLY)
         if (lexer->front.type != LexerTokenType::RPAREN && lexer->front.type != LexerTokenType::RCURLY) {
@@ -189,7 +189,6 @@ Node *Parser::parseFnDecl() {
         auto name = parseSymbol();
         decl->fnDeclData.name = name;
 
-
         ostringstream nameStringstream("");
         nameStringstream << SourceRegion{name->region};
         auto nameString = nameStringstream.str();
@@ -199,6 +198,8 @@ Node *Parser::parseFnDecl() {
 
         scopeInsert(decl->fnDeclData.name->symbolData.atomId, decl);
     }
+
+    scopes.push(new Scope(scopes.top()));
 
     // params
     expect(LexerTokenType::LPAREN, "(");
@@ -215,6 +216,14 @@ Node *Parser::parseFnDecl() {
         decl->fnDeclData.params = secondParams;
     } else {
         decl->fnDeclData.params = firstParams;
+    }
+
+    // put params in scope
+    for (auto param : decl->fnDeclData.ctParams) {
+        scopeInsert(param->declParamData.name->symbolData.atomId, param);
+    }
+    for (auto param : decl->fnDeclData.params) {
+        scopeInsert(param->declParamData.name->symbolData.atomId, param);
     }
 
     // return type
@@ -236,16 +245,9 @@ Node *Parser::parseFnDecl() {
     }
     auto end = expect(LexerTokenType::RCURLY, "}");
 
-    // put params in scope
-    for (auto param : decl->fnDeclData.ctParams) {
-        scopeInsert(param->declParamData.name->symbolData.atomId, param);
-    }
-    for (auto param : decl->fnDeclData.params) {
-        scopeInsert(param->declParamData.name->symbolData.atomId, param);
-    }
-
     decl->region.end = end.region.end;
 
+    scopes.pop();
     scopes.pop();
     currentFnDecl = savedCurrentFnDecl;
 
@@ -650,6 +652,11 @@ Node *Parser::parseType() {
 
             type->region.end = lexer->lastLoc;
         } break;
+        case LexerTokenType::EXPOSED_TYPE: {
+            type->region = lexer->front.region;
+            popFront();
+            type->typeData.kind = NodeTypekind::EXPOSED_TYPE;
+        } break;
         default: {
             ostringstream s("");
             s << "unknown type '" << SourceRegion{saved.region} << "'";
@@ -743,6 +750,15 @@ Node *Parser::parseRvalueSimple() {
     }
 
     return parseLvalueOrLiteral();
+}
+
+Node *Parser::parseCTRvalue() {
+    if (lexer->front.type == LexerTokenType::I32
+            || lexer->front.type == LexerTokenType::I64) {
+        return parseType();
+    }
+
+    return parseRvalue();
 }
 
 Node *Parser::parseRvalue() {
@@ -886,7 +902,7 @@ Node *Parser::parseFnCall() {
     if (lexer->front.type == LexerTokenType::NOT) {
         expect(LexerTokenType::NOT, "!");
         expect(LexerTokenType::LPAREN, "(");
-        call->fnCallData.ctParams = parseValueParams();
+        call->fnCallData.ctParams = parseValueParams(true);
         expect(LexerTokenType::RPAREN, ")");
     }
 

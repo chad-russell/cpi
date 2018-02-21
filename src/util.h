@@ -66,6 +66,7 @@ enum class NodeTypekind {
     STRUCT,
     SYMBOL,
     POINTER,
+    EXPOSED_TYPE,
 };
 
 template<typename T> 

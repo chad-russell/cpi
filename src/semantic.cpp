@@ -6,9 +6,11 @@
 #include <memory>
 
 int32_t typeSize(Node *type) {
-    assert(type->type == NodeType::TYPE);
+    auto resolved = resolve(type);
 
-    switch (type->typeData.kind) {
+    assert(resolved->type == NodeType::TYPE);
+
+    switch (resolved->typeData.kind) {
         case NodeTypekind::NONE:
             return 0;
         case NodeTypekind::BOOLEAN:
@@ -20,17 +22,17 @@ int32_t typeSize(Node *type) {
         case NodeTypekind::I64:
             return 8;
         case NodeTypekind::SYMBOL:
-            return typeSize(type->resolved);
+            assert(false);
         case NodeTypekind::STRUCT: {
             auto total = 0;
 
-            if (type->typeData.structTypeData.isLiteral) {
-                for (auto param : type->typeData.structTypeData.params) {
+            if (resolved->typeData.structTypeData.isLiteral) {
+                for (auto param : resolved->typeData.structTypeData.params) {
                     param->localOffset = total;
                     total += typeSize(param->valueParamData.value->typeInfo);
                 }
             } else {
-                for (auto param : type->typeData.structTypeData.params) {
+                for (auto param : resolved->typeData.structTypeData.params) {
                     param->localOffset = total;
                     total += typeSize(param->declParamData.type);
                 }
@@ -45,6 +47,9 @@ int32_t typeSize(Node *type) {
 bool typesMatch(Node *desired, Node *actual) {
     assert(desired->type == NodeType::TYPE);
     assert(actual->type == NodeType::TYPE);
+
+    desired = resolve(desired);
+    actual = resolve(actual);
 
     // coercion from integer literal to any integer is valid
     // todo(chad): check for overflow?
@@ -86,6 +91,10 @@ bool typesMatch(Node *desired, Node *actual) {
             }
         }
 
+        return true;
+    }
+
+    if (desired->typeData.kind == NodeTypekind::EXPOSED_TYPE) {
         return true;
     }
 
@@ -298,6 +307,7 @@ void resolveDecl(Semantic *semantic, Node *node) {
 
 void resolveType(Semantic *semantic, Node *node) {
     switch (node->typeData.kind) {
+        case NodeTypekind::EXPOSED_TYPE:
         case NodeTypekind::NONE:
         case NodeTypekind::INT_LITERAL:
         case NodeTypekind::I32:
@@ -327,9 +337,9 @@ void resolveType(Semantic *semantic, Node *node) {
                 return;
             }
 
-            assert(node->resolved->type == NodeType::TYPE);
+            assert(resolve(node)->type == NodeType::TYPE);
 
-            semantic->resolveTypes(node->resolved);
+            semantic->resolveTypes(resolve(node));
         } break;
         case NodeTypekind::POINTER: {
             semantic->resolveTypes(node->typeData.pointerTypeData.underlyingType);
@@ -486,6 +496,8 @@ void resolveFnCall(Semantic *semantic, Node *node) {
             auto givenParam = ctGivenParams[i];
             semantic->resolveTypes(givenParam);
             if (!typesMatch(declParam->typeInfo, givenParam->typeInfo)) {
+                // todo if match exposed to real type then set resolved on exposed to real and pass match
+                // unless already set then error?
                 semantic->reportError({node, declParam, givenParam}, Error{node->region, "type mismatch!"});
             }
         }

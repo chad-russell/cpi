@@ -1,5 +1,5 @@
-fn id(V: i32)(a: i32) { ret a + V; }
+fn id(T: Type)(a: T) { ret a; }
 
 fn main() {
-    ret id!(7)(3);
+    ret id!(i32)(3);
 }

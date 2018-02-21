@@ -156,6 +156,7 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "import", LexerTokenType::IMPORT)) { return; }
     if (tryEatKeyword(&next, "cast", LexerTokenType::CAST)) { return; }
     if (tryEatKeyword(&next, "assert", LexerTokenType::ASSERT)) { return; }
+    if (tryEatKeyword(&next, "Type", LexerTokenType::EXPOSED_TYPE)) { return; }
 
     // BACK_TICK
     if (srcInfo.source[loc.byteIndex] == '`') {
@@ -414,7 +415,8 @@ const vector<string> Lexer::lexerTokenTypeStrings = {
     "CAST",
     "ASSERT",
     "SEMICOLON",
-    "RUN"
+    "RUN",
+    "EXPOSED_TYPE"
 };
 
 ostream &operator<<(ostream &os, LexerTokenType tokenType) {
