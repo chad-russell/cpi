@@ -51,6 +51,10 @@ bool typesMatch(Node *desired, Node *actual) {
     desired = resolve(desired);
     actual = resolve(actual);
 
+    if (desired->typeData.kind == NodeTypekind::EXPOSED_TYPE) {
+        return true;
+    }
+
     // coercion from integer literal to any integer is valid
     // todo(chad): check for overflow?
     if (desired->typeData.kind == NodeTypekind::INT_LITERAL) {
@@ -91,10 +95,6 @@ bool typesMatch(Node *desired, Node *actual) {
             }
         }
 
-        return true;
-    }
-
-    if (desired->typeData.kind == NodeTypekind::EXPOSED_TYPE) {
         return true;
     }
 
@@ -272,7 +272,8 @@ void resolveSymbol(Semantic *semantic, Node *node) {
 
     assert(node->resolved->type == NodeType::DECL
            || node->resolved->type == NodeType::FN_DECL
-           || node->resolved->type == NodeType::DECL_PARAM);
+           || node->resolved->type == NodeType::DECL_PARAM
+           || node->resolved->type == NodeType::TYPE);
 
     semantic->resolveTypes(node->resolved);
     node->typeInfo = node->resolved->typeInfo;

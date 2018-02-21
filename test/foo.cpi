@@ -1,5 +1,11 @@
-fn id(T: Type)(a: T) { ret a; }
+fn id(T : Type)(a: T) { ret a; }
+
+type Foo struct { x: i32, y: i64 }
 
 fn main() {
-    ret id!(i32)(3);
+    f: Foo;
+    f.x = 13;
+    f.y = 14;
+
+    ret id!(Foo)(f);
 }
