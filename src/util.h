@@ -52,7 +52,8 @@ enum class NodeType {
     IMPORT,
     CAST,
     ASSERT,
-    RUN
+    RUN,
+    TYPEOF,
 };
 
 enum class NodeTypekind {
@@ -132,6 +133,7 @@ enum class LexerTokenType : int32_t {
     SEMICOLON,
     RUN,
     EXPOSED_TYPE,
+    TYPEOF,
 };
 
 struct SourceInfo {
@@ -188,6 +190,8 @@ struct DeclParamData {
     Node *name = nullptr;
     Node *type = nullptr;
     Node *initialValue = nullptr;
+
+    Node *polyLink = nullptr;
 };
 
 struct ValueParamData {
@@ -255,6 +259,8 @@ struct FnCallData {
     Node *fn = nullptr;
     vector<Node *> ctParams = {};
     vector<Node *> params = {};
+
+    bool hasRuntimeParams = true;
 };
 
 struct DotData {

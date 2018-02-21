@@ -143,6 +143,9 @@ ostream &operator<<(ostream &os, NodeType type) {
         } break;
         case NodeType::RUN: {
             return os << "run";
-        }
+        } break;
+        case NodeType::TYPEOF: {
+            return os << "typeof";
+        } break;
     }
 }

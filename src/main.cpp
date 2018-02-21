@@ -116,6 +116,7 @@ int main(int argc, char **argv) {
         auto semantic = new Semantic();
         semantic->lexer = lexer;
         semantic->resolveTypes(parser->mainFn);
+        if (semantic->encounteredErrors) { return -1; }
 
         auto gen = new BytecodeGen();
         gen->isMainFn = true;

@@ -47,7 +47,7 @@ struct Parser {
     void parseRoot();
     Node *parseTopLevel();
     vector<Node *> parseDeclParams();
-    vector<Node *> parseValueParams(bool ct = false);
+    vector<Node *> parseValueParams();
     Node *parseFnDecl(bool polymorphCopy = false);
     Node *parseTypeDecl();
     Node *parseSymbol();
@@ -58,10 +58,10 @@ struct Parser {
     Node *parseType();
     Node *parseStructLiteral();
     Node *parseRun();
+    Node *parseTypeof();
     Node *parseLvalueOrLiteral();
     Node *parseRvalueSimple();
     Node *parseRvalue();
-    Node *parseCTRvalue();
     Node *parseIntLiteral();
     Node *parseFloatLiteral();
     Node *parseLvalueHelper(Node *symbol, Location saved);

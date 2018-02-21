@@ -106,7 +106,10 @@ void BytecodeGen::gen(Node *node) {
             currentFnStackSize = node->fnDeclData.stackSize;
 
             for (auto stmt : node->fnDeclData.body) {
-                gen(stmt);
+                // todo(chad): @Hack? Basically why would we gen a fn or type decl if it's not being called...
+                if (stmt->type != NodeType::FN_DECL && stmt->type != NodeType::TYPE) {
+                    gen(stmt);
+                }
             }
 
             currentFnStackSize = savedCurrentFnStackSize;
@@ -273,6 +276,8 @@ void BytecodeGen::gen(Node *node) {
             }
         } break;
         case NodeType::FN_CALL: {
+            if (!node->fnCallData.hasRuntimeParams) { break; }
+
             auto paramCount = node->fnCallData.params.size();
             int32_t totalParamsSize = 0;
             for (auto i = 0; i < paramCount; i++) {

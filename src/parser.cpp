@@ -137,7 +137,7 @@ vector<Node *> Parser::parseDeclParams() {
     return params;
 }
 
-vector<Node *> Parser::parseValueParams(bool ct) {
+vector<Node *> Parser::parseValueParams() {
     vector<Node *> params;
 
     while (!lexer->isEmpty() && lexer->front.type != LexerTokenType::RPAREN && lexer->front.type != LexerTokenType::RCURLY) {
@@ -153,7 +153,7 @@ vector<Node *> Parser::parseValueParams(bool ct) {
             expect(LexerTokenType::COLON, ":");
         }
 
-        param.value = ct ? parseCTRvalue() : parseRvalue();
+        param.value = parseRvalue();
 
         // comma (if not RPAREN or RCURLY)
         if (lexer->front.type != LexerTokenType::RPAREN && lexer->front.type != LexerTokenType::RCURLY) {
@@ -608,6 +608,10 @@ Node *Parser::parseLvalue() {
 Node *Parser::parseType() {
     auto saved = lexer->front;
 
+    if (saved.type == LexerTokenType::TYPEOF) {
+        return parseTypeof();
+    }
+
     auto type = new Node(lexer->srcInfo, &allNodes, NodeType::TYPE, scopes.top());
     type->region = saved.region;
 
@@ -695,7 +699,22 @@ Node *Parser::parseRun() {
     return node;
 }
 
+Node *Parser::parseTypeof() {
+    auto type = new Node(lexer->srcInfo, &allNodes, NodeType::TYPEOF, scopes.top());
+    type->region.start = lexer->front.region.start;
+    popFront();
+    expect(LexerTokenType::LPAREN, "(");
+    type->nodeData = parseRvalue();
+    type->region.end = lexer->front.region.end;
+    expect(LexerTokenType::RPAREN, ")");
+    return type;
+}
+
 Node *Parser::parseLvalueOrLiteral() {
+    if (lexer->front.type == LexerTokenType::I32 || lexer->front.type == LexerTokenType::I64) {
+        return parseType();
+    }
+
     auto saved = lexer->front.region.start;
     Node *symbol;
 
@@ -714,6 +733,8 @@ Node *Parser::parseLvalueOrLiteral() {
         symbol = parseStructLiteral();
     } else if (lexer->front.type == LexerTokenType::RUN) {
         symbol = parseRun();
+    } else if (lexer->front.type == LexerTokenType::TYPEOF) {
+        symbol = parseTypeof();
     } else {
         symbol = parseSymbol();
     }
@@ -751,15 +772,6 @@ Node *Parser::parseRvalueSimple() {
     }
 
     return parseLvalueOrLiteral();
-}
-
-Node *Parser::parseCTRvalue() {
-    if (lexer->front.type == LexerTokenType::I32
-            || lexer->front.type == LexerTokenType::I64) {
-        return parseType();
-    }
-
-    return parseRvalue();
 }
 
 Node *Parser::parseRvalue() {
@@ -903,13 +915,18 @@ Node *Parser::parseFnCall() {
     if (lexer->front.type == LexerTokenType::NOT) {
         expect(LexerTokenType::NOT, "!");
         expect(LexerTokenType::LPAREN, "(");
-        call->fnCallData.ctParams = parseValueParams(true);
+        call->fnCallData.ctParams = parseValueParams();
         expect(LexerTokenType::RPAREN, ")");
     }
 
-    expect(LexerTokenType::LPAREN, "(");
-    call->fnCallData.params = parseValueParams();
-    expect(LexerTokenType::RPAREN, ")");
+    if (lexer->front.type == LexerTokenType::LPAREN) {
+        expect(LexerTokenType::LPAREN, "(");
+        call->fnCallData.params = parseValueParams();
+        expect(LexerTokenType::RPAREN, ")");
+        call->fnCallData.hasRuntimeParams = true;
+    } else {
+        call->fnCallData.hasRuntimeParams = false;
+    }
 
     call->region.end = last.region.end;
 

@@ -46,11 +46,11 @@ int32_t typeSize(Node *type) {
 }
 
 bool typesMatch(Node *desired, Node *actual) {
-    assert(desired->type == NodeType::TYPE);
-    assert(actual->type == NodeType::TYPE);
-
     desired = resolve(desired);
     actual = resolve(actual);
+
+    assert(desired->type == NodeType::TYPE);
+    assert(actual->type == NodeType::TYPE);
 
     if (desired->typeData.kind == NodeTypekind::EXPOSED_TYPE) {
         return true;
@@ -312,8 +312,8 @@ void resolveDecl(Semantic *semantic, Node *node) {
 
 void resolveType(Semantic *semantic, Node *node) {
     switch (node->typeData.kind) {
-        case NodeTypekind::EXPOSED_TYPE:
         case NodeTypekind::NONE:
+        case NodeTypekind::EXPOSED_TYPE:
         case NodeTypekind::INT_LITERAL:
         case NodeTypekind::I32:
         case NodeTypekind::I64:
@@ -342,9 +342,18 @@ void resolveType(Semantic *semantic, Node *node) {
                 return;
             }
 
-            assert(resolve(node)->type == NodeType::TYPE);
+            auto resolved = resolve(node);
+            switch (resolved->type) {
+                case NodeType::DECL_PARAM: {
+                    assert(resolved->declParamData.type->typeData.kind == NodeTypekind::EXPOSED_TYPE);
+                } break;
+                case NodeType::TYPEOF:
+                case NodeType::TYPE:
+                    break;
+                default: assert(false);
+            }
 
-            semantic->resolveTypes(resolve(node));
+            semantic->resolveTypes(resolved);
         } break;
         case NodeTypekind::POINTER: {
             semantic->resolveTypes(node->typeData.pointerTypeData.underlyingType);
@@ -500,18 +509,47 @@ void resolveFnCall(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->fnCallData.fn);
     auto resolvedFn = resolve(node->fnCallData.fn);
 
-    if (!node->fnCallData.ctParams.empty()) {
-        assert(resolvedFn->type == NodeType::FN_DECL);
+    auto isPoly = resolvedFn->type == NodeType::FN_DECL && !resolvedFn->fnDeclData.ctParams.empty();
 
-        // make a new function, always!!!!!
-        // todo(chad): memoize this based on the ctParams. So not really *always*
+    if (isPoly) {
+        // make a new function
+        // todo(chad): memoize this based on the ctParams
         auto newResolvedFn = semantic->deepCopy(resolvedFn, resolvedFn->scope);
         newResolvedFn->fnDeclData.cameFromPolymorph = true;
 
         node->fnCallData.fn->resolved = newResolvedFn;
         resolvedFn = newResolvedFn;
+    }
 
-        auto ctDeclParams = newResolvedFn->fnDeclData.ctParams;
+    // assign runtime params
+    if (node->fnCallData.hasRuntimeParams) {
+        vector<Node *> declParams;
+
+        if (isPoly) {
+            assert(resolvedFn->type == NodeType::FN_DECL);
+            declParams = resolvedFn->fnDeclData.params;
+        } else {
+            auto resolvedFnType = resolve(resolvedFn->typeInfo)->typeData;
+            assert(resolvedFnType.kind == NodeTypekind::FN);
+
+            declParams = resolvedFnType.fnTypeData.params;
+        }
+
+        auto givenParams = node->fnCallData.params;
+        auto encounteredError = assignParams(semantic, node, declParams, givenParams);
+        assert(!encounteredError);
+
+        if (isPoly) {
+            // 'link' each decl param to its runtime param
+            for (auto p = 0; p < declParams.size(); p++) {
+                declParams[p]->declParamData.polyLink = givenParams[p];
+            }
+        }
+    }
+
+    // assign compile-time params
+    if (isPoly) {
+        auto ctDeclParams = resolvedFn->fnDeclData.ctParams;
         auto ctGivenParams = node->fnCallData.ctParams;
         auto encounteredError = assignParams(semantic, node, ctDeclParams, ctGivenParams);
         assert(!encounteredError);
@@ -519,14 +557,51 @@ void resolveFnCall(Semantic *semantic, Node *node) {
         // Make sure the ctDeclParams resolve to their compile-time values
         for (auto i = 0; i < ctGivenParams.size(); i++) {
             auto ctParam = ctGivenParams[i];
-            assert(ctParam->type == NodeType::VALUE_PARAM);
 
-            auto ctValue = ctParam->valueParamData.value;
-            semantic->resolveTypes(ctValue);
-            ctDeclParams[i]->resolved = ctValue;
+            if (ctParam->type == NodeType::VALUE_PARAM) {
+                auto ctValue = ctParam->valueParamData.value;
+                semantic->resolveTypes(ctValue);
+                ctDeclParams[i]->resolved = ctValue;
+            } else {
+                ctDeclParams[i]->resolved = ctParam;
+            }
+            semantic->resolveTypes(ctParam);
+        }
+    }
+
+    // un-assign runtime params
+    if (node->fnCallData.hasRuntimeParams) {
+        vector<Node *> declParams;
+
+        if (isPoly) {
+            assert(resolvedFn->type == NodeType::FN_DECL);
+            declParams = resolvedFn->fnDeclData.params;
+        } else {
+            auto resolvedFnType = resolve(resolvedFn->typeInfo)->typeData;
+            assert(resolvedFnType.kind == NodeTypekind::FN);
+
+            declParams = resolvedFnType.fnTypeData.params;
         }
 
-        semantic->resolveTypes(newResolvedFn);
+        if (isPoly) {
+            // 'link' each decl param to its runtime param
+            for (auto p = 0; p < declParams.size(); p++) {
+                declParams[p]->declParamData.polyLink = nullptr;
+            }
+        }
+
+        // @Hack!!!
+        for (auto d : declParams) {
+            d->semantic = false;
+            semantic->resolveTypes(d);
+        }
+    }
+
+    semantic->resolveTypes(resolvedFn);
+
+    if (isPoly) {
+        auto ctDeclParams = resolvedFn->fnDeclData.ctParams;
+        auto ctGivenParams = node->fnCallData.ctParams;
 
         for (unsigned long i = 0; i < ctGivenParams.size(); i++) {
             auto declParam = ctDeclParams[i];
@@ -540,23 +615,26 @@ void resolveFnCall(Semantic *semantic, Node *node) {
         }
     }
 
-    auto resolvedFnType = resolve(resolvedFn->typeInfo)->typeData;
-    assert(resolvedFnType.kind == NodeTypekind::FN);
-    node->typeInfo = resolvedFnType.fnTypeData.returnType;
+    if (node->fnCallData.hasRuntimeParams) {
+        auto resolvedFnType = resolve(resolvedFn->typeInfo)->typeData;
+        assert(resolvedFnType.kind == NodeTypekind::FN);
 
-    auto declParams = resolvedFnType.fnTypeData.params;
-    auto givenParams = node->fnCallData.params;
+        auto declParams = resolvedFnType.fnTypeData.params;
+        auto givenParams = node->fnCallData.params;
 
-    auto encounteredError = assignParams(semantic, node, declParams, givenParams);
-    assert(!encounteredError);
-
-    for (unsigned long i = 0; i < givenParams.size(); i++) {
-        auto declParam = declParams[i];
-        auto givenParam = givenParams[i];
-        semantic->resolveTypes(givenParam);
-        if (!typesMatch(declParam->typeInfo, givenParam->typeInfo)) {
-            semantic->reportError({node, declParam, givenParam}, Error{node->region, "type mismatch!"});
+        for (unsigned long i = 0; i < givenParams.size(); i++) {
+            auto declParam = declParams[i];
+            auto givenParam = givenParams[i];
+            semantic->resolveTypes(givenParam);
+            if (!typesMatch(declParam->typeInfo, givenParam->typeInfo)) {
+                semantic->reportError({node, declParam, givenParam}, Error{node->region, "type mismatch!"});
+            }
         }
+
+        node->typeInfo = resolvedFnType.fnTypeData.returnType;
+    } else {
+        node->resolved = resolvedFn;
+        node->typeInfo = resolvedFn->typeInfo;
     }
 }
 
@@ -572,11 +650,18 @@ void resolveAssign(Semantic *semantic, Node *node) {
 void resolveDeclParam(Semantic *semantic, Node *node) {
     assert(!(node->declParamData.type == nullptr && node->declParamData.initialValue == nullptr));
     semantic->resolveTypes(node->declParamData.initialValue);
+
     if (node->declParamData.type == nullptr) {
         node->declParamData.type = node->declParamData.initialValue->typeInfo;
     }
+
     semantic->resolveTypes(node->declParamData.type);
-    node->typeInfo = node->declParamData.type;
+    if (node->declParamData.polyLink != nullptr) {
+        semantic->resolveTypes(node->declParamData.polyLink);
+        node->typeInfo = node->declParamData.polyLink->typeInfo;
+    } else {
+        node->typeInfo = node->declParamData.type;
+    }
 }
 
 void resolveParam(Semantic *semantic, Node *node) {
@@ -762,6 +847,12 @@ void resolveRun(Semantic *semantic, Node *node) {
     }
 }
 
+void resolveTypeof(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->nodeData);
+    node->resolved = node->nodeData->typeInfo;
+    node->typeInfo = node->nodeData->typeInfo;
+}
+
 void Semantic::resolveTypes(Node *node) {
     if (node == nullptr) { return; }
 
@@ -825,6 +916,9 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::RUN: {
             resolveRun(this, node);
+        } break;
+        case NodeType::TYPEOF: {
+            resolveTypeof(this, node);
         } break;
         default: assert(false);
     }
