@@ -114,6 +114,7 @@ int main(int argc, char **argv) {
         parser->parseRoot();
 
         auto semantic = new Semantic();
+        semantic->lexer = lexer;
         semantic->resolveTypes(parser->mainFn);
 
         auto gen = new BytecodeGen();

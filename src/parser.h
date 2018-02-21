@@ -30,6 +30,7 @@ struct Parser {
     vector<Node *> allNodes = {};
     stack<Scope *> scopes = {};
     Node *currentFnDecl = nullptr;
+    bool nodePolymorph = false;
 
     Parser(Lexer *lexer_);
 
@@ -47,7 +48,7 @@ struct Parser {
     Node *parseTopLevel();
     vector<Node *> parseDeclParams();
     vector<Node *> parseValueParams(bool ct = false);
-    Node *parseFnDecl();
+    Node *parseFnDecl(bool polymorphCopy = false);
     Node *parseTypeDecl();
     Node *parseSymbol();
     Node *parseScopedStmt();

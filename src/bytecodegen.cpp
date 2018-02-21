@@ -28,7 +28,7 @@ Node *resolveNode(Node *node) {
 void BytecodeGen::binopHelper(string instructionStr, Node *node) {
     string bytecodeStr;
 
-    auto kind = node->binopData.lhs->typeInfo->typeData.kind;
+    auto kind = resolve(node->binopData.lhs->typeInfo)->typeData.kind;
     switch (kind) {
         case NodeTypekind::I32: {
             instructionStr.append("I32");

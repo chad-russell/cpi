@@ -1,6 +1,7 @@
 #include <vector>
 
 #include "node.h"
+#include "parser.h"
 
 class Semantic {
 public:
@@ -8,7 +9,9 @@ public:
     FnDeclData *currentFnDecl = nullptr;
     Node *targetType = nullptr;
 
-    void reportError(vector<Node *> affectedNodes, Error error);
+    Lexer *lexer;
 
+    Node *deepCopy(Node *node, Scope *scope);
+    void reportError(vector<Node *> affectedNodes, Error error);
     void resolveTypes(Node *node);
 };

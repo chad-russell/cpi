@@ -20,6 +20,9 @@ bool endsWith(string s, string suf);
 
 int bytesInCodepoint(char firstByte);
 
+class Node;
+class Scope;
+
 enum class NodeType {
     FN_DECL,
     SYMBOL,
@@ -67,6 +70,311 @@ enum class NodeTypekind {
     SYMBOL,
     POINTER,
     EXPOSED_TYPE,
+};
+
+enum class LexerTokenType : int32_t {
+    EOF_,
+    COMMENT,
+    LCURLY,
+    RCURLY,
+    LPAREN,
+    RPAREN,
+    LSQUARE,
+    RSQUARE,
+    SUB,
+    ADD,
+    MUL,
+    DIV,
+    DEREF,
+    EQ_EQ,
+    NE,
+    LE,
+    GE,
+    LT,
+    GT,
+    AMP,
+    DOT,
+    COLON_EQ,
+    COLON,
+    EQ,
+    COMMA,
+    SINGLE_QUOTE,
+    DOUBLE_QUOTE,
+    BACK_TICK,
+    VERTICAL_BAR,
+    AT,
+    FN,
+    TYPE,
+    STRUCT,
+    SYMBOL,
+    INT_LITERAL,
+    FLOAT_LITERAL,
+    RET,
+    STRING,
+    BOOLEAN,
+    I32,
+    I64,
+    F32,
+    F64,
+    IF,
+    WHILE,
+    ELSE,
+    TRUE_,
+    FALSE_,
+    AND,
+    OR,
+    NOT,
+    NIL,
+    MODULE,
+    IMPORT,
+    CAST,
+    ASSERT,
+    SEMICOLON,
+    RUN,
+    EXPOSED_TYPE,
+};
+
+struct SourceInfo {
+    string fileName = "";
+    string source = "";
+    vector<unsigned long> lines = {};
+};
+
+struct Location {
+    unsigned long byteIndex;
+    unsigned long line = 1;
+    unsigned long col = 1;
+};
+
+struct Region {
+    SourceInfo srcInfo = {};
+    Location start = {};
+    Location end = {};
+};
+
+struct FnTypeData {
+    vector<Node *> params = {};
+    Node *returnType = nullptr;
+};
+
+struct StructTypeData {
+    bool isLiteral = false;
+    Node *name = nullptr;
+    vector<Node *> params = {};
+};
+
+struct PointerTypeData {
+    bool isNilLiteral = false;
+    Node *underlyingType = nullptr;
+};
+
+struct SymbolTypeData {
+    int64_t atomId;
+};
+
+struct TypeData {
+    // todo(chad): size?
+
+    NodeTypekind kind;
+//     union {
+    FnTypeData fnTypeData;
+    StructTypeData structTypeData;
+    PointerTypeData pointerTypeData;
+    SymbolTypeData symbolTypeData;
+//     };
+};
+
+struct DeclParamData {
+    Node *name = nullptr;
+    Node *type = nullptr;
+    Node *initialValue = nullptr;
+};
+
+struct ValueParamData {
+    Node *name = nullptr;
+    Node *value = nullptr;
+};
+
+struct ParamData {
+    Node *name = nullptr;
+    Node *value = nullptr;
+};
+
+struct ModuleData {
+    Node *name = nullptr;
+    vector<Node *> decls = {};
+};
+
+struct ImportData {
+    Node *target = nullptr;
+};
+
+struct FnDeclData {
+    Node *name = nullptr;
+    vector<Node *> ctParams = {};
+    vector<Node *> params = {};
+    Node * returnType = nullptr;
+    vector<Node *> body = {};
+    vector<Node *> locals = {};
+    vector<Node *> returns = {};
+
+    Scope *paramScope = nullptr;
+    Scope *bodyScope = nullptr;
+
+    int32_t stackSize = 0;
+    unsigned long instOffset;
+    bool isLiteral;
+    unsigned long tableIndex;
+    bool cameFromPolymorph;
+};
+
+struct DeclData {
+    Node *lvalue = nullptr;
+    Node *type = nullptr;
+    Node *initialValue = nullptr;
+};
+
+struct AssignData {
+    Node *lhs = nullptr;
+    Node *rhs = nullptr;
+};
+
+struct IntLiteralData {
+    int64_t value;
+};
+
+struct FloatLiteralData {
+    double value;
+};
+
+struct BoolLiteralData {
+    bool value;
+};
+
+struct FnCallData {
+    Node *fn = nullptr;
+    vector<Node *> ctParams = {};
+    vector<Node *> params = {};
+};
+
+struct DotData {
+    Node *lhs = nullptr;
+    Node *rhs = nullptr;
+    Node *resolved = nullptr;
+
+    Node *autoDerefStorage = nullptr;
+    bool pointerIsRelative = false;
+};
+
+struct BinopData {
+    LexerTokenType type;
+
+    Node *lhs = nullptr;
+    Node *rhs = nullptr;
+
+    Node *lhsTemporary;
+    Node *rhsTemporary;
+};
+
+struct PipeData {
+    Node *lhs = nullptr;
+    Node *rhs = nullptr;
+};
+
+struct StructLiteralData {
+    vector<Node *> params = {};
+};
+
+struct IfData {
+    Node *condition = nullptr;
+    vector<Node *> stmts = {};
+    vector<Node *> elseStmts = {};
+};
+
+struct WhileData {
+    Node *condition = nullptr;
+    vector<Node *> stmts = {};
+};
+
+struct CastData {
+    Node *type = nullptr;
+    Node *value = nullptr;
+};
+
+struct RetData {
+    Node *value = nullptr;
+};
+
+struct SymbolData {
+    int64_t atomId;
+};
+
+struct DerefData {
+    Node *target = nullptr;
+    bool isRvalue;
+};
+
+class Scope {
+public:
+    unordered_map<int64_t, Node *> symbols = {};
+    Scope *parent = {};
+
+    Scope(Scope *parent);
+
+    Node *find(int64_t atomId);
+};
+
+class Node {
+public:
+    unsigned long id;
+
+    Region region = {};
+    Scope *scope = nullptr;
+    Node *typeInfo = nullptr;
+    Node *resolved = nullptr;
+    NodeType type;
+
+    // union {
+    Node *nodeData;
+    ModuleData moduleData;
+    FnDeclData fnDeclData;
+    DeclData declData;
+    AssignData assignData;
+    IntLiteralData intLiteralData;
+    FloatLiteralData floatLiteralData;
+    BoolLiteralData boolLiteralData;
+    FnCallData fnCallData;
+    DotData dotData;
+    BinopData binopData;
+    PipeData pipeData;
+    DeclParamData declParamData;
+    ValueParamData valueParamData;
+    TypeData typeData;
+    StructLiteralData structLiteralData;
+    IfData ifData;
+    WhileData whileData;
+    ImportData importData;
+    CastData castData;
+    RetData retData;
+    SymbolData symbolData;
+    DerefData derefData;
+    // };
+
+    bool isUsedInError = false;
+    bool semantic = false;
+    bool gen = false;
+    bool sourceMapStatement = false;
+
+    // todo(chad): better way to store this?
+    vector<unsigned char> bytecode;
+    bool isLocal = false;
+
+    // the offset of the storage for this node from the current pointer
+    int32_t localOffset = 0;
+
+    Node();
+    Node(NodeTypekind typekind);
+    Node(SourceInfo srcInfo, vector<Node *> *allNodes, NodeType type_, Scope *scope_);
 };
 
 template<typename T> 
@@ -120,24 +428,6 @@ string suffixForType() {
 
     assert(false);
 }
-
-struct SourceInfo {
-    string fileName = "";
-    string source = "";
-    vector<unsigned long> lines = {};
-};
-
-struct Location {
-    unsigned long byteIndex;
-    unsigned long line = 1;
-    unsigned long col = 1;
-};
-
-struct Region {
-    SourceInfo srcInfo = {};
-    Location start = {};
-    Location end = {};
-};
 
 struct SourceRegion {
     Region region = {};

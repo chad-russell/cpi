@@ -1,11 +1,16 @@
-fn id(T : Type)(a: T) { ret a; }
+fn id(T : Type)(a: T) { ret a.x; }
 
-type Foo struct { x: i32, y: i64 }
+type Foo struct { x: i64, y: i64 }
+type Bar struct { z: i64, x: i64 }
 
 fn main() {
     f: Foo;
-    f.x = 13;
+    f.x = 99;
     f.y = 14;
 
-    ret id!(Foo)(f);
+    b: Bar;
+    b.z = 88;
+    b.x = 88;
+
+    ret id!(Foo)(f) + id!(Bar)(b);
 }

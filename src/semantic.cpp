@@ -1,6 +1,7 @@
 #include "semantic.h"
 #include "bytecodegen.h"
 #include "interpreter.h"
+#include "parser.h"
 
 #include <sstream>
 #include <memory>
@@ -133,16 +134,19 @@ void Semantic::reportError(vector<Node *> nodes, Error error) {
 
 void resolveFnDecl(Semantic *semantic, Node *node) {
     auto data = &node->fnDeclData;
+
+    if (!data->ctParams.empty() && !data->cameFromPolymorph) {
+        return;
+    }
+
     auto savedFnDecl = semantic->currentFnDecl;
     semantic->currentFnDecl = data;
 
+    data->tableIndex = fnTableId;
+    fnTableId += 1;
+
     for (auto param : data->ctParams) {
         semantic->resolveTypes(param);
-    }
-
-    if (!data->ctParams.empty()) {
-        // if it's polymorphic, just check the ct params for now
-        return;
     }
 
     for (auto param : data->params) {
@@ -480,6 +484,18 @@ bool assignParams(Semantic *semantic,
     return encounteredError;
 }
 
+Node *Semantic::deepCopy(Node *node, Scope *scope) {
+    // for now make sure we only copy fn decls
+    assert(node->type == NodeType::FN_DECL);
+
+    auto copyingLexer = new Lexer(lexer, node);
+
+    auto copyingParser = new Parser(copyingLexer);
+    copyingParser->scopes.pop();
+    copyingParser->scopes.push(scope);
+    return copyingParser->parseFnDecl(true);
+}
+
 void resolveFnCall(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->fnCallData.fn);
     auto resolvedFn = resolve(node->fnCallData.fn);
@@ -487,10 +503,30 @@ void resolveFnCall(Semantic *semantic, Node *node) {
     if (!node->fnCallData.ctParams.empty()) {
         assert(resolvedFn->type == NodeType::FN_DECL);
 
-        auto ctDeclParams = resolvedFn->fnDeclData.ctParams;
+        // make a new function, always!!!!!
+        // todo(chad): memoize this based on the ctParams. So not really *always*
+        auto newResolvedFn = semantic->deepCopy(resolvedFn, resolvedFn->scope);
+        newResolvedFn->fnDeclData.cameFromPolymorph = true;
+
+        node->fnCallData.fn->resolved = newResolvedFn;
+        resolvedFn = newResolvedFn;
+
+        auto ctDeclParams = newResolvedFn->fnDeclData.ctParams;
         auto ctGivenParams = node->fnCallData.ctParams;
         auto encounteredError = assignParams(semantic, node, ctDeclParams, ctGivenParams);
         assert(!encounteredError);
+
+        // Make sure the ctDeclParams resolve to their compile-time values
+        for (auto i = 0; i < ctGivenParams.size(); i++) {
+            auto ctParam = ctGivenParams[i];
+            assert(ctParam->type == NodeType::VALUE_PARAM);
+
+            auto ctValue = ctParam->valueParamData.value;
+            semantic->resolveTypes(ctValue);
+            ctDeclParams[i]->resolved = ctValue;
+        }
+
+        semantic->resolveTypes(newResolvedFn);
 
         for (unsigned long i = 0; i < ctGivenParams.size(); i++) {
             auto declParam = ctDeclParams[i];
@@ -502,35 +538,6 @@ void resolveFnCall(Semantic *semantic, Node *node) {
                 semantic->reportError({node, declParam, givenParam}, Error{node->region, "type mismatch!"});
             }
         }
-
-        // make a new function!
-        // todo(chad): memoize this based on the ctParams
-        auto newResolvedFn = new Node();
-        newResolvedFn->id = nodeId;
-        nodeId += 1;
-        newResolvedFn->region = resolvedFn->region;
-        newResolvedFn->scope = resolvedFn->scope;
-        newResolvedFn->type = resolvedFn->type;
-
-        // Make sure the ctDeclParams resolve to their compile-time values
-        for (auto i = 0; i < ctGivenParams.size(); i++) {
-            auto ctParam = ctGivenParams[i];
-            assert(ctParam->type == NodeType::VALUE_PARAM);
-            ctDeclParams[i]->resolved = ctParam->valueParamData.value;
-        }
-
-        // set fnDeclData to the old version, but remove ctParams.
-        // Now that they've been put into scope and typechecked,
-        // we should not need them anymore.
-        newResolvedFn->fnDeclData = resolvedFn->fnDeclData;
-        newResolvedFn->fnDeclData.ctParams = {};
-
-//        newResolvedFn->typeInfo = new Node(NodeTypekind::FN);
-//        newResolvedFn->typeInfo
-
-        resolvedFn->resolved = newResolvedFn;
-        resolvedFn = newResolvedFn;
-        semantic->resolveTypes(newResolvedFn);
     }
 
     auto resolvedFnType = resolve(resolvedFn->typeInfo)->typeData;

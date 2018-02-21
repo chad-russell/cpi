@@ -5,68 +5,6 @@
 
 #include "util.h"
 
-enum class LexerTokenType : int32_t {
-    EOF_,
-    COMMENT,
-    LCURLY,
-    RCURLY,
-    LPAREN,
-    RPAREN,
-    LSQUARE,
-    RSQUARE,
-    SUB,
-    ADD,
-    MUL,
-    DIV,
-    DEREF,
-    EQ_EQ,
-    NE,
-    LE,
-    GE,
-    LT,
-    GT,
-    AMP,
-    DOT,
-    COLON_EQ,
-    COLON,
-    EQ,
-    COMMA,
-    SINGLE_QUOTE,
-    DOUBLE_QUOTE,
-    BACK_TICK,
-    VERTICAL_BAR,
-    AT,
-    FN,
-    TYPE,
-    STRUCT,
-    SYMBOL,
-    INT_LITERAL,
-    FLOAT_LITERAL,
-    RET,
-    STRING,
-    BOOLEAN,
-    I32,
-    I64,
-    F32,
-    F64,
-    IF,
-    WHILE,
-    ELSE,
-    TRUE_,
-    FALSE_,
-    AND,
-    OR,
-    NOT,
-    NIL,
-    MODULE,
-    IMPORT,
-    CAST,
-    ASSERT,
-    SEMICOLON,
-    RUN,
-    EXPOSED_TYPE,
-};
-
 struct LexerToken {
     LexerTokenType type = {};
     Region region = {};
@@ -84,6 +22,7 @@ public:
 
     const static vector<string> lexerTokenTypeStrings;
 
+    Lexer(Lexer *lexer, Node *node);
     Lexer(string fileName);
 
     void popFront();

@@ -171,12 +171,9 @@ vector<Node *> Parser::parseValueParams(bool ct) {
     return params;
 }
 
-Node *Parser::parseFnDecl() {
+Node *Parser::parseFnDecl(bool polymorphCopy) {
     auto decl = new Node(lexer->srcInfo, &allNodes, NodeType::FN_DECL, scopes.top());
     decl->region.start = lexer->front.region.start;
-
-    decl->fnDeclData.tableIndex = fnTableId;
-    fnTableId += 1;
 
     auto savedCurrentFnDecl = currentFnDecl;
     currentFnDecl = decl;
@@ -196,10 +193,13 @@ Node *Parser::parseFnDecl() {
             mainFn = decl;
         }
 
-        scopeInsert(decl->fnDeclData.name->symbolData.atomId, decl);
+        if (!polymorphCopy) {
+            scopeInsert(decl->fnDeclData.name->symbolData.atomId, decl);
+        }
     }
 
     scopes.push(new Scope(scopes.top()));
+    decl->fnDeclData.paramScope = scopes.top();
 
     // params
     expect(LexerTokenType::LPAREN, "(");
@@ -235,6 +235,7 @@ Node *Parser::parseFnDecl() {
     expect(LexerTokenType::LCURLY, "{");
 
     scopes.push(new Scope(scopes.top()));
+    decl->fnDeclData.bodyScope = scopes.top();
 
     while (!lexer->isEmpty() && lexer->front.type != LexerTokenType::RCURLY) {
         auto scopedStmt = parseScopedStmt();

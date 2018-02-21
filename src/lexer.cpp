@@ -30,6 +30,14 @@ bool isSpecial(char c) {
            || c == ';';
 }
 
+Lexer::Lexer(Lexer *lexer, Node *node) {
+    this->srcInfo = lexer->srcInfo;
+    this->lastLoc = node->region.start;
+    this->loc = node->region.start;
+    this->popFront();
+    this->popFront();
+}
+
 Lexer::Lexer(string fileName) {
     ifstream t(fileName);
     string fileBytes;
