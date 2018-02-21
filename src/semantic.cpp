@@ -149,20 +149,20 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
         semantic->resolveTypes(param);
     }
 
-    if (data->returnType != nullptr) {
-        if (data->returns.empty()) {
-            semantic->reportError({node},
-                                  Error{node->region, "fn has a return type, but there are no return statements!"});
-        }
+    if (data->returnType != nullptr && data->returns.empty()) {
+        semantic->reportError({node}, Error{node->region, "fn has a return type, but there are no return statements!"});
     }
     else if (data->returns.empty()) {
         data->returnType = new Node(NodeTypekind::NONE);
     }
-    else {
+    else if (data->returnType == nullptr) {
         auto firstReturn = data->returns[0];
         semantic->resolveTypes(firstReturn);
         data->returnType = firstReturn->typeInfo;
     }
+
+    assert(data->returnType != nullptr);
+    semantic->resolveTypes(data->returnType);
 
     node->typeInfo = new Node(NodeTypekind::FN);
     node->typeInfo->typeData.fnTypeData.params = {};
@@ -339,15 +339,17 @@ void resolveType(Semantic *semantic, Node *node) {
             }
 
             auto resolved = resolve(node);
-            switch (resolved->type) {
-                case NodeType::DECL_PARAM: {
-//                    assert(resolved->declParamData.type->typeData.kind == NodeTypekind::EXPOSED_TYPE);
-                } break;
-                case NodeType::TYPEOF:
-                case NodeType::TYPE:
-                    break;
-                default: assert(false);
-            }
+
+            // todo(chad): this is kind of broken...
+//            switch (resolved->type) {
+//                case NodeType::DECL_PARAM: {
+////                    assert(resolved->declParamData.type->typeData.kind == NodeTypekind::EXPOSED_TYPE);
+//                } break;
+//                case NodeType::TYPEOF:
+//                case NodeType::TYPE:
+//                    break;
+//                default: assert(false);
+//            }
 
             semantic->resolveTypes(resolved);
         } break;
@@ -673,7 +675,7 @@ void resolveParam(Semantic *semantic, Node *node) {
 
 void resolveDeref(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->derefData.target);
-    auto pointerType = node->derefData.target->typeInfo;
+    auto pointerType = resolve(node->derefData.target->typeInfo);
     assert(pointerType->typeData.kind == NodeTypekind::POINTER);
     node->typeInfo = pointerType->typeData.pointerTypeData.underlyingType;
 }

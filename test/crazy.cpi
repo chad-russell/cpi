@@ -84,7 +84,23 @@ fn main() {
 
     assert(stupid_sqrt(9) == 3);
 
+    assert(id(3) == 3);
+
+    p: pair;
+    p.x = 8;
+    assert(id(p).x == 8);
+
+    assert(deref_ct(&3) == 3);
+
     ret 0;
+}
+
+fn id(T := typeof(t))(t: T) T {
+    ret t;
+}
+
+fn deref_ct(T := typeof(t))(t: T) {
+    ret ^t;
 }
 
 fn stupid_sqrt(n: i64) {
