@@ -12,23 +12,12 @@ void append(vector<unsigned char> &instructions, Instruction instruction) {
     append(instructions, static_cast<unsigned char>(instruction));
 }
 
-Node *resolveNode(Node *node) {
-    if (node == nullptr) { return nullptr; }
-
-    auto resolved = node->resolved;
-    if (resolved == nullptr) { return node; }
-
-    while (resolved->resolved != nullptr) {
-        resolved = resolved->resolved;
-    }
-
-    return resolved;
-}
-
 void BytecodeGen::binopHelper(string instructionStr, Node *node) {
     string bytecodeStr;
 
-    auto kind = resolve(node->binopData.lhs->typeInfo)->typeData.kind;
+    auto resolved = resolve(node->binopData.lhs->typeInfo);
+    auto kind = resolved->typeData.kind;
+
     switch (kind) {
         case NodeTypekind::I32: {
             instructionStr.append("I32");
@@ -152,7 +141,7 @@ void BytecodeGen::gen(Node *node) {
 
             gen(data.initialValue);
 
-            auto resolvedInitialValue = resolveNode(data.initialValue);
+            auto resolvedInitialValue = resolve(data.initialValue);
             gen(resolvedInitialValue);
 
             auto localOffset = node->localOffset;
@@ -215,7 +204,7 @@ void BytecodeGen::gen(Node *node) {
             }
         } break;
         case NodeType::SYMBOL: {
-            auto resolved = resolveNode(node);
+            auto resolved = resolve(node);
             auto resolvedType = resolve(resolved->typeInfo);
             gen(resolved);
 

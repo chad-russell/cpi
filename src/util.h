@@ -71,6 +71,7 @@ enum class NodeTypekind {
     SYMBOL,
     POINTER,
     EXPOSED_TYPE,
+    EXPOSED_ANY,
 };
 
 enum class LexerTokenType : int32_t {
@@ -133,6 +134,7 @@ enum class LexerTokenType : int32_t {
     SEMICOLON,
     RUN,
     EXPOSED_TYPE,
+    EXPOSED_ANY,
     TYPEOF,
 };
 
@@ -174,20 +176,14 @@ struct SymbolTypeData {
     int64_t atomId;
 };
 
-struct ExposedTypeData {
-    Node *value;
-};
-
 struct TypeData {
-    // todo(chad): size?
-
     NodeTypekind kind;
+
 //     union {
     FnTypeData fnTypeData;
     StructTypeData structTypeData;
     PointerTypeData pointerTypeData;
     SymbolTypeData symbolTypeData;
-    ExposedTypeData exposedTypeData;
 //     };
 };
 
@@ -370,6 +366,8 @@ public:
     SymbolData symbolData;
     DerefData derefData;
     // };
+
+    Node *staticValue = nullptr;
 
     bool isUsedInError = false;
     bool semantic = false;

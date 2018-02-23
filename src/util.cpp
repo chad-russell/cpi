@@ -169,6 +169,9 @@ ostream &operator<<(ostream &os, NodeTypekind kind) {
         case NodeTypekind::EXPOSED_TYPE: {
             return os << "type";
         }
+        case NodeTypekind::EXPOSED_ANY: {
+            return os << "any";
+        }
         default: assert(false);
     }
 }

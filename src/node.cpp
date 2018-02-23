@@ -1,9 +1,6 @@
 #include "node.h"
 
-Node::Node(SourceInfo srcInfo, vector<Node *> *allNodes, NodeType type_, Scope *scope_) {
-    id = nodeId;
-    nodeId += 1;
-
+Node::Node(SourceInfo srcInfo, vector<Node *> *allNodes, NodeType type_, Scope *scope_) : Node() {
     type = type_;
 
     scope = scope_;
@@ -17,7 +14,10 @@ Node::Node(SourceInfo srcInfo, vector<Node *> *allNodes, NodeType type_, Scope *
     }
 }
 
-Node::Node(NodeTypekind typekind) {
+Node::Node(NodeTypekind typekind) : Node() {
+    id = nodeId;
+    nodeId += 1;
+
     type = NodeType::TYPE;
     typeData.kind = typekind;
 }
@@ -26,11 +26,16 @@ Node::Node() { }
 
 Node *resolve(Node *n) {
     if (n == nullptr) { return nullptr; }
+
     if (n->resolved == nullptr) { return n; }
 
     auto resolved = n->resolved;
-    while (resolved->resolved != nullptr) {
-        resolved = resolved->resolved;
+    while (resolved->resolved != nullptr || resolved->staticValue != nullptr) {
+        if (resolved->staticValue != nullptr) {
+            resolved = resolved->staticValue;
+        } else {
+            resolved = resolved->resolved;
+        }
     }
     return resolved;
 }

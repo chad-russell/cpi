@@ -8,7 +8,6 @@
 
 int32_t typeSize(Node *type) {
     auto resolved = resolve(type);
-
     assert(resolved->type == NodeType::TYPE);
 
     switch (resolved->typeData.kind) {
@@ -51,6 +50,22 @@ bool typesMatch(Node *desired, Node *actual) {
 
     assert(desired->type == NodeType::TYPE);
     assert(actual->type == NodeType::TYPE);
+
+    // exposed types match exposed types, always
+    if (desired->typeData.kind == NodeTypekind::EXPOSED_TYPE && actual->typeData.kind == NodeTypekind::EXPOSED_TYPE) {
+        return true;
+    }
+
+    // but exposed types also match concrete types if the exposed type has a static value
+    // and it matches the given type.
+    if (actual->typeData.kind == NodeTypekind::EXPOSED_TYPE) {
+        if (actual->staticValue == nullptr) { return false; }
+        actual = actual->staticValue;
+    }
+    if (desired->typeData.kind == NodeTypekind::EXPOSED_TYPE) {
+        if (desired->staticValue == nullptr) { return false; }
+        desired = desired->staticValue;
+    }
 
     // coercion from integer literal to any integer is valid
     // todo(chad): check for overflow?
@@ -290,9 +305,10 @@ void resolveDecl(Semantic *semantic, Node *node) {
     }
 
     // if there is an initial value and a declared type, they should match
-    if (node->declData.initialValue != nullptr && node->declData.initialValue->typeInfo != nullptr
-            && node->declData.type != nullptr
-            && !typesMatch(node->declData.initialValue->typeInfo, node->declData.type)) {
+    auto shouldCheckTypeMatch = node->declData.initialValue != nullptr
+                                && node->declData.initialValue->typeInfo != nullptr
+                                && node->declData.type != nullptr;
+    if (shouldCheckTypeMatch && !typesMatch(node->declData.type, node->declData.initialValue->typeInfo)) {
         ostringstream s("");
         s << "Type mismatch! wanted " << node->declData.type->typeData.kind
           << ", got " << node->declData.initialValue->typeInfo->typeData.kind;
@@ -310,6 +326,7 @@ void resolveType(Semantic *semantic, Node *node) {
     switch (node->typeData.kind) {
         case NodeTypekind::NONE:
         case NodeTypekind::EXPOSED_TYPE:
+        case NodeTypekind::EXPOSED_ANY:
         case NodeTypekind::INT_LITERAL:
         case NodeTypekind::I32:
         case NodeTypekind::I64:
@@ -339,17 +356,6 @@ void resolveType(Semantic *semantic, Node *node) {
             }
 
             auto resolved = resolve(node);
-
-            // todo(chad): this is kind of broken...
-//            switch (resolved->type) {
-//                case NodeType::DECL_PARAM: {
-////                    assert(resolved->declParamData.type->typeData.kind == NodeTypekind::EXPOSED_TYPE);
-//                } break;
-//                case NodeType::TYPEOF:
-//                case NodeType::TYPE:
-//                    break;
-//                default: assert(false);
-//            }
 
             semantic->resolveTypes(resolved);
         } break;
@@ -554,15 +560,16 @@ void resolveFnCall(Semantic *semantic, Node *node) {
 
         // Make sure the ctDeclParams resolve to their compile-time values
         for (auto i = 0; i < ctGivenParams.size(); i++) {
-            auto ctParam = ctGivenParams[i];
+            const auto& ctParam = ctGivenParams[i];
 
             if (ctParam->type == NodeType::VALUE_PARAM) {
                 auto ctValue = ctParam->valueParamData.value;
                 semantic->resolveTypes(ctValue);
-                ctDeclParams[i]->resolved = ctValue;
+                ctDeclParams[i]->staticValue = ctValue;
             } else {
-                ctDeclParams[i]->resolved = ctParam;
+                ctDeclParams[i]->staticValue = ctParam;
             }
+
             semantic->resolveTypes(ctParam);
         }
     }
@@ -582,20 +589,18 @@ void resolveFnCall(Semantic *semantic, Node *node) {
         }
 
         if (isPoly) {
-            // 'link' each decl param to its runtime param
+            // un-link
             for (auto p = 0; p < declParams.size(); p++) {
                 declParams[p]->declParamData.polyLink = nullptr;
             }
-        }
 
-        // @Hack!!!
-        for (auto d : declParams) {
-            d->semantic = false;
-            semantic->resolveTypes(d);
+            // @Hack!!!
+            for (auto d : declParams) {
+                d->semantic = false;
+                semantic->resolveTypes(d);
+            }
         }
     }
-
-    semantic->resolveTypes(resolvedFn);
 
     if (isPoly) {
         auto ctDeclParams = resolvedFn->fnDeclData.ctParams;
@@ -604,14 +609,28 @@ void resolveFnCall(Semantic *semantic, Node *node) {
         for (unsigned long i = 0; i < ctGivenParams.size(); i++) {
             auto declParam = ctDeclParams[i];
             auto givenParam = ctGivenParams[i];
+
+            semantic->resolveTypes(declParam);
             semantic->resolveTypes(givenParam);
-            if (!typesMatch(declParam->typeInfo, givenParam->typeInfo)) {
-                // todo if match exposed to real type then set resolved on exposed to real and pass match
-                // unless already set then error?
-                semantic->reportError({node, declParam, givenParam}, Error{node->region, "type mismatch!"});
+
+            // if declParam is an exposed 'Any' type, convert the givenParam to that
+            if (declParam->typeInfo->typeData.kind == NodeTypekind::EXPOSED_ANY) {
+                givenParam->typeInfo = new Node(NodeTypekind::EXPOSED_ANY);
+                givenParam->typeInfo->staticValue = givenParam;
             }
+            else {
+                if (!typesMatch(declParam->typeInfo, givenParam->valueParamData.value->typeInfo)) {
+                    // todo if match exposed to real type then set resolved on exposed to real and pass match
+                    // unless already set then error?
+                    semantic->reportError({node, declParam, givenParam}, Error{node->region, "static type mismatch!"});
+                }
+            }
+
+            semantic->resolveTypes(givenParam);
         }
     }
+
+    semantic->resolveTypes(resolvedFn);
 
     if (node->fnCallData.hasRuntimeParams) {
         auto resolvedFnType = resolve(resolvedFn->typeInfo)->typeData;
@@ -662,7 +681,7 @@ void resolveDeclParam(Semantic *semantic, Node *node) {
     }
 
     if (node->declParamData.type != nullptr && node->declParamData.initialValue != nullptr) {
-        if (!typesMatch(node->declParamData.initialValue->typeInfo, node->declParamData.type->typeInfo)) {
+        if (!typesMatch(node->declParamData.type, node->declParamData.initialValue->typeInfo)) {
             semantic->reportError({node}, Error{node->region, "Type mismatch decl param"});
         }
     }
@@ -853,10 +872,13 @@ void resolveRun(Semantic *semantic, Node *node) {
 
 void resolveTypeof(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->nodeData);
-    node->resolved = node->nodeData->typeInfo;
 
     node->typeInfo = new Node(NodeTypekind::EXPOSED_TYPE);
-    node->typeInfo->typeData.exposedTypeData.value = node->nodeData->typeInfo;
+
+    node->staticValue = node->nodeData->typeInfo;
+
+//    node->typeInfo->resolved = node->nodeData->typeInfo;
+//    node->resolved = node->nodeData->typeInfo;
 }
 
 void Semantic::resolveTypes(Node *node) {

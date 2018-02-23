@@ -84,7 +84,7 @@ fn main() {
 
     assert(stupid_sqrt(9) == 3);
 
-    assert(id(3) == 3);
+    assert(id!(i32)(3) == 3);
 
     p: pair;
     p.x = 8;

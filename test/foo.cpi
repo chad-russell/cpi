@@ -1,7 +1,7 @@
-fn id(T := typeof(t))(t: T) {
+fn id(T := i32)(t: T) {
     ret t;
 }
 
 fn main() {
-    ret id(3);
+    ret id!(i64)(89);
 }

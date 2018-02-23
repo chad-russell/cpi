@@ -670,6 +670,11 @@ Node *Parser::parseType() {
             popFront();
             type->typeData.kind = NodeTypekind::EXPOSED_TYPE;
         } break;
+        case LexerTokenType::EXPOSED_ANY: {
+            type->region = lexer->front.region;
+            popFront();
+            type->typeData.kind = NodeTypekind::EXPOSED_ANY;
+        } break;
         default: {
             ostringstream s("");
             s << "unknown type '" << SourceRegion{saved.region} << "'";
@@ -720,7 +725,10 @@ Node *Parser::parseTypeof() {
 
 Node *Parser::parseLvalueOrLiteral() {
     if (lexer->front.type == LexerTokenType::I32 || lexer->front.type == LexerTokenType::I64) {
-        return parseType();
+        auto exposedType = new Node(lexer->srcInfo, &allNodes, NodeType::TYPE, scopes.top());
+        exposedType->typeData.kind = NodeTypekind::EXPOSED_TYPE;
+        exposedType->staticValue = parseType();
+        return exposedType;
     }
 
     auto saved = lexer->front.region.start;

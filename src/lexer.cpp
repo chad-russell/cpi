@@ -165,6 +165,7 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "cast", LexerTokenType::CAST)) { return; }
     if (tryEatKeyword(&next, "assert", LexerTokenType::ASSERT)) { return; }
     if (tryEatKeyword(&next, "Type", LexerTokenType::EXPOSED_TYPE)) { return; }
+    if (tryEatKeyword(&next, "Any", LexerTokenType::EXPOSED_ANY)) { return; }
     if (tryEatKeyword(&next, "typeof", LexerTokenType::TYPEOF)) { return; }
 
     // BACK_TICK
@@ -426,6 +427,7 @@ const vector<string> Lexer::lexerTokenTypeStrings = {
     "SEMICOLON",
     "RUN",
     "EXPOSED_TYPE",
+    "EXPOSED_ANY",
     "TYPEOF",
 };
 
