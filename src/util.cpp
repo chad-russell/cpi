@@ -1,7 +1,20 @@
 #include "util.h"
 
 #include <iostream>
+#include <fstream>
 #include <sstream>
+
+const char *readFile(const char *fileName) {
+    ifstream fileStream;
+    fileStream.open(fileName);
+
+    stringstream fileStringStream;
+
+    fileStringStream << fileStream.rdbuf();
+
+    fileStream.close();
+    return fileStringStream.str().c_str();
+}
 
 int bytesInCodepoint(char firstByte) {
     if (firstByte >= '\x00' && firstByte <= '\x7F') {
@@ -206,4 +219,16 @@ int64_t AtomTable::insert(Region r) {
     AtomTable::current->atoms.insert({sourceStr, tableIndex});
     AtomTable::current->backwardAtoms.push_back(sourceStr);
     return tableIndex;
+}
+
+bool isConstant(Node *node) {
+    switch (resolve(node)->type) {
+        case NodeType::INT_LITERAL:
+        case NodeType::ADDRESS_OF:
+        case NodeType::DEREF:
+        case NodeType::FN_DECL:
+        case NodeType::STRUCT_LITERAL:
+            return true;
+        default: return false;
+    }
 }

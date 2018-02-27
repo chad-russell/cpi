@@ -73,6 +73,7 @@ public:
     unordered_map<uint32_t, uint32_t> fnTable = {};
 
     vector<unsigned char> stack = {};
+    int32_t stackSize = 1024;
 
     uint64_t stepCount = 0;
 
@@ -88,6 +89,7 @@ public:
     bool terminated = false;
 
     SourceMap sourceMap;
+    unsigned long currentSourceMapStmtIndex = 0;
     vector<unsigned long> breakpoints = {};
     bool continuing = false;
 
@@ -97,8 +99,10 @@ public:
 
     Interpreter(): Interpreter(1024 * 32) {}
 
-    Interpreter(int32_t stackSize) {
-        stack.reserve(stackSize);
+    Interpreter(int32_t stackSize_) {
+        this->stackSize = stackSize_;
+
+        stack.reserve((unsigned long) stackSize);
         for (auto i = 0; i < stackSize; i++) {
             stack.push_back(0);
         }
@@ -315,54 +319,6 @@ public:
       auto consumed = consume<int32_t>();
       auto value = readFromStack<T>(consumed);
       return Optional<T>{true, value};
-
-//      instructionPcString = AssemblyLexer::instructionStrings[instructions[pc]];
-//      testInstructionString = suffixForType<T>();
-//      if (instructionPcString == instructionPcString) {
-//          pc += 1;
-//          auto consumed = consume<int32_t>();
-//          auto value = readFromStack<T>(consumed);
-//          return Optional<T>{true, value};
-//      }
-
-//      auto instructionPcString = AssemblyLexer::instructionStrings[instructions[pc]];
-//
-//      string prefix = "RELCONST";
-//      auto testInstructionString = prefix.append(suffixForType<T>());
-//      if (instructionPcString == testInstructionString) {
-//          pc += 1;
-//          auto consumed = consume<T>();
-//          consumed += static_cast<T>(bp);
-//          return Optional<T>{true, consumed};
-//      }
-//
-//      prefix = "REL";
-//      testInstructionString = prefix.append(suffixForType<T>());
-//      if (instructionPcString == testInstructionString) {
-//          pc += 1;
-//          auto consumed = consume<int32_t>();
-//          auto value = readFromStack<T>(consumed + bp);
-//          return Optional<T>{true, value};
-//      }
-//
-//      prefix = "CONST";
-//      testInstructionString = prefix.append(suffixForType<T>());
-//      if (instructionPcString == testInstructionString) {
-//          pc += 1;
-//          auto consumed = consume<T>();
-//          return Optional<T>{true, consumed};
-//      }
-//
-//      instructionPcString = AssemblyLexer::instructionStrings[instructions[pc]];
-//      testInstructionString = suffixForType<T>();
-//      if (instructionPcString == instructionPcString) {
-//          pc += 1;
-//          auto consumed = consume<int32_t>();
-//          auto value = readFromStack<T>(consumed);
-//          return Optional<T>{true, value};
-//      }
-//
-//      return {false, {}};
   }
 
   auto readBits8() {

@@ -7,7 +7,6 @@ class Semantic {
 public:
     bool encounteredErrors;
     FnDeclData *currentFnDecl = nullptr;
-    Node *targetType = nullptr;
 
     Lexer *lexer;
 

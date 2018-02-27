@@ -25,22 +25,24 @@ int32_t typeSize(Node *type) {
             assert(false);
         case NodeTypekind::STRUCT: {
             auto total = 0;
+            auto index = 0;
 
-            if (resolved->typeData.structTypeData.isLiteral) {
-                for (auto param : resolved->typeData.structTypeData.params) {
-                    param->localOffset = total;
+            for (auto param : resolved->typeData.structTypeData.params) {
+                param->localOffset = total;
+
+                if (resolved->typeData.structTypeData.isLiteral) {
                     total += typeSize(param->valueParamData.value->typeInfo);
-                }
-            } else {
-                for (auto param : resolved->typeData.structTypeData.params) {
-                    param->localOffset = total;
+                } else {
                     total += typeSize(param->declParamData.type);
+                    index += 1;
                 }
+
             }
 
             return total;
         }
-        default: assert(false);
+        default:
+            assert(false);
     }
 }
 
@@ -59,12 +61,14 @@ bool typesMatch(Node *desired, Node *actual) {
     // but exposed types also match concrete types if the exposed type has a static value
     // and it matches the given type.
     if (actual->typeData.kind == NodeTypekind::EXPOSED_TYPE) {
-        if (actual->staticValue == nullptr) { return false; }
-        actual = actual->staticValue;
+        if (actual->staticValue != nullptr) {
+            actual = actual->staticValue;
+        }
     }
     if (desired->typeData.kind == NodeTypekind::EXPOSED_TYPE) {
-        if (desired->staticValue == nullptr) { return false; }
-        desired = desired->staticValue;
+        if (desired->staticValue != nullptr) {
+            desired = desired->staticValue;
+        }
     }
 
     // coercion from integer literal to any integer is valid
@@ -145,6 +149,12 @@ void Semantic::reportError(vector<Node *> nodes, Error error) {
 
 void resolveFnDecl(Semantic *semantic, Node *node) {
     auto data = &node->fnDeclData;
+
+    auto index = 0;
+    for (auto param : node->fnDeclData.params) {
+        param->declParamData.index = index;
+        index += 1;
+    }
 
     if (!data->ctParams.empty() && !data->cameFromPolymorph) {
         return;
@@ -244,15 +254,19 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
         semantic->reportError({node}, Error{node->region, s.str()});
     }
 
+    auto localIndex = 0;
     for (auto local : data->locals) {
-        auto resolved = resolve(local);
-        if (resolved != local && resolved->isLocal) { continue; }
+        auto resolvedLocal = resolve(local);
+        if (resolvedLocal != local && resolvedLocal->isLocal) { continue; }
 
         local->localOffset = semantic->currentFnDecl->stackSize;
+
         semantic->currentFnDecl->stackSize += typeSize(local->typeInfo);
+        localIndex += 1;
     }
 
     auto paramOffset = -8;
+    localIndex = 0;
     for (auto declParam : node->fnDeclData.params) {
         // we push the params onto the stack in reverse order
         paramOffset -= typeSize(declParam->typeInfo);
@@ -338,11 +352,16 @@ void resolveType(Semantic *semantic, Node *node) {
             semantic->resolveTypes(node->typeData.fnTypeData.returnType);
         } break;
         case NodeTypekind::STRUCT: {
-            int32_t total = 0;
+            auto total = 0;
+            auto localIndex = 0;
+
             for (auto param : node->typeData.structTypeData.params) {
                 param->localOffset = total;
+
                 semantic->resolveTypes(param);
+
                 total += typeSize(param->declParamData.type);
+                localIndex = 0;
             }
         } break;
         case NodeTypekind::SYMBOL: {
@@ -365,7 +384,7 @@ void resolveType(Semantic *semantic, Node *node) {
         default: assert(false);
     }
 
-    node->typeInfo = node;
+    node->typeInfo = new Node(NodeTypekind::EXPOSED_TYPE);
 }
 
 Node *makeTemporary(Semantic *semantic, Node *n) {
@@ -512,13 +531,13 @@ Node *Semantic::deepCopy(Node *node, Scope *scope) {
 void resolveFnCall(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->fnCallData.fn);
     auto resolvedFn = resolve(node->fnCallData.fn);
-
     auto isPoly = resolvedFn->type == NodeType::FN_DECL && !resolvedFn->fnDeclData.ctParams.empty();
 
     if (isPoly) {
         // make a new function
         // todo(chad): memoize this based on the ctParams
         auto newResolvedFn = semantic->deepCopy(resolvedFn, resolvedFn->scope);
+        assert(newResolvedFn->type == NodeType::FN_DECL);
         newResolvedFn->fnDeclData.cameFromPolymorph = true;
 
         node->fnCallData.fn->resolved = newResolvedFn;

@@ -92,7 +92,24 @@ fn main() {
 
     assert(deref_ct(&3) == 3);
 
+    assert(add_static!(3, 4)(5) == 12);
+
+    assert(apply_static!(add_one)(3) == 4);
+
+    assert(apply_static!(fn(x: i32) { ret x + 3; })(3) == 6);
+
+    baked := id!(pair);
+    assert(baked(p).x == 8);
+
     ret 0;
+}
+
+fn apply_static(f : Any)(t: i32) {
+    ret f(t);
+}
+
+fn add_one(T := typeof(n))(n: i32) {
+    ret n + 1;
 }
 
 fn id(T := typeof(t))(t: T) T {
@@ -101,6 +118,10 @@ fn id(T := typeof(t))(t: T) T {
 
 fn deref_ct(T := typeof(t))(t: T) {
     ret ^t;
+}
+
+fn add_static(T: i32, U: i32)(m: i32) {
+    ret T + U + m;
 }
 
 fn stupid_sqrt(n: i64) {

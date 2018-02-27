@@ -574,7 +574,6 @@ Node *Parser::parseLvalue() {
         popFront();
         auto deref = new Node(lexer->srcInfo, &allNodes, NodeType::DEREF, scopes.top());
         deref->derefData.target = parseRvalueSimple();
-        deref->derefData.isRvalue = false;
         return deref;
     }
 
@@ -725,10 +724,7 @@ Node *Parser::parseTypeof() {
 
 Node *Parser::parseLvalueOrLiteral() {
     if (lexer->front.type == LexerTokenType::I32 || lexer->front.type == LexerTokenType::I64) {
-        auto exposedType = new Node(lexer->srcInfo, &allNodes, NodeType::TYPE, scopes.top());
-        exposedType->typeData.kind = NodeTypekind::EXPOSED_TYPE;
-        exposedType->staticValue = parseType();
-        return exposedType;
+        return parseType();
     }
 
     auto saved = lexer->front.region.start;
@@ -778,7 +774,6 @@ Node *Parser::parseRvalueSimple() {
         auto deref = new Node(lexer->srcInfo, &allNodes, NodeType::DEREF, scopes.top());
 
         deref->derefData.target = parseRvalueSimple();
-        deref->derefData.isRvalue = true;
 
         addLocal(deref->derefData.target);
         addLocal(deref);

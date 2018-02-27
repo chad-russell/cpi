@@ -15,28 +15,28 @@ Node::Node(SourceInfo srcInfo, vector<Node *> *allNodes, NodeType type_, Scope *
 }
 
 Node::Node(NodeTypekind typekind) : Node() {
-    id = nodeId;
-    nodeId += 1;
-
     type = NodeType::TYPE;
     typeData.kind = typekind;
 }
 
-Node::Node() { }
+Node::Node() {
+    id = nodeId;
+    nodeId += 1;
+}
 
 Node *resolve(Node *n) {
     if (n == nullptr) { return nullptr; }
 
-    if (n->resolved == nullptr) { return n; }
+    auto resolved = n;
 
-    auto resolved = n->resolved;
     while (resolved->resolved != nullptr || resolved->staticValue != nullptr) {
-        if (resolved->staticValue != nullptr) {
-            resolved = resolved->staticValue;
-        } else {
+        if (resolved->resolved != nullptr) {
             resolved = resolved->resolved;
+        } else {
+            resolved = resolved->staticValue;
         }
     }
+
     return resolved;
 }
 

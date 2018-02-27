@@ -31,19 +31,23 @@ void Interpreter::interpret() {
     auto mp = new MnemonicPrinter(this->instructions);
 
     while (pc < instructions.size() && !terminated) {
-        auto stmtStop = false;
-        for (auto&& s : sourceMap.statements) {
-            if (s.instIndex == pc) { stmtStop = true; }
+
+        bool shouldStop = false;
+        if (debugFlag) {
+            auto stmtStop = false;
+            for (auto&& s : sourceMap.statements) {
+                if (s.instIndex == pc) { stmtStop = true; }
+            }
+
+            if (stmtStop) {
+                lastStmtPc = pc;
+            }
+
+            auto breakStopIf = find(breakpoints.begin(), breakpoints.end(), pc);
+            auto breakStop = breakStopIf != breakpoints.end();
+
+            shouldStop = (stmtStop && !continuing) || breakStop;
         }
-
-        if (stmtStop) {
-            lastStmtPc = pc;
-        }
-
-        auto breakStopIf = find(breakpoints.begin(), breakpoints.end(), pc);
-        auto breakStop = breakStopIf != breakpoints.end();
-
-        auto shouldStop = (stmtStop && !continuing) || breakStop;
 
         while (shouldStop && !terminated && depth < overDepth) {
             continuing = false;
@@ -223,7 +227,7 @@ void interpretJump(Interpreter *interp) {
 void interpretStore(Interpreter *interp) {
     auto storeOffset = interp->read<int32_t>();
 
-    if (storeOffset >= interp->stack.size()) {
+    if (storeOffset >= interp->stackSize) {
         cout << "STACK OVERFLOW!!!!" << endl;
         exit(1);
     }
@@ -240,7 +244,7 @@ void interpretStore(Interpreter *interp) {
 void interpretStoreConst(Interpreter *interp) {
     auto storeOffset = interp->read<int32_t>();
 
-    if (storeOffset >= interp->stack.size()) {
+    if (storeOffset >= interp->stackSize) {
         cout << "STACK OVERFLOW!!!!" << endl;
         exit(1);
     }

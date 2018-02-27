@@ -12,6 +12,9 @@ using namespace std;
 
 extern unsigned long nodeId;
 extern unsigned long fnTableId;
+extern int debugFlag;
+
+const char *readFile(const char *fileName);
 
 bool startsWith(string s, unsigned long startPos, string pre);
 bool startsWith(string s, string pre);
@@ -193,6 +196,7 @@ struct DeclParamData {
     Node *initialValue = nullptr;
 
     Node *polyLink = nullptr;
+    int64_t index;
 };
 
 struct ValueParamData {
@@ -230,7 +234,7 @@ struct FnDeclData {
     unsigned long instOffset;
     bool isLiteral;
     unsigned long tableIndex;
-    bool cameFromPolymorph;
+    bool cameFromPolymorph = false;
 };
 
 struct DeclData {
@@ -318,7 +322,6 @@ struct SymbolData {
 
 struct DerefData {
     Node *target = nullptr;
-    bool isRvalue;
 };
 
 class Scope {
@@ -372,6 +375,7 @@ public:
     bool isUsedInError = false;
     bool semantic = false;
     bool gen = false;
+    bool llvmGen = false;
     bool sourceMapStatement = false;
 
     // todo(chad): better way to store this?
@@ -380,6 +384,9 @@ public:
 
     // the offset of the storage for this node from the current pointer
     int32_t localOffset = 0;
+
+    void *llvmLocal = nullptr;
+    void *llvmData = nullptr;
 
     Node();
     Node(NodeTypekind typekind);
@@ -528,5 +535,9 @@ public:
 
     AtomTable();
 };
+
+Node *resolve(Node *n);
+
+bool isConstant(Node *node);
 
 #endif

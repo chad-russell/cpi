@@ -1,5 +1,4 @@
 #include <vector>
-#include <cstring>
 #include <iostream>
 #include <getopt.h>
 #include <fstream>
@@ -7,19 +6,44 @@
 
 #include "assembler.h"
 #include "interpreter.h"
-#include "util.h"
 #include "lexer.h"
 #include "parser.h"
 #include "semantic.h"
 #include "bytecodegen.h"
+#include "llvmgen.h"
+
+#include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Type.h"
+#include "llvm/IR/Verifier.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Host.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/TargetRegistry.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetOptions.h"
+#include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/GVN.h"
 
 using namespace std;
+using namespace llvm;
 
 unsigned long nodeId;
 unsigned long fnTableId;
+int debugFlag;
 
 static int printAsmFlag = 0;
-static int debugFlag = 0;
 static int interpretFlag = 0;
 
 void printHelp() {
@@ -53,6 +77,7 @@ InputType inputTypeFromExtension(const string &fileName) {
 
 int main(int argc, char **argv) {
     nodeId = 0;
+    debugFlag = 0;
 
     AtomTable();
     AssemblyLexer::populateMaps();
@@ -108,9 +133,11 @@ int main(int argc, char **argv) {
     vector<unsigned char> instructions;
     unordered_map<uint32_t, uint32_t> fnTable;
 
+    Parser *parser = nullptr;
+
     if (inputType == InputType::CPI) {
         auto lexer = new Lexer(inputFile);
-        auto parser = new Parser(lexer);
+        parser = new Parser(lexer);
         parser->parseRoot();
 
         auto semantic = new Semantic();
@@ -214,19 +241,13 @@ int main(int argc, char **argv) {
     }
 
     if (outputFileName != nullptr) {
-        auto writeAssembly = endsWith(outputFileName, ".cas");
-        if (!writeAssembly && !endsWith(outputFileName, ".cbc")) {
-            cout << "output file name must be .cas or .cbc" << endl;
-            exit(1);
-        }
-
         std::ofstream out(outputFileName);
 
-        if (writeAssembly) {
+        if (endsWith(outputFileName, ".cas")) {
             auto printer = new MnemonicPrinter(instructions);
             printer->fnTable = fnTable;
             out << printer->debugString();
-        } else {
+        } else if (endsWith(outputFileName, ".cbc")) {
             // .cbc
 
             // fn table
@@ -237,6 +258,75 @@ int main(int argc, char **argv) {
 
             // instructions
             out << instructions;
+        } else if (endsWith(outputFileName, ".ll")) {
+            // .ll
+
+            auto llvmGen = new LlvmGen();
+            llvmGen->gen(parser->mainFn);
+            llvmGen->module->print(llvm::errs(), nullptr);
+        } else {
+            // assume we are generating an executable
+            auto llvmGen = new LlvmGen();
+            llvmGen->gen(parser->mainFn);
+
+            InitializeAllTargetInfos();
+            InitializeAllTargets();
+            InitializeAllTargetMCs();
+            InitializeAllAsmParsers();
+            InitializeAllAsmPrinters();
+
+            auto TargetTriple = sys::getDefaultTargetTriple();
+            llvmGen->module->setTargetTriple(TargetTriple);
+
+            std::string Error;
+            auto Target = TargetRegistry::lookupTarget(TargetTriple, Error);
+
+            // Print an error and exit if we couldn't find the requested target.
+            // This generally occurs if we've forgotten to initialise the
+            // TargetRegistry or we have a bogus target triple.
+            if (!Target) {
+                errs() << Error;
+                return 1;
+            }
+
+            auto CPU = "generic";
+            auto Features = "";
+
+            TargetOptions opt;
+            auto RM = llvm::Optional<Reloc::Model>();
+            auto TheTargetMachine = Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
+
+            llvmGen->module->setDataLayout(TheTargetMachine->createDataLayout());
+
+            auto targetingObj = endsWith(outputFileName, ".o");
+            auto outputObjName = targetingObj ? outputFileName : "output.o";
+
+            std::error_code EC;
+            raw_fd_ostream dest(outputObjName, EC, sys::fs::F_None);
+
+            if (EC) {
+                errs() << "Could not open file: " << EC.message();
+                return 1;
+            }
+
+            legacy::PassManager pass;
+            auto FileType = TargetMachine::CGFT_ObjectFile;
+
+            if (TheTargetMachine->addPassesToEmitFile(pass, dest, FileType)) {
+                errs() << "TheTargetMachine can't emit a file of this type";
+                return 1;
+            }
+
+            pass.run(*llvmGen->module);
+            dest.flush();
+
+            if (!targetingObj) {
+                ostringstream command;
+                command << "clang -o " << outputFileName << " output.o";
+                system(command.str().c_str());
+
+                system("rm output.o");
+            }
         }
 
         out.close();

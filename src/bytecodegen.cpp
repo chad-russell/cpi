@@ -53,7 +53,6 @@ void BytecodeGen::binopHelper(string instructionStr, Node *node) {
 
 void BytecodeGen::gen(Node *node) {
     // avoids generating code for a fn decl within another fn decl
-    // todo(chad): make sure this is the right way to do this
     if (node->type == NodeType::FN_DECL && !processFnDecls) {
         if (node->fnDeclData.isLiteral && node->bytecode.empty()) {
             // placeholder
@@ -552,6 +551,7 @@ void BytecodeGen::fixup() {
     }
 }
 
+// todo(chad): remove the first parameter. We can always store to the main 'instructions' member
 void BytecodeGen::storeValue(vector<unsigned char> &instructions, Node *node, int32_t offset) {
     node = resolve(node);
 
@@ -637,17 +637,5 @@ void BytecodeGen::storeValue(vector<unsigned char> &instructions, Node *node, in
         } break;
         default:
             assert(false);
-    }
-}
-
-bool isConstant(Node *node) {
-    switch (resolve(node)->type) {
-        case NodeType::INT_LITERAL:
-        case NodeType::ADDRESS_OF:
-        case NodeType::DEREF:
-        case NodeType::FN_DECL:
-        case NodeType::STRUCT_LITERAL:
-            return true;
-        default: return false;
     }
 }

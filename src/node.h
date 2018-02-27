@@ -8,8 +8,6 @@
 
 int32_t typeSize(Node *type);
 
-Node *resolve(Node *n);
-
 ostream &operator<<(ostream &os, NodeType type);
 
 #endif // NODE_H

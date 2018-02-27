@@ -43,7 +43,7 @@ Lexer::Lexer(string fileName) {
     string fileBytes;
 
     t.seekg(0, ios::end);   
-    fileBytes.reserve(t.tellg());
+    fileBytes.reserve((unsigned long) t.tellg());
     t.seekg(0, ios::beg);
 
     fileBytes.assign((istreambuf_iterator<char>(t)),
@@ -60,7 +60,7 @@ Lexer::Lexer(string fileName) {
 bool Lexer::tryEat(LexerToken *token, string pre, LexerTokenType type) {
     if (prefix(pre)) {
         token->type = type;
-        popFrontFinalize(pre.length(), *token);
+        popFrontFinalize((int) pre.length(), *token);
         return 1;
     }
     return 0;
