@@ -349,13 +349,14 @@ type point struct {
     y: i64
 }
 
-fn point_get_x(p: point) { ret p.y; }
+fn point_get_x(p: point) { ret p.x; }
 
 fn point_id(p: point) { ret p; }
 
 fn testNestedCall() {
     p: point;
-    p.y = 3;
+    p.x = 3;
+    p.y = bad();
     ret point_get_x(point_id(point_id(point_id(point_id(point_id(point_id(p)))))));
 }
 

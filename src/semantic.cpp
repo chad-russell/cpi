@@ -797,6 +797,7 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
         auto local = new Node(NodeTypekind::POINTER);
         local->typeInfo = local;
         local->isLocal = true;
+        local->isAutoDerefStorage = true;
         semantic->currentFnDecl->locals.push_back(local);
 
         node->dotData.autoDerefStorage = local;

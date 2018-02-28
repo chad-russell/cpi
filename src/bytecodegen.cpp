@@ -445,7 +445,6 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, toBytes32(4));
             }
 
-            // TAG
             if (node->dotData.autoDerefStorage) {
                 node->dotData.pointerIsRelative = true;
 

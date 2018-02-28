@@ -382,6 +382,9 @@ public:
     vector<unsigned char> bytecode;
     bool isLocal = false;
 
+    // todo(chad): figure out a way to get rid of this
+    bool isAutoDerefStorage = false;
+
     // the offset of the storage for this node from the current pointer
     int32_t localOffset = 0;
 

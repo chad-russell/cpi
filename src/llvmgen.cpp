@@ -2,6 +2,10 @@
 #include "util.h"
 #include "node.h"
 
+void debugValue(llvm::Value *val) {
+    val->print(llvm::errs());
+}
+
 LlvmGen::LlvmGen() : builder(context), module(llvm::make_unique<llvm::Module>("module", context)) {
     TheFPM = llvm::make_unique<llvm::legacy::FunctionPassManager>(module.get());
 
@@ -36,18 +40,34 @@ llvm::Type *LlvmGen::typeFor(Node *node) {
             return llvm::PointerType::get(fnType, 0);
         }
         case NodeTypekind::POINTER: {
+            if (node->typeData.pointerTypeData.underlyingType == nullptr) {
+                return llvm::PointerType::getVoidTy(context);
+            }
+
             return llvm::PointerType::get(typeFor(node->typeData.pointerTypeData.underlyingType), 0);
         }
         case NodeTypekind::STRUCT: {
+            if (node->llvmData) { return (llvm::Type *) node->llvmData; }
+
+            auto ty = llvm::StructType::create(context);
+            node->llvmData = ty;
+
             vector<llvm::Type *> elementTypes;
             for (auto param : node->typeData.structTypeData.params) {
                 elementTypes.push_back(typeFor(param->typeInfo));
             }
+            ty->setBody(elementTypes);
 
-            return llvm::StructType::get(context, elementTypes, false);
+            return ty;
         }
         case NodeTypekind::SYMBOL: {
             return typeFor(resolve(node));
+        }
+        case NodeTypekind::BOOLEAN: {
+            return llvm::IntegerType::getInt1Ty(context);
+        }
+        case NodeTypekind::NONE: {
+            return llvm::Type::getVoidTy(context);
         }
         default: assert(false);
     }
@@ -59,7 +79,7 @@ llvm::Value *LlvmGen::rvalueFor(Node *node) {
     if (resolved->isLocal) {
         return builder.CreateLoad((llvm::Value *) resolved->llvmLocal);
     }
-    else if (resolved->type == NodeType::DOT && resolve(resolved->dotData.lhs)->isLocal) {
+    else if (resolved->type == NodeType::DOT && resolved->dotData.lhs->isLocal) {
         return builder.CreateLoad((llvm::Value *) resolved->llvmData);
     }
 
@@ -67,7 +87,14 @@ llvm::Value *LlvmGen::rvalueFor(Node *node) {
 }
 
 llvm::Value *LlvmGen::store(llvm::Value *val, llvm::Value *ptr) {
-    return builder.CreateStore(val, ptr);
+    assert(val);
+    assert(ptr);
+
+    auto ptrToValType = llvm::PointerType::get(val->getType(), 0);
+//    assert(((llvm::StructType *) val->getType())->isLayoutIdentical((llvm::StructType *) ptr->getType()->getContainedType(0)));
+
+    return builder.CreateStore(val, builder.CreateBitCast(ptr, ptrToValType));
+//    return builder.CreateStore(val, ptr);
 }
 
 void LlvmGen::gen(Node *node) {
@@ -106,9 +133,16 @@ void LlvmGen::gen(Node *node) {
                 auto resolvedLocal = resolve(local);
                 if (resolvedLocal != local && resolvedLocal->isLocal) { continue; }
 
-                // todo(chad): get the name based on node type, include that in the alloca for convenience
-                resolvedLocal->llvmData = builder.CreateAlloca(typeFor(resolvedLocal->typeInfo));
-                resolvedLocal->llvmLocal = resolvedLocal->llvmData;
+                if (resolvedLocal->type == NodeType::DECL) {
+                    assert(resolvedLocal->declData.lvalue->type == NodeType::SYMBOL);
+                    auto atomId = resolvedLocal->declData.lvalue->symbolData.atomId;
+
+                    if (resolvedLocal->typeInfo->typeData.kind != NodeTypekind::NONE && !resolvedLocal->isAutoDerefStorage) {
+                        resolvedLocal->llvmLocal = builder.CreateAlloca(typeFor(resolvedLocal->typeInfo), nullptr, AtomTable::current->backwardAtoms[atomId]);
+                    }
+                } else if (resolvedLocal->typeInfo->typeData.kind != NodeTypekind::NONE && !resolvedLocal->isAutoDerefStorage) {
+                    resolvedLocal->llvmLocal = builder.CreateAlloca(typeFor(resolvedLocal->typeInfo));
+                }
             }
 
             for (const auto& stmt : node->fnDeclData.body) {
@@ -123,6 +157,9 @@ void LlvmGen::gen(Node *node) {
 
             // DO_OPTIMIZE
             TheFPM->run(*F);
+
+            verifyFunction(*F, &llvm::errs());
+
         } break;
         case NodeType::RET: {
             gen(node->retData.value);
@@ -140,13 +177,18 @@ void LlvmGen::gen(Node *node) {
             auto resolvedInitialValue = resolve(data.initialValue);
             gen(resolvedInitialValue);
 
-            store(rvalueFor(data.initialValue), (llvm::Value *) node->llvmData);
+            store(rvalueFor(data.initialValue), (llvm::Value *) node->llvmLocal);
         } break;
         case NodeType::SYMBOL: {
             auto resolved = resolve(node);
             gen(resolved);
 
             node->llvmData = resolved->llvmData;
+            node->llvmLocal = resolved->llvmLocal;
+
+            if (node->isLocal && resolved->type != NodeType::DECL) {
+                store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
+            }
         } break;
         case NodeType::FN_CALL: {
             if (!node->fnCallData.hasRuntimeParams) { break; }
@@ -160,9 +202,11 @@ void LlvmGen::gen(Node *node) {
             auto resolvedFn = resolve(node->fnCallData.fn);
             gen(resolvedFn);
 
-            auto callInst = builder.CreateCall(rvalueFor(resolvedFn), args);
+            node->llvmData = builder.CreateCall(rvalueFor(resolvedFn), args);
 
-            store((llvm::Value *) callInst, (llvm::Value *) node->llvmData);
+            if (node->isLocal) {
+                store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
+            }
         } break;
         case NodeType::VALUE_PARAM: {
             gen(node->valueParamData.value);
@@ -177,15 +221,25 @@ void LlvmGen::gen(Node *node) {
                 case LexerTokenType::ADD: {
                     value = builder.CreateAdd(rvalueFor(node->binopData.lhs), rvalueFor(node->binopData.rhs));
                 } break;
+                case LexerTokenType::DIV: {
+                    value = builder.CreateSDiv(rvalueFor(node->binopData.lhs), rvalueFor(node->binopData.rhs));
+                } break;
+                case LexerTokenType::SUB: {
+                    value = builder.CreateSub(rvalueFor(node->binopData.lhs), rvalueFor(node->binopData.rhs));
+                } break;
                 default: assert(false);
             }
 
-            store(value, (llvm::Value *) node->llvmData);
+            store(value, (llvm::Value *) node->llvmLocal);
         } break;
         case NodeType::DECL_PARAM: {
             auto resolvedParam = currentFnDecl->fnDeclData.params[node->declParamData.index];
             auto fn = static_cast<llvm::Function *>(currentFnDecl->llvmData);
             node->llvmData = &fn->arg_begin()[resolvedParam->declParamData.index];
+
+            if (node->isLocal) {
+                store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
+            }
         } break;
         case NodeType::ADDRESS_OF: {
             auto resolved = resolve(node->nodeData);
@@ -224,29 +278,50 @@ void LlvmGen::gen(Node *node) {
                 node->llvmData = store(rvalueFor(resolvedRhs), (llvm::Value *) resolvedLhs->llvmLocal);
             } else if (resolvedDecl->type == NodeType::DEREF) {
                 // store rvalue into its slot
-                store((llvm::Value *) resolvedRhs->llvmData, (llvm::Value *) resolvedRhs->llvmLocal);
+                if (isConstant(resolvedRhs)) {
+                    store((llvm::Value *) resolvedRhs->llvmData, (llvm::Value *) resolvedRhs->llvmLocal);
+                }
 
                 auto storageTargetNode = resolve(node->assignData.lhs->derefData.target);
                 gen(storageTargetNode);
 
                 auto storageTarget = (llvm::Value *) storageTargetNode->llvmLocal;
-
-                node->llvmData = store(rvalueFor(resolvedRhs), builder.CreateLoad(storageTarget));
+                if (storageTargetNode->type == NodeType::DECL_PARAM) {
+                    assert(storageTarget == nullptr);
+                    storageTarget = (llvm::Value *) storageTargetNode->llvmData;
+                    node->llvmData = store(rvalueFor(resolvedRhs), storageTarget);
+                } else {
+                    node->llvmData = store(rvalueFor(resolvedRhs), builder.CreateLoad(storageTarget));
+                }
             } else if (resolvedDecl->type == NodeType::DOT) {
                 // store rvalue into its slot
-                store((llvm::Value *) resolvedRhs->llvmData, (llvm::Value *) resolvedRhs->llvmLocal);
+                if (isConstant(resolvedRhs)) {
+                    store((llvm::Value *) resolvedRhs->llvmData, (llvm::Value *) resolvedRhs->llvmLocal);
+                }
 
                 auto foundParam = resolvedDecl->dotData.resolved;
                 auto paramIndex = (uint64_t) foundParam->declParamData.index;
 
                 gen(resolvedDecl->dotData.lhs);
 
-                assert(resolve(resolvedDecl->dotData.lhs)->isLocal);
-                auto gep = builder.CreateGEP((llvm::Value *) resolvedDecl->dotData.lhs->llvmData, {
-                        llvm::ConstantInt::get(llvm::Type::getInt32Ty(context), 0),
-                        llvm::ConstantInt::get(llvm::Type::getInt32Ty(context), paramIndex)
-                });
+//                auto gepTarget = (llvm::Value *) resolvedDecl->dotData.lhs->llvmData;
+                auto gepTarget = (llvm::Value *) resolvedDecl->dotData.lhs->llvmLocal;
 
+                vector<llvm::Value *> geps;
+                geps.push_back(llvm::ConstantInt::get(llvm::Type::getInt32Ty(context), 0));
+
+                auto resolvedTypeInfo = resolve(resolve(resolvedDecl->dotData.lhs)->typeInfo);
+                auto pointerCount = 0;
+                while (resolvedTypeInfo->typeData.kind == NodeTypekind::POINTER) {
+                    resolvedTypeInfo = resolve(resolvedTypeInfo->typeData.pointerTypeData.underlyingType);
+                    pointerCount += 1;
+                }
+                for (auto i = 0; i < pointerCount; i++) {
+                    gepTarget = builder.CreateLoad(gepTarget);
+                }
+
+                geps.push_back(llvm::ConstantInt::get(llvm::Type::getInt32Ty(context), paramIndex));
+                auto gep = builder.CreateGEP(gepTarget, geps);
                 store(rvalueFor(resolvedRhs), gep);
                 node->llvmData = gep;
             } else {
@@ -259,25 +334,48 @@ void LlvmGen::gen(Node *node) {
 
             gen(node->dotData.lhs);
 
-            if (resolve(node->dotData.lhs)->isLocal) {
-                auto gep = builder.CreateGEP((llvm::Value *) node->dotData.lhs->llvmData, {
-                        llvm::ConstantInt::get(llvm::Type::getInt32Ty(context), 0),
-                        llvm::ConstantInt::get(llvm::Type::getInt32Ty(context), paramIndex)
-                });
+            vector<llvm::Value *> geps;
+            geps.push_back(llvm::ConstantInt::get(llvm::Type::getInt32Ty(context), 0));
+
+            auto resolvedLhs = resolve(node->dotData.lhs);
+
+            llvm::Value *gepTarget;
+            if (node->dotData.lhs->isLocal) {
+                gepTarget = (llvm::Value *) resolvedLhs->llvmLocal;
+            } else {
+                gepTarget = (llvm::Value *) resolvedLhs->llvmData;
+            }
+
+            auto resolvedTypeInfo = resolve(resolvedLhs->typeInfo);
+            auto pointerCount = 0;
+            while (resolvedTypeInfo->typeData.kind == NodeTypekind::POINTER) {
+                resolvedTypeInfo = resolve(resolvedTypeInfo->typeData.pointerTypeData.underlyingType);
+                pointerCount += 1;
+            }
+            for (auto i = 0; i < pointerCount; i++) {
+                gepTarget = builder.CreateLoad(gepTarget);
+            }
+
+            geps.push_back(llvm::ConstantInt::get(llvm::Type::getInt32Ty(context), paramIndex));
+
+            if (node->dotData.lhs->isLocal) {
+                auto gep = builder.CreateGEP(gepTarget, geps);
                 node->llvmData = gep;
 
                 if (node->isLocal) {
-                    store(builder.CreateLoad(gep), (llvm::Value *) node->llvmLocal);
+                    node->llvmLocal = gep;
                 }
             } else {
-//                ((llvm::Value *) node->dotData.lhs->llvmData)->print(llvm::errs());
                 vector<unsigned int> values = { (unsigned int) paramIndex };
-                node->llvmData = builder.CreateExtractValue((llvm::Value *) node->dotData.lhs->llvmData, values);
+                node->llvmData = builder.CreateExtractValue(gepTarget, values);
 
                 if (node->isLocal) {
                     store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
                 }
             }
+        } break;
+        case NodeType::TYPE: {
+            // nothing to do
         } break;
         default: assert(false);
     }
