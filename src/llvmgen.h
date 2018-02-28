@@ -32,7 +32,7 @@ public:
 
     llvm::Type *typeFor(Node *node);
     llvm::Value *rvalueFor(Node *node);
-    void setLocal(Node *a, Node *b);
+    llvm::Value *store(llvm::Value *val, llvm::Value *ptr);
 
     void gen(Node *node);
 };

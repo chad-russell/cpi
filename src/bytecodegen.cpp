@@ -185,7 +185,6 @@ void BytecodeGen::gen(Node *node) {
 
                 append(instructions, Instruction::STORE);
 
-                // TAG
                 if (resolvedDecl->dotData.pointerIsRelative) {
                     append(instructions, Instruction::RELI32);
                     append(instructions, toBytes(resolvedDecl->localOffset));
@@ -615,7 +614,6 @@ void BytecodeGen::storeValue(vector<unsigned char> &instructions, Node *node, in
             append(instructions, Instruction::RELCONSTI32);
             append(instructions, toBytes32(offset));
 
-            // TAG
             if (node->dotData.pointerIsRelative) {
                 append(instructions, Instruction::RELI32);
                 append(instructions, toBytes(node->localOffset));

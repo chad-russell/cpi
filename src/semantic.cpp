@@ -357,11 +357,12 @@ void resolveType(Semantic *semantic, Node *node) {
 
             for (auto param : node->typeData.structTypeData.params) {
                 param->localOffset = total;
+                param->declParamData.index = localIndex;
 
                 semantic->resolveTypes(param);
 
                 total += typeSize(param->declParamData.type);
-                localIndex = 0;
+                localIndex += 1;
             }
         } break;
         case NodeTypekind::SYMBOL: {
@@ -821,6 +822,7 @@ void resolveStructLiteral(Semantic *semantic, Node *node) {
     for (auto param : node->structLiteralData.params) {
         semantic->resolveTypes(param->valueParamData.value);
         node->typeInfo->typeData.structTypeData.params.push_back(param);
+        param->typeInfo = param->valueParamData.value->typeInfo;
     }
 }
 

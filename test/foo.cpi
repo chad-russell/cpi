@@ -1,6 +1,117 @@
+fn saved() {
+
+}
+
 fn main() {
-    a3 := 3;
+    f := fn() {
+        ret fn() {
+            ret foo;
+        };
+    };
+
+    a1 := f()()()();
+
+    a2 := apply(inc, 1) + apply_overboard(inc, 0);
+
+    a3 := ^^^^^^&&&^&&&&^&^^&&3;
+
     a4_helper := &&&&^&&&&&&&&&a3;
     a4 := ^^^^^^^^^^^^a4_helper;
-    ret a4;
+
+    a5 := a5_fn();
+
+    a6 := (^^&&a5_fn)();
+
+    a7 := (^&(fn() i64 { ret 3; }))();
+
+    a8_helper1 := &&bad;
+    a8_helper2 := &&bar;
+    ^a8_helper1 = ^a8_helper2;
+    a8 := (^^a8_helper1)();
+
+    a9 := testA9();
+
+    a10 := testStruct1();
+
+    a11 := testStruct2();
+
+    a12 := testNestedCall();
+
+    ret a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12;
+}
+
+type S struct {
+	x: struct {
+		p1: i64,
+		p2: i64
+	},
+	y: i64
+}
+
+fn foo() {
+    ret bar;
+}
+
+fn bar() i64 {
+    ret 3;
+}
+
+fn apply(a: fn(n: i64) i64, b: i64) {
+    ret a(b);
+}
+
+fn apply_overboard(a: fn(n: i64) i64, b: i64) {
+    ret fn(f: fn(n: i64) i64, g: i64) {
+        ret f(g);
+    }(a, b);
+}
+
+fn inc(n: i64) {
+    ret n + 1;
+}
+
+fn a5_fn() {
+    f := fn() i64 { ret 3; };
+    p := &f;
+    ret (^p)();
+}
+
+fn bad() i64 { ret 999; }
+
+fn testA9Helper() {
+    a9 := bad();
+    a9_p := &&&a9;
+    ^^^a9_p = 3;
+    ret ^^^a9_p;
+}
+
+fn testA9() {
+    ret testA9Helper();
+}
+
+fn testStruct1() {
+	f: S;
+	f.y = 3;
+	ret ^^&&(f.y);
+}
+
+fn testStruct2() {
+	f: S;
+	f.y = 3;
+	ret f.y;
+}
+
+type point struct {
+    x: i64,
+    y: i64
+}
+
+fn point_get_x(p: point) { ret p.y; }
+
+fn point_id(p: point) { ret p; }
+
+fn testNestedCall() {
+    p: point;
+    p.y = 3;
+    ret point_get_x(point_id(point_id(point_id(point_id(point_id(point_id(p)))))));
 }
