@@ -289,6 +289,10 @@ void resolveIntLiteral(Semantic *semantic, Node *node) {
     node->typeInfo = new Node(NodeTypekind::INT_LITERAL);
 }
 
+void resolveBooleanLiteral(Semantic *semantic, Node *node) {
+    node->typeInfo = new Node(NodeTypekind::BOOLEAN);
+}
+
 void resolveSymbol(Semantic *semantic, Node *node) {
     node->resolved = node->scope->find(node->symbolData.atomId);
 
@@ -339,6 +343,7 @@ void resolveDecl(Semantic *semantic, Node *node) {
 void resolveType(Semantic *semantic, Node *node) {
     switch (node->typeData.kind) {
         case NodeTypekind::NONE:
+        case NodeTypekind::BOOLEAN:
         case NodeTypekind::EXPOSED_TYPE:
         case NodeTypekind::EXPOSED_ANY:
         case NodeTypekind::INT_LITERAL:
@@ -808,12 +813,8 @@ void resolveDot(Semantic *semantic, Node *node) {
     resolveDot(semantic, node, resolve(node->dotData.lhs), node->dotData.rhs);
 }
 
-void resolveAssert(Semantic *semantic, Node *node) {
-    semantic->resolveTypes(node->nodeData);
-    if (node->nodeData->typeInfo->typeData.kind != NodeTypekind::BOOLEAN) {
-        semantic->reportError({node, node->nodeData},
-                              Error{node->nodeData->region, "condition for assert must be a boolean"});
-    }
+void resolvePanic(Semantic *semantic, Node *node) {
+    // nothing to do here, we're just gonna panic anyway...
 }
 
 void resolveStructLiteral(Semantic *semantic, Node *node) {
@@ -898,9 +899,6 @@ void resolveTypeof(Semantic *semantic, Node *node) {
     node->typeInfo = new Node(NodeTypekind::EXPOSED_TYPE);
 
     node->staticValue = node->nodeData->typeInfo;
-
-//    node->typeInfo->resolved = node->nodeData->typeInfo;
-//    node->resolved = node->nodeData->typeInfo;
 }
 
 void Semantic::resolveTypes(Node *node) {
@@ -955,8 +953,8 @@ void Semantic::resolveTypes(Node *node) {
         case NodeType::DOT: {
             resolveDot(this, node);
         } break;
-        case NodeType::ASSERT: {
-            resolveAssert(this, node);
+        case NodeType::PANIC: {
+            resolvePanic(this, node);
         } break;
         case NodeType::STRUCT_LITERAL: {
             resolveStructLiteral(this, node);
@@ -969,6 +967,9 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::TYPEOF: {
             resolveTypeof(this, node);
+        } break;
+        case NodeType::BOOLEAN_LITERAL: {
+            resolveBooleanLiteral(this, node);
         } break;
         default: assert(false);
     }

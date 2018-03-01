@@ -16,6 +16,9 @@ LlvmGen::LlvmGen() : builder(context), module(llvm::make_unique<llvm::Module>("m
     TheFPM->add(llvm::createPromoteMemoryToRegisterPass());
 
     TheFPM->doInitialization();
+
+    llvm::FunctionType *panicType = llvm::FunctionType::get(builder.getVoidTy(), { builder.getInt8Ty()->getPointerTo() }, false);
+    panicFunc = module->getOrInsertFunction("panic", panicType);
 }
 
 llvm::Type *LlvmGen::typeFor(Node *node) {
@@ -145,8 +148,13 @@ void LlvmGen::gen(Node *node) {
                 }
             }
 
+            auto didTerminate = false;
             for (const auto& stmt : node->fnDeclData.body) {
+                if (stmt->type == NodeType::RET || stmt->type == NodeType::PANIC) { didTerminate = true; }
                 gen(stmt);
+            }
+            if (!didTerminate) {
+                builder.CreateRetVoid();
             }
 
             if (currentBB) {
@@ -158,7 +166,7 @@ void LlvmGen::gen(Node *node) {
             verifyFunction(*F, &llvm::errs());
 
             // DO_OPTIMIZE
-//            TheFPM->run(*F);
+            TheFPM->run(*F);
         } break;
         case NodeType::RET: {
             gen(node->retData.value);
@@ -166,6 +174,9 @@ void LlvmGen::gen(Node *node) {
         } break;
         case NodeType::INT_LITERAL: {
             node->llvmData = llvm::ConstantInt::get(typeFor(node->typeInfo), (uint64_t) node->intLiteralData.value);
+        } break;
+        case NodeType::BOOLEAN_LITERAL: {
+            node->llvmData = llvm::ConstantInt::get(typeFor(node->typeInfo), (uint64_t) node->boolLiteralData.value ? 1 : 0);
         } break;
         case NodeType::DECL: {
             auto data = node->declData;
@@ -203,7 +214,7 @@ void LlvmGen::gen(Node *node) {
 
             node->llvmData = builder.CreateCall(rvalueFor(resolvedFn), args);
 
-            if (node->isLocal) {
+            if (node->isLocal && node->typeInfo->typeData.kind != NodeTypekind::NONE) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
         } break;
@@ -389,26 +400,30 @@ void LlvmGen::gen(Node *node) {
             builder.CreateCondBr(rvalueFor(node->ifData.condition), thenBlock, elseBlock);
 
             builder.SetInsertPoint(thenBlock);
-            auto didRet = false;
+            auto didTerminate = false;
             for (auto stmt : node->ifData.stmts) {
-                if (stmt->type == NodeType::RET) { didRet = true; }
+                if (stmt->type == NodeType::RET || stmt->type == NodeType::PANIC) { didTerminate = true; }
                 gen(stmt);
             }
-            if (!didRet) {
+            if (!didTerminate) {
                 builder.CreateBr(mergeBlock);
             }
 
             builder.SetInsertPoint(elseBlock);
-            didRet = false;
+            didTerminate = false;
             for (auto stmt : node->ifData.elseStmts) {
-                if (stmt->type == NodeType::RET) { didRet = true; }
+                if (stmt->type == NodeType::RET || stmt->type == NodeType::PANIC) { didTerminate = true; }
                 gen(stmt);
             }
-            if (!didRet) {
+            if (!didTerminate) {
                 builder.CreateBr(mergeBlock);
             }
 
             builder.SetInsertPoint(mergeBlock);
+        } break;
+        case NodeType::PANIC: {
+            builder.CreateCall(panicFunc, { builder.CreateGlobalStringPtr("assertion failed!!!") });
+            builder.CreateRet(builder.getInt64(0));
         } break;
         default: assert(false);
     }

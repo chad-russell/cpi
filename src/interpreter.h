@@ -65,7 +65,7 @@ void interpretJump(Interpreter *interp);
 void interpretStore(Interpreter *interp);
 void interpretStoreConst(Interpreter *interp);
 void interpretExit(Interpreter *interp);
-void interpretAssert(Interpreter *interp);
+void interpretPanic(Interpreter *interp);
 
 class Interpreter {
 public:
@@ -219,7 +219,7 @@ public:
             interpretCall,
             interpretRet,
             interpretExit,
-            interpretAssert};
+            interpretPanic};
   }
 
     void interpret();

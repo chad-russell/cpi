@@ -143,9 +143,6 @@ ostream &operator<<(ostream &os, NodeType type) {
         case NodeType::CAST: {
             return os << "cast";
         } break;
-        case NodeType::ASSERT: {
-            return os << "assert";
-        } break;
         case NodeType::RUN: {
             return os << "run";
         } break;

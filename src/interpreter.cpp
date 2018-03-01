@@ -151,13 +151,10 @@ void interpretExit(Interpreter *interp) {
     interp->terminated = true;
 }
 
-void interpretAssert(Interpreter *interp) {
-    auto condition = interp->read<int32_t>();
-    if (condition == 0) {
-        cout << "ASSERTION FAILURE!!!!" << endl << "> ";
-        printStmt(interp, interp->lastStmtPc, true);
-        exit(0);
-    }
+void interpretPanic(Interpreter *interp) {
+    cout << "assertion failed!!!" << endl << "> ";
+    printStmt(interp, interp->lastStmtPc, true);
+    exit(0);
 }
 
 // calli

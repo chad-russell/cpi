@@ -237,7 +237,6 @@ int main(int argc, char **argv) {
         }
 
         cout << interp->readFromStack<int32_t>(0) << endl;
-//        cout << "step count: " << interp->stepCount << endl;
     }
 
     if (outputFileName != nullptr) {
@@ -260,7 +259,6 @@ int main(int argc, char **argv) {
             out << instructions;
         } else if (endsWith(outputFileName, ".ll")) {
             // .ll
-
             auto llvmGen = new LlvmGen();
             llvmGen->gen(parser->mainFn);
             llvmGen->module->print(llvm::errs(), nullptr);

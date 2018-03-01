@@ -54,7 +54,7 @@ enum class NodeType {
     MODULE,
     IMPORT,
     CAST,
-    ASSERT,
+    PANIC,
     RUN,
     TYPEOF,
 };
@@ -133,12 +133,12 @@ enum class LexerTokenType : int32_t {
     MODULE,
     IMPORT,
     CAST,
-    ASSERT,
     SEMICOLON,
     RUN,
     EXPOSED_TYPE,
     EXPOSED_ANY,
     TYPEOF,
+    PANIC
 };
 
 struct SourceInfo {

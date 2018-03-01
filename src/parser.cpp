@@ -334,7 +334,7 @@ Node *Parser::parseScopedStmt() {
     auto saved = lexer->front.region.start;
     auto lvalue = parseLvalue();
 
-    if (lvalue->type == NodeType::FN_CALL || lvalue->type == NodeType::ASSERT) {
+    if (lvalue->type == NodeType::FN_CALL || lvalue->type == NodeType::PANIC) {
         expectSemicolon();
         return lvalue;
     }
@@ -582,23 +582,19 @@ Node *Parser::parseLvalue() {
             auto symbol = parseSymbol();
             return parseLvalueHelper(symbol, saved);
         }
-        case LexerTokenType::ASSERT: {
+        case LexerTokenType::PANIC: {
             popFront();
-            auto assertNode = new Node(lexer->srcInfo, &allNodes, NodeType::ASSERT, scopes.top());
+            auto panicNode = new Node(lexer->srcInfo, &allNodes, NodeType::PANIC, scopes.top());
             expect(LexerTokenType::LPAREN, "(");
 
-            // todo(chad): get rid of this.
-            assertNode->nodeData = parseRvalue();
-            addLocal(assertNode->nodeData);
-
-            assertNode->sourceMapStatement = true;
+            panicNode->sourceMapStatement = true;
             expect(LexerTokenType::RPAREN, ")");
 
-            assertNode->region.start = saved;
-            assertNode->region.end = lexer->front.region.start;
+            panicNode->region.start = saved;
+            panicNode->region.end = lexer->front.region.start;
 
-            return assertNode;
-        } break;
+            return panicNode;
+        }
         default: {
             auto savedType = lexer->front.type;
             popFront();
@@ -623,6 +619,10 @@ Node *Parser::parseType() {
     type->region = saved.region;
 
     switch (saved.type) {
+        case LexerTokenType::BOOLEAN: {
+            popFront();
+            type->typeData.kind = NodeTypekind::BOOLEAN;
+        } break;
         case LexerTokenType::I32: {
             popFront();
             type->typeData.kind = NodeTypekind::I32;
@@ -741,6 +741,16 @@ Node *Parser::parseLvalueOrLiteral() {
     } else if (lexer->front.type == LexerTokenType::FN) {
         symbol = parseFnDecl();
         symbol->fnDeclData.isLiteral = true;
+    } else if (lexer->front.type == LexerTokenType::TRUE_) {
+        symbol = new Node(lexer->srcInfo, &allNodes, NodeType::BOOLEAN_LITERAL, scopes.top());
+        symbol->boolLiteralData.value = true;
+        symbol->region = lexer->front.region;
+        popFront();
+    } else if (lexer->front.type == LexerTokenType::FALSE_) {
+        symbol = new Node(lexer->srcInfo, &allNodes, NodeType::BOOLEAN_LITERAL, scopes.top());
+        symbol->boolLiteralData.value = false;
+        symbol->region = lexer->front.region;
+        popFront();
     } else if (lexer->front.type == LexerTokenType::LCURLY) {
         symbol = parseStructLiteral();
     } else if (lexer->front.type == LexerTokenType::RUN) {

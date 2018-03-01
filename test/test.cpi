@@ -104,6 +104,17 @@ fn main() {
     ret 0;
 }
 
+fn saved() {
+
+}
+
+fn assert(b: bool) {
+    if (b == false) {
+        panic();
+    }
+    ret 0;
+}
+
 fn apply_static(f : Any)(t: i32) {
     ret f(t);
 }
@@ -517,4 +528,6 @@ fn test23() {
     assert(3 == ^^bar.baz.qux.value);
     assert(3 == ^^baz.qux.value);
     assert(3 == ^^qux.value);
+
+    ret 0;
 }

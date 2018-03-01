@@ -116,12 +116,12 @@ int AssemblyLexer::getArgCount(TokenType tt) {
                || tt == TokenType::JUMP
                || tt == TokenType::CALL
                || tt == TokenType::CALLI
-               || tt == TokenType::STORECONST
-               || tt == TokenType::ASSERT) {
+               || tt == TokenType::STORECONST) {
         return 1;
     } else if (tt == TokenType::RET
                || tt == TokenType::EXIT
-               || tt == TokenType::COMMENT) {
+               || tt == TokenType::COMMENT
+               || tt == TokenType::PANIC) {
         return 0;
     }
 
@@ -335,7 +335,7 @@ const vector<string> AssemblyLexer::tokenTypeStrings = {
     "CALL", 
     "RET", 
     "EXIT",
-    "ASSERT",
+    "PANIC",
 
     // literals
     "CONSTI8", "CONSTI16", "CONSTI32", "CONSTI64", "CONSTF32", "CONSTF64",
@@ -390,7 +390,7 @@ const vector<string> AssemblyLexer::instructionStrings = {
     "CALL", 
     "RET", 
     "EXIT",
-    "ASSERT",
+    "PANIC",
 
     // literals
     "CONSTI8", "CONSTI16", "CONSTI32", "CONSTI64", "CONSTF32", "CONSTF64",
@@ -510,7 +510,7 @@ void MnemonicPrinter::step() {
         readTypeAndInt();
         instructionString.append(" ");
         readTypeAndInt();
-    } else if (startsWith(inst, "CALLI") || startsWith(inst, "ASSERT")) {
+    } else if (startsWith(inst, "CALLI")) {
         instructionString.append(inst);
         instructionString.append(" ");
         readTypeAndInt();
@@ -563,7 +563,6 @@ void MnemonicPrinter::readTypeAndInt()
         instructionString.append(to_string(consume<int32_t>()));
     } else {
         instructionString.append("<<<ERROR>>>");
-//        assert(false);
     }
 }
 
@@ -580,6 +579,5 @@ void MnemonicPrinter::readTypeAndFloat()
         instructionString.append(to_string(consume<double>()));
     } else {
         instructionString.append("<<<error>>>");
-//        assert(false);
     }
 }

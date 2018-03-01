@@ -23,6 +23,8 @@ public:
     llvm::IRBuilder<> builder;
     unique_ptr<llvm::Module> module;
 
+    llvm::Constant *panicFunc;
+
     // Create a new pass manager attached to it.
     unique_ptr<llvm::legacy::FunctionPassManager> TheFPM;
 

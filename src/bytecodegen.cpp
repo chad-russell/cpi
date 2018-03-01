@@ -19,6 +19,7 @@ void BytecodeGen::binopHelper(string instructionStr, Node *node) {
     auto kind = resolved->typeData.kind;
 
     switch (kind) {
+        case NodeTypekind::BOOLEAN:
         case NodeTypekind::I32: {
             instructionStr.append("I32");
             bytecodeStr = "RELI32";
@@ -131,6 +132,11 @@ void BytecodeGen::gen(Node *node) {
                 default: assert(false);
             }
         } break;
+        case NodeType::BOOLEAN_LITERAL: {
+            append(node->bytecode, Instruction::CONSTI32);
+            auto litData = static_cast<int32_t>(node->boolLiteralData.value ? 1 : 0);
+            append(node->bytecode, toBytes(litData));
+        } break;
         case NodeType::STRUCT_LITERAL: {
             // nothing to do here! wait until we actually need to store it somewhere
         } break;
@@ -218,6 +224,7 @@ void BytecodeGen::gen(Node *node) {
                         append(node->bytecode, toBytes32(localOffset));
                     }
                 } break;
+                case NodeTypekind::BOOLEAN:
                 case NodeTypekind::POINTER:
                 case NodeTypekind::I32: {
                     append(node->bytecode, Instruction::RELI32);
@@ -478,11 +485,8 @@ void BytecodeGen::gen(Node *node) {
                 node->localOffset = hijackedOffsetLocation + offsetWords;
             }
         } break;
-        case NodeType::ASSERT: {
-            gen(node->nodeData);
-            append(instructions, Instruction::ASSERT);
-            append(instructions, Instruction::RELI32);
-            append(instructions, toBytes(node->nodeData->localOffset));
+        case NodeType::PANIC: {
+            append(instructions, Instruction::PANIC);
         } break;
         case NodeType::IF: {
             gen(node->ifData.condition);
@@ -554,6 +558,14 @@ void BytecodeGen::storeValue(vector<unsigned char> &instructions, Node *node, in
     node = resolve(node);
 
     switch (node->type) {
+        case NodeType::BOOLEAN_LITERAL: {
+            append(instructions, Instruction::STORECONST);
+
+            append(instructions, Instruction::RELCONSTI32);
+            append(instructions, toBytes(offset));
+
+            append(instructions, node->bytecode);
+        } break;
         case NodeType::INT_LITERAL: {
             append(instructions, Instruction::STORECONST);
 

@@ -37,7 +37,7 @@ set(CMAKE_CXX_FLAGS "-I/usr/local/Cellar/llvm/5.0.1/include -L/usr/local/Cellar/
     -std=c++14")
 
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
-set(CMAKE_CXX_FLAGS_RELEASE "-g -O2")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 set(CMAKE_BUILD_TYPE Debug)
 #set(CMAKE_BUILD_TYPE Release)
