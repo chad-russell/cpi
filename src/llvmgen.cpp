@@ -155,11 +155,10 @@ void LlvmGen::gen(Node *node) {
 
             currentFnDecl = savedFnDecl;
 
-            // DO_OPTIMIZE
-            TheFPM->run(*F);
-
             verifyFunction(*F, &llvm::errs());
 
+            // DO_OPTIMIZE
+//            TheFPM->run(*F);
         } break;
         case NodeType::RET: {
             gen(node->retData.value);
@@ -226,6 +225,9 @@ void LlvmGen::gen(Node *node) {
                 } break;
                 case LexerTokenType::SUB: {
                     value = builder.CreateSub(rvalueFor(node->binopData.lhs), rvalueFor(node->binopData.rhs));
+                } break;
+                case LexerTokenType::EQ_EQ: {
+                    value = builder.CreateICmpEQ(rvalueFor(node->binopData.lhs), rvalueFor(node->binopData.rhs));
                 } break;
                 default: assert(false);
             }
@@ -376,6 +378,37 @@ void LlvmGen::gen(Node *node) {
         } break;
         case NodeType::TYPE: {
             // nothing to do
+        } break;
+        case NodeType::IF: {
+            auto thenBlock = llvm::BasicBlock::Create(context, "then", (llvm::Function *) currentFnDecl->llvmData);
+            auto elseBlock = llvm::BasicBlock::Create(context, "else", (llvm::Function *) currentFnDecl->llvmData);
+            auto mergeBlock = llvm::BasicBlock::Create(context, "if_cont", (llvm::Function *) currentFnDecl->llvmData);
+
+            gen(node->ifData.condition);
+
+            builder.CreateCondBr(rvalueFor(node->ifData.condition), thenBlock, elseBlock);
+
+            builder.SetInsertPoint(thenBlock);
+            auto didRet = false;
+            for (auto stmt : node->ifData.stmts) {
+                if (stmt->type == NodeType::RET) { didRet = true; }
+                gen(stmt);
+            }
+            if (!didRet) {
+                builder.CreateBr(mergeBlock);
+            }
+
+            builder.SetInsertPoint(elseBlock);
+            didRet = false;
+            for (auto stmt : node->ifData.elseStmts) {
+                if (stmt->type == NodeType::RET) { didRet = true; }
+                gen(stmt);
+            }
+            if (!didRet) {
+                builder.CreateBr(mergeBlock);
+            }
+
+            builder.SetInsertPoint(mergeBlock);
         } break;
         default: assert(false);
     }

@@ -63,7 +63,73 @@ fn main() {
 
     a25 := test25();
 
-    ret a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14 + a15 + a16 + a17 + a18 + a19 + a20 + a21 + a22 + a23 + a24 + a25;
+    a26 := id!(i64)(3);
+
+    p: pair;
+    p.x = 3;
+    a27 := id(p).x;
+
+    a28 := deref_ct(&3);
+
+    a29 := add_static!(1, 1)(1);
+
+    a30 := apply_static!(add_one)(2);
+
+    a31 := apply_static!(fn(x: i64) { ret x + 3; })(3) / 2;
+
+    baked := id!(pair);
+    a32 := baked(p).x;
+
+    a33 := fib(6) - 10;
+
+    a34 := stupid_sqrt(5) + 3;
+
+    a35 := stupid_sqrt(9);
+
+    ret a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14 + a15
+        + a16 + a17 + a18 + a19 + a20 + a21 + a22 + a23 + a24 + a25 + a26 + a27 + a28 + a29 + a30
+        + a31 + a32 + a33 + a34 + a35;
+}
+
+fn stupid_sqrt(n: i64) {
+    if n == 1 {
+        ret 1;
+    } else if n == 4 {
+        ret 2;
+    } else if n == 9 {
+        ret 3;
+    } else if n == 16 {
+        ret 4;
+    }
+
+    -- couldn't find a sqrt, oh well!
+    ret 0;
+}
+
+fn fib(n: i32) {
+    if n == 0 { ret 1; }
+    if n == 1 { ret 1; }
+    ret fib(n - 1) + fib(n - 2);
+}
+
+fn add_one(T := typeof(n))(n: i64) {
+    ret n + 1;
+}
+
+fn apply_static(f : Any)(t: i64) {
+    ret f(t);
+}
+
+fn add_static(T: i64, U: i64)(m: i64) {
+    ret T + U + m;
+}
+
+fn id(T := typeof(t))(t: T) T {
+    ret t;
+}
+
+fn deref_ct(T := typeof(t))(t: T) {
+    ret ^t;
 }
 
 fn testSetter() {
