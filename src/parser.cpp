@@ -182,6 +182,7 @@ vector<Node *> Parser::parseValueParams() {
 Node *Parser::parseFnDecl(bool polymorphCopy) {
     auto decl = new Node(lexer->srcInfo, &allNodes, NodeType::FN_DECL, scopes.top());
     decl->region.start = lexer->front.region.start;
+    decl->sourceMapStatement = true;
 
     auto savedCurrentFnDecl = currentFnDecl;
     currentFnDecl = decl;
@@ -248,7 +249,6 @@ Node *Parser::parseFnDecl(bool polymorphCopy) {
     while (!lexer->isEmpty() && lexer->front.type != LexerTokenType::RCURLY) {
         auto scopedStmt = parseScopedStmt();
         if (scopedStmt != nullptr) {
-            scopedStmt->sourceMapStatement = true;
             decl->fnDeclData.body.push_back(scopedStmt);
         }
     }
@@ -290,6 +290,7 @@ Node *Parser::parseTypeDecl() {
     // todo(chad): else  / else if
 
     typeDecl->region = Region{lexer->srcInfo, saved, end};
+    typeDecl->sourceMapStatement = true;
 
     return typeDecl;
 }
@@ -335,6 +336,7 @@ Node *Parser::parseScopedStmt() {
     auto lvalue = parseLvalue();
 
     if (lvalue->type == NodeType::FN_CALL || lvalue->type == NodeType::PANIC) {
+        lvalue->sourceMapStatement = true;
         expectSemicolon();
         return lvalue;
     }
@@ -367,6 +369,7 @@ Node *Parser::parseScopedStmt() {
         decl->declData.type = type;
 
         decl->region = {lexer->srcInfo, saved, last.region.end};
+        decl->sourceMapStatement = true;
 
         scopeInsert(lvalue->symbolData.atomId, decl);
 
@@ -393,6 +396,7 @@ Node *Parser::parseScopedStmt() {
         decl->declData.initialValue = rvalue;
 
         decl->region = {lexer->srcInfo, saved, last.region.end};
+        decl->sourceMapStatement = true;
 
         scopeInsert(lvalue->symbolData.atomId, decl);
 
@@ -418,9 +422,11 @@ Node *Parser::parseScopedStmt() {
         ass->assignData.rhs = rvalue;
         ass->region = {lexer->srcInfo, saved, last.region.end};
 
-        if (lvalue->type == NodeType::DEREF || lvalue->type == NodeType::DOT) {
+        if (lvalue->type == NodeType::DEREF || lvalue->type == NodeType::DOT || lvalue->type == NodeType::ARRAY_INDEX) {
             addLocal(rvalue);
         }
+
+        ass->sourceMapStatement = true;
 
         return ass;
     }
@@ -437,12 +443,15 @@ Node *Parser::parseIf() {
     if_->region.start = saved;
     if_->ifData.condition = parseRvalue();
 
+    if_->sourceMapStatement = true;
+    if_->ifData.condition->sourceMapStatement = true;
+
     expect(LexerTokenType::LCURLY, "{");
     while (lexer->front.type != LexerTokenType::RCURLY) {
         if_->ifData.stmts.push_back(parseScopedStmt());
     }
 
-    if_->region.end = lexer->front.region.start;
+    if_->region.end = lexer->front.region.end;
     expect(LexerTokenType::RCURLY, "}");
 
     if (lexer->front.type == LexerTokenType::ELSE) {
@@ -480,6 +489,8 @@ Node *Parser::parseRet() {
 
     expectSemicolon();
 
+    ret->sourceMapStatement = true;
+
     return ret;
 }
 
@@ -500,6 +511,15 @@ Node *Parser::buildDots(stack<Node *> rvalues) {
         top->fnCallData.fn = buildDots(rvalues);
 
         top->region = {lexer->srcInfo, top->fnCallData.fn->region.start, top->region.end};
+        return top;
+    } else if (top->type == NodeType::ARRAY_INDEX) {
+        rvalues.pop();
+
+        top->type = NodeType::ARRAY_INDEX;
+
+        top->arrayIndexData.target = buildDots(rvalues);
+
+        top->region = {lexer->srcInfo, top->arrayIndexData.target->region.start, top->region.end};
         return top;
     } else if (top->type == NodeType::SYMBOL) {
         rvalues.pop();
@@ -526,15 +546,25 @@ Node *Parser::buildDots(stack<Node *> rvalues) {
     exit(-1);
 }
 
+void maybePushArrayIndexOrFnCalls(Parser *parser, stack<Node *> &rvalues) {
+    while (parser->lexer->front.type == LexerTokenType::LPAREN
+           || parser->lexer->front.type == LexerTokenType::NOT
+           || parser->lexer->front.type == LexerTokenType::LSQUARE) {
+        if (parser->lexer->front.type == LexerTokenType::LSQUARE) {
+            auto arrIndex = parser->parseArrayIndex();
+            rvalues.push(arrIndex);
+        } else {
+            auto fnCall = parser->parseFnCall();
+            rvalues.push(fnCall);
+        }
+    }
+}
+
 Node *Parser::parseLvalueHelper(Node *symbol, Location saved) {
     stack<Node *> rvalues;
     rvalues.push(symbol);
 
-    while (lexer->front.type == LexerTokenType::LPAREN
-            || lexer->front.type == LexerTokenType::NOT) {
-        auto fnCall = parseFnCall();
-        rvalues.push(fnCall);
-    }
+    maybePushArrayIndexOrFnCalls(this, rvalues);
 
     // ('.' lvalue_simple)*
     while (lexer->front.type == LexerTokenType::DOT) {
@@ -542,11 +572,7 @@ Node *Parser::parseLvalueHelper(Node *symbol, Location saved) {
         auto sym = parseSymbol();
         rvalues.push(sym);
 
-        while (lexer->front.type == LexerTokenType::LPAREN
-                || lexer->front.type == LexerTokenType::NOT) {
-            auto fnCall = parseFnCall();
-            rvalues.push(fnCall);
-        }
+        maybePushArrayIndexOrFnCalls(this, rvalues);
     }
 
     if (rvalues.size() == 1) {
@@ -574,6 +600,10 @@ Node *Parser::parseLvalue() {
         popFront();
         auto deref = new Node(lexer->srcInfo, &allNodes, NodeType::DEREF, scopes.top());
         deref->derefData.target = parseRvalueSimple();
+
+        addLocal(deref->derefData.target);
+        addLocal(deref);
+
         return deref;
     }
 
@@ -673,6 +703,18 @@ Node *Parser::parseType() {
             type->region = lexer->front.region;
             popFront();
             type->typeData.kind = NodeTypekind::EXPOSED_ANY;
+        } break;
+        case LexerTokenType::LSQUARE: {
+            type->region.start = lexer->front.region.start;
+            popFront(); // '['
+
+            expect(LexerTokenType::RSQUARE, "]");
+
+            auto elementType = parseType();
+            type->region.end = elementType->region.end;
+
+            type->typeData.kind = NodeTypekind::ARRAY;
+            type->typeData.arrayTypeData.elementType = elementType;
         } break;
         default: {
             ostringstream s("");
@@ -778,7 +820,7 @@ Node *Parser::parseRvalueSimple() {
         return addrOf;
     }
 
-    // * (rvalue_simple)
+    // ^ (rvalue_simple)
     if (lexer->front.type == LexerTokenType::DEREF) {
         popFront();
         auto deref = new Node(lexer->srcInfo, &allNodes, NodeType::DEREF, scopes.top());
@@ -790,6 +832,24 @@ Node *Parser::parseRvalueSimple() {
 
         deref->region = Region{lexer->srcInfo, saved, deref->derefData.target->region.end};
         return deref;
+    }
+
+    // cast
+    if (lexer->front.type == LexerTokenType::CAST) {
+        auto cast = new Node(lexer->srcInfo, &allNodes, NodeType::CAST, scopes.top());
+        cast->region.start = lexer->front.region.start;
+
+        popFront();
+
+        expect(LexerTokenType::LPAREN, "(");
+        cast->castData.type = parseType();
+        expect(LexerTokenType::RPAREN, ")");
+
+        cast->castData.value = parseRvalueSimple();
+
+        cast->region.end = cast->castData.value->region.end;
+
+        return cast;
     }
 
     return parseLvalueOrLiteral();
@@ -930,6 +990,19 @@ void Parser::addLocal(Node *local) {
     }
 }
 
+Node *Parser::parseArrayIndex() {
+    auto node = new Node(lexer->srcInfo, &allNodes, NodeType::ARRAY_INDEX, scopes.top());
+
+    expect(LexerTokenType::LSQUARE, "[");
+    node->arrayIndexData.indexValue = parseRvalue();
+    addLocal(node->arrayIndexData.indexValue);
+    expect(LexerTokenType::RSQUARE, "]");
+
+    node->region.end = last.region.end;
+
+    return node;
+}
+
 Node *Parser::parseFnCall() {
     auto call = new Node(lexer->srcInfo, &allNodes, NodeType::FN_CALL, scopes.top());
 
@@ -951,6 +1024,7 @@ Node *Parser::parseFnCall() {
 
     call->region.end = last.region.end;
 
+    // todo(chad): do we need this??
     addLocal(call);
 
     return call;

@@ -152,8 +152,8 @@ void interpretExit(Interpreter *interp) {
 }
 
 void interpretPanic(Interpreter *interp) {
-    cout << "assertion failed!!!" << endl << "> ";
-    printStmt(interp, interp->lastStmtPc, true);
+    cout << "assertion failed!!!" << endl;
+//    printStmt(interp, interp->lastStmtPc, true);
     exit(0);
 }
 
@@ -265,6 +265,12 @@ void interpretStoreConst(Interpreter *interp) {
     } else if (inst == Instruction::CONSTI64) {
         int64_t value = interp->consume<int64_t>();
         memcpy(&interp->stack[storeOffset], &value, sizeof(int64_t));
+    } else if (inst == Instruction::CONSTF32) {
+        auto value = interp->consume<float>();
+        memcpy(&interp->stack[storeOffset], &value, sizeof(float));
+    } else if (inst == Instruction::CONSTF64) {
+        auto value = interp->consume<double>();
+        memcpy(&interp->stack[storeOffset], &value, sizeof(double));
     } else {
         assert(false);
     }

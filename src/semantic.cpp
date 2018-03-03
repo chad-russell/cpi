@@ -16,10 +16,13 @@ int32_t typeSize(Node *type) {
         case NodeTypekind::BOOLEAN:
         case NodeTypekind::I32:
         case NodeTypekind::FN:
-        case NodeTypekind::POINTER:
+        case NodeTypekind::FLOAT_LITERAL:
+        case NodeTypekind::F32:
             return 4;
+        case NodeTypekind::POINTER:
         case NodeTypekind::INT_LITERAL:
         case NodeTypekind::I64:
+        case NodeTypekind::F64:
             return 8;
         case NodeTypekind::SYMBOL:
             assert(false);
@@ -41,6 +44,10 @@ int32_t typeSize(Node *type) {
 
             return total;
         }
+        case NodeTypekind::ARRAY: {
+            // for now the count is ALWAYS an i32, and the data is always a pointer which means it's 4 bytes as well
+            return 8;
+        } break;
         default:
             assert(false);
     }
@@ -203,7 +210,7 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
     }
     if (data->returnType != nullptr
         && data->returnType ->typeData.kind == NodeTypekind::FLOAT_LITERAL) {
-        data->returnType->typeData.kind = NodeTypekind::F64;
+        data->returnType->typeData.kind = NodeTypekind::F32;
     }
 
     node->typeInfo->typeData.fnTypeData.returnType = data->returnType;
@@ -293,6 +300,71 @@ void resolveBooleanLiteral(Semantic *semantic, Node *node) {
     node->typeInfo = new Node(NodeTypekind::BOOLEAN);
 }
 
+void resolveArrayIndex(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->arrayIndexData.target);
+    semantic->resolveTypes(node->arrayIndexData.indexValue);
+
+    switch (node->arrayIndexData.indexValue->typeInfo->typeData.kind) {
+        case NodeTypekind::INT_LITERAL:
+        case NodeTypekind::I32:
+        case NodeTypekind::I64:
+            break;
+        default: {
+            semantic->reportError({node->arrayIndexData.target},
+                                  Error{node->arrayIndexData.target->region,
+                                        "expected some kind of integer for array index"});
+        }
+    }
+
+    if (node->arrayIndexData.target->typeInfo->typeData.kind != NodeTypekind::ARRAY) {
+        semantic->reportError({node}, Error{node->region, "cannot index a non-array"});
+    }
+
+    node->typeInfo = node->arrayIndexData.target->typeInfo->typeData.arrayTypeData.elementType;
+
+    // a[i] <==> ^((cast(*i32) a) + i * sizeof(i32)), for example (if typeof(a) is []i32)
+    // todo(chad): our size calculations may not always be the same as llvm's, because of alignment ets. etc. So make a sizeof(...) operator
+    auto typeSizeNode = new Node();
+    typeSizeNode->type = NodeType::INT_LITERAL;
+    typeSizeNode->intLiteralData.value = typeSize(node->typeInfo);
+
+    auto iTimesElementSize = new Node(node->region.srcInfo, nullptr, NodeType::BINOP, node->scope);
+    iTimesElementSize->binopData.type = LexerTokenType::MUL;
+    iTimesElementSize->binopData.lhs = node->arrayIndexData.indexValue;
+    iTimesElementSize->binopData.rhs = typeSizeNode;
+
+    semantic->addLocal(iTimesElementSize);
+
+    auto aCasted = new Node();
+    aCasted->type = NodeType::CAST;
+    aCasted->castData.isCastFromArrayToDataPtr = true;
+    aCasted->castData.type = new Node(NodeTypekind::POINTER);
+    aCasted->castData.type->typeData.pointerTypeData.underlyingType = node->typeInfo;
+    aCasted->castData.value = node->arrayIndexData.target;
+
+    auto add = new Node(node->region.srcInfo, nullptr, NodeType::BINOP, node->scope);
+    add->binopData.type = LexerTokenType::ADD;
+    add->binopData.lhs = aCasted;
+    add->binopData.rhs = iTimesElementSize;
+
+    auto deref = new Node(node->region.srcInfo, nullptr, NodeType::DEREF, node->scope);
+    deref->derefData.target = add;
+
+    semantic->addLocal(deref->derefData.target);
+    semantic->addLocal(deref);
+
+    node->resolved = deref;
+
+    semantic->resolveTypes(node->resolved);
+}
+
+void resolveCast(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->castData.type);
+    semantic->resolveTypes(node->castData.value);
+
+    node->typeInfo = node->castData.type;
+}
+
 void resolveSymbol(Semantic *semantic, Node *node) {
     node->resolved = node->scope->find(node->symbolData.atomId);
 
@@ -310,132 +382,6 @@ void resolveSymbol(Semantic *semantic, Node *node) {
 
     semantic->resolveTypes(node->resolved);
     node->typeInfo = node->resolved->typeInfo;
-}
-
-void resolveDecl(Semantic *semantic, Node *node) {
-    semantic->resolveTypes(node->declData.type);
-    semantic->resolveTypes(node->declData.initialValue);
-
-    if (node->declData.initialValue != nullptr && node->declData.initialValue->typeInfo == nullptr) {
-        semantic->reportError({node, node->declData.initialValue},
-                              Error{node->declData.initialValue->region, "could not resolve type of initial value for this declaration"});
-        return;
-    }
-
-    // if there is an initial value and a declared type, they should match
-    auto shouldCheckTypeMatch = node->declData.initialValue != nullptr
-                                && node->declData.initialValue->typeInfo != nullptr
-                                && node->declData.type != nullptr;
-    if (shouldCheckTypeMatch && !typesMatch(node->declData.type, node->declData.initialValue->typeInfo)) {
-        ostringstream s("");
-        s << "Type mismatch! wanted " << node->declData.type->typeData.kind
-          << ", got " << node->declData.initialValue->typeInfo->typeData.kind;
-        semantic->reportError({node, node->declData.initialValue, node->declData.type},
-                              Error{node->region, s.str()});
-    }
-    else if (node->declData.type == nullptr) {
-        node->declData.type = node->declData.initialValue->typeInfo;
-    }
-
-    node->typeInfo = node->declData.type;
-}
-
-void resolveType(Semantic *semantic, Node *node) {
-    switch (node->typeData.kind) {
-        case NodeTypekind::NONE:
-        case NodeTypekind::BOOLEAN:
-        case NodeTypekind::EXPOSED_TYPE:
-        case NodeTypekind::EXPOSED_ANY:
-        case NodeTypekind::INT_LITERAL:
-        case NodeTypekind::I32:
-        case NodeTypekind::I64:
-            break;
-        case NodeTypekind::FN: {
-            for (auto param : node->typeData.fnTypeData.params) {
-                semantic->resolveTypes(param);
-            }
-            semantic->resolveTypes(node->typeData.fnTypeData.returnType);
-        } break;
-        case NodeTypekind::STRUCT: {
-            auto total = 0;
-            auto localIndex = 0;
-
-            for (auto param : node->typeData.structTypeData.params) {
-                param->localOffset = total;
-                param->declParamData.index = localIndex;
-
-                semantic->resolveTypes(param);
-
-                total += typeSize(param->declParamData.type);
-                localIndex += 1;
-            }
-        } break;
-        case NodeTypekind::SYMBOL: {
-            node->resolved = node->scope->find(node->typeData.symbolTypeData.atomId);
-
-            if (node->resolved == nullptr) {
-                ostringstream s("");
-                s << "undeclared identifier " << AtomTable::current->backwardAtoms[node->typeData.symbolTypeData.atomId];
-                semantic->reportError({node}, Error{node->region, s.str()});
-                return;
-            }
-
-            auto resolved = resolve(node);
-
-            semantic->resolveTypes(resolved);
-        } break;
-        case NodeTypekind::POINTER: {
-            semantic->resolveTypes(node->typeData.pointerTypeData.underlyingType);
-        } break;
-        default: assert(false);
-    }
-
-    node->typeInfo = new Node(NodeTypekind::EXPOSED_TYPE);
-}
-
-Node *makeTemporary(Semantic *semantic, Node *n) {
-    auto node = new Node();
-    node->typeInfo = n->typeInfo;
-    node->isLocal = true;
-    semantic->currentFnDecl->locals.push_back(node);
-    return node;
-}
-
-void resolveBinop(Semantic *semantic, Node *node) {
-    semantic->resolveTypes(node->binopData.lhs);
-    semantic->resolveTypes(node->binopData.rhs);
-
-    node->binopData.lhsTemporary = makeTemporary(semantic, node->binopData.lhs);
-    node->binopData.rhsTemporary = makeTemporary(semantic, node->binopData.rhs);
-
-    if (node->binopData.lhs->type == NodeType::DOT) {
-        auto newLocalStorage = new Node();
-        newLocalStorage->type = NodeType::TYPE;
-        newLocalStorage->typeInfo = node->binopData.lhs->typeInfo;
-
-        newLocalStorage->isLocal = true;
-        semantic->currentFnDecl->locals.push_back(newLocalStorage);
-    }
-    if (node->binopData.rhs->type == NodeType::DOT) {
-        auto newLocalStorage = new Node();
-        newLocalStorage->type = NodeType::TYPE;
-        newLocalStorage->typeInfo = node->binopData.rhs->typeInfo;
-
-        newLocalStorage->isLocal = true;
-        semantic->currentFnDecl->locals.push_back(newLocalStorage);
-    }
-
-    if (!typesMatch(node->binopData.lhs->typeInfo, node->binopData.rhs->typeInfo)) {
-        semantic->reportError({node, node->binopData.lhs, node->binopData.rhs},
-                              Error{node->region, "type mismatch - both sides of binary operation need to be the same type"});
-    }
-
-
-    if (isBooleanBinop(node->binopData.type)) {
-        node->typeInfo = new Node(NodeTypekind::BOOLEAN);
-    } else {
-        node->typeInfo = node->binopData.lhs->typeInfo;
-    }
 }
 
 bool assignParams(Semantic *semantic,
@@ -520,6 +466,157 @@ bool assignParams(Semantic *semantic,
     givenParams = newParams;
 
     return encounteredError;
+}
+
+void resolveDecl(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->declData.type);
+    semantic->resolveTypes(node->declData.initialValue);
+
+    if (node->declData.initialValue != nullptr && node->declData.initialValue->typeInfo == nullptr) {
+        semantic->reportError({node, node->declData.initialValue},
+                              Error{node->declData.initialValue->region, "could not resolve type of initial value for this declaration"});
+        return;
+    }
+
+    // if there is an initial value and a declared type, they should match
+    auto shouldCheckTypeMatch = node->declData.initialValue != nullptr
+                                && node->declData.initialValue->typeInfo != nullptr
+                                && node->declData.type != nullptr;
+    if (shouldCheckTypeMatch && !typesMatch(node->declData.type, node->declData.initialValue->typeInfo)) {
+        ostringstream s("");
+        s << "Type mismatch! wanted " << node->declData.type->typeData.kind
+          << ", got " << node->declData.initialValue->typeInfo->typeData.kind;
+        semantic->reportError({node, node->declData.initialValue, node->declData.type},
+                              Error{node->region, s.str()});
+    }
+    else if (node->declData.type == nullptr) {
+        node->declData.type = node->declData.initialValue->typeInfo;
+    }
+
+    if (shouldCheckTypeMatch && resolve(node->declData.type)->typeData.kind == NodeTypekind::STRUCT
+            && node->declData.initialValue->type == NodeType::STRUCT_LITERAL) {
+        assignParams(semantic, node, resolve(node->declData.type)->typeData.structTypeData.params, node->declData.initialValue->structLiteralData.params);
+    }
+
+    node->typeInfo = node->declData.type;
+}
+
+void resolveType(Semantic *semantic, Node *node) {
+    switch (node->typeData.kind) {
+        case NodeTypekind::NONE:
+        case NodeTypekind::BOOLEAN:
+        case NodeTypekind::EXPOSED_TYPE:
+        case NodeTypekind::EXPOSED_ANY:
+        case NodeTypekind::INT_LITERAL:
+        case NodeTypekind::FLOAT_LITERAL:
+        case NodeTypekind::I32:
+        case NodeTypekind::I64:
+            break;
+        case NodeTypekind::FN: {
+            for (auto param : node->typeData.fnTypeData.params) {
+                semantic->resolveTypes(param);
+            }
+            semantic->resolveTypes(node->typeData.fnTypeData.returnType);
+        } break;
+        case NodeTypekind::STRUCT: {
+            auto total = 0;
+            auto localIndex = 0;
+
+            for (auto param : node->typeData.structTypeData.params) {
+                param->localOffset = total;
+                param->declParamData.index = localIndex;
+
+                semantic->resolveTypes(param);
+
+                total += typeSize(param->declParamData.type);
+                localIndex += 1;
+            }
+        } break;
+        case NodeTypekind::SYMBOL: {
+            node->resolved = node->scope->find(node->typeData.symbolTypeData.atomId);
+
+            if (node->resolved == nullptr) {
+                ostringstream s("");
+                s << "undeclared identifier " << AtomTable::current->backwardAtoms[node->typeData.symbolTypeData.atomId];
+                semantic->reportError({node}, Error{node->region, s.str()});
+                return;
+            }
+
+            auto resolved = resolve(node);
+
+            semantic->resolveTypes(resolved);
+        } break;
+        case NodeTypekind::POINTER: {
+            semantic->resolveTypes(node->typeData.pointerTypeData.underlyingType);
+        } break;
+        case NodeTypekind::ARRAY: {
+            semantic->resolveTypes(node->typeData.arrayTypeData.elementType);
+        } break;
+        default: assert(false);
+    }
+
+    node->typeInfo = new Node(NodeTypekind::EXPOSED_TYPE);
+}
+
+Node *makeTemporary(Semantic *semantic, Node *n) {
+    auto node = new Node();
+    node->typeInfo = n->typeInfo;
+    node->isLocal = true;
+    semantic->currentFnDecl->locals.push_back(node);
+    return node;
+}
+
+void resolveBinop(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->binopData.lhs);
+    semantic->resolveTypes(node->binopData.rhs);
+
+    node->binopData.lhsTemporary = makeTemporary(semantic, node->binopData.lhs);
+    node->binopData.rhsTemporary = makeTemporary(semantic, node->binopData.rhs);
+
+    if (node->binopData.lhs->type == NodeType::DOT) {
+        auto newLocalStorage = new Node();
+        newLocalStorage->type = NodeType::TYPE;
+        newLocalStorage->typeInfo = node->binopData.lhs->typeInfo;
+
+        newLocalStorage->isLocal = true;
+        semantic->currentFnDecl->locals.push_back(newLocalStorage);
+    }
+    if (node->binopData.rhs->type == NodeType::DOT) {
+        auto newLocalStorage = new Node();
+        newLocalStorage->type = NodeType::TYPE;
+        newLocalStorage->typeInfo = node->binopData.rhs->typeInfo;
+
+        newLocalStorage->isLocal = true;
+        semantic->currentFnDecl->locals.push_back(newLocalStorage);
+    }
+
+    if (node->binopData.lhs->typeInfo->typeData.kind == NodeTypekind::POINTER
+        && (node->binopData.rhs->typeInfo->typeData.kind == NodeTypekind::INT_LITERAL
+            || node->binopData.rhs->typeInfo->typeData.kind == NodeTypekind::I32
+            || node->binopData.rhs->typeInfo->typeData.kind == NodeTypekind::I64)) {
+        node->typeInfo = node->binopData.lhs->typeInfo;
+        return;
+    }
+
+    if (node->binopData.rhs->typeInfo->typeData.kind == NodeTypekind::POINTER
+        && (node->binopData.lhs->typeInfo->typeData.kind == NodeTypekind::INT_LITERAL
+            || node->binopData.lhs->typeInfo->typeData.kind == NodeTypekind::I32
+            || node->binopData.lhs->typeInfo->typeData.kind == NodeTypekind::I64)) {
+        node->typeInfo = node->binopData.rhs->typeInfo;
+        return;
+    }
+
+    if (!typesMatch(node->binopData.lhs->typeInfo, node->binopData.rhs->typeInfo)) {
+        semantic->reportError({node, node->binopData.lhs, node->binopData.rhs},
+                              Error{node->region, "type mismatch - both sides of binary operation need to be the same type"});
+    }
+
+
+    if (isBooleanBinop(node->binopData.type)) {
+        node->typeInfo = new Node(NodeTypekind::BOOLEAN);
+    } else {
+        node->typeInfo = node->binopData.lhs->typeInfo;
+    }
 }
 
 Node *Semantic::deepCopy(Node *node, Scope *scope) {
@@ -821,10 +918,14 @@ void resolveStructLiteral(Semantic *semantic, Node *node) {
     node->typeInfo = new Node(NodeTypekind::STRUCT);
     node->typeInfo->typeData.structTypeData.isLiteral = true;
 
+    auto paramIndex = 0;
     for (auto param : node->structLiteralData.params) {
         semantic->resolveTypes(param->valueParamData.value);
         node->typeInfo->typeData.structTypeData.params.push_back(param);
         param->typeInfo = param->valueParamData.value->typeInfo;
+
+        param->valueParamData.index = paramIndex;
+        paramIndex += 1;
     }
 }
 
@@ -971,6 +1072,21 @@ void Semantic::resolveTypes(Node *node) {
         case NodeType::BOOLEAN_LITERAL: {
             resolveBooleanLiteral(this, node);
         } break;
+        case NodeType::ARRAY_INDEX: {
+            resolveArrayIndex(this, node);
+        } break;
+        case NodeType::CAST: {
+            resolveCast(this, node);
+        } break;
         default: assert(false);
+    }
+}
+
+void Semantic::addLocal(Node *local) {
+    if (local->isLocal) { return; }
+    local->isLocal = true;
+
+    if (currentFnDecl) {
+        currentFnDecl->locals.push_back(local);
     }
 }

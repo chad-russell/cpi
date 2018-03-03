@@ -1,4 +1,28 @@
 TODO:
+    - arrays
+
+    - 'malloc' implementation for interpreter. Can use real malloc and then just convert the offset based on where our stack begins
+
+    - nil
+
+    - strings (nothing more than an array of bytes with special syntax to assign from a string literal)
+
+    - default types (especially for structs / fn params)
+        -- p: i32; -- should default to 0
+        -- p: struct{x := 9, y := 10}; -- p.x should be 9, p.y should be 10
+        -- p: struct{x := 9, y := 10} = {x: 5}; -- should pass type checking, p.x should be 5, p.y should be 10
+        -- f: fn(x: i32 = 3) k ret x; }; ret f(); -- should pass type checking, return value should be 3
+
+    - declare external fns
+
+    - better interpreter debugging
+
+    - llvm debugging info
+
+    - real implementation for 'Any' and 'Type'
+
+    - conversion (like a cast but does actual work)
+
     - passing stack variables to polymorphic procedures?
         - first, is this even a good thing to allow?
         - implementation should just be to convert the pointer to the relative offset for the new function

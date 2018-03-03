@@ -489,7 +489,7 @@ void MnemonicPrinter::step() {
         instructionString.append(" ");
         readTypeAndInt();
         instructionString.append(" ");
-        readTypeAndInt();
+        readTypeAndIntOrFloat();
         instructionString.append(" ");
     } else if (startsWith(inst, "STORE")) {
         instructionString.append(inst);
@@ -498,7 +498,7 @@ void MnemonicPrinter::step() {
         readTypeAndInt();
         instructionString.append(" ");
 
-        readTypeAndInt();
+        readTypeAndIntOrFloat();
         instructionString.append(" ");
 
         instructionString.append(to_string(consume<int32_t>()));
@@ -570,7 +570,7 @@ void MnemonicPrinter::readTypeAndFloat()
 {
     auto inst = AssemblyLexer::instructionStrings[instructions[pc]];
 
-    inst.append(" ");
+    instructionString.append(" ");
     pc += 1;
 
     if (endsWith(inst, "F32")) {

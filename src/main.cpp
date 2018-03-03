@@ -237,6 +237,7 @@ int main(int argc, char **argv) {
         }
 
         cout << interp->readFromStack<int32_t>(0) << endl;
+//        cout << interp->readFromStack<float>(0) << endl;
     }
 
     if (outputFileName != nullptr) {

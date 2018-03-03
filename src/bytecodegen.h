@@ -28,8 +28,7 @@ public:
     void gen(Node *node);
     void fixup();
 
-    void copyBytes(vector<unsigned char> &instructions, int64_t offset, int64_t i, int64_t size);
-    void storeValue(vector<unsigned char> &instructions, Node *node, int32_t offset);
+    void storeValue(Node *node, int32_t offset);
 };
 
 bool isConstant(Node *node);

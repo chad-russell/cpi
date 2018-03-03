@@ -149,5 +149,8 @@ ostream &operator<<(ostream &os, NodeType type) {
         case NodeType::TYPEOF: {
             return os << "typeof";
         } break;
+        case NodeType::ARRAY_INDEX: {
+            return os << "array index";
+        }
     }
 }

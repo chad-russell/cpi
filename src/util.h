@@ -57,6 +57,7 @@ enum class NodeType {
     PANIC,
     RUN,
     TYPEOF,
+    ARRAY_INDEX,
 };
 
 enum class NodeTypekind {
@@ -75,6 +76,7 @@ enum class NodeTypekind {
     POINTER,
     EXPOSED_TYPE,
     EXPOSED_ANY,
+    ARRAY
 };
 
 enum class LexerTokenType : int32_t {
@@ -179,6 +181,11 @@ struct SymbolTypeData {
     int64_t atomId;
 };
 
+struct ArrayTypeData {
+    int64_t size;
+    Node *elementType;
+};
+
 struct TypeData {
     NodeTypekind kind;
 
@@ -187,6 +194,7 @@ struct TypeData {
     StructTypeData structTypeData;
     PointerTypeData pointerTypeData;
     SymbolTypeData symbolTypeData;
+    ArrayTypeData arrayTypeData;
 //     };
 };
 
@@ -202,11 +210,8 @@ struct DeclParamData {
 struct ValueParamData {
     Node *name = nullptr;
     Node *value = nullptr;
-};
 
-struct ParamData {
-    Node *name = nullptr;
-    Node *value = nullptr;
+    int32_t index;
 };
 
 struct ModuleData {
@@ -268,6 +273,13 @@ struct FnCallData {
     bool hasRuntimeParams = true;
 };
 
+struct ArrayIndexData {
+    Node *target;
+    Node *indexValue;
+
+    Node *offsetCalculationStorage;
+};
+
 struct DotData {
     Node *lhs = nullptr;
     Node *rhs = nullptr;
@@ -310,6 +322,9 @@ struct WhileData {
 struct CastData {
     Node *type = nullptr;
     Node *value = nullptr;
+
+    // @Hack??
+    bool isCastFromArrayToDataPtr = false;
 };
 
 struct RetData {
@@ -354,6 +369,7 @@ public:
     FloatLiteralData floatLiteralData;
     BoolLiteralData boolLiteralData;
     FnCallData fnCallData;
+    ArrayIndexData arrayIndexData;
     DotData dotData;
     BinopData binopData;
     PipeData pipeData;

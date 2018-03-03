@@ -66,6 +66,7 @@ struct Parser {
     Node *parseFloatLiteral();
     Node *parseLvalueHelper(Node *symbol, Location saved);
     Node *parseFnCall();
+    Node *parseArrayIndex();
     Node *buildDots(stack<Node *> rvalues);
 };
 

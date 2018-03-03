@@ -228,6 +228,7 @@ bool isConstant(Node *node) {
         case NodeType::DEREF:
         case NodeType::FN_DECL:
         case NodeType::STRUCT_LITERAL:
+        case NodeType::ARRAY_INDEX:
             return true;
         default: return false;
     }

@@ -13,4 +13,5 @@ public:
     Node *deepCopy(Node *node, Scope *scope);
     void reportError(vector<Node *> affectedNodes, Error error);
     void resolveTypes(Node *node);
+    void addLocal(Node *local);
 };

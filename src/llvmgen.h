@@ -35,6 +35,7 @@ public:
     llvm::Type *typeFor(Node *node);
     llvm::Value *rvalueFor(Node *node);
     llvm::Value *store(llvm::Value *val, llvm::Value *ptr);
+    void storeIfNeeded(Node *node);
 
     void gen(Node *node);
 };
