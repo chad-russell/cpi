@@ -221,14 +221,13 @@ int64_t AtomTable::insert(Region r) {
     return tableIndex;
 }
 
-bool isConstant(Node *node) {
+bool hasNoLocalByDefault(Node *node) {
     switch (resolve(node)->type) {
         case NodeType::INT_LITERAL:
         case NodeType::ADDRESS_OF:
         case NodeType::DEREF:
         case NodeType::FN_DECL:
         case NodeType::STRUCT_LITERAL:
-        case NodeType::ARRAY_INDEX:
             return true;
         default: return false;
     }

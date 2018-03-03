@@ -557,6 +557,6 @@ public:
 
 Node *resolve(Node *n);
 
-bool isConstant(Node *node);
+bool hasNoLocalByDefault(Node *node);
 
 #endif

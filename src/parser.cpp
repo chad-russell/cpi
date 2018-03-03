@@ -602,7 +602,6 @@ Node *Parser::parseLvalue() {
         deref->derefData.target = parseRvalueSimple();
 
         addLocal(deref->derefData.target);
-        addLocal(deref);
 
         return deref;
     }
@@ -816,7 +815,9 @@ Node *Parser::parseRvalueSimple() {
         auto addrOf = new Node(lexer->srcInfo, &allNodes, NodeType::ADDRESS_OF, scopes.top());
         addrOf->nodeData = parseRvalueSimple();
         addrOf->region = Region{lexer->srcInfo, saved, addrOf->nodeData->region.end};
+
         addLocal(addrOf->nodeData);
+
         return addrOf;
     }
 
@@ -828,7 +829,6 @@ Node *Parser::parseRvalueSimple() {
         deref->derefData.target = parseRvalueSimple();
 
         addLocal(deref->derefData.target);
-        addLocal(deref);
 
         deref->region = Region{lexer->srcInfo, saved, deref->derefData.target->region.end};
         return deref;

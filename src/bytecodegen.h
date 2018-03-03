@@ -31,6 +31,6 @@ public:
     void storeValue(Node *node, int32_t offset);
 };
 
-bool isConstant(Node *node);
+bool hasNoLocalByDefault(Node *node);
 
 #endif // BYTECODEGEN_H

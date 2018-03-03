@@ -399,7 +399,7 @@ void BytecodeGen::gen(Node *node) {
         case NodeType::ADDRESS_OF: {
             gen(node->nodeData);
 
-            if (isConstant(node->nodeData)) {
+            if (hasNoLocalByDefault(node->nodeData)) {
                 auto constOffset = node->nodeData->localOffset;
                 storeValue(node->nodeData, constOffset);
             }
@@ -423,7 +423,7 @@ void BytecodeGen::gen(Node *node) {
             auto offsetWords = foundParam->localOffset;
 
             gen(node->dotData.lhs);
-            if (isConstant(node->dotData.lhs)) {
+            if (hasNoLocalByDefault(node->dotData.lhs)) {
                 storeValue(node->dotData.lhs, node->dotData.lhs->localOffset);
             }
 

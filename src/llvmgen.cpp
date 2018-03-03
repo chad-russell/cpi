@@ -19,7 +19,7 @@ llvm::Value *LlvmGen::store(llvm::Value *val, llvm::Value *ptr) {
 
 bool needsStorage(Node *node) {
     // otherwise if it's constant (doesn't have own local by default), then we should store it
-    return isConstant(node);
+    return hasNoLocalByDefault(node);
 }
 
 void LlvmGen::storeIfNeeded(Node *node) {
