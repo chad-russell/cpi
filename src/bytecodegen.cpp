@@ -228,7 +228,6 @@ void BytecodeGen::gen(Node *node) {
                 gen(resolvedDecl);
 
                 auto foundParam = resolvedDecl->dotData.resolved;
-                auto offsetWords = foundParam->localOffset;
 
                 append(instructions, Instruction::STORE);
 

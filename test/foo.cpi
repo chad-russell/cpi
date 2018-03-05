@@ -1,7 +1,18 @@
 fn main() {
-    a := 3;
-    while a != 10 {
-        a = a + 1;
+    count: i32 = 5;
+    a := cast([]i64) {&{1, 2, 3, 4, 5}, count};
+
+    p2 := &(a[2]);
+    ^p2 = 23;
+
+    assert(a[2] == 23);
+
+    ret 0;
+}
+
+fn assert(b: bool) {
+    if (b == false) {
+        panic();
     }
-    ret a;
+    ret 0;
 }

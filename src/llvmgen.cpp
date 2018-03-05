@@ -372,16 +372,25 @@ void LlvmGen::gen(Node *node) {
             }
         } break;
         case NodeType::ADDRESS_OF: {
-            auto resolved = resolve(node->nodeData);
+            if (node->nodeData->type == NodeType::ARRAY_INDEX) {
+                auto resolved = resolve(node->nodeData);
+                gen(resolved);
+                storeIfNeeded(resolved);
 
-            gen(resolved);
+                node->llvmData = resolved->llvmData;
+                node->llvmLocal = resolved->llvmData;
+                node->isLocal = resolved->isLocal;
+            }
+            else {
+                auto resolved = resolve(node->nodeData);
+                gen(resolved);
+                storeIfNeeded(resolved);
 
-            storeIfNeeded(resolved);
+                node->llvmData = resolved->llvmLocal;
 
-            node->llvmData = resolved->llvmLocal;
-
-            if (node->isLocal) {
-                store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
+                if (node->isLocal) {
+                    store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
+                }
             }
         } break;
         case NodeType::DEREF: {

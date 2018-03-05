@@ -910,6 +910,10 @@ void resolveAddressOf(Semantic *semantic, Node *node) {
     auto pointerTypeInfo = new Node(NodeTypekind::POINTER);
     pointerTypeInfo->typeData.pointerTypeData.underlyingType = node->nodeData->typeInfo;
     node->typeInfo = pointerTypeInfo;
+
+    if (node->nodeData->type == NodeType::ARRAY_INDEX) {
+        node->resolved = resolve(node->nodeData)->derefData.target;
+    }
 }
 
 Node *findParam(Semantic *semantic, Node *node) {

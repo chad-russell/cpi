@@ -502,7 +502,10 @@ Node *Parser::parseWhile() {
 
     expect(LexerTokenType::LCURLY, "{");
     while (lexer->front.type != LexerTokenType::RCURLY) {
-        while_->whileData.stmts.push_back(parseScopedStmt());
+        auto scopedStmt = parseScopedStmt();
+        if (scopedStmt) {
+            while_->whileData.stmts.push_back(scopedStmt);
+        }
     }
 
     while_->region.end = lexer->front.region.end;

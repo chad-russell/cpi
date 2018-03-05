@@ -14,7 +14,7 @@ fn glGenBuffers(count: i32, ptr: *i32) none
 fn glBindVertexArray(vao: i32) none
 fn glBindBuffer(target: i32, buffer: i32) none
 fn glBufferData(target: i32, size: i32, data: *none, usage: i32) none
-fn glVertexAttribPointer(index: i32, size: i32, glType: i32, normalized: i8, stride: i32, data: *none) none
+fn glVertexAttribPointer(index: i32, size: i32, glType: i32, normalized: i8, stride: i32, data: i32) none
 fn glEnableVertexAttribArray(index: i32) none
 fn glGenTextures(n: i32, textures: *none) none
 fn glBindTexture(target: i32, texture: i32) none
@@ -57,33 +57,12 @@ type GlmMat4 struct {
     a1_0:  f32, a1_1:  f32,  a1_2: f32, a1_3:  f32,
     a2_0:  f32, a2_1:  f32,  a2_2: f32, a2_3:  f32,
     a3_0:  f32, a3_1:  f32,  a3_2: f32, a3_3:  f32,
-    a4_0:  f32, a4_1:  f32,  a4_2: f32, a4_3:  f32,
-    a5_0:  f32, a5_1:  f32,  a5_2: f32, a5_3:  f32,
-    a6_0:  f32, a6_1:  f32,  a6_2: f32, a6_3:  f32,
-    a7_0:  f32, a7_1:  f32,  a7_2: f32, a7_3:  f32,
-    a8_0:  f32, a8_1:  f32,  a8_2: f32, a8_3:  f32,
-    a9_0:  f32, a9_1:  f32,  a9_2: f32, a9_3:  f32,
-    a10_0: f32, a10_1: f32, a10_2: f32, a10_3: f32,
-    a11_0: f32, a11_1: f32, a11_2: f32, a11_3: f32,
-    a12_0: f32, a12_1: f32, a12_2: f32, a12_3: f32,
-    a13_0: f32, a13_1: f32, a13_2: f32, a13_3: f32,
-    a14_0: f32, a14_1: f32, a14_2: f32, a14_3: f32,
-    a15_0: f32, a15_1: f32, a15_2: f32, a15_3: f32
 }
 
 type GlmVec3 struct {
-    a0: f32,
-    a1: f32,
-    a2: f32,
-    a3: f32,
-    a4: f32,
-    a5: f32,
-    a6: f32,
-    a7: f32,
-    a8: f32,
-    a9: f32,
-    a10: f32,
-    a11: f32,
+    x: f32,
+    y: f32,
+    z: f32,
 }
 
 fn glm_mat4(d: f32) GlmMat4
@@ -132,16 +111,52 @@ fn main() {
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
-    shaderProgram := setup_shaders();
-
     float_size : i32 = 4;
 
-    vertices := cast(*f32) &{
-        -0.5, -0.5, 0.0,
-         0.5, -0.5, 0.0,
-         0.0,  0.5, 0.0
-    };
-    vertices_count : i32 = 9;
+	vertices := cast(*f32) &{
+		-0.5, -0.5, -0.5,  0.0, 0.0,
+		0.5, -0.5, -0.5,  1.0, 0.0,
+		0.5,  0.5, -0.5,  1.0, 1.0,
+		0.5,  0.5, -0.5,  1.0, 1.0,
+		-0.5,  0.5, -0.5,  0.0, 1.0,
+		-0.5, -0.5, -0.5,  0.0, 0.0,
+
+		-0.5, -0.5,  0.5,  0.0, 0.0,
+		0.5, -0.5,  0.5,  1.0, 0.0,
+		0.5,  0.5,  0.5,  1.0, 1.0,
+		0.5,  0.5,  0.5,  1.0, 1.0,
+		-0.5,  0.5,  0.5,  0.0, 1.0,
+		-0.5, -0.5,  0.5,  0.0, 0.0,
+
+		-0.5,  0.5,  0.5,  1.0, 0.0,
+		-0.5,  0.5, -0.5,  1.0, 1.0,
+		-0.5, -0.5, -0.5,  0.0, 1.0,
+		-0.5, -0.5, -0.5,  0.0, 1.0,
+		-0.5, -0.5,  0.5,  0.0, 0.0,
+		-0.5,  0.5,  0.5,  1.0, 0.0,
+
+		0.5,  0.5,  0.5,  1.0, 0.0,
+		0.5,  0.5, -0.5,  1.0, 1.0,
+		0.5, -0.5, -0.5,  0.0, 1.0,
+		0.5, -0.5, -0.5,  0.0, 1.0,
+		0.5, -0.5,  0.5,  0.0, 0.0,
+		0.5,  0.5,  0.5,  1.0, 0.0,
+
+		-0.5, -0.5, -0.5,  0.0, 1.0,
+		0.5, -0.5, -0.5,  1.0, 1.0,
+		0.5, -0.5,  0.5,  1.0, 0.0,
+		0.5, -0.5,  0.5,  1.0, 0.0,
+		-0.5, -0.5,  0.5,  0.0, 0.0,
+		-0.5, -0.5, -0.5,  0.0, 1.0,
+
+		-0.5,  0.5, -0.5,  0.0, 1.0,
+		0.5,  0.5, -0.5,  1.0, 1.0,
+		0.5,  0.5,  0.5,  1.0, 0.0,
+		0.5,  0.5,  0.5,  1.0, 0.0,
+		-0.5,  0.5,  0.5,  0.0, 0.0,
+		-0.5,  0.5, -0.5,  0.0, 1.0
+	};
+	vertices_count : i32 = 180;
     size_of_vertices : i32 = vertices_count * float_size;
 
     VBO: i32;
@@ -154,22 +169,90 @@ fn main() {
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, size_of_vertices, vertices, GL_STATIC_DRAW);
 
-    vertices_stride : i32 = 3;
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertices_stride * float_size, nil);
+    -- position attribute
+    position_stride : i32 = 5;
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, position_stride * float_size, 0);
     glEnableVertexAttribArray(0);
+
+    -- texture coord attribute
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, position_stride * float_size, 3 * float_size);
+    glEnableVertexAttribArray(1);
+
+    texture1 := setupTexture("/Users/chadrussell/Pictures/container.jpg\0", false);
+    texture2 := setupTexture("/Users/chadrussell/Pictures/awesomeface.png\0", true);
+
+    shaderProgram := setup_shaders();
+    glUseProgram(shaderProgram);
+    glUniform1i(glGetUniformLocation(shaderProgram, "texture1\0".data), 0);
+    glUniform1i(glGetUniformLocation(shaderProgram, "texture2\0".data), 1);
+
+    cubePositions : []GlmVec3 = {
+        data: cast(*GlmVec3) &{
+            glm_vec3( 0.0,   0.0,  0.0 ),
+            glm_vec3( 2.0,   5.0, -15.0),
+            glm_vec3(-1.5,  -2.2, -2.5 ),
+            glm_vec3(-3.8,  -2.0, -12.3),
+            glm_vec3( 2.4,  -0.4, -3.5 ),
+            glm_vec3(-1.7,   3.0, -7.5 ),
+            glm_vec3( 1.3,  -2.0, -2.5 ),
+            glm_vec3( 1.5,   2.0, -2.5 ),
+            glm_vec3( 1.5,   0.2, -1.5 ),
+            glm_vec3(-1.3,   1.0, -1.5 )
+        },
+        count: 10
+    };
+
+    glEnable(GL_DEPTH_TEST);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     glBindVertexArray(0);
 
+    deltaTime := 0.0;
+    lastFrame := 0.0;
+    fov := 45.0;
+
+    cameraPos   := glm_vec3(0.0, 0.0,  3.0);
+    cameraFront := glm_vec3(0.0, 0.0, -1.0);
+    cameraUp    := glm_vec3(0.0, 1.0,  0.0);
+
     while true
     {
-        glClearColor(0.2, 0.3, 0.3, 1.0);
-        glClear(GL_COLOR_BUFFER_BIT);
+        currentFrame := glfwGetTime();
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
 
-        glUseProgram(shaderProgram);
-        glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        -- process_input(window);
+
+		glClearColor(0.2, 0.3, 0.3, 1.0);
+        glClear(GL_COLOR_OR_DEPTH_BUFFER_BIT);
+
+        projection := glm_mat4(1.0);
+        projection = glm_perspective(glm_radians(fov), 800.0 / 600.0, 0.1, 100.0);
+        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection\0".data), 1, GL_FALSE, glm_mat4_addr(projection));
+
+        h1 := glm_vec3_add(glm_vec3(0.0, 0.0, 0.0), glm_vec3(0.0, 0.0, 0.0));
+        -- view := glm_look_at(cameraPos, glm_vec3_add(cameraPos, cameraFront), cameraUp);
+
+        -- glActiveTexture(GL_TEXTURE0);
+        -- glBindTexture(GL_TEXTURE_2D, texture1);
+        -- glActiveTexture(GL_TEXTURE1);
+        -- glBindTexture(GL_TEXTURE_2D, texture2);
+
+        -- glBindVertexArray(VAO);
+        -- idx := 0;
+        -- idxf := 0.0;
+        -- while idx < 10 {
+            -- model := glm_mat4(1.0);
+            -- model = glm_mat4_translate(model, cubePositions[idx]);
+
+            -- angle := 20.0 * (idxf + 1.0);
+            -- model = glm_mat4_rotate(model, glm_radians(angle), glm_vec3(1.0, 0.3, 0.5));
+
+            -- glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model\0".data), 1, GL_FALSE, glm_mat4_addr(model));
+
+            -- glDrawArrays(GL_TRIANGLES, 0, 36);
+        -- }
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -180,23 +263,36 @@ fn main() {
 
 fn setup_shaders() {
     fss := "
-        #version 330 core\n
-        out vec4 FragColor;\n
+        #version 330 core
+        out vec4 FragColor;
 
-        void main()\n
-        {\n
-            FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n
-        }\n
+        in vec2 texCoord;
+
+        uniform sampler2D texture1;
+        uniform sampler2D texture2;
+
+        void main()
+        {
+        	FragColor = mix(texture(texture1, texCoord), texture(texture2, texCoord), 0.2);
+        }
     \0";
 
     vss := "
-        #version 330 core\n
-        layout (location = 0) in vec3 aPos;\n
+        #version 330 core
+        layout (location = 0) in vec3 aPos;
+        layout (location = 1) in vec2 aTexCoord;
 
-        void main()\n
-        {\n
-            gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n
-        }\n
+        out vec2 texCoord;
+
+        uniform mat4 model;
+        uniform mat4 view;
+        uniform mat4 projection;
+
+        void main()
+        {
+            texCoord = aTexCoord;
+            gl_Position = projection * view * model * vec4(aPos, 1.0f);
+        }
     \0";
 
     GL_VERTEX_SHADER: i32 = 35633;
@@ -270,13 +366,16 @@ fn setupTexture(imageFilePath: []i8, includeAlpha := false) {
 
     data := stbi_load(imageFilePath.data, &width, &height, &nrChannels, 0);
     if (data != nil) {
+        putstr("Successfully loaded texture\0");
+
         format := GL_RGB;
         if includeAlpha { format = GL_RGBA; }
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
     }
     else {
-        putstr("Failed to load texture");
+        putstr("Failed to load texture:\0");
+        putstr(imageFilePath);
     }
     stbi_image_free(data);
 
@@ -304,52 +403,4 @@ fn scroll_callback(window: *none, xoffset: f64, yoffset: f64) {
 	putstr("scroll callback!\0");
 
     ret 0;
-}
-
-fn saved() {
-	vertices := cast(*f32) &{
-		-0.5, -0.5, -0.5,  0.0, 0.0,
-		0.5, -0.5, -0.5,  1.0, 0.0,
-		0.5,  0.5, -0.5,  1.0, 1.0,
-		0.5,  0.5, -0.5,  1.0, 1.0,
-		-0.5,  0.5, -0.5,  0.0, 1.0,
-		-0.5, -0.5, -0.5,  0.0, 0.0,
-
-		-0.5, -0.5,  0.5,  0.0, 0.0,
-		0.5, -0.5,  0.5,  1.0, 0.0,
-		0.5,  0.5,  0.5,  1.0, 1.0,
-		0.5,  0.5,  0.5,  1.0, 1.0,
-		-0.5,  0.5,  0.5,  0.0, 1.0,
-		-0.5, -0.5,  0.5,  0.0, 0.0,
-
-		-0.5,  0.5,  0.5,  1.0, 0.0,
-		-0.5,  0.5, -0.5,  1.0, 1.0,
-		-0.5, -0.5, -0.5,  0.0, 1.0,
-		-0.5, -0.5, -0.5,  0.0, 1.0,
-		-0.5, -0.5,  0.5,  0.0, 0.0,
-		-0.5,  0.5,  0.5,  1.0, 0.0,
-
-		0.5,  0.5,  0.5,  1.0, 0.0,
-		0.5,  0.5, -0.5,  1.0, 1.0,
-		0.5, -0.5, -0.5,  0.0, 1.0,
-		0.5, -0.5, -0.5,  0.0, 1.0,
-		0.5, -0.5,  0.5,  0.0, 0.0,
-		0.5,  0.5,  0.5,  1.0, 0.0,
-
-		-0.5, -0.5, -0.5,  0.0, 1.0,
-		0.5, -0.5, -0.5,  1.0, 1.0,
-		0.5, -0.5,  0.5,  1.0, 0.0,
-		0.5, -0.5,  0.5,  1.0, 0.0,
-		-0.5, -0.5,  0.5,  0.0, 0.0,
-		-0.5, -0.5, -0.5,  0.0, 1.0,
-
-		-0.5,  0.5, -0.5,  0.0, 1.0,
-		0.5,  0.5, -0.5,  1.0, 1.0,
-		0.5,  0.5,  0.5,  1.0, 0.0,
-		0.5,  0.5,  0.5,  1.0, 0.0,
-		-0.5,  0.5,  0.5,  0.0, 0.0,
-		-0.5,  0.5, -0.5,  0.0, 1.0
-	};
-
-	vertices_size : i32 = 180;
 }
