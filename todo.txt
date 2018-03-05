@@ -1,9 +1,9 @@
 TODO:
-    - strings (nothing more than an array of bytes with special syntax to assign from a string literal)
+    - explicit access of length and data pointers for arrays / strings
+        - question: should we be able to assign to these things?
+            - answer: probably yes
 
-    - nil
-
-    - declare external fns
+    - short-circuit 'and' and 'or'
 
     - 'malloc' implementation for interpreter. Can use real malloc and then just convert the offset based on where our stack begins
 
@@ -14,10 +14,16 @@ TODO:
         -- f: fn(x: i32 = 3) k ret x; }; ret f(); -- should pass type checking, return value should be 3
 
     - better interpreter debugging
+        - more accurate source information
+        - get list of stack variables and print their values by name
 
     - llvm debugging info
 
+    - enum / tagged union
+
     - real implementation for 'Any' and 'Type'
+
+    - array bounds checking
 
     - conversion (like a cast but does actual work)
 

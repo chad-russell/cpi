@@ -13,6 +13,8 @@ int32_t typeSize(Node *type) {
     switch (resolved->typeData.kind) {
         case NodeTypekind::NONE:
             return 0;
+        case NodeTypekind::I8:
+            return 1;
         case NodeTypekind::BOOLEAN:
         case NodeTypekind::I32:
         case NodeTypekind::FN:
@@ -44,10 +46,6 @@ int32_t typeSize(Node *type) {
 
             return total;
         }
-        case NodeTypekind::ARRAY: {
-            // for now the count is ALWAYS an i32, and the data is always a pointer which means it's 4 bytes as well
-            return 8;
-        } break;
         default:
             assert(false);
     }
@@ -81,7 +79,8 @@ bool typesMatch(Node *desired, Node *actual) {
     // coercion from integer literal to any integer is valid
     // todo(chad): check for overflow?
     if (desired->typeData.kind == NodeTypekind::INT_LITERAL) {
-        if (actual->typeData.kind == NodeTypekind::I32
+        if (actual->typeData.kind == NodeTypekind::I8
+            || actual->typeData.kind == NodeTypekind::I32
             || actual->typeData.kind == NodeTypekind::I64) {
             desired->typeData.kind = actual->typeData.kind;
             return true;
@@ -95,8 +94,32 @@ bool typesMatch(Node *desired, Node *actual) {
         return false;
     }
     if (actual->typeData.kind == NodeTypekind::INT_LITERAL) {
-        if (desired->typeData.kind == NodeTypekind::I32
+        if (desired->typeData.kind == NodeTypekind::I8
+            || desired->typeData.kind == NodeTypekind::I32
             || desired->typeData.kind == NodeTypekind::I64) {
+            actual->typeData.kind = desired->typeData.kind;
+            return true;
+        }
+        return false;
+    }
+
+    // coercion from float literal to any float is valid
+    // todo(chad): check for overflow?
+    if (desired->typeData.kind == NodeTypekind::FLOAT_LITERAL) {
+        if (actual->typeData.kind == NodeTypekind::F32 || actual->typeData.kind == NodeTypekind::F64) {
+            desired->typeData.kind = actual->typeData.kind;
+            return true;
+        }
+        else if (actual->typeData.kind == NodeTypekind::FLOAT_LITERAL) {
+            // if they're both literals then they become f32 by default
+            desired->typeData.kind = NodeTypekind::F32;
+            actual->typeData.kind = NodeTypekind::F32;
+            return true;
+        }
+        return false;
+    }
+    if (actual->typeData.kind == NodeTypekind::FLOAT_LITERAL) {
+        if (desired->typeData.kind == NodeTypekind::F32 || desired->typeData.kind == NodeTypekind::F64) {
             actual->typeData.kind = desired->typeData.kind;
             return true;
         }
@@ -181,7 +204,12 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
         semantic->resolveTypes(param);
     }
 
-    if (data->returnType != nullptr && data->returns.empty()) {
+    if (data->body.empty()) {
+        if (data->returnType == nullptr) {
+            data->returnType = new Node(NodeTypekind::NONE);
+        }
+    }
+    else if (data->returnType != nullptr && data->returns.empty()) {
         semantic->reportError({node}, Error{node->region, "fn has a return type, but there are no return statements!"});
     }
     else if (data->returns.empty()) {
@@ -293,6 +321,8 @@ void resolveFloatLiteral(Semantic *semantic, Node *node) {
 }
 
 void resolveIntLiteral(Semantic *semantic, Node *node) {
+    if (node->typeInfo) { return; }
+
     node->typeInfo = new Node(NodeTypekind::INT_LITERAL);
 }
 
@@ -316,11 +346,16 @@ void resolveArrayIndex(Semantic *semantic, Node *node) {
         }
     }
 
-    if (node->arrayIndexData.target->typeInfo->typeData.kind != NodeTypekind::ARRAY) {
+    if (node->arrayIndexData.target->typeInfo->typeData.kind != NodeTypekind::STRUCT) {
         semantic->reportError({node}, Error{node->region, "cannot index a non-array"});
+        return;
+    }
+    if (!node->arrayIndexData.target->typeInfo->typeData.structTypeData.isSecretlyArray) {
+        semantic->reportError({node}, Error{node->region, "cannot index a non-array"});
+        return;
     }
 
-    node->typeInfo = node->arrayIndexData.target->typeInfo->typeData.arrayTypeData.elementType;
+    node->typeInfo = node->arrayIndexData.target->typeInfo->typeData.structTypeData.secretArrayElementType;
 
     // a[i] <==> ^((cast(*i32) a) + i * sizeof(i32)), for example (if typeof(a) is []i32)
     // todo(chad): our size calculations may not always be the same as llvm's, because of alignment ets. etc. So make a sizeof(...) operator
@@ -363,6 +398,55 @@ void resolveCast(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->castData.value);
 
     node->typeInfo = node->castData.type;
+}
+
+void resolveStringLiteral(Semantic *semantic, Node *node) {
+    // typeInfo = []i8;
+    node->typeInfo = makeArrayType(new Node(NodeTypekind::I8));
+    semantic->resolveTypes(node->typeInfo);
+
+    // "hello" <==> {&{'h', 'e', 'l', 'l', 'o'}, 5};
+    auto arrayLiteral = new Node(node->region.srcInfo, nullptr, NodeType::STRUCT_LITERAL, node->scope);
+    arrayLiteral->region = node->region;
+
+    // charArrayLiteral = {'h', 'e', 'l', 'l', 'o'}
+    auto charArrayLiteral = new Node();
+    charArrayLiteral->type = NodeType::STRUCT_LITERAL;
+
+    for (auto c : node->stringLiteralData.value) {
+        auto charNode = new Node();
+        charNode->type = NodeType::INT_LITERAL;
+        charNode->typeInfo = new Node(NodeTypekind::I8);
+        charNode->intLiteralData.value = static_cast<int64_t>(c);
+
+        charArrayLiteral->structLiteralData.params.push_back(wrapInValueParam(charNode, ""));
+    }
+
+    // addrOfCharArrayLiteral = &{'h', 'e', 'l', 'l', 'o'}
+    auto addrOfCharArrayLiteral = new Node();
+    addrOfCharArrayLiteral->type = NodeType::ADDRESS_OF;
+    addrOfCharArrayLiteral->nodeData = charArrayLiteral;
+
+    semantic->addLocal(addrOfCharArrayLiteral->nodeData);
+
+    // countNode = 5
+    auto countNode = new Node();
+    countNode->type = NodeType::INT_LITERAL;
+    countNode->typeInfo = new Node(NodeTypekind::I32);
+    countNode->intLiteralData.value = static_cast<int64_t>(node->stringLiteralData.value.size());
+
+    // arrayLiteral = {&{'h', 'e', 'l', 'l', 'o'}, 5}
+    arrayLiteral->structLiteralData.params.push_back(wrapInValueParam(addrOfCharArrayLiteral, "data"));
+    arrayLiteral->structLiteralData.params.push_back(wrapInValueParam(countNode, "count"));
+
+    semantic->resolveTypes(arrayLiteral);
+
+    node->resolved = arrayLiteral;
+}
+
+void resolveNilLiteral(Semantic *semantic, Node *node) {
+    node->typeInfo = new Node(NodeTypekind::POINTER);
+    node->typeInfo->typeData.pointerTypeData.underlyingType = new Node(NodeTypekind::NONE);
 }
 
 void resolveSymbol(Semantic *semantic, Node *node) {
@@ -509,8 +593,11 @@ void resolveType(Semantic *semantic, Node *node) {
         case NodeTypekind::EXPOSED_ANY:
         case NodeTypekind::INT_LITERAL:
         case NodeTypekind::FLOAT_LITERAL:
+        case NodeTypekind::I8:
         case NodeTypekind::I32:
         case NodeTypekind::I64:
+        case NodeTypekind::F32:
+        case NodeTypekind::F64:
             break;
         case NodeTypekind::FN: {
             for (auto param : node->typeData.fnTypeData.params) {
@@ -548,9 +635,6 @@ void resolveType(Semantic *semantic, Node *node) {
         } break;
         case NodeTypekind::POINTER: {
             semantic->resolveTypes(node->typeData.pointerTypeData.underlyingType);
-        } break;
-        case NodeTypekind::ARRAY: {
-            semantic->resolveTypes(node->typeData.arrayTypeData.elementType);
         } break;
         default: assert(false);
     }
@@ -931,6 +1015,7 @@ void resolveStructLiteral(Semantic *semantic, Node *node) {
 
 void resolveIf(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->ifData.condition);
+
     if (node->ifData.condition->typeInfo->typeData.kind != NodeTypekind::BOOLEAN) {
         semantic->reportError({node, node->ifData.condition}, Error{node->ifData.condition->region, "Condition for 'if' must be a boolean!"});
     }
@@ -939,6 +1024,18 @@ void resolveIf(Semantic *semantic, Node *node) {
         semantic->resolveTypes(stmt);
     }
     for (const auto& stmt : node->ifData.elseStmts) {
+        semantic->resolveTypes(stmt);
+    }
+}
+
+void resolveWhile(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->whileData.condition);
+
+    if (node->whileData.condition->typeInfo->typeData.kind != NodeTypekind::BOOLEAN) {
+        semantic->reportError({node, node->whileData.condition}, Error{node->whileData.condition->region, "Condition for 'while' must be a boolean!"});
+    }
+
+    for (const auto& stmt : node->whileData.stmts) {
         semantic->resolveTypes(stmt);
     }
 }
@@ -1077,6 +1174,15 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::CAST: {
             resolveCast(this, node);
+        } break;
+        case NodeType::STRING_LITERAL: {
+            resolveStringLiteral(this, node);
+        } break;
+        case NodeType::NIL_LITERAL: {
+            resolveNilLiteral(this, node);
+        } break;
+        case NodeType::WHILE: {
+            resolveWhile(this, node);
         } break;
         default: assert(false);
     }

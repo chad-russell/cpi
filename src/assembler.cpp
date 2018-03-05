@@ -336,6 +336,7 @@ const vector<string> AssemblyLexer::tokenTypeStrings = {
     "RET", 
     "EXIT",
     "PANIC",
+    "NONE",
 
     // literals
     "CONSTI8", "CONSTI16", "CONSTI32", "CONSTI64", "CONSTF32", "CONSTF64",

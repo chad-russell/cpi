@@ -88,7 +88,7 @@ ostream &operator<<(ostream &os, HighlightedRegion region) {
     for (auto i = startSrc; i < region.region.srcInfo.source.length() && region.region.srcInfo.source[i] != '\n'; i++) {
         Colored<string> colored;
         if (i == region.region.start.byteIndex) {
-            os << "\e[" << Color::BG_MAGENTA << ";" << Color::FG_LIGHT_GREY << "m";
+            os << "\e[" << Color::BG_MAGENTA << ";" << Color::FG_DARK_GREY << "m";
         }
         if (i == region.region.end.byteIndex) {
             os << Colored<string>{"", {}};
@@ -146,6 +146,9 @@ ostream &operator<<(ostream &os, NodeTypekind kind) {
         case NodeTypekind::INT_LITERAL: {
             return os << "an integer literal";
         }
+        case NodeTypekind::I8: {
+            return os << "an i8";
+        }
         case NodeTypekind::I32: {
             return os << "an i32";
         }
@@ -154,9 +157,6 @@ ostream &operator<<(ostream &os, NodeTypekind kind) {
         }
         case NodeTypekind::FLOAT_LITERAL: {
             return os << "an float literal";
-        }
-        case NodeTypekind::STRING: {
-            return os << "an string";
         }
         case NodeTypekind::BOOLEAN: {
             return os << "an bool";
@@ -203,6 +203,18 @@ AtomTable *AtomTable::current = nullptr;
 
 AtomTable::AtomTable() {
     current = this;
+}
+
+int64_t AtomTable::insertStr(string s) {
+    auto found = atoms.find(s);
+    if (found != atoms.end()) {
+        return found->second;
+    }
+
+    auto tableIndex = (int64_t) AtomTable::current->backwardAtoms.size();
+    AtomTable::current->atoms.insert({s, tableIndex});
+    AtomTable::current->backwardAtoms.push_back(s);
+    return tableIndex;
 }
 
 int64_t AtomTable::insert(Region r) {

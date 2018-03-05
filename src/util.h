@@ -63,10 +63,10 @@ enum class NodeType {
 enum class NodeTypekind {
     NONE,
     INT_LITERAL,
+    I8,
     I32,
     I64,
     FLOAT_LITERAL,
-    STRING,
     BOOLEAN,
     F32,
     F64,
@@ -76,7 +76,6 @@ enum class NodeTypekind {
     POINTER,
     EXPOSED_TYPE,
     EXPOSED_ANY,
-    ARRAY
 };
 
 enum class LexerTokenType : int32_t {
@@ -119,6 +118,7 @@ enum class LexerTokenType : int32_t {
     RET,
     STRING,
     BOOLEAN,
+    I8,
     I32,
     I64,
     F32,
@@ -140,7 +140,8 @@ enum class LexerTokenType : int32_t {
     EXPOSED_TYPE,
     EXPOSED_ANY,
     TYPEOF,
-    PANIC
+    PANIC,
+    NONE
 };
 
 struct SourceInfo {
@@ -168,22 +169,18 @@ struct FnTypeData {
 
 struct StructTypeData {
     bool isLiteral = false;
-    Node *name = nullptr;
     vector<Node *> params = {};
+
+    bool isSecretlyArray = false;
+    Node *secretArrayElementType = nullptr;
 };
 
 struct PointerTypeData {
-    bool isNilLiteral = false;
     Node *underlyingType = nullptr;
 };
 
 struct SymbolTypeData {
     int64_t atomId;
-};
-
-struct ArrayTypeData {
-    int64_t size;
-    Node *elementType;
 };
 
 struct TypeData {
@@ -194,7 +191,6 @@ struct TypeData {
     StructTypeData structTypeData;
     PointerTypeData pointerTypeData;
     SymbolTypeData symbolTypeData;
-    ArrayTypeData arrayTypeData;
 //     };
 };
 
@@ -308,6 +304,10 @@ struct StructLiteralData {
     vector<Node *> params = {};
 };
 
+struct StringLiteralData {
+    string value;
+};
+
 struct IfData {
     Node *condition = nullptr;
     vector<Node *> stmts = {};
@@ -377,6 +377,7 @@ public:
     ValueParamData valueParamData;
     TypeData typeData;
     StructLiteralData structLiteralData;
+    StringLiteralData stringLiteralData;
     IfData ifData;
     WhileData whileData;
     ImportData importData;
@@ -428,6 +429,11 @@ vector<unsigned char> toBytes(const T object) {
 template<typename T>
 vector<unsigned char> toBytes32(const T object) {
     return toBytes(static_cast<int32_t>(object));
+}
+
+template<typename T>
+vector<unsigned char> toBytes64(const T object) {
+    return toBytes(static_cast<int64_t>(object));
 }
 
 template<typename T>
@@ -551,6 +557,7 @@ public:
     vector<string> backwardAtoms = {};
 
     int64_t insert(Region r);
+    int64_t insertStr(string s);
 
     AtomTable();
 };

@@ -75,7 +75,6 @@ void Parser::parseRoot() {
 Node *Parser::parseTopLevel() {
         // comment
         while (lexer->front.type == LexerTokenType::COMMENT) {
-            // todo(chad): do we actually want to save this somehow?
             popFront();
         }
 
@@ -227,17 +226,28 @@ Node *Parser::parseFnDecl(bool polymorphCopy) {
         decl->fnDeclData.params = firstParams;
     }
 
+    // return type
+    if (lexer->front.type != LexerTokenType::LCURLY) {
+        decl->fnDeclData.returnType = parseType();
+    }
+
+    // if there's no more then it's an external declaration
+    // todo(chad): once we have annotations, make an @extern. Everything else can be a faster calling convention
+    if (lexer->front.type != LexerTokenType::LCURLY) {
+        decl->region.end = decl->fnDeclData.returnType->region.end;
+
+        scopes.pop();
+        currentFnDecl = savedCurrentFnDecl;
+
+        return decl;
+    }
+
     // put params in scope
     for (auto param : decl->fnDeclData.ctParams) {
         scopeInsert(param->declParamData.name->symbolData.atomId, param);
     }
     for (auto param : decl->fnDeclData.params) {
         scopeInsert(param->declParamData.name->symbolData.atomId, param);
-    }
-
-    // return type
-    if (lexer->front.type != LexerTokenType::LCURLY) {
-        decl->fnDeclData.returnType = parseType();
     }
 
     // body
@@ -279,7 +289,6 @@ Node *Parser::parseTypeDecl() {
                              NodeType::TYPE,
                              scopes.top());
     typeDecl->typeData.kind = NodeTypekind::STRUCT;
-    typeDecl->typeData.structTypeData.name = typeName;
     typeDecl->typeData.structTypeData.params = parseDeclParams();
     typeDecl->typeData.structTypeData.isLiteral = false;
     scopeInsert(typeName->symbolData.atomId, typeDecl);
@@ -330,6 +339,11 @@ Node *Parser::parseScopedStmt() {
     // if
     if (lexer->front.type == LexerTokenType::IF) {
         return parseIf();
+    }
+
+    // while
+    if (lexer->front.type == LexerTokenType::WHILE) {
+        return parseWhile();
     }
 
     auto saved = lexer->front.region.start;
@@ -473,6 +487,28 @@ Node *Parser::parseIf() {
     }
 
     return if_;
+}
+
+Node *Parser::parseWhile() {
+    auto saved = lexer->front.region.start;
+    popFront();
+
+    auto while_ = new Node(lexer->srcInfo, &allNodes, NodeType::WHILE, scopes.top());
+    while_->region.start = saved;
+    while_->whileData.condition = parseRvalue();
+
+    while_->sourceMapStatement = true;
+    while_->whileData.condition->sourceMapStatement = true;
+
+    expect(LexerTokenType::LCURLY, "{");
+    while (lexer->front.type != LexerTokenType::RCURLY) {
+        while_->whileData.stmts.push_back(parseScopedStmt());
+    }
+
+    while_->region.end = lexer->front.region.end;
+    expect(LexerTokenType::RCURLY, "}");
+
+    return while_;
 }
 
 Node *Parser::parseRet() {
@@ -652,6 +688,10 @@ Node *Parser::parseType() {
             popFront();
             type->typeData.kind = NodeTypekind::BOOLEAN;
         } break;
+        case LexerTokenType::I8: {
+            popFront();
+            type->typeData.kind = NodeTypekind::I8;
+        } break;
         case LexerTokenType::I32: {
             popFront();
             type->typeData.kind = NodeTypekind::I32;
@@ -659,6 +699,18 @@ Node *Parser::parseType() {
         case LexerTokenType::I64: {
             popFront();
             type->typeData.kind = NodeTypekind::I64;
+        } break;
+        case LexerTokenType::F32: {
+            popFront();
+            type->typeData.kind = NodeTypekind::F32;
+        } break;
+        case LexerTokenType::F64: {
+            popFront();
+            type->typeData.kind = NodeTypekind::F64;
+        } break;
+        case LexerTokenType::NONE: {
+            popFront();
+            type->typeData.kind = NodeTypekind::NONE;
         } break;
         case LexerTokenType::FN: {
             popFront();
@@ -712,8 +764,8 @@ Node *Parser::parseType() {
             auto elementType = parseType();
             type->region.end = elementType->region.end;
 
-            type->typeData.kind = NodeTypekind::ARRAY;
-            type->typeData.arrayTypeData.elementType = elementType;
+            auto arrayType = makeArrayType(elementType);
+            type->typeData = arrayType->typeData;
         } break;
         default: {
             ostringstream s("");
@@ -764,21 +816,39 @@ Node *Parser::parseTypeof() {
 }
 
 Node *Parser::parseLvalueOrLiteral() {
+    // comment
+    while (lexer->front.type == LexerTokenType::COMMENT) {
+        popFront();
+    }
+
     if (lexer->front.type == LexerTokenType::I32 || lexer->front.type == LexerTokenType::I64) {
         return parseType();
     }
 
     auto saved = lexer->front.region.start;
-    Node *symbol;
+    Node *symbol = nullptr;
 
     if (lexer->front.type == LexerTokenType::LPAREN) {
         popFront();
         symbol = parseRvalue();
         expect(LexerTokenType::RPAREN, ")");
+    } else if (lexer->front.type == LexerTokenType::SUB) {
+        // negative of a literal
+        // todo(chad): @robustness
+        popFront();
+        if (lexer->front.type == LexerTokenType::INT_LITERAL) {
+            symbol = parseIntLiteral();
+            symbol->intLiteralData.value = -symbol->intLiteralData.value;
+        } else if (lexer->front.type == LexerTokenType::FLOAT_LITERAL) {
+            symbol = parseFloatLiteral();
+            symbol->floatLiteralData.value = -symbol->floatLiteralData.value;
+        }
     } else if (lexer->front.type == LexerTokenType::INT_LITERAL) {
         symbol = parseIntLiteral();
     } else if (lexer->front.type == LexerTokenType::FLOAT_LITERAL) {
         symbol = parseFloatLiteral();
+    } else if (lexer->front.type == LexerTokenType::DOUBLE_QUOTE) {
+        symbol = parseStringLiteral();
     } else if (lexer->front.type == LexerTokenType::FN) {
         symbol = parseFnDecl();
         symbol->fnDeclData.isLiteral = true;
@@ -798,8 +868,18 @@ Node *Parser::parseLvalueOrLiteral() {
         symbol = parseRun();
     } else if (lexer->front.type == LexerTokenType::TYPEOF) {
         symbol = parseTypeof();
+    } else if (lexer->front.type == LexerTokenType::NIL) {
+        symbol = new Node();
+        symbol->region = lexer->front.region;
+        symbol->type = NodeType::NIL_LITERAL;
+        popFront();
     } else {
         symbol = parseSymbol();
+    }
+
+    // comment
+    while (lexer->front.type == LexerTokenType::COMMENT) {
+        popFront();
     }
 
     assert(symbol != nullptr);
@@ -924,7 +1004,40 @@ Node *Parser::parseFloatLiteral() {
         }
     }
 
-    node->floatLiteralData.value = stod(s.str());
+    auto toConvert = s.str();
+    node->floatLiteralData.value = stod(toConvert);
+
+    return node;
+}
+
+Node *Parser::parseStringLiteral() {
+    auto strTok = expect(LexerTokenType::DOUBLE_QUOTE, "\"");
+
+    auto node = new Node(lexer->srcInfo, &allNodes, NodeType::STRING_LITERAL, scopes.top());
+    node->region = strTok.region;
+
+    ostringstream s("");
+    for (auto i = node->region.start.byteIndex + 1; i < node->region.end.byteIndex - 1; i++) {
+        if (node->region.srcInfo.source[i] == '\\') {
+            assert(node->region.srcInfo.source.size() > i + 1);
+            switch (node->region.srcInfo.source[i + 1]) {
+                case 'n': {
+                    s << '\n';
+                } break;
+                case '0': {
+                    s << '\0';
+                } break;
+                default: {
+                    reportError("unexpected escape sequence");
+                } break;
+            }
+            i = i + 1;
+        }
+        else {
+            s << node->region.srcInfo.source[i];
+        }
+    }
+    node->stringLiteralData.value = s.str();
 
     return node;
 }

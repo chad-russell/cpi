@@ -1,26 +1,7 @@
 fn main() {
-    count: i32 = 3;
-
-    type PointyPoint struct {
-        x: *i64,
-        y: *i64
+    a := 3;
+    while a != 10 {
+        a = a + 1;
     }
-
-    p: PointyPoint = {&12, &8};
-    py := p.y;
-
-    e1: PointyPoint = {&0, &0};
-    ab := {data: cast(*PointyPoint) &{e1, p, e1}, count: count};
-    a := cast([]PointyPoint) ab;
-
-    h1 := a[1];
-    h2 := h1.x;
-    ret ^h2;
-}
-
-fn assert(b: bool) {
-    if b == false {
-        panic();
-    }
-    ret 0;
+    ret a;
 }

@@ -236,6 +236,7 @@ int main(int argc, char **argv) {
             interp->interpret();
         }
 
+//        cout << interp->readFromStack<int8_t>(0) << endl;
         cout << interp->readFromStack<int32_t>(0) << endl;
 //        cout << interp->readFromStack<float>(0) << endl;
     }

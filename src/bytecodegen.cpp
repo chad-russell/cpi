@@ -36,6 +36,14 @@ void BytecodeGen::binopHelper(string instructionStr, Node *node) {
             instructionStr.append("I64");
             bytecodeStr = "RELI64";
         } break;
+        case NodeTypekind::F32: {
+            instructionStr.append("F32");
+            bytecodeStr = "RELF32";
+        } break;
+        case NodeTypekind::F64: {
+            instructionStr.append("F64");
+            bytecodeStr = "RELF64";
+        } break;
         default: assert(false);
     }
 
@@ -43,8 +51,8 @@ void BytecodeGen::binopHelper(string instructionStr, Node *node) {
     append(instructions, inst);
 
     auto bytecodeInst = AssemblyLexer::nameToInstruction[bytecodeStr];
-    if (startsWith(instructionStr, "EQ")) {
-        // if this is an EQ instruction, our bytecode is a boolean and therefore *always* an i32
+    if (startsWith(instructionStr, "EQ") || startsWith(instructionStr, "NE")) {
+        // if this is an EQ or a NE instruction, our bytecode is a boolean and therefore *always* an i32
         append(node->bytecode, Instruction::RELI32);
     } else {
         append(node->bytecode, bytecodeInst);
@@ -131,6 +139,11 @@ void BytecodeGen::gen(Node *node) {
                     auto litData = static_cast<int32_t>(node->intLiteralData.value);
                     append(node->bytecode, toBytes(litData));
                 } break;
+                case NodeTypekind::I8: {
+                    append(node->bytecode, Instruction::CONSTI8);
+                    auto litData = static_cast<int8_t>(node->intLiteralData.value);
+                    append(node->bytecode, toBytes(litData));
+                } break;
                 case NodeTypekind::INT_LITERAL:
                 case NodeTypekind::I64: {
                     append(node->bytecode, Instruction::CONSTI64);
@@ -139,6 +152,10 @@ void BytecodeGen::gen(Node *node) {
                 } break;
                 default: assert(false);
             }
+        } break;
+        case NodeType::NIL_LITERAL: {
+            append(node->bytecode, Instruction::CONSTI64);
+            append(node->bytecode, toBytes64(0));
         } break;
         case NodeType::FLOAT_LITERAL: {
             switch (node->typeInfo->typeData.kind) {
@@ -249,9 +266,13 @@ void BytecodeGen::gen(Node *node) {
                         append(node->bytecode, toBytes32(localOffset));
                     }
                 } break;
+                case NodeTypekind::I8: {
+                    append(node->bytecode, Instruction::I8);
+                    append(node->bytecode, toBytes32(localOffset));
+                } break;
                 case NodeTypekind::BOOLEAN:
                 case NodeTypekind::I32: {
-                    append(node->bytecode, Instruction::RELI32);
+                    append(node->bytecode, Instruction::I32);
                     append(node->bytecode, toBytes32(localOffset));
                 } break;
                 case NodeTypekind::POINTER:
@@ -260,7 +281,15 @@ void BytecodeGen::gen(Node *node) {
                     append(node->bytecode, Instruction::I64);
                     append(node->bytecode, toBytes32(localOffset));
                 } break;
-                case NodeTypekind::ARRAY:
+                case NodeTypekind::FLOAT_LITERAL:
+                case NodeTypekind::F32: {
+                    append(node->bytecode, Instruction::F32);
+                    append(node->bytecode, toBytes32(localOffset));
+                } break;
+                case NodeTypekind::F64: {
+                    append(node->bytecode, Instruction::F64);
+                    append(node->bytecode, toBytes32(localOffset));
+                } break;
                 case NodeTypekind::STRUCT: {
                     // nothing to do
                 } break;
@@ -291,6 +320,12 @@ void BytecodeGen::gen(Node *node) {
                 } break;
                 case LexerTokenType::EQ_EQ: {
                     binopHelper("EQ", node);
+                } break;
+                case LexerTokenType::NE: {
+                    binopHelper("NEQ", node);
+                } break;
+                case LexerTokenType::LT: {
+                    binopHelper("LT", node);
                 } break;
                 default: assert(false);
             }
@@ -556,6 +591,35 @@ void BytecodeGen::gen(Node *node) {
                 memcpy(&instructions[skipElseBranchOverwrite], &instSize, sizeof(int32_t));
             }
         } break;
+        case NodeType::WHILE: {
+            auto jumpBackToInst = instructions.size();
+
+            gen(node->whileData.condition);
+
+            append(instructions, Instruction::JUMPIF);
+            append(instructions, node->whileData.condition->bytecode);
+
+            append(instructions, Instruction::CONSTI32);
+            auto trueBranchOverwrite = instructions.size();
+            append(instructions, toBytes32(888));
+
+            append(instructions, Instruction::CONSTI32);
+            auto falseBranchOverwrite = instructions.size();
+            append(instructions, toBytes32(999));
+
+            auto instSize = static_cast<int32_t>(instructions.size());
+            memcpy(&instructions[trueBranchOverwrite], &instSize, sizeof(int32_t));
+
+            for (const auto& stmt: node->whileData.stmts) {
+                gen(stmt);
+            }
+
+            append(instructions, Instruction::JUMP);
+            append(instructions, toBytes32(jumpBackToInst));
+
+            instSize = static_cast<int32_t>(instructions.size());
+            memcpy(&instructions[falseBranchOverwrite], &instSize, sizeof(int32_t));
+        } break;
         case NodeType::RUN: {
             // work should already be done, just need to go with whatever it resolved itself to
             gen(node->resolved);
@@ -565,6 +629,9 @@ void BytecodeGen::gen(Node *node) {
         } break;
         case NodeType::CAST: {
             gen(node->castData.value);
+        } break;
+        case NodeType::STRING_LITERAL: {
+            gen(node->resolved);
         } break;
         default: assert(false);
     }
@@ -599,6 +666,14 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
             append(instructions, node->bytecode);
         } break;
         case NodeType::INT_LITERAL: {
+            append(instructions, Instruction::STORECONST);
+
+            append(instructions, Instruction::RELCONSTI32);
+            append(instructions, toBytes(offset));
+
+            append(instructions, node->bytecode);
+        } break;
+        case NodeType::NIL_LITERAL: {
             append(instructions, Instruction::STORECONST);
 
             append(instructions, Instruction::RELCONSTI32);

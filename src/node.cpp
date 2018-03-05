@@ -152,5 +152,51 @@ ostream &operator<<(ostream &os, NodeType type) {
         case NodeType::ARRAY_INDEX: {
             return os << "array index";
         }
+        case NodeType::PANIC: {
+            return os << "panic";
+        }
     }
+}
+
+Node *makeArrayType(Node *elementType) {
+    auto ptrTy = new Node(NodeTypekind::POINTER);
+    ptrTy->typeData.pointerTypeData.underlyingType = elementType;
+
+    auto countTy = new Node(NodeTypekind::I32);
+
+    auto arrayType = new Node(NodeTypekind::STRUCT);
+    arrayType->typeData.structTypeData.isSecretlyArray = true;
+    arrayType->typeData.structTypeData.secretArrayElementType = elementType;
+    arrayType->typeData.structTypeData.params = {wrapInDeclParam(ptrTy, "data", 0), wrapInDeclParam(countTy, "count", 1)};
+
+    return arrayType;
+}
+
+Node *wrapInValueParam(Node *value, string name) {
+    auto valueParam = new Node();
+    valueParam->type = NodeType::VALUE_PARAM;
+    valueParam->valueParamData.value = value;
+
+    if (!name.empty()) {
+        auto nameNode = new Node(NodeTypekind::SYMBOL);
+        nameNode->symbolData.atomId = AtomTable::current->insertStr(name);
+        valueParam->valueParamData.name = nameNode;
+    }
+
+    return valueParam;
+}
+
+Node *wrapInDeclParam(Node *type, string name, int index) {
+    auto param = new Node();
+    param->type = NodeType::DECL_PARAM;
+    param->declParamData.type = type;
+    param->declParamData.index = index;
+
+    if (!name.empty()) {
+        auto nameNode = new Node(NodeTypekind::SYMBOL);
+        nameNode->symbolData.atomId = AtomTable::current->insertStr(name);
+        param->declParamData.name = nameNode;
+    }
+
+    return param;
 }

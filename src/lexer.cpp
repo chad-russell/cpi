@@ -151,6 +151,7 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "string", LexerTokenType::STRING)) { return; }
     if (tryEatKeyword(&next, "bool", LexerTokenType::BOOLEAN)) { return; }
     if (tryEatKeyword(&next, "i32", LexerTokenType::I32)) { return;}
+    if (tryEatKeyword(&next, "i8", LexerTokenType::I8)) { return;}
     if (tryEatKeyword(&next, "i64", LexerTokenType::I64)) { return;}
     if (tryEatKeyword(&next, "f32", LexerTokenType::F32)) { return;}
     if (tryEatKeyword(&next, "f64", LexerTokenType::F64)) { return;}
@@ -167,6 +168,7 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "Any", LexerTokenType::EXPOSED_ANY)) { return; }
     if (tryEatKeyword(&next, "typeof", LexerTokenType::TYPEOF)) { return; }
     if (tryEatKeyword(&next, "panic", LexerTokenType::PANIC)) { return; }
+    if (tryEatKeyword(&next, "none", LexerTokenType::NONE)) { return; }
 
     // BACK_TICK
     if (srcInfo.source[loc.byteIndex] == '`') {
@@ -407,6 +409,7 @@ const vector<string> Lexer::lexerTokenTypeStrings = {
     "RET",
     "STRING",
     "BOOLEAN",
+    "I8",
     "I32",
     "I64",
     "F32",

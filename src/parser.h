@@ -53,6 +53,7 @@ struct Parser {
     Node *parseSymbol();
     Node *parseScopedStmt();
     Node *parseIf();
+    Node *parseWhile();
     Node *parseRet();
     Node *parseLvalue();
     Node *parseType();
@@ -64,6 +65,7 @@ struct Parser {
     Node *parseRvalue();
     Node *parseIntLiteral();
     Node *parseFloatLiteral();
+    Node *parseStringLiteral();
     Node *parseLvalueHelper(Node *symbol, Location saved);
     Node *parseFnCall();
     Node *parseArrayIndex();
