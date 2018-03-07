@@ -632,6 +632,9 @@ void BytecodeGen::gen(Node *node) {
         case NodeType::STRING_LITERAL: {
             gen(node->resolved);
         } break;
+        case NodeType::UNARY_NEG: {
+            gen(node->nodeData);
+        } break;
         default: assert(false);
     }
 

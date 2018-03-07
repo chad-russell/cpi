@@ -22,7 +22,6 @@ llvm::Value *LlvmGen::store(llvm::Value *val, llvm::Value *ptr) {
 }
 
 bool needsStorage(Node *node) {
-    // otherwise if it's constant (doesn't have own local by default), then we should store it
     return hasNoLocalByDefault(node);
 }
 
@@ -632,6 +631,11 @@ void LlvmGen::gen(Node *node) {
             node->llvmData = node->resolved->llvmData;
             node->llvmLocal = node->resolved->llvmLocal;
             node->isLocal = node->resolved->isLocal;
+        } break;
+        case NodeType::UNARY_NEG: {
+            gen(node->nodeData);
+
+            node->llvmData = builder.CreateNeg(rvalueFor(node->nodeData));
         } break;
         default: assert(false);
     }

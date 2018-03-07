@@ -1044,6 +1044,43 @@ void resolveWhile(Semantic *semantic, Node *node) {
     }
 }
 
+void resolveUnaryNeg(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->nodeData);
+    node->typeInfo = node->nodeData->typeInfo;
+
+    auto resolvedBinop = new Node();
+    resolvedBinop->type = NodeType::BINOP;
+    resolvedBinop->binopData.type = LexerTokenType::MUL;
+
+    semantic->addLocal(resolvedBinop);
+
+    resolvedBinop->binopData.lhs = new Node();
+    switch (node->typeInfo->typeData.kind) {
+        case NodeTypekind::FLOAT_LITERAL:
+        case NodeTypekind::F32:
+        case NodeTypekind::F64: {
+            resolvedBinop->binopData.lhs->type = NodeType::FLOAT_LITERAL;
+            resolvedBinop->binopData.lhs->floatLiteralData.value = -1.0;
+        } break;
+        case NodeTypekind::INT_LITERAL:
+        case NodeTypekind::I8:
+        case NodeTypekind::I32:
+        case NodeTypekind::I64: {
+            resolvedBinop->binopData.lhs->type = NodeType::INT_LITERAL;
+            resolvedBinop->binopData.lhs->intLiteralData.value = -1;
+        } break;
+        default: assert(false);
+    }
+
+    resolvedBinop->binopData.rhs = node->nodeData;
+
+    auto resolved = resolvedBinop;
+    resolved->region = node->nodeData->region;
+    node->resolved = resolved;
+
+    semantic->resolveTypes(resolved);
+}
+
 void resolveRun(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->nodeData);
 
@@ -1187,6 +1224,9 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::WHILE: {
             resolveWhile(this, node);
+        } break;
+        case NodeType::UNARY_NEG: {
+            resolveUnaryNeg(this, node);
         } break;
         default: assert(false);
     }

@@ -845,6 +845,11 @@ Node *Parser::parseLvalueOrLiteral() {
         } else if (lexer->front.type == LexerTokenType::FLOAT_LITERAL) {
             symbol = parseFloatLiteral();
             symbol->floatLiteralData.value = -symbol->floatLiteralData.value;
+        } else {
+            auto target = parseRvalueSimple();
+            symbol = new Node();
+            symbol->type = NodeType::UNARY_NEG;
+            symbol->nodeData = target;
         }
     } else if (lexer->front.type == LexerTokenType::INT_LITERAL) {
         symbol = parseIntLiteral();

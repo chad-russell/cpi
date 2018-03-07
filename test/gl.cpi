@@ -20,7 +20,7 @@ fn glGenTextures(n: i32, textures: *none) none
 fn glBindTexture(target: i32, texture: i32) none
 fn glTexParameteri(target: i32, pname: i32, param: i32) none
 fn stbi_load(filename: *i8, x: *i32, y: *i32, channels_in_file: *i32, desired_channels: i32) *i8
-fn glTexImage2D(target: i32, level: i32, internalformat: i32, width: i32, height: i32, border: i32, format: i32, glType: i32, pixels: *none) none
+fn glTexImage2D(target: i32, level: i32, internalformat: i32, width: i32, height: i32, border: i32, format: i32, glType: i32, pixels: *i8) none
 fn glGenerateMipmap(n: i32) none
 fn glCompileShader(n: i32) none
 fn glShaderSource(shader: i32, count: i32, src: **i8, length: *none) none
@@ -52,28 +52,263 @@ fn putstr(s: []i8) {
 
 fn gl_main(window: *none, shaderProgram: i32, vertices: *f32) i32
 
-type GlmMat4 struct {
+type Mat4 struct {
     a0_0:  f32, a0_1:  f32,  a0_2: f32, a0_3:  f32,
     a1_0:  f32, a1_1:  f32,  a1_2: f32, a1_3:  f32,
     a2_0:  f32, a2_1:  f32,  a2_2: f32, a2_3:  f32,
     a3_0:  f32, a3_1:  f32,  a3_2: f32, a3_3:  f32,
 }
 
-type GlmVec3 struct {
+type Vec3 struct {
     x: f32,
     y: f32,
     z: f32,
 }
 
-fn glm_mat4(d: f32) GlmMat4
-fn glm_vec3(x: f32, y: f32, z: f32) GlmVec3
-fn glm_radians(d: f32) f32
-fn glm_perspective(fovy: f32, aspect: f32, zNear: f32, zFar: f32) GlmMat4
-fn glm_look_at(cameraPos: GlmVec3, target: GlmVec3, cameraUp: GlmVec3) GlmMat4
-fn glm_vec3_add(a: GlmVec3, b: GlmVec3) GlmVec3
-fn glm_mat4_translate(m: GlmMat4, v: GlmVec3) GlmMat4
-fn glm_mat4_rotate(m: GlmMat4, f: f32, v: GlmVec3) GlmMat4
-fn glm_mat4_addr(m: GlmMat4) *f32
+fn sqrt(f: f32) f32
+fn sin(f: f32) f32
+fn cos(f: f32) f32
+fn tan(f: f32) f32
+
+fn radians(degrees: f32) f32
+
+fn vec3_normalize(v: Vec3) Vec3
+fn vec3_muls(v: Vec3, s: f32) Vec3
+fn vec3_add(a: Vec3, b: Vec3) Vec3
+fn vec3_sub(a: Vec3, b: Vec3) Vec3
+fn vec3_cross(a: Vec3, b: Vec3) Vec3
+
+fn mat4_id() Mat4
+fn mat4_mul(a: Mat4, b: Mat4) Mat4
+fn mat4_perspective(fovy: f32, aspect: f32, zNear: f32, zFar: f32) Mat4
+fn mat4_translate(v: Vec3) Mat4
+fn mat4_rotate(v: Vec3) Mat4
+fn mat4_look_at(pos: Vec3, target: Vec3, worldUp: Vec3) Mat4
+
+-- fn radians(degrees: f32) {
+    -- ret degrees / 360.0 * 2.0 * 3.1415926535;
+-- }
+
+-- fn vec3_normalize(v: Vec3) Vec3 {
+    -- magnitude := sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+    -- ret { v.x / magnitude, v.y / magnitude, v.z / magnitude };
+-- }
+
+-- fn vec3_muls(v: Vec3, s: f32) Vec3 {
+    -- ret { v.x * s, v.y * s, v.z * s };
+-- }
+
+-- fn vec3_add(a: Vec3, b: Vec3) Vec3 {
+    -- ret { a.x + b.x, a.y + b.y, a.z + b.z };
+-- }
+
+-- fn vec3_sub(a: Vec3, b: Vec3) Vec3 {
+    -- ret { a.x - b.x, a.y - b.y, a.z - b.z };
+-- }
+
+-- fn vec3_cross(a: Vec3, b: Vec3) Vec3 {
+    -- ret { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
+-- }
+
+-- fn mat4_zeroes() {
+    -- m: Mat4;
+    -- fm := cast(*f32) &m;
+
+    -- i := 0;
+    -- while i < 16 {
+        -- ^(fm + (i * 4)) = 0.0;
+        -- i = i + 1;
+    -- }
+    -- ret m;
+-- }
+
+-- fn mat4_id() {
+    -- m := mat4_zeroes();
+    -- fm := cast(*f32) &m;
+
+    -- m[0][0] = 1.0
+    -- ^fm = 1.0;
+
+    -- m[1][1] = 1.0
+    -- ^(fm + (4 + 1) * 4) = 1.0;
+
+    -- m[2][2] = 1.0
+    -- ^(fm + (8 + 2) * 4) = 1.0;
+
+    -- m[3][3] = 1.0
+    -- ^(fm + (12 + 3) * 4) = 1.0;
+
+    -- ret m;
+-- }
+
+-- fn mat4_mul(a: Mat4, b: Mat4) {
+    -- m := mat4_zeroes();
+    -- fm := cast(*f32) &m;
+
+    -- i := 0;
+    -- while i < 16 {
+        -- ^(fm + (i * 4)) = 0.0;
+        -- i = i + 1;
+    -- }
+
+    -- fa := cast(*f32) &a;
+    -- fb := cast(*f32) &b;
+
+    -- i = 0;
+    -- while i < 4 {
+        -- j := 0;
+        -- while j < 4 {
+            -- k := 0;
+            -- while k < 4 {
+                -- aik := ^(fa + ((i * 4) + k) * 4);
+                -- bkj := ^(fb + ((k * 4) + j) * 4);
+                -- rij := fm + ((i * 4) + j) * 4;
+                -- ^rij = ^rij + (aik * bkj);
+
+                -- k = k + 1;
+            -- }
+
+            -- j = j + 1;
+        -- }
+
+        -- i = i + 1;
+    -- }
+
+    -- ret m;
+-- }
+
+-- fn mat4_perspective(fovy: f32, aspect: f32, zNear: f32, zFar: f32) {
+    -- f := 1.0 / tan(fovy * 0.5);
+
+    -- r := mat4_zeroes();
+    -- fr := cast(*f32) &r;
+
+    -- ^fr = f / aspect;
+    -- ^(fr + (4 + 1) * 4) = f;
+    -- ^(fr + (8 + 2) * 4) = (zFar + zNear) / (zNear - zFar);
+    -- ^(fr + (8 + 3) * 4) = -1.0;
+    -- ^(fr + (12 + 2) * 4) = (2.0 * zFar * zNear) / (zNear - zFar);
+
+    -- ret r;
+-- }
+
+-- fn mat4_translate(v: Vec3) {
+    -- r := mat4_id();
+    -- fr := cast(*f32) &r;
+
+    -- ^(fr + 12 * 4) = v.x;
+    -- ^(fr + (12 + 1) * 4) = v.y;
+    -- ^(fr + (12 + 2) * 4) = v.z;
+
+    -- ret r;
+-- }
+
+-- fn mat4_rotate(v: Vec3) {
+    -- r := mat4_zeroes();
+    -- fr := cast(*f32) &r;
+
+    -- A       := cos(v.x);
+    -- B       := sin(v.x);
+    -- C       := cos(v.y);
+    -- D       := sin(v.y);
+    -- E       := cos(v.z);
+    -- F       := sin(v.z);
+
+    -- ^fr  =  C * E;
+    -- ^(fr + 1 * 4)  = -C * F;
+    -- ^(fr + 2 * 4)  = -D;
+    -- ^(fr + 4 * 4)  = -B * D * E + A * F;
+    -- ^(fr + 5 * 4)  =  B * D * F + A * E;
+    -- ^(fr + 6 * 4)  = -B * C;
+    -- ^(fr + 8 * 4)  =  A * D * E + B * F;
+    -- ^(fr + 9 * 4)  = -A * D * F + B * E;
+    -- ^(fr + 10 * 4) =  A * C;
+
+    -- ^(fr + 3 * 4) = 0.0;
+    -- ^(fr + 7 * 4) = 0.0;
+    -- ^(fr + 11 * 4) = 0.0;
+    -- ^(fr + 12 * 4) = 0.0;
+    -- ^(fr + 13 * 4) = 0.0;
+    -- ^(fr + 14 * 4) = 0.0;
+
+    -- ^(fr + 15 * 4) =  1.0;
+
+    -- ret r;
+-- }
+
+-- fn mat4_look_at(pos: Vec3, target: Vec3, worldUp: Vec3) {
+    -- cameraDirection
+    -- zaxis := vec3_normalize(vec3_sub(pos, target));
+
+    -- positive right axis vector
+    -- xaxis := vec3_normalize(vec3_cross(vec3_normalize(worldUp), zaxis));
+
+    -- camera up vector
+    -- yaxis := vec3_cross(zaxis, xaxis);
+
+    -- translation
+    -- translation := mat4_id();
+    -- ftranslation := cast(*f32) &translation;
+    -- ^(ftranslation + 12 * 4) = -pos.x;
+    -- ^(ftranslation + (12 + 1) * 4) = -pos.y;
+    -- ^(ftranslation + (12 + 2) * 4) = -pos.z;
+
+    -- rotation
+    -- rotation := mat4_id();
+    -- frotation := cast(*f32) &rotation;
+    -- ^(frotation) = xaxis.x;
+    -- ^(frotation + 4 * 4) = xaxis.y;
+    -- ^(frotation + 8 * 4) = xaxis.z;
+    -- ^(frotation + 1 * 4) = yaxis.x;
+    -- ^(frotation + (4 + 1) * 4) = yaxis.y;
+    -- ^(frotation + (8 + 1) * 4) = yaxis.z;
+    -- ^(frotation + 2 * 4) = zaxis.x;
+    -- ^(frotation + (4 + 2) * 4) = zaxis.y;
+    -- ^(frotation + (8 + 2) * 4) = zaxis.z;
+
+    -- ret mat4_mul(rotation, translation);
+-- }
+
+fn c_mainloop(window: *none, VAO: i32, t1: i32, t2: i32, sp: i32) none
+
+fn setupTexture(imageFilePath: *i8, includeAlpha: i32) {
+    GL_TEXTURE_2D: i32 = 3553;
+    GL_TEXTURE_WRAP_S: i32 = 10242;
+    GL_TEXTURE_WRAP_T: i32 = 10243;
+    GL_REPEAT: i32 = 10497;
+    GL_LINEAR: i32 = 9729;
+    GL_TEXTURE_MIN_FILTER: i32 = 10241;
+    GL_TEXTURE_MAG_FILTER: i32 = 10240;
+    GL_UNSIGNED_BYTE: i32 = 5121;
+    GL_RGB: i32 = 6407;
+    GL_RGBA: i32 = 6408;
+
+    texture: i32;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    -- set the texture wrapping/filtering options (on the currently bound texture object)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    width: i32;
+    height: i32;
+    nrChannels: i32;
+    data := stbi_load(imageFilePath, &width, &height, &nrChannels, 0);
+
+    format := GL_RGB;
+    if includeAlpha == 1 {
+         format = GL_RGBA;
+    }
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    stbi_image_free(data);
+
+    ret texture;
+}
 
 fn main() {
     GLFW_CONTEXT_VERSION_MAJOR : i32 = 139266;
@@ -90,8 +325,8 @@ fn main() {
     GL_DEPTH_BUFFER_BIT : i32 = 256;
     GL_COLOR_BUFFER_BIT : i32 = 16384;
     GL_COLOR_OR_DEPTH_BUFFER_BIT : i32 = 16640;
-    GL_TEXTURE0 : i32 = 2124;
-    GL_TEXTURE1 : i32 = 2125;
+    GL_TEXTURE0 : i32 = 33984;
+    GL_TEXTURE1 : i32 = 33985;
     GL_TEXTURE_2D : i32 = 3553;
     GL_TRIANGLES : i32 = 4;
 
@@ -167,7 +402,7 @@ fn main() {
     glBindVertexArray(VAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, size_of_vertices, vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, size_of_vertices, cast(*none) vertices, GL_STATIC_DRAW);
 
     -- position attribute
     position_stride : i32 = 5;
@@ -178,61 +413,60 @@ fn main() {
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, position_stride * float_size, 3 * float_size);
     glEnableVertexAttribArray(1);
 
-    texture1 := setupTexture("/Users/chadrussell/Pictures/container.jpg\0", false);
-    texture2 := setupTexture("/Users/chadrussell/Pictures/awesomeface.png\0", true);
+    texture1 := setupTexture(cast(*i8) "/Users/chadrussell/Pictures/container.jpg\0".data, 0);
+    texture2 := setupTexture(cast(*i8) "/Users/chadrussell/Pictures/awesomeface.png\0".data, 1);
 
     shaderProgram := setup_shaders();
     glUseProgram(shaderProgram);
     glUniform1i(glGetUniformLocation(shaderProgram, "texture1\0".data), 0);
     glUniform1i(glGetUniformLocation(shaderProgram, "texture2\0".data), 1);
 
-    cubePositions : []GlmVec3 = {
-        data: cast(*GlmVec3) &{
-            glm_vec3( 0.0,   0.0,  0.0 ),
-            glm_vec3( 2.0,   5.0, -15.0),
-            glm_vec3(-1.5,  -2.2, -2.5 ),
-            glm_vec3(-3.8,  -2.0, -12.3),
-            glm_vec3( 2.4,  -0.4, -3.5 ),
-            glm_vec3(-1.7,   3.0, -7.5 ),
-            glm_vec3( 1.3,  -2.0, -2.5 ),
-            glm_vec3( 1.5,   2.0, -2.5 ),
-            glm_vec3( 1.5,   0.2, -1.5 ),
-            glm_vec3(-1.3,   1.0, -1.5 )
-        },
-        count: 10
-    };
+    -- cubePositions : []Vec3 = {
+        -- data: cast(*Vec3) &{
+            -- { 0.0,   0.0,  0.0 },
+            -- { 2.0,   5.0, -15.0},
+            -- {-1.5,  -2.2, -2.5 },
+            -- {-3.8,  -2.0, -12.3},
+            -- { 2.4,  -0.4, -3.5 },
+            -- {-1.7,   3.0, -7.5 },
+            -- { 1.3,  -2.0, -2.5 },
+            -- { 1.5,   2.0, -2.5 },
+            -- { 1.5,   0.2, -1.5 },
+            -- {-1.3,   1.0, -1.5 }
+        -- },
+        -- count: 10
+    -- };
 
     glEnable(GL_DEPTH_TEST);
 
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    -- deltaTime := 0.0;
+    -- lastFrame := 0.0;
+    -- fov := 45.0;
 
-    glBindVertexArray(0);
+    -- cameraPos   := {0.0, 0.0,  3.0};
+    -- cameraFront := {0.0, 0.0, -1.0};
+    -- cameraUp    := {0.0, 1.0,  0.0};
 
-    deltaTime := 0.0;
-    lastFrame := 0.0;
-    fov := 45.0;
+    c_mainloop(window, VAO, texture1, texture2, shaderProgram);
 
-    cameraPos   := glm_vec3(0.0, 0.0,  3.0);
-    cameraFront := glm_vec3(0.0, 0.0, -1.0);
-    cameraUp    := glm_vec3(0.0, 1.0,  0.0);
-
-    while true
-    {
-        currentFrame := glfwGetTime();
-        deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
+    -- while true
+    -- {
+        -- currentFrame := glfwGetTime();
+        -- deltaTime = currentFrame - lastFrame;
+        -- lastFrame = currentFrame;
 
         -- process_input(window);
 
-		glClearColor(0.2, 0.3, 0.3, 1.0);
-        glClear(GL_COLOR_OR_DEPTH_BUFFER_BIT);
+		-- glClearColor(0.2, 0.3, 0.3, 1.0);
+        -- glClear(GL_COLOR_OR_DEPTH_BUFFER_BIT);
 
-        projection := glm_mat4(1.0);
-        projection = glm_perspective(glm_radians(fov), 800.0 / 600.0, 0.1, 100.0);
-        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection\0".data), 1, GL_FALSE, glm_mat4_addr(projection));
+        -- projection := mat4_perspective(radians(fov), 800.0 / 600.0, 0.1, 100.0);
+        -- projection := mat4_id();
+        -- glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection\0".data), 1, GL_FALSE, cast(*f32) &projection);
 
-        h1 := glm_vec3_add(glm_vec3(0.0, 0.0, 0.0), glm_vec3(0.0, 0.0, 0.0));
-        -- view := glm_look_at(cameraPos, glm_vec3_add(cameraPos, cameraFront), cameraUp);
+        -- view := mat4_look_at(cameraPos, vec3_add(cameraPos, cameraFront), cameraUp);
+        -- view := mat4_id();
+        -- glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view\0".data), 1, GL_FALSE, cast(*f32) &view);
 
         -- glActiveTexture(GL_TEXTURE0);
         -- glBindTexture(GL_TEXTURE_2D, texture1);
@@ -243,20 +477,25 @@ fn main() {
         -- idx := 0;
         -- idxf := 0.0;
         -- while idx < 10 {
-            -- model := glm_mat4(1.0);
-            -- model = glm_mat4_translate(model, cubePositions[idx]);
+            -- model := mat4_translate(cubePositions[idx]);
 
             -- angle := 20.0 * (idxf + 1.0);
-            -- model = glm_mat4_rotate(model, glm_radians(angle), glm_vec3(1.0, 0.3, 0.5));
+            -- angle = radians(angle);
+            -- r := mat4_rotate({angle / 8.0, angle / 8.0, angle / 16.0});
 
-            -- glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model\0".data), 1, GL_FALSE, glm_mat4_addr(model));
+            -- model = mat4_mul(r, model);
+            -- model := mat4_id();
+
+            -- glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model\0".data), 1, GL_FALSE, cast(*f32) &model);
 
             -- glDrawArrays(GL_TRIANGLES, 0, 36);
+
+            -- idx = idx + 1;
         -- }
 
-        glfwSwapBuffers(window);
-        glfwPollEvents();
-    }
+        -- glfwSwapBuffers(window);
+        -- glfwPollEvents();
+    -- }
 
     ret 0;
 }
@@ -331,55 +570,10 @@ fn setup_shaders() {
         putstr("shader linking failed!!");
     }
 
-    -- glDeleteShader(vertex);
-    -- glDeleteShader(fragment);
+    glDeleteShader(vertex);
+    glDeleteShader(fragment);
 
     ret id;
-}
-
-fn setupTexture(imageFilePath: []i8, includeAlpha := false) {
-    GL_TEXTURE_2D: i32 = 3553;
-    GL_TEXTURE_WRAP_S: i32 = 10242;
-    GL_TEXTURE_WRAP_T: i32 = 10243;
-    GL_REPEAT: i32 = 10497;
-    GL_LINEAR: i32 = 9729;
-    GL_TEXTURE_MIN_FILTER: i32 = 10241;
-    GL_TEXTURE_MAG_FILTER: i32 = 10240;
-    GL_UNSIGNED_BYTE: i32 = 5121;
-    GL_RGB: i32 = 6407;
-    GL_RGBA: i32 = 6408;
-
-    texture: i32;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-
-    -- set the texture wrapping/filtering options (on the currently bound texture object)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    -- load and generate the textures
-    width: i32;
-    height: i32;
-    nrChannels: i32;
-
-    data := stbi_load(imageFilePath.data, &width, &height, &nrChannels, 0);
-    if (data != nil) {
-        putstr("Successfully loaded texture\0");
-
-        format := GL_RGB;
-        if includeAlpha { format = GL_RGBA; }
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-    }
-    else {
-        putstr("Failed to load texture:\0");
-        putstr(imageFilePath);
-    }
-    stbi_image_free(data);
-
-    ret texture;
 }
 
 fn framebuffer_size_callback(window: *none, width: i32, height: i32) {
