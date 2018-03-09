@@ -65,10 +65,10 @@ type Vec3 struct {
     z: f32,
 }
 
-fn sqrt(f: f32) f32
-fn sin(f: f32) f32
-fn cos(f: f32) f32
-fn tan(f: f32) f32
+fn sqrtf(f: f32) f32
+fn sinf(f: f32) f32
+fn cosf(f: f32) f32
+fn tanf(f: f32) f32
 
 fn radians(degrees: f32) f32
 
@@ -90,7 +90,7 @@ fn mat4_look_at(pos: Vec3, target: Vec3, worldUp: Vec3) Mat4
 -- }
 
 -- fn vec3_normalize(v: Vec3) Vec3 {
-    -- magnitude := sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+    -- magnitude := sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
     -- ret { v.x / magnitude, v.y / magnitude, v.z / magnitude };
 -- }
 
@@ -110,35 +110,22 @@ fn mat4_look_at(pos: Vec3, target: Vec3, worldUp: Vec3) Mat4
     -- ret { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
 -- }
 
--- fn mat4_zeroes() {
-    -- m: Mat4;
-    -- fm := cast(*f32) &m;
-
-    -- i := 0;
-    -- while i < 16 {
-        -- ^(fm + (i * 4)) = 0.0;
-        -- i = i + 1;
-    -- }
-    -- ret m;
+-- fn mat4_zeroes() Mat4 {
+    -- ret {
+        -- 0.0, 0.0, 0.0, 0.0,
+        -- 0.0, 0.0, 0.0, 0.0,
+        -- 0.0, 0.0, 0.0, 0.0,
+        -- 0.0, 0.0, 0.0, 0.0
+    -- };
 -- }
 
--- fn mat4_id() {
-    -- m := mat4_zeroes();
-    -- fm := cast(*f32) &m;
-
-    -- m[0][0] = 1.0
-    -- ^fm = 1.0;
-
-    -- m[1][1] = 1.0
-    -- ^(fm + (4 + 1) * 4) = 1.0;
-
-    -- m[2][2] = 1.0
-    -- ^(fm + (8 + 2) * 4) = 1.0;
-
-    -- m[3][3] = 1.0
-    -- ^(fm + (12 + 3) * 4) = 1.0;
-
-    -- ret m;
+-- fn mat4_id() Mat4 {
+    -- ret {
+        -- 1.0, 0.0, 0.0, 0.0,
+        -- 0.0, 1.0, 0.0, 0.0,
+        -- 0.0, 0.0, 1.0, 0.0,
+        -- 0.0, 0.0, 0.0, 1.0
+    -- };
 -- }
 
 -- fn mat4_mul(a: Mat4, b: Mat4) {
@@ -269,8 +256,6 @@ fn mat4_look_at(pos: Vec3, target: Vec3, worldUp: Vec3) Mat4
     -- ret mat4_mul(rotation, translation);
 -- }
 
-fn c_mainloop(window: *none, VAO: i32, t1: i32, t2: i32, sp: i32) none
-
 fn setupTexture(imageFilePath: *i8, includeAlpha: i32) {
     GL_TEXTURE_2D: i32 = 3553;
     GL_TEXTURE_WRAP_S: i32 = 10242;
@@ -310,6 +295,8 @@ fn setupTexture(imageFilePath: *i8, includeAlpha: i32) {
     ret texture;
 }
 
+fn c_main(window: *none) none
+
 fn main() {
     GLFW_CONTEXT_VERSION_MAJOR : i32 = 139266;
     GLFW_CONTEXT_VERSION_MINOR : i32 = 139267;
@@ -345,6 +332,8 @@ fn main() {
     window := glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "wb\0".data, nil, nil);
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    c_main(window);
 
     float_size : i32 = 4;
 
@@ -413,44 +402,42 @@ fn main() {
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, position_stride * float_size, 3 * float_size);
     glEnableVertexAttribArray(1);
 
-    texture1 := setupTexture(cast(*i8) "/Users/chadrussell/Pictures/container.jpg\0".data, 0);
-    texture2 := setupTexture(cast(*i8) "/Users/chadrussell/Pictures/awesomeface.png\0".data, 1);
+    -- texture1 := setupTexture(cast(*i8) "/Users/chadrussell/Pictures/container.jpg\0".data, 0);
+    -- texture2 := setupTexture(cast(*i8) "/Users/chadrussell/Pictures/awesomeface.png\0".data, 1);
 
-    shaderProgram := setup_shaders();
-    glUseProgram(shaderProgram);
-    glUniform1i(glGetUniformLocation(shaderProgram, "texture1\0".data), 0);
-    glUniform1i(glGetUniformLocation(shaderProgram, "texture2\0".data), 1);
+    -- shaderProgram := setup_shaders();
+    -- glUseProgram(shaderProgram);
+    -- glUniform1i(glGetUniformLocation(shaderProgram, "texture1\0".data), 0);
+    -- glUniform1i(glGetUniformLocation(shaderProgram, "texture2\0".data), 1);
 
-    -- cubePositions : []Vec3 = {
-        -- data: cast(*Vec3) &{
-            -- { 0.0,   0.0,  0.0 },
-            -- { 2.0,   5.0, -15.0},
-            -- {-1.5,  -2.2, -2.5 },
-            -- {-3.8,  -2.0, -12.3},
-            -- { 2.4,  -0.4, -3.5 },
-            -- {-1.7,   3.0, -7.5 },
-            -- { 1.3,  -2.0, -2.5 },
-            -- { 1.5,   2.0, -2.5 },
-            -- { 1.5,   0.2, -1.5 },
-            -- {-1.3,   1.0, -1.5 }
-        -- },
-        -- count: 10
-    -- };
+    cubePositions : []Vec3 = {
+        data: cast(*Vec3) &{
+            { 0.0,  0.0,  0.0 },
+            { 2.0,  5.0, -15.0},
+            {-1.5, -2.2, -2.5 },
+            {-3.8, -2.0, -12.3},
+            { 2.4, -0.4, -3.5 },
+            {-1.7,  3.0, -7.5 },
+            { 1.3, -2.0, -2.5 },
+            { 1.5,  2.0, -2.5 },
+            { 1.5,  0.2, -1.5 },
+            {-1.3,  1.0, -1.5 }
+        },
+        count: 10
+    };
 
     glEnable(GL_DEPTH_TEST);
 
-    -- deltaTime := 0.0;
-    -- lastFrame := 0.0;
-    -- fov := 45.0;
+    deltaTime := 0.0;
+    lastFrame := 0.0;
+    fov := 45.0;
 
-    -- cameraPos   := {0.0, 0.0,  3.0};
-    -- cameraFront := {0.0, 0.0, -1.0};
-    -- cameraUp    := {0.0, 1.0,  0.0};
+    cameraPos   := {0.0, 0.0,  3.0};
+    cameraFront := {0.0, 0.0, -1.0};
+    cameraUp    := {0.0, 1.0,  0.0};
 
-    c_mainloop(window, VAO, texture1, texture2, shaderProgram);
+    while true {
 
-    -- while true
-    -- {
         -- currentFrame := glfwGetTime();
         -- deltaTime = currentFrame - lastFrame;
         -- lastFrame = currentFrame;
@@ -461,11 +448,9 @@ fn main() {
         -- glClear(GL_COLOR_OR_DEPTH_BUFFER_BIT);
 
         -- projection := mat4_perspective(radians(fov), 800.0 / 600.0, 0.1, 100.0);
-        -- projection := mat4_id();
         -- glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection\0".data), 1, GL_FALSE, cast(*f32) &projection);
 
         -- view := mat4_look_at(cameraPos, vec3_add(cameraPos, cameraFront), cameraUp);
-        -- view := mat4_id();
         -- glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view\0".data), 1, GL_FALSE, cast(*f32) &view);
 
         -- glActiveTexture(GL_TEXTURE0);
@@ -477,14 +462,13 @@ fn main() {
         -- idx := 0;
         -- idxf := 0.0;
         -- while idx < 10 {
+            -- model := mat4_id();
             -- model := mat4_translate(cubePositions[idx]);
 
             -- angle := 20.0 * (idxf + 1.0);
             -- angle = radians(angle);
             -- r := mat4_rotate({angle / 8.0, angle / 8.0, angle / 16.0});
-
             -- model = mat4_mul(r, model);
-            -- model := mat4_id();
 
             -- glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model\0".data), 1, GL_FALSE, cast(*f32) &model);
 
@@ -495,7 +479,7 @@ fn main() {
 
         -- glfwSwapBuffers(window);
         -- glfwPollEvents();
-    -- }
+    }
 
     ret 0;
 }
