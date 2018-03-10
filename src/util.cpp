@@ -236,6 +236,7 @@ int64_t AtomTable::insert(Region r) {
 bool hasNoLocalByDefault(Node *node) {
     switch (resolve(node)->type) {
         case NodeType::INT_LITERAL:
+        case NodeType::FLOAT_LITERAL:
         case NodeType::ADDRESS_OF:
         case NodeType::DEREF:
         case NodeType::FN_DECL:

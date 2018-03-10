@@ -144,6 +144,7 @@ void LlvmGen::gen(Node *node) {
             auto fnName = node->fnDeclData.name ? AtomTable::current->backwardAtoms[node->fnDeclData.name->symbolData.atomId] : "anon";
 
             auto *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, fnName, module.get());
+            F->setCallingConv(llvm::CallingConv::C);
             node->llvmData = F;
 
             // if it's just a declaration, then we're done
@@ -208,7 +209,7 @@ void LlvmGen::gen(Node *node) {
             verifyFunction(*F, &llvm::errs());
 
             // DO_OPTIMIZE
-            TheFPM->run(*F);
+//            TheFPM->run(*F);
         } break;
         case NodeType::RET: {
             gen(node->retData.value);
@@ -218,7 +219,7 @@ void LlvmGen::gen(Node *node) {
             node->llvmData = llvm::ConstantInt::get(typeFor(node->typeInfo), (uint64_t) node->intLiteralData.value);
         } break;
         case NodeType::FLOAT_LITERAL: {
-            node->llvmData = llvm::ConstantFP::get(typeFor(node->typeInfo), node->floatLiteralData.value);
+            node->llvmData = llvm::ConstantFP::get(typeFor(node->typeInfo), (float) node->floatLiteralData.value);
         } break;
         case NodeType::NIL_LITERAL: {
             node->llvmData = llvm::ConstantPointerNull::get(llvm::Type::getVoidTy(context)->getPointerTo(0));
@@ -287,79 +288,83 @@ void LlvmGen::gen(Node *node) {
             auto lhsValue = rvalueFor(node->binopData.lhs);
             auto rhsValue = rvalueFor(node->binopData.rhs);
 
-            llvm::Type *pointerType = nullptr;
+//            llvm::Type *pointerType = nullptr;
 
             if (node->binopData.lhs->typeInfo->typeData.kind == NodeTypekind::POINTER) {
-                pointerType = lhsValue->getType();
-                lhsValue = builder.CreatePtrToInt(lhsValue, builder.getInt64Ty());
+//                pointerType = lhsValue->getType();
+
+//                lhsValue = builder.CreatePtrToInt(lhsValue, builder.getInt64Ty());
+
+                auto value = builder.CreateGEP(lhsValue, rhsValue, "parith");
+                store(value, (llvm::Value *) node->llvmLocal);
             }
+            else if (node->binopData.rhs->typeInfo->typeData.kind == NodeTypekind::POINTER) {
+//                pointerType = rhsValue->getType();
 
-            if (node->binopData.rhs->typeInfo->typeData.kind == NodeTypekind::POINTER) {
-                pointerType = rhsValue->getType();
-                rhsValue = builder.CreatePtrToInt(rhsValue, builder.getInt64Ty());
-            }
+//                rhsValue = builder.CreatePtrToInt(rhsValue, builder.getInt64Ty());
 
-            llvm::Value *value = nullptr;
-
-            auto isFloat = node->binopData.lhs->typeInfo->typeData.kind == NodeTypekind::FLOAT_LITERAL
-                        || node->binopData.lhs->typeInfo->typeData.kind == NodeTypekind::F32
-                        || node->binopData.lhs->typeInfo->typeData.kind == NodeTypekind::F64;
-
-            if (isFloat) {
-                 switch (node->binopData.type) {
-                    case LexerTokenType::ADD: {
-                        value = builder.CreateFAdd(lhsValue, rhsValue);
-                    } break;
-                    case LexerTokenType::DIV: {
-                        value = builder.CreateFDiv(lhsValue, rhsValue);
-                    } break;
-                    case LexerTokenType::SUB: {
-                        value = builder.CreateFSub(lhsValue, rhsValue);
-                    } break;
-                    case LexerTokenType::MUL: {
-                        value = builder.CreateFMul(lhsValue, rhsValue);
-                    } break;
-                    case LexerTokenType::EQ_EQ: {
-                        value = builder.CreateFCmpOEQ(lhsValue, rhsValue);
-                    } break;
-                    case LexerTokenType::NE: {
-                        value = builder.CreateFCmpONE(lhsValue, rhsValue);
-                    } break;
-                    default: assert(false);
-                }
+                auto value = builder.CreateGEP(rhsValue, lhsValue, "parith");
+                store(value, (llvm::Value *) node->llvmLocal);
             }
             else {
-                switch (node->binopData.type) {
-                    case LexerTokenType::ADD: {
-                        value = builder.CreateAdd(lhsValue, rhsValue);
-                    } break;
-                    case LexerTokenType::DIV: {
-                        value = builder.CreateSDiv(lhsValue, rhsValue);
-                    } break;
-                    case LexerTokenType::SUB: {
-                        value = builder.CreateSub(lhsValue, rhsValue);
-                    } break;
-                    case LexerTokenType::MUL: {
-                        value = builder.CreateMul(lhsValue, rhsValue);
-                    } break;
-                    case LexerTokenType::EQ_EQ: {
-                        value = builder.CreateICmpEQ(lhsValue, rhsValue);
-                    } break;
-                    case LexerTokenType::NE: {
-                        value = builder.CreateICmpNE(lhsValue, rhsValue);
-                    } break;
-                    case LexerTokenType::LT: {
-                        value = builder.CreateICmpSLT(lhsValue, rhsValue);
-                    } break;
-                    default: assert(false);
+                llvm::Value *value = nullptr;
+
+                auto isFloat = node->binopData.lhs->typeInfo->typeData.kind == NodeTypekind::FLOAT_LITERAL
+                               || node->binopData.lhs->typeInfo->typeData.kind == NodeTypekind::F32
+                               || node->binopData.lhs->typeInfo->typeData.kind == NodeTypekind::F64;
+
+                if (isFloat) {
+                    switch (node->binopData.type) {
+                        case LexerTokenType::ADD: {
+                            value = builder.CreateFAdd(lhsValue, rhsValue);
+                        } break;
+                        case LexerTokenType::DIV: {
+                            value = builder.CreateFDiv(lhsValue, rhsValue);
+                        } break;
+                        case LexerTokenType::SUB: {
+                            value = builder.CreateFSub(lhsValue, rhsValue);
+                        } break;
+                        case LexerTokenType::MUL: {
+                            value = builder.CreateFMul(lhsValue, rhsValue);
+                        } break;
+                        case LexerTokenType::EQ_EQ: {
+                            value = builder.CreateFCmpOEQ(lhsValue, rhsValue);
+                        } break;
+                        case LexerTokenType::NE: {
+                            value = builder.CreateFCmpONE(lhsValue, rhsValue);
+                        } break;
+                        default: assert(false);
+                    }
                 }
-            }
+                else {
+                    switch (node->binopData.type) {
+                        case LexerTokenType::ADD: {
+                            value = builder.CreateAdd(lhsValue, rhsValue);
+                        } break;
+                        case LexerTokenType::DIV: {
+                            value = builder.CreateSDiv(lhsValue, rhsValue);
+                        } break;
+                        case LexerTokenType::SUB: {
+                            value = builder.CreateSub(lhsValue, rhsValue);
+                        } break;
+                        case LexerTokenType::MUL: {
+                            value = builder.CreateMul(lhsValue, rhsValue);
+                        } break;
+                        case LexerTokenType::EQ_EQ: {
+                            value = builder.CreateICmpEQ(lhsValue, rhsValue);
+                        } break;
+                        case LexerTokenType::NE: {
+                            value = builder.CreateICmpNE(lhsValue, rhsValue);
+                        } break;
+                        case LexerTokenType::LT: {
+                            value = builder.CreateICmpSLT(lhsValue, rhsValue);
+                        } break;
+                        default: assert(false);
+                    }
+                }
 
-            if (pointerType != nullptr) {
-                value = builder.CreateIntToPtr(value, pointerType);
+                store(value, (llvm::Value *) node->llvmLocal);
             }
-
-            store(value, (llvm::Value *) node->llvmLocal);
         } break;
         case NodeType::DECL_PARAM: {
             auto resolvedParam = currentFnDecl->fnDeclData.params[node->declParamData.index];

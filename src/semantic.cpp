@@ -357,18 +357,8 @@ void resolveArrayIndex(Semantic *semantic, Node *node) {
 
     node->typeInfo = node->arrayIndexData.target->typeInfo->typeData.structTypeData.secretArrayElementType;
 
-    // a[i] <==> ^((cast(*i32) a) + i * sizeof(i32)), for example (if typeof(a) is []i32)
+    // a[i] <==> ^((cast(*i32) a) + i, for example (if typeof(a) is []i32)
     // todo(chad): our size calculations may not always be the same as llvm's, because of alignment ets. etc. So make a sizeof(...) operator
-    auto typeSizeNode = new Node();
-    typeSizeNode->type = NodeType::INT_LITERAL;
-    typeSizeNode->intLiteralData.value = typeSize(node->typeInfo);
-
-    auto iTimesElementSize = new Node(node->region.srcInfo, nullptr, NodeType::BINOP, node->scope);
-    iTimesElementSize->binopData.type = LexerTokenType::MUL;
-    iTimesElementSize->binopData.lhs = node->arrayIndexData.indexValue;
-    iTimesElementSize->binopData.rhs = typeSizeNode;
-
-    semantic->addLocal(iTimesElementSize);
 
     auto aCasted = new Node();
     aCasted->type = NodeType::CAST;
@@ -380,7 +370,7 @@ void resolveArrayIndex(Semantic *semantic, Node *node) {
     auto add = new Node(node->region.srcInfo, nullptr, NodeType::BINOP, node->scope);
     add->binopData.type = LexerTokenType::ADD;
     add->binopData.lhs = aCasted;
-    add->binopData.rhs = iTimesElementSize;
+    add->binopData.rhs = node->arrayIndexData.indexValue;
 
     auto deref = new Node(node->region.srcInfo, nullptr, NodeType::DEREF, node->scope);
     deref->derefData.target = add;

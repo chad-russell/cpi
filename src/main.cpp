@@ -237,8 +237,8 @@ int main(int argc, char **argv) {
         }
 
 //        cout << interp->readFromStack<int8_t>(0) << endl;
-        cout << interp->readFromStack<int32_t>(0) << endl;
-//        cout << interp->readFromStack<float>(0) << endl;
+//        cout << interp->readFromStack<int32_t>(0) << endl;
+        cout << interp->readFromStack<float>(0) << endl;
     }
 
     if (outputFileName != nullptr) {
@@ -262,12 +262,42 @@ int main(int argc, char **argv) {
         } else if (endsWith(outputFileName, ".ll")) {
             // .ll
             auto llvmGen = new LlvmGen();
+
+            InitializeAllTargetInfos();
+            InitializeAllTargets();
+            InitializeAllTargetMCs();
+            InitializeAllAsmParsers();
+            InitializeAllAsmPrinters();
+
+//            auto TargetTriple = sys::getDefaultTargetTriple();
+            auto TargetTriple = "x86_64-apple-macosx10.13.0";
+            llvmGen->module->setTargetTriple(TargetTriple);
+
+            std::string Error;
+            auto Target = TargetRegistry::lookupTarget(TargetTriple, Error);
+
+            // Print an error and exit if we couldn't find the requested target.
+            // This generally occurs if we've forgotten to initialise the
+            // TargetRegistry or we have a bogus target triple.
+            if (!Target) {
+                errs() << Error;
+                return 1;
+            }
+
+            auto CPU = "generic";
+            auto Features = "";
+
+            TargetOptions opt;
+            auto RM = llvm::Optional<Reloc::Model>();
+            auto TheTargetMachine = Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
+
+            llvmGen->module->setDataLayout(TheTargetMachine->createDataLayout());
+
             llvmGen->gen(parser->mainFn);
             llvmGen->module->print(llvm::errs(), nullptr);
         } else {
             // assume we are generating an executable
             auto llvmGen = new LlvmGen();
-            llvmGen->gen(parser->mainFn);
 
             InitializeAllTargetInfos();
             InitializeAllTargets();
@@ -308,6 +338,8 @@ int main(int argc, char **argv) {
                 errs() << "Could not open file: " << EC.message();
                 return 1;
             }
+
+            llvmGen->gen(parser->mainFn);
 
             legacy::PassManager pass;
             auto FileType = TargetMachine::CGFT_ObjectFile;

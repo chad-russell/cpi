@@ -49,6 +49,7 @@ fn putstr(s: []i8) {
 	puts(s.data);
 	ret 0;
 }
+fn print_float(f: f32) none
 
 fn gl_main(window: *none, shaderProgram: i32, vertices: *f32) i32
 
@@ -79,182 +80,179 @@ fn vec3_sub(a: Vec3, b: Vec3) Vec3
 fn vec3_cross(a: Vec3, b: Vec3) Vec3
 
 fn mat4_id() Mat4
+fn mat4_zeroes() Mat4
 fn mat4_mul(a: Mat4, b: Mat4) Mat4
 fn mat4_perspective(fovy: f32, aspect: f32, zNear: f32, zFar: f32) Mat4
 fn mat4_translate(v: Vec3) Mat4
 fn mat4_rotate(v: Vec3) Mat4
 fn mat4_look_at(pos: Vec3, target: Vec3, worldUp: Vec3) Mat4
 
--- fn radians(degrees: f32) {
-    -- ret degrees / 360.0 * 2.0 * 3.1415926535;
--- }
+fn c_radians(degrees: f32) {
+    ret degrees / 360.0 * 2.0 * 3.1415926535;
+}
 
--- fn vec3_normalize(v: Vec3) Vec3 {
-    -- magnitude := sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
-    -- ret { v.x / magnitude, v.y / magnitude, v.z / magnitude };
--- }
+fn c_vec3_normalize(v: Vec3) Vec3 {
+    magnitude := sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
+    ret { v.x / magnitude, v.y / magnitude, v.z / magnitude };
+}
 
--- fn vec3_muls(v: Vec3, s: f32) Vec3 {
-    -- ret { v.x * s, v.y * s, v.z * s };
--- }
+fn c_vec3_muls(v: Vec3, s: f32) Vec3 {
+    ret { v.x * s, v.y * s, v.z * s };
+}
 
--- fn vec3_add(a: Vec3, b: Vec3) Vec3 {
-    -- ret { a.x + b.x, a.y + b.y, a.z + b.z };
--- }
+fn c_vec3_add(a: Vec3, b: Vec3) Vec3 {
+    ret { a.x + b.x, a.y + b.y, a.z + b.z };
+}
 
--- fn vec3_sub(a: Vec3, b: Vec3) Vec3 {
-    -- ret { a.x - b.x, a.y - b.y, a.z - b.z };
--- }
+fn c_vec3_sub(a: Vec3, b: Vec3) Vec3 {
+    ret { a.x - b.x, a.y - b.y, a.z - b.z };
+}
 
--- fn vec3_cross(a: Vec3, b: Vec3) Vec3 {
-    -- ret { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
--- }
+fn c_vec3_cross(a: Vec3, b: Vec3) Vec3 {
+    ret { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
+}
 
--- fn mat4_zeroes() Mat4 {
-    -- ret {
-        -- 0.0, 0.0, 0.0, 0.0,
-        -- 0.0, 0.0, 0.0, 0.0,
-        -- 0.0, 0.0, 0.0, 0.0,
-        -- 0.0, 0.0, 0.0, 0.0
-    -- };
--- }
+fn c_mat4_zeroes() Mat4 {
+    ret {
+        0.0, 0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0
+    };
+}
 
--- fn mat4_id() Mat4 {
-    -- ret {
-        -- 1.0, 0.0, 0.0, 0.0,
-        -- 0.0, 1.0, 0.0, 0.0,
-        -- 0.0, 0.0, 1.0, 0.0,
-        -- 0.0, 0.0, 0.0, 1.0
-    -- };
--- }
+fn c_mat4_id() Mat4 {
+    ret {
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 1.0
+    };
+}
 
--- fn mat4_mul(a: Mat4, b: Mat4) {
-    -- m := mat4_zeroes();
-    -- fm := cast(*f32) &m;
+fn c_mat4_mul(a: *Mat4, b: *Mat4) {
+    r := c_mat4_zeroes();
+    fr := cast(*f32) &r;
 
-    -- i := 0;
-    -- while i < 16 {
-        -- ^(fm + (i * 4)) = 0.0;
-        -- i = i + 1;
-    -- }
+    fa := cast(*f32) a;
+    fb := cast(*f32) b;
 
-    -- fa := cast(*f32) &a;
-    -- fb := cast(*f32) &b;
+    i := 0;
+    while i < 4 {
+        j := 0;
+        while j < 4 {
+            k := 0;
+            while k < 4 {
+                rij := fr + (i * 4) + j;
+                aik := ^(fa + (i * 4) + k);
+                bkj := ^(fb + (k * 4) + j);
 
-    -- i = 0;
-    -- while i < 4 {
-        -- j := 0;
-        -- while j < 4 {
-            -- k := 0;
-            -- while k < 4 {
-                -- aik := ^(fa + ((i * 4) + k) * 4);
-                -- bkj := ^(fb + ((k * 4) + j) * 4);
-                -- rij := fm + ((i * 4) + j) * 4;
-                -- ^rij = ^rij + (aik * bkj);
+                ^rij = ^rij + (aik * bkj);
 
-                -- k = k + 1;
-            -- }
+                k = k + 1;
+            }
 
-            -- j = j + 1;
-        -- }
+            j = j + 1;
+        }
 
-        -- i = i + 1;
-    -- }
+        i = i + 1;
+    }
 
-    -- ret m;
--- }
+    ret r;
+}
 
--- fn mat4_perspective(fovy: f32, aspect: f32, zNear: f32, zFar: f32) {
-    -- f := 1.0 / tan(fovy * 0.5);
+fn c_mat4_perspective(fovy: f32, aspect: f32, zNear: f32, zFar: f32) {
+    f := 1.0 / tanf(fovy * 0.5);
 
-    -- r := mat4_zeroes();
-    -- fr := cast(*f32) &r;
+    r := c_mat4_zeroes();
+    fr := cast(*f32) &r;
 
-    -- ^fr = f / aspect;
-    -- ^(fr + (4 + 1) * 4) = f;
-    -- ^(fr + (8 + 2) * 4) = (zFar + zNear) / (zNear - zFar);
-    -- ^(fr + (8 + 3) * 4) = -1.0;
-    -- ^(fr + (12 + 2) * 4) = (2.0 * zFar * zNear) / (zNear - zFar);
+    ^fr = f / aspect;
+    ^(fr + 1*4 + 1) = f;
+    ^(fr + 2*4 + 2) = (zFar + zNear) / (zNear - zFar);
+    ^(fr + 2*4 + 3) = -1.0;
+    ^(fr + 3*4 + 2) = (2.0 * zFar * zNear) / (zNear - zFar);
 
-    -- ret r;
--- }
+    ret r;
+}
 
--- fn mat4_translate(v: Vec3) {
-    -- r := mat4_id();
-    -- fr := cast(*f32) &r;
+fn c_mat4_translate(v: Vec3) {
+    r := c_mat4_id();
+    fr := cast(*f32) &r;
 
-    -- ^(fr + 12 * 4) = v.x;
-    -- ^(fr + (12 + 1) * 4) = v.y;
-    -- ^(fr + (12 + 2) * 4) = v.z;
+    ^(fr + 3*4) = v.x;
+    ^(fr + 3*4 + 1) = v.y;
+    ^(fr + 3*4 + 2) = v.z;
 
-    -- ret r;
--- }
+    ret r;
+}
 
--- fn mat4_rotate(v: Vec3) {
-    -- r := mat4_zeroes();
-    -- fr := cast(*f32) &r;
+fn c_mat4_rotate(v: Vec3) {
+    r := c_mat4_zeroes();
+    fr := cast(*f32) &r;
 
-    -- A       := cos(v.x);
-    -- B       := sin(v.x);
-    -- C       := cos(v.y);
-    -- D       := sin(v.y);
-    -- E       := cos(v.z);
-    -- F       := sin(v.z);
+    A       := cosf(v.x);
+    B       := sinf(v.x);
+    C       := cosf(v.y);
+    D       := sinf(v.y);
+    E       := cosf(v.z);
+    F       := sinf(v.z);
 
-    -- ^fr  =  C * E;
-    -- ^(fr + 1 * 4)  = -C * F;
-    -- ^(fr + 2 * 4)  = -D;
-    -- ^(fr + 4 * 4)  = -B * D * E + A * F;
-    -- ^(fr + 5 * 4)  =  B * D * F + A * E;
-    -- ^(fr + 6 * 4)  = -B * C;
-    -- ^(fr + 8 * 4)  =  A * D * E + B * F;
-    -- ^(fr + 9 * 4)  = -A * D * F + B * E;
-    -- ^(fr + 10 * 4) =  A * C;
+    ^(fr + 0)  =  C * E;
+    ^(fr + 1)  = -C * F;
+    ^(fr + 2)  = -D;
+    ^(fr + 4)  = -B * D * E + A * F;
+    ^(fr + 5)  =  B * D * F + A * E;
+    ^(fr + 6)  = -B * C;
+    ^(fr + 8)  =  A * D * E + B * F;
+    ^(fr + 9)  = -A * D * F + B * E;
+    ^(fr + 10) =  A * C;
+    ^(fr + 15) =  1.0;
 
-    -- ^(fr + 3 * 4) = 0.0;
-    -- ^(fr + 7 * 4) = 0.0;
-    -- ^(fr + 11 * 4) = 0.0;
-    -- ^(fr + 12 * 4) = 0.0;
-    -- ^(fr + 13 * 4) = 0.0;
-    -- ^(fr + 14 * 4) = 0.0;
+    ret r;
+}
 
-    -- ^(fr + 15 * 4) =  1.0;
-
-    -- ret r;
--- }
-
--- fn mat4_look_at(pos: Vec3, target: Vec3, worldUp: Vec3) {
+fn c_mat4_look_at(pos: Vec3, target: Vec3, worldUp: Vec3) {
     -- cameraDirection
-    -- zaxis := vec3_normalize(vec3_sub(pos, target));
+    zaxis := c_vec3_normalize(c_vec3_sub(target, pos));
 
     -- positive right axis vector
-    -- xaxis := vec3_normalize(vec3_cross(vec3_normalize(worldUp), zaxis));
+    xaxis := c_vec3_normalize(c_vec3_cross(c_vec3_normalize(worldUp), zaxis));
 
     -- camera up vector
-    -- yaxis := vec3_cross(zaxis, xaxis);
+    yaxis := c_vec3_cross(zaxis, xaxis);
 
-    -- translation
-    -- translation := mat4_id();
-    -- ftranslation := cast(*f32) &translation;
-    -- ^(ftranslation + 12 * 4) = -pos.x;
-    -- ^(ftranslation + (12 + 1) * 4) = -pos.y;
-    -- ^(ftranslation + (12 + 2) * 4) = -pos.z;
+    -- TRANSLATION
+    neg_pos: Vec3;
+    neg_pos.x = -pos.x;
+    neg_pos.y = -pos.y;
+    neg_pos.z = -pos.z;
+    translation := c_mat4_translate(neg_pos);
+    ft := cast(*f32) &translation;
 
-    -- rotation
-    -- rotation := mat4_id();
-    -- frotation := cast(*f32) &rotation;
-    -- ^(frotation) = xaxis.x;
-    -- ^(frotation + 4 * 4) = xaxis.y;
-    -- ^(frotation + 8 * 4) = xaxis.z;
-    -- ^(frotation + 1 * 4) = yaxis.x;
-    -- ^(frotation + (4 + 1) * 4) = yaxis.y;
-    -- ^(frotation + (8 + 1) * 4) = yaxis.z;
-    -- ^(frotation + 2 * 4) = zaxis.x;
-    -- ^(frotation + (4 + 2) * 4) = zaxis.y;
-    -- ^(frotation + (8 + 2) * 4) = zaxis.z;
+    -- ROTATION
+    rotation := c_mat4_zeroes();
+    fr := cast(*f32) &rotation;
 
-    -- ret mat4_mul(rotation, translation);
--- }
+    ^(fr)       = xaxis.x;
+    ^(fr + 1*4) = xaxis.y;
+    ^(fr + 2*4) = xaxis.z;
+
+    ^(fr + 1)       = yaxis.x;
+    ^(fr + 1*4 + 1) = yaxis.y;
+    ^(fr + 2*4 + 1) = yaxis.z;
+
+    ^(fr + 2)       = zaxis.x;
+    ^(fr + 1*4 + 2) = zaxis.y;
+    ^(fr + 2*4 + 2) = zaxis.z;
+
+    ^(fr + 3*4 + 3) = 1.0;
+
+    answer := c_mat4_mul(&rotation, &translation);
+    fanswer := cast(*f32) &answer;
+
+    ret c_mat4_mul(&rotation, &translation);
+}
 
 fn setupTexture(imageFilePath: *i8, includeAlpha: i32) {
     GL_TEXTURE_2D: i32 = 3553;
@@ -295,7 +293,10 @@ fn setupTexture(imageFilePath: *i8, includeAlpha: i32) {
     ret texture;
 }
 
-fn c_main(window: *none) none
+fn c_main(window: *none, VBO: i32, VAO: i32, texture1: i32, texture2: i32, shaderProgram: i32,
+    cpx: f32, cpy: f32, cpz: f32,
+    cfx: f32, cfy: f32, cfz: f32,
+    cux: f32, cuy: f32, cuz: f32) none
 
 fn main() {
     GLFW_CONTEXT_VERSION_MAJOR : i32 = 139266;
@@ -332,8 +333,6 @@ fn main() {
     window := glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "wb\0".data, nil, nil);
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-
-    c_main(window);
 
     float_size : i32 = 4;
 
@@ -402,29 +401,28 @@ fn main() {
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, position_stride * float_size, 3 * float_size);
     glEnableVertexAttribArray(1);
 
-    -- texture1 := setupTexture(cast(*i8) "/Users/chadrussell/Pictures/container.jpg\0".data, 0);
-    -- texture2 := setupTexture(cast(*i8) "/Users/chadrussell/Pictures/awesomeface.png\0".data, 1);
+    texture1 := setupTexture(cast(*i8) "/Users/chadrussell/Pictures/container.jpg\0".data, 0);
+    texture2 := setupTexture(cast(*i8) "/Users/chadrussell/Pictures/awesomeface.png\0".data, 1);
 
-    -- shaderProgram := setup_shaders();
-    -- glUseProgram(shaderProgram);
-    -- glUniform1i(glGetUniformLocation(shaderProgram, "texture1\0".data), 0);
-    -- glUniform1i(glGetUniformLocation(shaderProgram, "texture2\0".data), 1);
+    shaderProgram := c_setup_shaders();
+    glUseProgram(shaderProgram);
+    glUniform1i(glGetUniformLocation(shaderProgram, "texture1\0".data), 0);
+    glUniform1i(glGetUniformLocation(shaderProgram, "texture2\0".data), 1);
 
-    cubePositions : []Vec3 = {
-        data: cast(*Vec3) &{
-            { 0.0,  0.0,  0.0 },
-            { 2.0,  5.0, -15.0},
-            {-1.5, -2.2, -2.5 },
-            {-3.8, -2.0, -12.3},
-            { 2.4, -0.4, -3.5 },
-            {-1.7,  3.0, -7.5 },
-            { 1.3, -2.0, -2.5 },
-            { 1.5,  2.0, -2.5 },
-            { 1.5,  0.2, -1.5 },
-            {-1.3,  1.0, -1.5 }
-        },
-        count: 10
+    cubePositions := cast(*Vec3) &{
+        { 0.0,  0.0,  0.0 },
+        { 2.0,  5.0, -15.0},
+        {-1.5, -2.2, -2.5 },
+        {-3.8, -2.0, -12.3},
+        { 2.4, -0.4, -3.5 },
+        {-1.7,  3.0, -7.5 },
+        { 1.3, -2.0, -2.5 },
+        { 1.5,  2.0, -2.5 },
+        { 1.5,  0.2, -1.5 },
+        {-1.3,  1.0, -1.5 }
     };
+    cpArrayCount: i32 = 10;
+    cpArray : []Vec3 = {data: cubePositions, count: cpArrayCount};
 
     glEnable(GL_DEPTH_TEST);
 
@@ -432,59 +430,63 @@ fn main() {
     lastFrame := 0.0;
     fov := 45.0;
 
-    cameraPos   := {0.0, 0.0,  3.0};
-    cameraFront := {0.0, 0.0, -1.0};
-    cameraUp    := {0.0, 1.0,  0.0};
+    cameraPos   : Vec3 = {0.0, 0.0,  3.0};
+    cameraFront : Vec3 = {0.0, 0.0, -1.0};
+    cameraUp    : Vec3 = {0.0, 1.0,  0.0};
 
     while true {
-
         -- currentFrame := glfwGetTime();
         -- deltaTime = currentFrame - lastFrame;
         -- lastFrame = currentFrame;
 
         -- process_input(window);
 
-		-- glClearColor(0.2, 0.3, 0.3, 1.0);
-        -- glClear(GL_COLOR_OR_DEPTH_BUFFER_BIT);
+		glClearColor(0.2, 0.3, 0.3, 1.0);
+        glClear(GL_COLOR_OR_DEPTH_BUFFER_BIT);
 
-        -- projection := mat4_perspective(radians(fov), 800.0 / 600.0, 0.1, 100.0);
-        -- glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection\0".data), 1, GL_FALSE, cast(*f32) &projection);
+        projection := c_mat4_perspective(c_radians(fov), 800.0 / 600.0, 0.1, 100.0);
+        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection\0".data), 1, GL_FALSE, cast(*f32) &projection);
 
-        -- view := mat4_look_at(cameraPos, vec3_add(cameraPos, cameraFront), cameraUp);
-        -- glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view\0".data), 1, GL_FALSE, cast(*f32) &view);
+        view := c_mat4_look_at(cameraPos, c_vec3_add(cameraPos, cameraFront), cameraUp);
+        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view\0".data), 1, GL_FALSE, cast(*f32) &view);
 
-        -- glActiveTexture(GL_TEXTURE0);
-        -- glBindTexture(GL_TEXTURE_2D, texture1);
-        -- glActiveTexture(GL_TEXTURE1);
-        -- glBindTexture(GL_TEXTURE_2D, texture2);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texture1);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, texture2);
 
-        -- glBindVertexArray(VAO);
-        -- idx := 0;
-        -- idxf := 0.0;
-        -- while idx < 10 {
-            -- model := mat4_id();
-            -- model := mat4_translate(cubePositions[idx]);
+        glBindVertexArray(VAO);
+
+        -- c_main(window, VBO, VAO, texture1, texture2, shaderProgram,
+            -- cameraPos.x, cameraPos.y, cameraPos.z,
+            -- cameraFront.x, cameraFront.y, cameraFront.z,
+            -- cameraUp.x, cameraUp.y, cameraUp.z);
+
+        idx := 0;
+        idxf := 0.0;
+        while idx < 10 {
+            model := c_mat4_translate(cpArray[idx]);
 
             -- angle := 20.0 * (idxf + 1.0);
-            -- angle = radians(angle);
-            -- r := mat4_rotate({angle / 8.0, angle / 8.0, angle / 16.0});
-            -- model = mat4_mul(r, model);
+            -- angle = c_radians(angle);
+            -- r := c_mat4_rotate({angle / 8.0, angle / 8.0, angle / 16.0});
+            -- model = c_mat4_mul(&r, &model);
 
-            -- glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model\0".data), 1, GL_FALSE, cast(*f32) &model);
+            glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model\0".data), 1, GL_FALSE, cast(*f32) &model);
 
-            -- glDrawArrays(GL_TRIANGLES, 0, 36);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
 
-            -- idx = idx + 1;
-        -- }
+            idx = idx + 1;
+        }
 
-        -- glfwSwapBuffers(window);
-        -- glfwPollEvents();
+        glfwSwapBuffers(window);
+        glfwPollEvents();
     }
 
     ret 0;
 }
 
-fn setup_shaders() {
+fn c_setup_shaders() {
     fss := "
         #version 330 core
         out vec4 FragColor;
