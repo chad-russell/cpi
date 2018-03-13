@@ -70,7 +70,9 @@ bool AssemblyLexer::empty() {
 int AssemblyLexer::getArgCount(TokenType tt) {
     auto ttName = AssemblyLexer::tokenTypeStrings[static_cast<int>(tt)];
 
-    if (startsWith(ttName, "ADD")
+    if (ttName == "ADD_S_I64") {
+        return 4;
+    } else if (startsWith(ttName, "ADD")
         || startsWith(ttName, "SUB")
         || startsWith(ttName, "MUL")
         || startsWith(ttName, "DIV")
@@ -207,7 +209,7 @@ void AssemblyLexer::popFront() {
                 newInst = toBytes(static_cast<float>(parsed));
             } break;
             case Instruction::CONSTF64: {
-                newInst = toBytes(static_cast<double>(parsed));
+                newInst = toBytes(parsed);
             } break;
             default: assert(false);
         }
@@ -367,7 +369,7 @@ const vector<string> AssemblyLexer::instructionStrings = {
     "EQI32", "NEQI32", "UGTI32", "SGTI32", "UGEI32", "SGEI32", "ULTI32", "SLTI32", "ULEI32", "SLEI32",
 
     // I64 math
-    "ADDI64", "SUBI64", "MULI64", "UDIVI64", "SDIVI64", "UREMI64", "SREMI64",
+    "ADDI64", "ADD_S_I64", "SUBI64", "MULI64", "UDIVI64", "SDIVI64", "UREMI64", "SREMI64",
     "EQI64", "NEQI64", "UGTI64", "SGTI64", "UGEI64", "SGEI64", "ULTI64", "SLTI64", "ULEI64", "SLEI64",
 
     // F32 math
@@ -462,6 +464,20 @@ void MnemonicPrinter::step() {
             readTypeAndInt();
             instructionString.append(" ");
             instructionString.append(to_string(consume<int32_t>()));
+    } else if (inst == "ADD_S_I64") {
+        instructionString.append(inst);
+
+        instructionString.append(" ");
+        readTypeAndInt();
+
+        instructionString.append(" ");
+        readTypeAndInt();
+
+        instructionString.append(" ");
+        instructionString.append(to_string(consume<int32_t>()));
+
+        instructionString.append(" ");
+        instructionString.append(to_string(consume<int32_t>()));
     } else if (startsWith(inst, "ADDF")
         || startsWith(inst, "SUBF")
         || startsWith(inst, "MULF")

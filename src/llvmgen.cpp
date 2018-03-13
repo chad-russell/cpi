@@ -209,7 +209,7 @@ void LlvmGen::gen(Node *node) {
             verifyFunction(*F, &llvm::errs());
 
             // DO_OPTIMIZE
-//            TheFPM->run(*F);
+            TheFPM->run(*F);
         } break;
         case NodeType::RET: {
             gen(node->retData.value);
@@ -288,21 +288,11 @@ void LlvmGen::gen(Node *node) {
             auto lhsValue = rvalueFor(node->binopData.lhs);
             auto rhsValue = rvalueFor(node->binopData.rhs);
 
-//            llvm::Type *pointerType = nullptr;
-
             if (node->binopData.lhs->typeInfo->typeData.kind == NodeTypekind::POINTER) {
-//                pointerType = lhsValue->getType();
-
-//                lhsValue = builder.CreatePtrToInt(lhsValue, builder.getInt64Ty());
-
                 auto value = builder.CreateGEP(lhsValue, rhsValue, "parith");
                 store(value, (llvm::Value *) node->llvmLocal);
             }
             else if (node->binopData.rhs->typeInfo->typeData.kind == NodeTypekind::POINTER) {
-//                pointerType = rhsValue->getType();
-
-//                rhsValue = builder.CreatePtrToInt(rhsValue, builder.getInt64Ty());
-
                 auto value = builder.CreateGEP(rhsValue, lhsValue, "parith");
                 store(value, (llvm::Value *) node->llvmLocal);
             }
@@ -603,12 +593,21 @@ void LlvmGen::gen(Node *node) {
         case NodeType::CAST: {
             gen(node->castData.value);
 
+            auto toType = resolve(node->castData.type);
+            auto fromType = resolve(node->castData.value->typeInfo);
+
             if (node->castData.isCastFromArrayToDataPtr) {
                 auto arrayStruct = rvalueFor(node->castData.value);
 
                 node->llvmData = builder.CreateExtractValue(arrayStruct, 0);
                 node->llvmLocal = nullptr;
                 node->isLocal = false;
+            }
+            else if (fromType->typeData.kind == NodeTypekind::F32 && toType->typeData.kind == NodeTypekind::F64) {
+                node->llvmData = builder.CreateFPCast(static_cast<llvm::Value *>(node->castData.value->llvmData), builder.getDoubleTy());
+            }
+            else if (fromType->typeData.kind == NodeTypekind::F64 && toType->typeData.kind == NodeTypekind::F32) {
+                node->llvmData = builder.CreateFPCast(static_cast<llvm::Value *>(node->castData.value->llvmData), builder.getFloatTy());
             }
             else {
                 node->llvmData = (llvm::Value *) node->castData.value->llvmData;
@@ -640,7 +639,17 @@ void LlvmGen::gen(Node *node) {
         case NodeType::UNARY_NEG: {
             gen(node->nodeData);
 
-            node->llvmData = builder.CreateNeg(rvalueFor(node->nodeData));
+            if (node->typeInfo->typeData.kind == NodeTypekind::INT_LITERAL
+                || node->typeInfo->typeData.kind == NodeTypekind::I32
+                || node->typeInfo->typeData.kind == NodeTypekind::I64) {
+                node->llvmData = builder.CreateNeg(rvalueFor(node->nodeData));
+            } else if (node->typeInfo->typeData.kind == NodeTypekind::FLOAT_LITERAL
+                       || node->typeInfo->typeData.kind == NodeTypekind::F32
+                       || node->typeInfo->typeData.kind == NodeTypekind::F64) {
+                node->llvmData = builder.CreateFNeg(rvalueFor(node->nodeData));
+            } else {
+                assert(false);
+            }
         } break;
         default: assert(false);
     }

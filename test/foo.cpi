@@ -1,21 +1,5 @@
-type Vec3 struct {
-    x: f32,
-    y: f32,
-    z: f32
-}
-
 fn main() {
-    v: Vec3;
-    fv := cast(*f32) &v;
-
-    ^(fv + 1) = 1.7;
-
-    ret v.y;
-}
-
-fn assert(b: bool) {
-    if (b == false) {
-        panic();
-    }
-    ret 0;
+    count: i32 = 1;
+    a2 := cast([][]i64) {&{{&3, count}}, count};
+    ret a2[0][0];
 }

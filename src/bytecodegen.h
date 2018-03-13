@@ -23,7 +23,7 @@ public:
     // for going back at the end and setting call/jump locations
     unordered_map<int64_t, Node *> fixups = {};
 
-    void binopHelper(string instructionStr, Node *node);
+    void binopHelper(string instructionStr, Node *node, int32_t scale = 1);
 
     void gen(Node *node);
     void fixup();

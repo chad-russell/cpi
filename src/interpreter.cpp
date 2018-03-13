@@ -187,6 +187,15 @@ void Interpreter::dumpStack() {
     cout << endl << endl;
 }
 
+void interpretMathAddSI64(Interpreter *interp) {
+    auto a = interp->read<int64_t>();
+    auto b = interp->read<int64_t>();
+    auto c = interp->consume<int32_t>();
+    auto result = a + b * c;
+    auto storeOffset = interp->consume<int32_t>();
+    interp->copyToStack(result, interp->bp + storeOffset);
+}
+
 // bumpsp numBits
 void interpretBumpSP(Interpreter *interp) {
     auto numBytes = interp->consume<int32_t>();

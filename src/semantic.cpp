@@ -357,9 +357,7 @@ void resolveArrayIndex(Semantic *semantic, Node *node) {
 
     node->typeInfo = node->arrayIndexData.target->typeInfo->typeData.structTypeData.secretArrayElementType;
 
-    // a[i] <==> ^((cast(*i32) a) + i, for example (if typeof(a) is []i32)
-    // todo(chad): our size calculations may not always be the same as llvm's, because of alignment ets. etc. So make a sizeof(...) operator
-
+    // a[i] <==> ^((cast(*i32) a) + i), for example (if typeof(a) is []i32)
     auto aCasted = new Node();
     aCasted->type = NodeType::CAST;
     aCasted->castData.isCastFromArrayToDataPtr = true;
@@ -371,6 +369,7 @@ void resolveArrayIndex(Semantic *semantic, Node *node) {
     add->binopData.type = LexerTokenType::ADD;
     add->binopData.lhs = aCasted;
     add->binopData.rhs = node->arrayIndexData.indexValue;
+    add->binopData.rhsScale = typeSize(node->typeInfo);
 
     auto deref = new Node(node->region.srcInfo, nullptr, NodeType::DEREF, node->scope);
     deref->derefData.target = add;
@@ -901,6 +900,11 @@ void resolveAddressOf(Semantic *semantic, Node *node) {
     pointerTypeInfo->typeData.pointerTypeData.underlyingType = node->nodeData->typeInfo;
     node->typeInfo = pointerTypeInfo;
 
+    auto resolved = resolve(node->nodeData);
+    if (resolved->type == NodeType::DECL_PARAM) {
+        semantic->reportError({node}, Error{node->region, "Cannot take the address of a fn parameter, they are readonly"});
+    }
+
     if (node->nodeData->type == NodeType::ARRAY_INDEX) {
         node->resolved = resolve(node->nodeData)->derefData.target;
     }
@@ -1037,38 +1041,6 @@ void resolveWhile(Semantic *semantic, Node *node) {
 void resolveUnaryNeg(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->nodeData);
     node->typeInfo = node->nodeData->typeInfo;
-
-    auto resolvedBinop = new Node();
-    resolvedBinop->type = NodeType::BINOP;
-    resolvedBinop->binopData.type = LexerTokenType::MUL;
-
-    semantic->addLocal(resolvedBinop);
-
-    resolvedBinop->binopData.lhs = new Node();
-    switch (node->typeInfo->typeData.kind) {
-        case NodeTypekind::FLOAT_LITERAL:
-        case NodeTypekind::F32:
-        case NodeTypekind::F64: {
-            resolvedBinop->binopData.lhs->type = NodeType::FLOAT_LITERAL;
-            resolvedBinop->binopData.lhs->floatLiteralData.value = -1.0;
-        } break;
-        case NodeTypekind::INT_LITERAL:
-        case NodeTypekind::I8:
-        case NodeTypekind::I32:
-        case NodeTypekind::I64: {
-            resolvedBinop->binopData.lhs->type = NodeType::INT_LITERAL;
-            resolvedBinop->binopData.lhs->intLiteralData.value = -1;
-        } break;
-        default: assert(false);
-    }
-
-    resolvedBinop->binopData.rhs = node->nodeData;
-
-    auto resolved = resolvedBinop;
-    resolved->region = node->nodeData->region;
-    node->resolved = resolved;
-
-    semantic->resolveTypes(resolved);
 }
 
 void resolveRun(Semantic *semantic, Node *node) {

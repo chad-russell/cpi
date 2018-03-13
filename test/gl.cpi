@@ -191,23 +191,23 @@ fn c_mat4_rotate(v: Vec3) {
     r := c_mat4_zeroes();
     fr := cast(*f32) &r;
 
-    A       := cosf(v.x);
-    B       := sinf(v.x);
-    C       := cosf(v.y);
-    D       := sinf(v.y);
-    E       := cosf(v.z);
-    F       := sinf(v.z);
+    A := cosf(v.x);
+    B := sinf(v.x);
+    C := cosf(v.y);
+    D := sinf(v.y);
+    E := cosf(v.z);
+    F := sinf(v.z);
 
-    ^(fr + 0)  =  C * E;
+    ^(fr + 0)  = C * E;
     ^(fr + 1)  = -C * F;
     ^(fr + 2)  = -D;
-    ^(fr + 4)  = -B * D * E + A * F;
-    ^(fr + 5)  =  B * D * F + A * E;
+    ^(fr + 4)  = A * F - B * D * E;
+    ^(fr + 5)  = B * D * F + A * E;
     ^(fr + 6)  = -B * C;
-    ^(fr + 8)  =  A * D * E + B * F;
-    ^(fr + 9)  = -A * D * F + B * E;
-    ^(fr + 10) =  A * C;
-    ^(fr + 15) =  1.0;
+    ^(fr + 8)  = A * D * E + B * F;
+    ^(fr + 9)  = B * E - A * D * F;
+    ^(fr + 10) = A * C;
+    ^(fr + 15) = 1.0;
 
     ret r;
 }
@@ -292,11 +292,6 @@ fn setupTexture(imageFilePath: *i8, includeAlpha: i32) {
 
     ret texture;
 }
-
-fn c_main(window: *none, VBO: i32, VAO: i32, texture1: i32, texture2: i32, shaderProgram: i32,
-    cpx: f32, cpy: f32, cpz: f32,
-    cfx: f32, cfy: f32, cfz: f32,
-    cux: f32, cuy: f32, cuz: f32) none
 
 fn main() {
     GLFW_CONTEXT_VERSION_MAJOR : i32 = 139266;
@@ -430,14 +425,14 @@ fn main() {
     lastFrame := 0.0;
     fov := 45.0;
 
-    cameraPos   : Vec3 = {0.0, 0.0,  3.0};
+    cameraPos   : Vec3 = {0.0, 0.0,  7.0};
     cameraFront : Vec3 = {0.0, 0.0, -1.0};
     cameraUp    : Vec3 = {0.0, 1.0,  0.0};
 
     while true {
-        -- currentFrame := glfwGetTime();
-        -- deltaTime = currentFrame - lastFrame;
-        -- lastFrame = currentFrame;
+        currentTime := cast(f32) glfwGetTime();
+        deltaTime = currentTime - lastFrame;
+        lastFrame = currentTime;
 
         -- process_input(window);
 
@@ -457,26 +452,22 @@ fn main() {
 
         glBindVertexArray(VAO);
 
-        -- c_main(window, VBO, VAO, texture1, texture2, shaderProgram,
-            -- cameraPos.x, cameraPos.y, cameraPos.z,
-            -- cameraFront.x, cameraFront.y, cameraFront.z,
-            -- cameraUp.x, cameraUp.y, cameraUp.z);
-
         idx := 0;
         idxf := 0.0;
         while idx < 10 {
             model := c_mat4_translate(cpArray[idx]);
 
-            -- angle := 20.0 * (idxf + 1.0);
-            -- angle = c_radians(angle);
-            -- r := c_mat4_rotate({angle / 8.0, angle / 8.0, angle / 16.0});
-            -- model = c_mat4_mul(&r, &model);
+            angle := 20.0 * (idxf + 1.0);
+            angle = c_radians(angle) * cast(f32) glfwGetTime();
+            r := c_mat4_rotate({angle, angle, angle / 2.0});
+            model = c_mat4_mul(&r, &model);
 
             glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model\0".data), 1, GL_FALSE, cast(*f32) &model);
 
             glDrawArrays(GL_TRIANGLES, 0, 36);
 
             idx = idx + 1;
+            idxf = idxf + 1.0;
         }
 
         glfwSwapBuffers(window);

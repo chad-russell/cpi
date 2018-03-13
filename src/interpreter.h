@@ -17,6 +17,8 @@ class Interpreter;
 template <typename T>
 void interpretMathAdd(Interpreter *interp);
 
+void interpretMathAddSI64(Interpreter *interp);
+
 template <typename T>
 void interpretMathSub(Interpreter *interp);
 
@@ -160,6 +162,7 @@ public:
             interpretCmpLte<uint32_t>,
             interpretCmpLte<int32_t>,
             interpretMathAdd<int64_t>,
+            interpretMathAddSI64,
             interpretMathSub<int64_t>,
             interpretMathMul<int64_t>,
             interpretMathDiv<uint64_t>,

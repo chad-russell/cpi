@@ -3,6 +3,7 @@
 #include <getopt.h>
 #include <fstream>
 #include <sstream>
+#include <chrono>
 
 #include "assembler.h"
 #include "interpreter.h"
@@ -237,8 +238,8 @@ int main(int argc, char **argv) {
         }
 
 //        cout << interp->readFromStack<int8_t>(0) << endl;
-//        cout << interp->readFromStack<int32_t>(0) << endl;
-        cout << interp->readFromStack<float>(0) << endl;
+        cout << interp->readFromStack<int32_t>(0) << endl;
+//        cout << interp->readFromStack<float>(0) << endl;
     }
 
     if (outputFileName != nullptr) {

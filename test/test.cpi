@@ -214,10 +214,10 @@ fn testArray4() {
 
 fn testArray5() {
     count: i32 = 1;
-
     a2 := cast([][]i64) {&{{&3, count}}, count};
-
     assert(a2[0][0] == 3);
+
+    ret 0;
 }
 
 fn assert(b: bool) {

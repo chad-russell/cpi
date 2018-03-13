@@ -12,7 +12,7 @@ void append(vector<unsigned char> &instructions, Instruction instruction) {
     append(instructions, static_cast<unsigned char>(instruction));
 }
 
-void BytecodeGen::binopHelper(string instructionStr, Node *node) {
+void BytecodeGen::binopHelper(string instructionStr, Node *node, int32_t scale) {
     string bytecodeStr;
 
     auto resolvedLhsType = resolve(node->binopData.lhs->typeInfo);
@@ -63,6 +63,10 @@ void BytecodeGen::binopHelper(string instructionStr, Node *node) {
 
     append(instructions, bytecodeInst);
     append(instructions, toBytes(node->binopData.rhsTemporary->localOffset));
+
+    if (scale > 1) {
+        append(instructions, toBytes32(scale));
+    }
 
     append(instructions, toBytes32(node->localOffset));
     append(node->bytecode, toBytes32(node->localOffset));
@@ -304,9 +308,15 @@ void BytecodeGen::gen(Node *node) {
             storeValue(node->binopData.lhs, node->binopData.lhsTemporary->localOffset);
             storeValue(node->binopData.rhs, node->binopData.rhsTemporary->localOffset);
 
+            auto scale = node->binopData.rhsScale;
+
             switch (node->binopData.type) {
                 case LexerTokenType::ADD: {
-                    binopHelper("ADD", node);
+                    if (scale > 1) {
+                        binopHelper("ADD_S_", node, scale);
+                    } else {
+                        binopHelper("ADD", node);
+                    }
                 } break;
                 case LexerTokenType::SUB: {
                     binopHelper("SUB", node);
@@ -765,6 +775,9 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
             storeValue(node->castData.value, offset);
         } break;
         default:
+        case NodeType::UNARY_NEG: {
+            storeValue(node->nodeData, offset);
+        } break;
             assert(false);
     }
 }

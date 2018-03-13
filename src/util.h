@@ -272,8 +272,6 @@ struct FnCallData {
 struct ArrayIndexData {
     Node *target;
     Node *indexValue;
-
-    Node *offsetCalculationStorage;
 };
 
 struct DotData {
@@ -290,6 +288,8 @@ struct BinopData {
 
     Node *lhs = nullptr;
     Node *rhs = nullptr;
+
+    int rhsScale = 1;
 
     Node *lhsTemporary;
     Node *rhsTemporary;

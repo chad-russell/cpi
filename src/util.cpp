@@ -241,6 +241,7 @@ bool hasNoLocalByDefault(Node *node) {
         case NodeType::DEREF:
         case NodeType::FN_DECL:
         case NodeType::STRUCT_LITERAL:
+        case NodeType::UNARY_NEG:
             return true;
         default: return false;
     }
