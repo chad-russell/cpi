@@ -15,3 +15,8 @@ public:
     void resolveTypes(Node *node);
     void addLocal(Node *local);
 };
+
+bool assignParams(Semantic *semantic,
+                  Node *errorReportTarget,
+                  const vector<Node *> &declParams,
+                  vector<Node *> &givenParams);

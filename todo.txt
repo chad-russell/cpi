@@ -1,32 +1,54 @@
 TODO:
-    - explicit access of length and data pointers for arrays / strings
-        - question: should we be able to assign to these things?
-            - answer: probably yes
-
     - short-circuit 'and' and 'or'
 
-    - 'malloc' implementation for interpreter. Can use real malloc and then just convert the offset based on where our stack begins
+    - better support for arrays
+        - array literals
+            - use malloc for now, but later on when we do allocators should be able to specify allocator
+        - foreach
 
-    - default types (especially for structs / fn params)
-        -- p: i32; -- should default to 0
-        -- p: struct{x := 9, y := 10}; -- p.x should be 9, p.y should be 10
-        -- p: struct{x := 9, y := 10} = {x: 5}; -- should pass type checking, p.x should be 5, p.y should be 10
-        -- f: fn(x: i32 = 3) k ret x; }; ret f(); -- should pass type checking, return value should be 3
+    - enum / tagged union
+
+    - signed vs unsigned ints
+
+    - parse symbols in ``
+        - `one:symbol` := 3;
+
+    - more integer formats
+        - hex (0x123)
+        - binary (0b10010011)
+
+    - decide when types are matched
+        - when are struct types matched nominally vs structurally?
+        - when are int/float types auto-converted/promoted?
+        - arrays, strings, etc.
+
+    - pipe operator
+
+    - defer
+
+    - attributes
+
+    - 'do' keyword
+        - a := do(r) { r := 13; }
+
+    - decide whether to do argument destructuring
+        - would need an actual example of where it would be useful
+
+    - real implementation for 'Any' and 'Type'
 
     - better interpreter debugging
         - more accurate source information
         - get list of stack variables and print their values by name
 
-    - llvm debugging info
+    - allocators
+        - first decide what strategy we want to use (probably some kind of arena-based thing) and then do a lot of that.
+        - next, decide what (if any) language-level features are needed to make this style really easy to do
 
-    - enum / tagged union
-
-    - real implementation for 'Any' and 'Type'
+    - libraries / namespaces / modules
 
     - array bounds checking
-
-    - conversion (like a cast but does actual work)
 
     - passing stack variables to polymorphic procedures?
         - first, is this even a good thing to allow?
         - implementation should just be to convert the pointer to the relative offset for the new function
+            - would need a reliable way to do this in llvm world, with alignment, etc. We need to be able to subtract the sp from the address of the local

@@ -12,7 +12,9 @@ ostream &operator<<(ostream &os, NodeType type);
 
 Node *makeArrayType(Node *elementType);
 
+Node *wrapInValueParam(Node *value, Node *name);
 Node *wrapInValueParam(Node *value, string name);
+Node *wrapInValueParam(Node *value, int64_t atomId);
 
 Node *wrapInDeclParam(Node *value, string name, int index);
 

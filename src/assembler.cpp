@@ -110,6 +110,8 @@ int AssemblyLexer::getArgCount(TokenType tt) {
         || tt == TokenType::STORE
         || tt == TokenType::JUMPIF) {
         return 3;
+    } else if (tt == TokenType::MALLOC) {
+        return 2;
     } else if (startsWith(ttName, "CONST")
                || startsWith(ttName, "REL")
                || startsWith(ttName, "I")
@@ -118,7 +120,8 @@ int AssemblyLexer::getArgCount(TokenType tt) {
                || tt == TokenType::JUMP
                || tt == TokenType::CALL
                || tt == TokenType::CALLI
-               || tt == TokenType::STORECONST) {
+               || tt == TokenType::STORECONST
+               || tt == TokenType::FREE) {
         return 1;
     } else if (tt == TokenType::RET
                || tt == TokenType::EXIT
@@ -339,6 +342,8 @@ const vector<string> AssemblyLexer::tokenTypeStrings = {
     "EXIT",
     "PANIC",
     "NONE",
+    "MALLOC",
+    "FREE",
 
     // literals
     "CONSTI8", "CONSTI16", "CONSTI32", "CONSTI64", "CONSTF32", "CONSTF64",
@@ -394,6 +399,8 @@ const vector<string> AssemblyLexer::instructionStrings = {
     "RET", 
     "EXIT",
     "PANIC",
+    "MALLOC",
+    "FREE",
 
     // literals
     "CONSTI8", "CONSTI16", "CONSTI32", "CONSTI64", "CONSTF32", "CONSTF64",
@@ -437,6 +444,7 @@ string MnemonicPrinter::debugString(uint32_t startPc, uint32_t endPc) {
 }
 
 void MnemonicPrinter::step() {
+    auto instAtPc = static_cast<Instruction>(instructions[pc]);
     auto inst = AssemblyLexer::instructionStrings[instructions[pc]];
     pc += 1;
 
@@ -536,6 +544,17 @@ void MnemonicPrinter::step() {
         instructionString.append(" ");
         auto callPc = consume<int32_t>();
         instructionString.append(to_string(callPc));
+    } else if (startsWith(inst, "MALLOC")) {
+        instructionString.append(inst);
+        instructionString.append(" ");
+        readTypeAndInt();
+        instructionString.append(" ");
+        auto storageOffset = consume<int32_t>();
+        instructionString.append(to_string(storageOffset));
+    } else if (startsWith(inst, "FREE")) {
+        instructionString.append(inst);
+        instructionString.append(" ");
+        readTypeAndInt();
     } else {
         instructionString.append(inst);
     }

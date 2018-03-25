@@ -36,6 +36,7 @@
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 
 using namespace std;
 using namespace llvm;
@@ -237,6 +238,7 @@ int main(int argc, char **argv) {
             interp->interpret();
         }
 
+        cout << "ANSWER: ";
 //        cout << interp->readFromStack<int8_t>(0) << endl;
         cout << interp->readFromStack<int32_t>(0) << endl;
 //        cout << interp->readFromStack<float>(0) << endl;
@@ -262,90 +264,38 @@ int main(int argc, char **argv) {
             out << instructions;
         } else if (endsWith(outputFileName, ".ll")) {
             // .ll
-            auto llvmGen = new LlvmGen();
-
-            InitializeAllTargetInfos();
-            InitializeAllTargets();
-            InitializeAllTargetMCs();
-            InitializeAllAsmParsers();
-            InitializeAllAsmPrinters();
-
-//            auto TargetTriple = sys::getDefaultTargetTriple();
-            auto TargetTriple = "x86_64-apple-macosx10.13.0";
-            llvmGen->module->setTargetTriple(TargetTriple);
-
-            std::string Error;
-            auto Target = TargetRegistry::lookupTarget(TargetTriple, Error);
-
-            // Print an error and exit if we couldn't find the requested target.
-            // This generally occurs if we've forgotten to initialise the
-            // TargetRegistry or we have a bogus target triple.
-            if (!Target) {
-                errs() << Error;
-                return 1;
-            }
-
-            auto CPU = "generic";
-            auto Features = "";
-
-            TargetOptions opt;
-            auto RM = llvm::Optional<Reloc::Model>();
-            auto TheTargetMachine = Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
-
-            llvmGen->module->setDataLayout(TheTargetMachine->createDataLayout());
+            auto llvmGen = new LlvmGen(inputFile);
 
             llvmGen->gen(parser->mainFn);
-            llvmGen->module->print(llvm::errs(), nullptr);
+            llvmGen->finalize();
+
+            string outString;
+            llvm::raw_string_ostream outStream(outString);
+            llvmGen->module->print(outStream, nullptr);
+
+            std::ofstream outFile(outputFileName);
+            out << outString;
+            out.close();
         } else {
             // assume we are generating an executable
-            auto llvmGen = new LlvmGen();
-
-            InitializeAllTargetInfos();
-            InitializeAllTargets();
-            InitializeAllTargetMCs();
-            InitializeAllAsmParsers();
-            InitializeAllAsmPrinters();
-
-            auto TargetTriple = sys::getDefaultTargetTriple();
-            llvmGen->module->setTargetTriple(TargetTriple);
-
-            std::string Error;
-            auto Target = TargetRegistry::lookupTarget(TargetTriple, Error);
-
-            // Print an error and exit if we couldn't find the requested target.
-            // This generally occurs if we've forgotten to initialise the
-            // TargetRegistry or we have a bogus target triple.
-            if (!Target) {
-                errs() << Error;
-                return 1;
-            }
-
-            auto CPU = "generic";
-            auto Features = "";
-
-            TargetOptions opt;
-            auto RM = llvm::Optional<Reloc::Model>();
-            auto TheTargetMachine = Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
-
-            llvmGen->module->setDataLayout(TheTargetMachine->createDataLayout());
-
-            auto targetingObj = endsWith(outputFileName, ".o");
-            auto outputObjName = targetingObj ? outputFileName : "output.o";
+            auto llvmGen = new LlvmGen(inputFile);
 
             std::error_code EC;
-            raw_fd_ostream dest(outputObjName, EC, sys::fs::F_None);
-
+            raw_fd_ostream dest("output.bc", EC, sys::fs::F_None);
             if (EC) {
                 errs() << "Could not open file: " << EC.message();
                 return 1;
             }
 
             llvmGen->gen(parser->mainFn);
+            llvmGen->finalize();
+
+            WriteBitcodeToFile(llvmGen->module.get(), dest);
 
             legacy::PassManager pass;
             auto FileType = TargetMachine::CGFT_ObjectFile;
 
-            if (TheTargetMachine->addPassesToEmitFile(pass, dest, FileType)) {
+            if (llvmGen->targetMachine->addPassesToEmitFile(pass, dest, FileType)) {
                 errs() << "TheTargetMachine can't emit a file of this type";
                 return 1;
             }
@@ -353,13 +303,14 @@ int main(int argc, char **argv) {
             pass.run(*llvmGen->module);
             dest.flush();
 
-            if (!targetingObj) {
-                ostringstream command;
-                command << "clang -o " << outputFileName << " output.o";
-                system(command.str().c_str());
+            system("/usr/local/Cellar/llvm/5.0.1/bin/llc --filetype=obj ./output.bc");
 
-                system("rm output.o");
-            }
+            ostringstream command;
+            command << "clang -o " << outputFileName << " output.o";
+            system(command.str().c_str());
+
+            // need to keep the .o file because apparently that's where the debug info is stored
+            system("rm output.bc");
         }
 
         out.close();

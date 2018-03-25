@@ -68,6 +68,8 @@ void interpretStore(Interpreter *interp);
 void interpretStoreConst(Interpreter *interp);
 void interpretExit(Interpreter *interp);
 void interpretPanic(Interpreter *interp);
+void interpretMalloc(Interpreter *interp);
+void interpretFree(Interpreter *interp);
 
 class Interpreter {
 public:
@@ -99,7 +101,7 @@ public:
     uint16_t depth = 0;
     int32_t overDepth = (2 << 15) + 1;
 
-    Interpreter(): Interpreter(1024 * 32) {}
+    Interpreter(): Interpreter(1024 * 64) {}
 
     Interpreter(int32_t stackSize_) {
         this->stackSize = stackSize_;
@@ -222,7 +224,9 @@ public:
             interpretCall,
             interpretRet,
             interpretExit,
-            interpretPanic};
+            interpretPanic,
+            interpretMalloc,
+            interpretFree};
   }
 
     void interpret();

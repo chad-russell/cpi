@@ -16,21 +16,31 @@
 #include "util.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/IR/DIBuilder.h"
 
 class LlvmGen {
 public:
     llvm::LLVMContext context;
     llvm::IRBuilder<> builder;
     unique_ptr<llvm::Module> module;
+    llvm::TargetMachine *targetMachine;
+
+    llvm::DIBuilder *dBuilder;
+    llvm::DICompileUnit *diCu;
 
     llvm::Constant *panicFunc;
+    llvm::Constant *mallocFunc;
+    llvm::Constant *freeFunc;
 
     // Create a new pass manager attached to it.
     unique_ptr<llvm::legacy::FunctionPassManager> TheFPM;
 
     Node *currentFnDecl = nullptr;
+    vector<llvm::Function *> allFns;
+    llvm::DIScope *currentScope;
+    string currentScopeName;
 
-    LlvmGen();
+    LlvmGen(const char *fileName);
 
     llvm::Type *typeFor(Node *node);
     llvm::Value *rvalueFor(Node *node);
@@ -38,6 +48,8 @@ public:
     void storeIfNeeded(Node *node);
 
     void gen(Node *node);
+
+    void finalize();
 };
 
 #endif // LLVM_CODEGEN_H

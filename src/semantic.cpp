@@ -51,7 +51,7 @@ int32_t typeSize(Node *type) {
     }
 }
 
-bool typesMatch(Node *desired, Node *actual) {
+bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
     desired = resolve(desired);
     actual = resolve(actual);
 
@@ -131,20 +131,78 @@ bool typesMatch(Node *desired, Node *actual) {
             return false;
         }
 
-        if (actual->typeData.structTypeData.params.size() != desired->typeData.structTypeData.params.size()) {
-            return false;
-        }
-
-        for (auto i = 0; i < desired->typeData.structTypeData.params.size(); i++) {
-            if (!typesMatch(desired->typeData.structTypeData.params[i]->typeInfo, actual->typeData.structTypeData.params[i]->typeInfo)) {
-                return false;
-            }
-        }
-
-        return true;
+        auto encounteredError = assignParams(semantic, actual, desired->typeData.structTypeData.params, actual->typeData.structTypeData.params);
+        return !encounteredError;
     }
 
     return desired->typeData.kind == actual->typeData.kind;
+}
+
+Node *defaultValueFor(Semantic *semantic, Node *type) {
+    assert(type->type == NodeType::TYPE);
+
+    switch (type->typeData.kind) {
+        case NodeTypekind::INT_LITERAL:
+        case NodeTypekind::I8:
+        case NodeTypekind::I32:
+        case NodeTypekind::I64: {
+            auto def = new Node();
+            def->type = NodeType::INT_LITERAL;
+            def->intLiteralData.value = 0;
+            def->typeInfo = type;
+            return def;
+        }
+        case NodeTypekind::FLOAT_LITERAL:
+        case NodeTypekind::F32:
+        case NodeTypekind::F64: {
+            auto def = new Node();
+            def->type = NodeType::FLOAT_LITERAL;
+            def->floatLiteralData.value = 0;
+            def->typeInfo = type;
+            return def;
+        }
+        case NodeTypekind::BOOLEAN: {
+            auto def = new Node();
+            def->type = NodeType::BOOLEAN_LITERAL;
+            def->boolLiteralData.value = false;
+            def->typeInfo = type;
+            return def;
+        }
+        case NodeTypekind::FN:
+        case NodeTypekind::POINTER: {
+            auto def = new Node();
+            def->type = NodeType::NIL_LITERAL;
+            def->typeInfo = type;
+            return def;
+        }
+        case NodeTypekind::STRUCT: {
+            auto def = new Node();
+            def->type = NodeType::STRUCT_LITERAL;
+
+            for (auto param : type->typeData.structTypeData.params) {
+                auto vp = param->declParamData.initialValue;
+                if (vp == nullptr) {
+                    vp = wrapInValueParam(defaultValueFor(semantic, param->typeInfo), param->declParamData.name->symbolData.atomId);
+                }
+                else {
+                    vp = wrapInValueParam(vp, param->declParamData.name->symbolData.atomId);
+                }
+
+                semantic->resolveTypes(vp);
+                def->structLiteralData.params.push_back(vp);
+            }
+
+            def->typeInfo = type;
+
+            return def;
+        }
+        case NodeTypekind::SYMBOL:
+        // todo(chad): exposed_type and exposed_any are structs so they should have an actual default type at some point
+        case NodeTypekind::EXPOSED_TYPE:
+        case NodeTypekind::EXPOSED_ANY:
+        case NodeTypekind::NONE:
+            return nullptr;
+    }
 }
 
 void Semantic::reportError(vector<Node *> nodes, Error error) {
@@ -249,7 +307,7 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
         semantic->resolveTypes(ret);
 
          if (ret->typeInfo != nullptr) {
-             if (!typesMatch(ret->typeInfo, data->returnType)) {
+             if (!typesMatch(ret->typeInfo, data->returnType, semantic)) {
                  ostringstream s("");
                  s << "Type mismatch; function return type is "
                    << data->returnType->typeData.kind
@@ -524,7 +582,9 @@ bool assignParams(Semantic *semantic,
         if (declParam->declParamData.initialValue != nullptr && openParamsI) {
             openParams[i] = false;
             declParam->declParamData.initialValue->typeInfo = declParam->declParamData.type;
-            newParams[i] = declParam->declParamData.initialValue;
+            newParams[i] = wrapInValueParam(declParam->declParamData.initialValue, declParam->declParamData.name);
+
+            semantic->resolveTypes(newParams[i]);
         }
     }
 
@@ -555,7 +615,7 @@ void resolveDecl(Semantic *semantic, Node *node) {
     auto shouldCheckTypeMatch = node->declData.initialValue != nullptr
                                 && node->declData.initialValue->typeInfo != nullptr
                                 && node->declData.type != nullptr;
-    if (shouldCheckTypeMatch && !typesMatch(node->declData.type, node->declData.initialValue->typeInfo)) {
+    if (shouldCheckTypeMatch && !typesMatch(node->declData.type, node->declData.initialValue->typeInfo, semantic)) {
         ostringstream s("");
         s << "Type mismatch! wanted " << node->declData.type->typeData.kind
           << ", got " << node->declData.initialValue->typeInfo->typeData.kind;
@@ -564,6 +624,9 @@ void resolveDecl(Semantic *semantic, Node *node) {
     }
     else if (node->declData.type == nullptr) {
         node->declData.type = node->declData.initialValue->typeInfo;
+    }
+    else if (node->declData.initialValue == nullptr) {
+        node->declData.initialValue = defaultValueFor(semantic, node->declData.type);
     }
 
     if (shouldCheckTypeMatch && resolve(node->declData.type)->typeData.kind == NodeTypekind::STRUCT
@@ -679,7 +742,7 @@ void resolveBinop(Semantic *semantic, Node *node) {
         return;
     }
 
-    if (!typesMatch(node->binopData.lhs->typeInfo, node->binopData.rhs->typeInfo)) {
+    if (!typesMatch(node->binopData.lhs->typeInfo, node->binopData.rhs->typeInfo, semantic)) {
         semantic->reportError({node, node->binopData.lhs, node->binopData.rhs},
                               Error{node->region, "type mismatch - both sides of binary operation need to be the same type"});
     }
@@ -734,14 +797,13 @@ void resolveFnCall(Semantic *semantic, Node *node) {
             declParams = resolvedFnType.fnTypeData.params;
         }
 
-        auto givenParams = node->fnCallData.params;
-        auto encounteredError = assignParams(semantic, node, declParams, givenParams);
+        auto encounteredError = assignParams(semantic, node, declParams, node->fnCallData.params);
         assert(!encounteredError);
 
         if (isPoly) {
             // 'link' each decl param to its runtime param
             for (auto p = 0; p < declParams.size(); p++) {
-                declParams[p]->declParamData.polyLink = givenParams[p];
+                declParams[p]->declParamData.polyLink = node->fnCallData.params[p];
             }
         }
     }
@@ -814,7 +876,7 @@ void resolveFnCall(Semantic *semantic, Node *node) {
                 givenParam->typeInfo->staticValue = givenParam;
             }
             else {
-                if (!typesMatch(declParam->typeInfo, givenParam->valueParamData.value->typeInfo)) {
+                if (!typesMatch(declParam->typeInfo, givenParam->valueParamData.value->typeInfo, semantic)) {
                     // todo if match exposed to real type then set resolved on exposed to real and pass match
                     // unless already set then error?
                     semantic->reportError({node, declParam, givenParam}, Error{node->region, "static type mismatch!"});
@@ -838,7 +900,7 @@ void resolveFnCall(Semantic *semantic, Node *node) {
             auto declParam = declParams[i];
             auto givenParam = givenParams[i];
             semantic->resolveTypes(givenParam);
-            if (!typesMatch(declParam->typeInfo, givenParam->typeInfo)) {
+            if (!typesMatch(declParam->typeInfo, givenParam->typeInfo, semantic)) {
                 semantic->reportError({node, declParam, givenParam}, Error{node->region, "type mismatch!"});
             }
         }
@@ -853,7 +915,7 @@ void resolveFnCall(Semantic *semantic, Node *node) {
 void resolveAssign(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->assignData.lhs);
     semantic->resolveTypes(node->assignData.rhs);
-    if (!typesMatch(node->assignData.lhs->typeInfo, node->assignData.rhs->typeInfo)) {
+    if (!typesMatch(node->assignData.lhs->typeInfo, node->assignData.rhs->typeInfo, semantic)) {
         semantic->reportError({node, node->assignData.lhs, node->assignData.rhs},
                               Error{node->region, "assignment type mismatch"});
     }
@@ -876,13 +938,13 @@ void resolveDeclParam(Semantic *semantic, Node *node) {
     }
 
     if (node->declParamData.type != nullptr && node->declParamData.initialValue != nullptr) {
-        if (!typesMatch(node->declParamData.type, node->declParamData.initialValue->typeInfo)) {
+        if (!typesMatch(node->declParamData.type, node->declParamData.initialValue->typeInfo, semantic)) {
             semantic->reportError({node}, Error{node->region, "Type mismatch decl param"});
         }
     }
 }
 
-void resolveParam(Semantic *semantic, Node *node) {
+void resolveValueParam(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->valueParamData.value);
     node->typeInfo = node->valueParamData.value->typeInfo;
 }
@@ -1002,7 +1064,7 @@ void resolveStructLiteral(Semantic *semantic, Node *node) {
 
     auto paramIndex = 0;
     for (auto param : node->structLiteralData.params) {
-        semantic->resolveTypes(param->valueParamData.value);
+        semantic->resolveTypes(param);
         node->typeInfo->typeData.structTypeData.params.push_back(param);
         param->typeInfo = param->valueParamData.value->typeInfo;
 
@@ -1041,6 +1103,23 @@ void resolveWhile(Semantic *semantic, Node *node) {
 void resolveUnaryNeg(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->nodeData);
     node->typeInfo = node->nodeData->typeInfo;
+}
+
+void resolveMalloc(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->nodeData);
+    if (node->nodeData->typeInfo->typeData.kind != NodeTypekind::I64) {
+        semantic->reportError({node, node->nodeData}, Error{node->nodeData->region, "Expected i64"});
+    }
+
+    node->typeInfo = new Node(NodeTypekind::POINTER);
+    node->typeInfo->typeData.pointerTypeData.underlyingType = new Node(NodeTypekind::NONE);
+}
+
+void resolveFree(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->nodeData);
+    if (node->nodeData->typeInfo->typeData.kind != NodeTypekind::POINTER) {
+        semantic->reportError({node, node->nodeData}, Error{node->nodeData->region, "Expected a pointer"});
+    }
 }
 
 void resolveRun(Semantic *semantic, Node *node) {
@@ -1102,6 +1181,12 @@ void resolveTypeof(Semantic *semantic, Node *node) {
     node->staticValue = node->nodeData->typeInfo;
 }
 
+void resolveSizeof(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->nodeData);
+
+    node->typeInfo = new Node(NodeTypekind::I64);
+}
+
 void Semantic::resolveTypes(Node *node) {
     if (node == nullptr) { return; }
 
@@ -1143,7 +1228,7 @@ void Semantic::resolveTypes(Node *node) {
             resolveDeclParam(this, node);
         } break;
         case NodeType::VALUE_PARAM: {
-            resolveParam(this, node);
+            resolveValueParam(this, node);
         } break;
         case NodeType::DEREF: {
             resolveDeref(this, node);
@@ -1169,6 +1254,9 @@ void Semantic::resolveTypes(Node *node) {
         case NodeType::TYPEOF: {
             resolveTypeof(this, node);
         } break;
+        case NodeType::SIZEOF: {
+            resolveSizeof(this, node);
+        } break;
         case NodeType::BOOLEAN_LITERAL: {
             resolveBooleanLiteral(this, node);
         } break;
@@ -1189,6 +1277,12 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::UNARY_NEG: {
             resolveUnaryNeg(this, node);
+        } break;
+        case NodeType::MALLOC: {
+            resolveMalloc(this, node);
+        } break;
+        case NodeType::FREE: {
+            resolveFree(this, node);
         } break;
         default: assert(false);
     }

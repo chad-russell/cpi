@@ -157,6 +157,20 @@ void interpretPanic(Interpreter *interp) {
     exit(0);
 }
 
+void interpretMalloc(Interpreter *interp) {
+    auto numBytes = interp->read<int64_t>();
+    auto storeOffset = interp->consume<int32_t>();
+    auto allocated = malloc(static_cast<size_t>(numBytes));
+    int64_t offset_from_stack = static_cast<int64_t>((int8_t *) allocated - (int8_t *) interp->stack.data());
+    interp->copyToStack(offset_from_stack, interp->bp + storeOffset);
+}
+
+void interpretFree(Interpreter *interp) {
+    auto offset_from_stack = interp->read<int64_t>();
+    auto ptr_to_free = (int8_t *) interp->stack.data() + offset_from_stack;
+    free(ptr_to_free);
+}
+
 // calli
 void interpretCalli(Interpreter *interp) {
     auto fnTableIndex = interp->read<int32_t>();
@@ -233,10 +247,10 @@ void interpretJump(Interpreter *interp) {
 void interpretStore(Interpreter *interp) {
     auto storeOffset = interp->read<int32_t>();
 
-    if (storeOffset >= interp->stackSize) {
-        cout << "STACK OVERFLOW!!!!" << endl;
-        exit(1);
-    }
+//    if (storeOffset >= interp->stackSize) {
+//        cout << "STACK OVERFLOW!!!!" << endl;
+//        exit(1);
+//    }
 
     auto maybeReadOffset = interp->tryRead<int32_t>();
     assert(maybeReadOffset.isPresent);

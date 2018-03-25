@@ -60,6 +60,9 @@ struct Parser {
     Node *parseStructLiteral();
     Node *parseRun();
     Node *parseTypeof();
+    Node *parseSizeof();
+    Node *parseMalloc();
+    Node *parseFree();
     Node *parseLvalueOrLiteral();
     Node *parseRvalueSimple();
     Node *parseRvalue();

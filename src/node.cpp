@@ -146,6 +146,9 @@ ostream &operator<<(ostream &os, NodeType type) {
         case NodeType::TYPEOF: {
             return os << "typeof";
         }
+        case NodeType::SIZEOF: {
+            return os << "sizeof";
+        }
         case NodeType::ARRAY_INDEX: {
             return os << "array index";
         }
@@ -170,6 +173,26 @@ Node *makeArrayType(Node *elementType) {
     arrayType->typeData.structTypeData.params = {wrapInDeclParam(ptrTy, "data", 0), wrapInDeclParam(countTy, "count", 1)};
 
     return arrayType;
+}
+
+Node *wrapInValueParam(Node *value, Node *name) {
+    auto valueParam = new Node();
+    valueParam->type = NodeType::VALUE_PARAM;
+    valueParam->valueParamData.value = value;
+    valueParam->valueParamData.name = name;
+    return valueParam;
+}
+
+Node *wrapInValueParam(Node *value, int64_t atomId) {
+    auto valueParam = new Node();
+    valueParam->type = NodeType::VALUE_PARAM;
+    valueParam->valueParamData.value = value;
+
+    auto nameNode = new Node(NodeTypekind::SYMBOL);
+    nameNode->symbolData.atomId = atomId;
+    valueParam->valueParamData.name = nameNode;
+
+    return valueParam;
 }
 
 Node *wrapInValueParam(Node *value, string name) {

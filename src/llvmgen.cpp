@@ -2,6 +2,13 @@
 #include "util.h"
 #include "node.h"
 
+#include "llvm/Support/TargetRegistry.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetOptions.h"
+
+#include <unistd.h>
+
 void debugValue(void *val) {
     ((llvm::Value *) val)->print(llvm::errs());
 }
@@ -31,7 +38,28 @@ void LlvmGen::storeIfNeeded(Node *node) {
     }
 }
 
-LlvmGen::LlvmGen() : builder(context), module(llvm::make_unique<llvm::Module>("module", context)) {
+LlvmGen::LlvmGen(const char *fileName) : builder(context), module(llvm::make_unique<llvm::Module>("module", context)) {
+    llvm::InitializeAllTargetInfos();
+    llvm::InitializeAllTargets();
+    llvm::InitializeAllTargetMCs();
+    llvm::InitializeAllAsmParsers();
+    llvm::InitializeAllAsmPrinters();
+
+    auto CPU = "generic";
+    auto Features = "";
+
+    llvm::TargetOptions opt;
+    auto RM = llvm::Optional<llvm::Reloc::Model>();
+    auto TargetTriple = llvm::sys::getDefaultTargetTriple();
+
+    module->setTargetTriple(TargetTriple);
+    module->addModuleFlag(llvm::Module::Warning, "Dwarf Version", 2);
+
+    std::string Error;
+    auto Target = llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
+    targetMachine = Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
+    module->setDataLayout(targetMachine->createDataLayout());
+
     TheFPM = llvm::make_unique<llvm::legacy::FunctionPassManager>(module.get());
 
     TheFPM->add(llvm::createInstructionCombiningPass());
@@ -44,6 +72,53 @@ LlvmGen::LlvmGen() : builder(context), module(llvm::make_unique<llvm::Module>("m
 
     llvm::FunctionType *panicType = llvm::FunctionType::get(builder.getVoidTy(), { builder.getInt8Ty()->getPointerTo() }, false);
     panicFunc = module->getOrInsertFunction("panic", panicType);
+
+    llvm::FunctionType *mallocType = llvm::FunctionType::get(builder.getInt8Ty()->getPointerTo(), { builder.getInt64Ty() }, false);
+    mallocFunc = module->getOrInsertFunction("malloc", mallocType);
+
+    llvm::FunctionType *freeType = llvm::FunctionType::get(builder.getVoidTy(), { builder.getInt8Ty()->getPointerTo() }, false);
+    freeFunc = module->getOrInsertFunction("free", freeType);
+
+    dBuilder = new llvm::DIBuilder(*module);
+
+    auto fullPath = realpath(fileName, nullptr);
+    auto checkPos = 0;
+    auto lastSepPos = 0;
+    while (fullPath[checkPos] != '\0') {
+        if (fullPath[checkPos] == '/') {
+            lastSepPos = checkPos;
+        }
+        checkPos += 1;
+    }
+
+    string fullPathString(fullPath);
+    auto fileNameWithExtension = fullPathString.substr((unsigned long) lastSepPos + 1, fullPathString.length());
+    auto fileBasePath = fullPathString.substr(0, (unsigned long) lastSepPos);
+
+    diCu = dBuilder->createCompileUnit(llvm::dwarf::DW_LANG_C, dBuilder->createFile(fileNameWithExtension, fileBasePath), "cpi", false, "", 0);
+
+    currentScope = diCu;
+    currentScopeName = "diCu";
+
+    // Add the current debug info version into the module.
+    module->addModuleFlag(llvm::Module::Warning, "Debug Info Version", llvm::DEBUG_METADATA_VERSION);
+}
+
+void emitDebugLocation(LlvmGen *gen, Node *node) {
+    assert(gen->currentScope != nullptr);
+    gen->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(static_cast<unsigned int>(node->region.start.line),
+                                                             static_cast<unsigned int>(node->region.start.col),
+                                                             gen->currentScope));
+}
+
+void LlvmGen::finalize() {
+    dBuilder->finalize();
+
+    // DO_OPTIMIZE
+//    for (auto fn : allFns) {
+//        TheFPM->run(*fn);
+//    }
+    verifyModule(*module, &llvm::errs());
 }
 
 llvm::Type *LlvmGen::typeFor(Node *node) {
@@ -126,12 +201,108 @@ llvm::Value *LlvmGen::rvalueFor(Node *node) {
     return (llvm::Value *) resolved->llvmData;
 }
 
+llvm::DIType *diTypeFor(LlvmGen *gen, Node *type) {
+    auto resolved = resolve(type);
+
+    assert(resolved->type == NodeType::TYPE);
+
+    switch (resolved->typeData.kind) {
+        case NodeTypekind::INT_LITERAL:
+        case NodeTypekind::I64:
+            return gen->dBuilder->createBasicType("i64", 64, llvm::dwarf::DW_ATE_signed);
+        case NodeTypekind::I32:
+            return gen->dBuilder->createBasicType("i32", 32, llvm::dwarf::DW_ATE_signed);
+        case NodeTypekind::I8:
+            return gen->dBuilder->createBasicType("i8", 8, llvm::dwarf::DW_ATE_signed);
+        case NodeTypekind::BOOLEAN:
+            return gen->dBuilder->createBasicType("bool", 1, llvm::dwarf::DW_ATE_signed);
+        case NodeTypekind::FLOAT_LITERAL:
+        case NodeTypekind::F32:
+            return gen->dBuilder->createBasicType("f32", 32, llvm::dwarf::DW_ATE_float);
+        case NodeTypekind::F64:
+            return gen->dBuilder->createBasicType("f64", 64, llvm::dwarf::DW_ATE_float);
+        case NodeTypekind::FN: {
+            llvm::SmallVector<llvm::Metadata *, 8> diTypes;
+            diTypes.push_back(diTypeFor(gen, resolved->typeData.fnTypeData.returnType));
+            for (auto pt : resolved->typeData.fnTypeData.params) {
+                assert(pt->type == NodeType::DECL_PARAM);
+                diTypes.push_back(diTypeFor(gen, pt->declParamData.type));
+            }
+            return gen->dBuilder->createSubroutineType(gen->dBuilder->getOrCreateTypeArray(diTypes));
+        }
+        case NodeTypekind::STRUCT: {
+            auto diFile = gen->dBuilder->createFile(gen->diCu->getFilename(), gen->diCu->getDirectory());
+
+            auto ty = gen->typeFor(resolved);
+            auto structLayout = gen->module->getDataLayout().getStructLayout(reinterpret_cast<llvm::StructType *>(ty));
+
+            auto alignment = structLayout->getAlignment();
+            auto size = structLayout->getSizeInBits();
+
+            llvm::SmallVector<llvm::Metadata *, 8> elements = {};
+            unsigned int idx = 0;
+            for (auto param : type->typeData.structTypeData.params) {
+                auto basicType = diTypeFor(gen, param->typeInfo);
+
+                string name;
+                if (param->type == NodeType::VALUE_PARAM && param->valueParamData.name != nullptr) {
+                    name = AtomTable::current->backwardAtoms[param->valueParamData.name->symbolData.atomId];
+                }
+                else if (param->type == NodeType::DECL_PARAM && param->declParamData.name != nullptr) {
+                    name = AtomTable::current->backwardAtoms[param->declParamData.name->symbolData.atomId];
+                }
+                auto sizeInBits = basicType->getSizeInBits();
+                auto alignInBits = basicType->getAlignInBits();
+                auto offsetInBits = structLayout->getElementOffsetInBits(idx);
+
+                elements.push_back(gen->dBuilder->createMemberType(gen->diCu, name, diFile,
+                                                                   static_cast<unsigned int>(param->region.start.line),
+                                                                   sizeInBits, alignInBits, offsetInBits,
+                                                                   llvm::DINode::FlagZero, basicType));
+                idx += 1;
+            }
+
+            auto ct = gen->dBuilder->createStructType(gen->diCu, "composite_type", diFile, 0, size,
+                                                      alignment, llvm::DINode::FlagZero, nullptr, gen->dBuilder->getOrCreateArray(elements));
+            return ct;
+        }
+        case NodeTypekind::POINTER: {
+            auto basicType = diTypeFor(gen, resolved->typeData.pointerTypeData.underlyingType);
+            auto pointerType = gen->typeFor(resolved);
+            return gen->dBuilder->createPointerType(basicType,
+                                                    gen->module->getDataLayout().getTypeSizeInBits(pointerType),
+                                                    8 * gen->module->getDataLayout().getABITypeAlignment(pointerType));
+        }
+        case NodeTypekind::NONE: {
+            return gen->dBuilder->createBasicType("none", 0, llvm::dwarf::DW_ATE_unsigned);
+        }
+        default:
+            assert(false);
+    }
+}
+
 void LlvmGen::gen(Node *node) {
     if (node->llvmGen) { return; }
     node->llvmGen = true;
 
+//    emitDebugLocation(this, node);
+
     switch (node->type) {
         case NodeType::FN_DECL: {
+            // debug info
+            auto fnName = node->fnDeclData.name ? AtomTable::current->backwardAtoms[node->fnDeclData.name->symbolData.atomId] : "anon";
+            llvm::DIFile *unit = dBuilder->createFile(diCu->getFilename(), diCu->getDirectory());
+            auto *SP = dBuilder->createFunction(
+                    unit, fnName, fnName, unit, (unsigned int) node->region.start.line,
+                    static_cast<llvm::DISubroutineType *>(diTypeFor(this, node->typeInfo)),
+                    false /* internal linkage */, true /* definition */, (unsigned int) node->region.start.line,
+                    llvm::DINode::FlagZero, false, nullptr);
+
+            auto savedScope = currentScope;
+            auto savedScopeName = currentScopeName;
+            currentScope = SP;
+            currentScopeName = "SP_" + fnName;
+
             std::vector<llvm::Type*> paramTypes = {};
             for (const auto& param : node->fnDeclData.params) {
                 assert(param->type == NodeType::DECL_PARAM);
@@ -141,9 +312,9 @@ void LlvmGen::gen(Node *node) {
             auto returnType = typeFor(node->fnDeclData.returnType);
 
             auto FT = llvm::FunctionType::get(returnType, paramTypes, false);
-            auto fnName = node->fnDeclData.name ? AtomTable::current->backwardAtoms[node->fnDeclData.name->symbolData.atomId] : "anon";
 
             auto *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, fnName, module.get());
+            F->setSubprogram(SP);
             F->setCallingConv(llvm::CallingConv::C);
             node->llvmData = F;
 
@@ -184,7 +355,17 @@ void LlvmGen::gen(Node *node) {
                         assert(resolvedLocal->declData.lvalue->type == NodeType::SYMBOL);
                         auto atomId = resolvedLocal->declData.lvalue->symbolData.atomId;
 
-                        resolvedLocal->llvmLocal = builder.CreateAlloca(typeToAlloca, nullptr, AtomTable::current->backwardAtoms[atomId]);
+                        auto localName = AtomTable::current->backwardAtoms[atomId];
+                        resolvedLocal->llvmLocal = builder.CreateAlloca(typeToAlloca, nullptr, localName);
+
+                        auto debugLoc = llvm::DebugLoc::get(static_cast<unsigned int>(resolvedLocal->region.start.line),
+                                                            static_cast<unsigned int>(resolvedLocal->region.start.col),
+                                                            currentScope);
+                        auto diFile = dBuilder->createFile(diCu->getFilename(), diCu->getDirectory());
+                        auto diLocalVar = dBuilder->createAutoVariable(currentScope, localName, diFile,
+                                                                       static_cast<unsigned int>(resolvedLocal->region.start.line),
+                                                                       diTypeFor(this, resolvedLocal->typeInfo));
+                        dBuilder->insertDeclare((llvm::Value *) resolvedLocal->llvmLocal, diLocalVar, dBuilder->createExpression(), debugLoc, builder.GetInsertBlock());
                     } else {
                         resolvedLocal->llvmLocal = builder.CreateAlloca(typeToAlloca, nullptr, "local");
                     }
@@ -193,7 +374,7 @@ void LlvmGen::gen(Node *node) {
 
             auto didTerminate = false;
             for (const auto& stmt : node->fnDeclData.body) {
-                if (stmt->type == NodeType::RET || stmt->type == NodeType::PANIC) { didTerminate = true; }
+                if (stmt->type == NodeType::RET) { didTerminate = true; }
                 gen(stmt);
             }
             if (!didTerminate) {
@@ -204,15 +385,15 @@ void LlvmGen::gen(Node *node) {
                 builder.SetInsertPoint(currentBB, currentIP);
             }
 
+            currentScope = savedScope;
+            currentScopeName = savedScopeName;
             currentFnDecl = savedFnDecl;
 
-            verifyFunction(*F, &llvm::errs());
-
-            // DO_OPTIMIZE
-            TheFPM->run(*F);
+            allFns.push_back(F);
         } break;
         case NodeType::RET: {
             gen(node->retData.value);
+            emitDebugLocation(this, node);
             builder.CreateRet(rvalueFor(node->retData.value));
         } break;
         case NodeType::INT_LITERAL: {
@@ -265,6 +446,7 @@ void LlvmGen::gen(Node *node) {
             auto resolvedFn = resolve(node->fnCallData.fn);
             gen(resolvedFn);
 
+            emitDebugLocation(this, node);
             node->llvmData = builder.CreateCall(rvalueFor(resolvedFn), args);
 
             if (node->isLocal && node->typeInfo->typeData.kind != NodeTypekind::NONE) {
@@ -401,6 +583,8 @@ void LlvmGen::gen(Node *node) {
             auto resolvedLhs = resolve(node->assignData.lhs);
             auto resolvedRhs = resolve(node->assignData.rhs);
 
+            emitDebugLocation(this, node);
+
             gen(resolvedRhs);
 
             auto resolvedDecl = resolve(resolvedLhs);
@@ -522,7 +706,7 @@ void LlvmGen::gen(Node *node) {
             builder.SetInsertPoint(thenBlock);
             auto didTerminate = false;
             for (auto stmt : node->ifData.stmts) {
-                if (stmt->type == NodeType::RET || stmt->type == NodeType::PANIC) { didTerminate = true; }
+                if (stmt->type == NodeType::RET) { didTerminate = true; }
                 gen(stmt);
             }
             if (!didTerminate) {
@@ -532,7 +716,7 @@ void LlvmGen::gen(Node *node) {
             builder.SetInsertPoint(elseBlock);
             didTerminate = false;
             for (auto stmt : node->ifData.elseStmts) {
-                if (stmt->type == NodeType::RET || stmt->type == NodeType::PANIC) { didTerminate = true; }
+                if (stmt->type == NodeType::RET) { didTerminate = true; }
                 gen(stmt);
             }
             if (!didTerminate) {
@@ -555,7 +739,7 @@ void LlvmGen::gen(Node *node) {
             builder.SetInsertPoint(thenBlock);
             auto didTerminate = false;
             for (auto stmt : node->whileData.stmts) {
-                if (stmt->type == NodeType::RET || stmt->type == NodeType::PANIC) { didTerminate = true; }
+                if (stmt->type == NodeType::RET) { didTerminate = true; }
                 gen(stmt);
             }
             if (!didTerminate) {
@@ -565,8 +749,8 @@ void LlvmGen::gen(Node *node) {
             builder.SetInsertPoint(mergeBlock);
         } break;
         case NodeType::PANIC: {
+            emitDebugLocation(this, node);
             builder.CreateCall(panicFunc, { builder.CreateGlobalStringPtr("assertion failed!!!") });
-            builder.CreateRet(builder.getInt64(0));
         } break;
         case NodeType::STRUCT_LITERAL: {
             auto structType = (llvm::StructType *) typeFor(node->typeInfo);
@@ -576,7 +760,7 @@ void LlvmGen::gen(Node *node) {
             for (auto param : node->structLiteralData.params) {
                 gen(param);
 
-                auto valueToInsert = rvalueFor(param);
+                auto valueToInsert = rvalueFor(param->valueParamData.value);
                 assert(valueToInsert);
 
                 blankSlate = builder.CreateInsertValue(blankSlate, valueToInsert, idx);
@@ -603,11 +787,23 @@ void LlvmGen::gen(Node *node) {
                 node->llvmLocal = nullptr;
                 node->isLocal = false;
             }
-            else if (fromType->typeData.kind == NodeTypekind::F32 && toType->typeData.kind == NodeTypekind::F64) {
+            else if ((fromType->typeData.kind == NodeTypekind::INT_LITERAL || fromType->typeData.kind == NodeTypekind::F32)
+                     && toType->typeData.kind == NodeTypekind::F64) {
                 node->llvmData = builder.CreateFPCast(static_cast<llvm::Value *>(node->castData.value->llvmData), builder.getDoubleTy());
             }
-            else if (fromType->typeData.kind == NodeTypekind::F64 && toType->typeData.kind == NodeTypekind::F32) {
+            else if ((fromType->typeData.kind == NodeTypekind::INT_LITERAL || fromType->typeData.kind == NodeTypekind::F64)
+                     && toType->typeData.kind == NodeTypekind::F32) {
+                // todo(chad): warn about losing information here
                 node->llvmData = builder.CreateFPCast(static_cast<llvm::Value *>(node->castData.value->llvmData), builder.getFloatTy());
+            }
+            else if ((fromType->typeData.kind == NodeTypekind::INT_LITERAL || fromType->typeData.kind == NodeTypekind::I32)
+                     && toType->typeData.kind == NodeTypekind::I64) {
+                node->llvmData = builder.CreateIntCast(static_cast<llvm::Value *>(node->castData.value->llvmData), builder.getInt64Ty(), true);
+            }
+            else if ((fromType->typeData.kind == NodeTypekind::INT_LITERAL || fromType->typeData.kind == NodeTypekind::I32)
+                     && toType->typeData.kind == NodeTypekind::I32) {
+                // todo(chad): warn about losing information here
+                node->llvmData = builder.CreateIntCast(static_cast<llvm::Value *>(node->castData.value->llvmData), builder.getInt32Ty(), true);
             }
             else {
                 node->llvmData = (llvm::Value *) node->castData.value->llvmData;
@@ -651,6 +847,23 @@ void LlvmGen::gen(Node *node) {
                 assert(false);
             }
         } break;
+        case NodeType::MALLOC: {
+            gen(node->nodeData);
+            emitDebugLocation(this, node);
+            node->llvmData = builder.CreateCall(mallocFunc, { rvalueFor(node->nodeData) });
+        } break;
+        case NodeType::FREE: {
+            gen(node->nodeData);
+            emitDebugLocation(this, node);
+            node->llvmData = builder.CreateCall(freeFunc, { rvalueFor(node->nodeData) });
+        } break;
+        case NodeType::SIZEOF: {
+            auto sizeInBits = module->getDataLayout().getTypeSizeInBits(typeFor(node->nodeData));
+            auto sizeInBytes = sizeInBits / 8;
+            node->llvmData = llvm::ConstantInt::get(builder.getInt64Ty(), sizeInBytes);
+        } break;
         default: assert(false);
     }
+
+    builder.SetCurrentDebugLocation(nullptr);
 }

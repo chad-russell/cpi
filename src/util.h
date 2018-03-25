@@ -57,7 +57,10 @@ enum class NodeType {
     PANIC,
     RUN,
     TYPEOF,
+    SIZEOF,
     ARRAY_INDEX,
+    MALLOC,
+    FREE,
 };
 
 enum class NodeTypekind {
@@ -140,8 +143,11 @@ enum class LexerTokenType : int32_t {
     EXPOSED_TYPE,
     EXPOSED_ANY,
     TYPEOF,
+    SIZEOF,
     PANIC,
-    NONE
+    NONE,
+    MALLOC,
+    FREE,
 };
 
 struct SourceInfo {

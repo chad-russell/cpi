@@ -346,6 +346,13 @@ Node *Parser::parseScopedStmt() {
         return parseWhile();
     }
 
+    // free
+    if (lexer->front.type == LexerTokenType::FREE) {
+        auto freeStmt = parseFree();
+        expectSemicolon();
+        return freeStmt;
+    }
+
     auto saved = lexer->front.region.start;
     auto lvalue = parseLvalue();
 
@@ -818,6 +825,39 @@ Node *Parser::parseTypeof() {
     return type;
 }
 
+Node *Parser::parseSizeof() {
+    auto type = new Node(lexer->srcInfo, &allNodes, NodeType::SIZEOF, scopes.top());
+    type->region.start = lexer->front.region.start;
+    popFront();
+    expect(LexerTokenType::LPAREN, "(");
+    type->nodeData = parseType();
+    type->region.end = lexer->front.region.end;
+    expect(LexerTokenType::RPAREN, ")");
+    return type;
+}
+
+Node *Parser::parseMalloc() {
+    auto type = new Node(lexer->srcInfo, &allNodes, NodeType::MALLOC, scopes.top());
+    type->region.start = lexer->front.region.start;
+    popFront();
+    expect(LexerTokenType::LPAREN, "(");
+    type->nodeData = parseRvalue();
+    type->region.end = lexer->front.region.end;
+    expect(LexerTokenType::RPAREN, ")");
+    return type;
+}
+
+Node *Parser::parseFree() {
+    auto type = new Node(lexer->srcInfo, &allNodes, NodeType::FREE, scopes.top());
+    type->region.start = lexer->front.region.start;
+    popFront();
+    expect(LexerTokenType::LPAREN, "(");
+    type->nodeData = parseRvalue();
+    type->region.end = lexer->front.region.end;
+    expect(LexerTokenType::RPAREN, ")");
+    return type;
+}
+
 Node *Parser::parseLvalueOrLiteral() {
     // comment
     while (lexer->front.type == LexerTokenType::COMMENT) {
@@ -826,6 +866,14 @@ Node *Parser::parseLvalueOrLiteral() {
 
     if (lexer->front.type == LexerTokenType::I32 || lexer->front.type == LexerTokenType::I64) {
         return parseType();
+    }
+
+    if (lexer->front.type == LexerTokenType::SIZEOF) {
+        return parseSizeof();
+    }
+
+    if (lexer->front.type == LexerTokenType::MALLOC) {
+        return parseMalloc();
     }
 
     auto saved = lexer->front.region.start;

@@ -114,10 +114,19 @@ void BytecodeGen::gen(Node *node) {
             auto savedCurrentFnStackSize = currentFnStackSize;
             currentFnStackSize = node->fnDeclData.stackSize;
 
+            auto didTerminate = false;
             for (auto stmt : node->fnDeclData.body) {
                 // todo(chad): @Hack? Basically why would we gen a fn or type decl if it's not being called...
                 if (stmt->type != NodeType::FN_DECL && stmt->type != NodeType::TYPE) {
                     gen(stmt);
+                }
+                if (stmt->type == NodeType::RET || stmt->type == NodeType::PANIC) { didTerminate = true; }
+            }
+            if (!didTerminate) {
+                if (isMainFn) {
+                    append(instructions, Instruction::EXIT);
+                } else {
+                    append(instructions, Instruction::RET);
                 }
             }
 
@@ -156,6 +165,11 @@ void BytecodeGen::gen(Node *node) {
                 } break;
                 default: assert(false);
             }
+        } break;
+        case NodeType::SIZEOF: {
+            append(node->bytecode, Instruction::CONSTI64);
+            auto litData = static_cast<int64_t>(typeSize(node->nodeData));
+            append(node->bytecode, toBytes(litData));
         } break;
         case NodeType::NIL_LITERAL: {
             append(node->bytecode, Instruction::CONSTI64);
@@ -196,7 +210,9 @@ void BytecodeGen::gen(Node *node) {
 
             auto localOffset = node->localOffset;
 
-            storeValue(data.initialValue, localOffset);
+            if (data.initialValue) {
+                storeValue(data.initialValue, localOffset);
+            }
         } break;
         case NodeType::ASSIGN: {
             auto data = node->assignData;
@@ -645,6 +661,18 @@ void BytecodeGen::gen(Node *node) {
         case NodeType::UNARY_NEG: {
             gen(node->nodeData);
         } break;
+        case NodeType::MALLOC: {
+            gen(node->nodeData);
+
+            append(node->bytecode, Instruction::MALLOC);
+            append(node->bytecode, node->nodeData->bytecode);
+        } break;
+        case NodeType::FREE: {
+            gen(node->nodeData);
+
+            append(instructions, Instruction::FREE);
+            append(instructions, node->nodeData->bytecode);
+        } break;
         default: assert(false);
     }
 
@@ -677,7 +705,8 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
 
             append(instructions, node->bytecode);
         } break;
-        case NodeType::INT_LITERAL: {
+        case NodeType::INT_LITERAL:
+        case NodeType::SIZEOF: {
             append(instructions, Instruction::STORECONST);
 
             append(instructions, Instruction::RELCONSTI32);
@@ -774,10 +803,14 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
         case NodeType::CAST: {
             storeValue(node->castData.value, offset);
         } break;
-        default:
         case NodeType::UNARY_NEG: {
             storeValue(node->nodeData, offset);
         } break;
+        case NodeType::MALLOC: {
+            append(node->bytecode, toBytes(offset));
+            append(instructions, node->bytecode);
+        } break;
+        default:
             assert(false);
     }
 }

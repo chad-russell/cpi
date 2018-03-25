@@ -48,6 +48,8 @@ enum class TokenType : unsigned char {
     RET, 
     EXIT,
     PANIC,
+    MALLOC,
+    FREE,
 
     // literals
     CONSTI8, CONSTI16, CONSTI32, CONSTI64, CONSTF32, CONSTF64,
@@ -103,6 +105,8 @@ enum class Instruction : unsigned char {
     RET, 
     EXIT,
     PANIC,
+    MALLOC,
+    FREE,
 
     // literals
     CONSTI8, CONSTI16, CONSTI32, CONSTI64, CONSTF32, CONSTF64,

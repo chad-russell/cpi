@@ -1,5 +1,27 @@
+fn fib(n: i64) {
+    nn := n;
+    one := 1;
+    if nn == 0 {
+        ret one;
+    }
+    if nn == 1 {
+        ret one;
+    }
+    ret fib(nn - 1) + fib(nn - 2);
+}
+
 fn main() {
-    count: i32 = 1;
-    a2 := cast([][]i64) {&{{&3, count}}, count};
-    ret a2[0][0];
+    -- this is a comment
+    a := {x: 13, y: 18};
+
+    pa := &a;
+    b := fib(pa.x) + 3;
+    c := 91;
+
+    c = 1 + 2;
+    c = a + b;
+    c = a + c;
+    c = b + c;
+
+    ret pa.x + pa.y + b + c;
 }

@@ -167,8 +167,11 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "Type", LexerTokenType::EXPOSED_TYPE)) { return; }
     if (tryEatKeyword(&next, "Any", LexerTokenType::EXPOSED_ANY)) { return; }
     if (tryEatKeyword(&next, "typeof", LexerTokenType::TYPEOF)) { return; }
+    if (tryEatKeyword(&next, "sizeof", LexerTokenType::SIZEOF)) { return; }
     if (tryEatKeyword(&next, "panic", LexerTokenType::PANIC)) { return; }
     if (tryEatKeyword(&next, "none", LexerTokenType::NONE)) { return; }
+    if (tryEatKeyword(&next, "malloc", LexerTokenType::MALLOC)) { return; }
+    if (tryEatKeyword(&next, "free", LexerTokenType::FREE)) { return; }
 
     // BACK_TICK
     if (srcInfo.source[loc.byteIndex] == '`') {
@@ -431,7 +434,11 @@ const vector<string> Lexer::lexerTokenTypeStrings = {
     "EXPOSED_TYPE",
     "EXPOSED_ANY",
     "TYPEOF",
-    "PANIC,"
+    "SIZEOF",
+    "PANIC",
+    "NONE",
+    "MALLOC",
+    "FREE"
 };
 
 ostream &operator<<(ostream &os, LexerTokenType tokenType) {
