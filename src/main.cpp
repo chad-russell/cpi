@@ -306,7 +306,7 @@ int main(int argc, char **argv) {
             system("/usr/local/Cellar/llvm/5.0.1/bin/llc --filetype=obj ./output.bc");
 
             ostringstream command;
-            command << "clang -o " << outputFileName << " output.o";
+            command << "clang -O0 -o" << outputFileName << " output.o";
             system(command.str().c_str());
 
             // need to keep the .o file because apparently that's where the debug info is stored

@@ -158,6 +158,12 @@ ostream &operator<<(ostream &os, NodeType type) {
         case NodeType::UNARY_NEG: {
             return os << "unary neg";
         }
+        case NodeType::MALLOC: {
+            return os << "malloc";
+        }
+        case NodeType::FREE: {
+            return os << "free";
+        }
     }
 }
 
@@ -169,7 +175,9 @@ Node *makeArrayType(Node *elementType) {
 
     auto arrayType = new Node(NodeTypekind::STRUCT);
     arrayType->typeData.structTypeData.isSecretlyArray = true;
+
     arrayType->typeData.structTypeData.secretArrayElementType = elementType;
+
     arrayType->typeData.structTypeData.params = {wrapInDeclParam(ptrTy, "data", 0), wrapInDeclParam(countTy, "count", 1)};
 
     return arrayType;

@@ -1,5 +1,5 @@
 TODO:
-    - short-circuit 'and' and 'or'
+    - better llvm debug support
 
     - better support for arrays
         - array literals

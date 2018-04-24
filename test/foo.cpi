@@ -1,27 +1,11 @@
-fn fib(n: i64) {
-    nn := n;
-    one := 1;
-    if nn == 0 {
-        ret one;
-    }
-    if nn == 1 {
-        ret one;
-    }
-    ret fib(nn - 1) + fib(nn - 2);
+type Vec3 struct {
+    a: i64, b: i64, c: i64
+}
+
+fn foo(a: Vec3) {
+    ret a.a + a.b + a.c;
 }
 
 fn main() {
-    -- this is a comment
-    a := {x: 13, y: 18};
-
-    pa := &a;
-    b := fib(pa.x) + 3;
-    c := 91;
-
-    c = 1 + 2;
-    c = a + b;
-    c = a + c;
-    c = b + c;
-
-    ret pa.x + pa.y + b + c;
+    ret foo({12, 2, 3});
 }

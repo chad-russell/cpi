@@ -132,6 +132,16 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
         }
 
         auto encounteredError = assignParams(semantic, actual, desired->typeData.structTypeData.params, actual->typeData.structTypeData.params);
+
+        if (!encounteredError) {
+            if (!actual->typeData.structTypeData.isLiteral && desired->typeData.structTypeData.isLiteral) {
+                desired->typeData.structTypeData.coercedType = actual;
+            }
+            else if (actual->typeData.structTypeData.isLiteral && !desired->typeData.structTypeData.isLiteral) {
+                actual->typeData.structTypeData.coercedType = desired;
+            }
+        }
+
         return !encounteredError;
     }
 
@@ -488,6 +498,11 @@ void resolveStringLiteral(Semantic *semantic, Node *node) {
 
     semantic->resolveTypes(arrayLiteral);
 
+    assert(arrayLiteral->typeInfo->typeData.kind == NodeTypekind::STRUCT);
+    arrayLiteral->typeInfo->typeData.structTypeData.isSecretlyArray = true;
+
+    arrayLiteral->typeInfo->typeData.structTypeData.secretArrayElementType = new Node(NodeTypekind::I8);
+
     node->resolved = arrayLiteral;
 }
 
@@ -565,8 +580,14 @@ bool assignParams(Semantic *semantic,
             }
             else {
                 auto declParam = declParams[j];
-                assert(declParam->type == NodeType::DECL_PARAM);
-                passedParam->typeInfo = declParam->declParamData.type;
+
+                if (declParam->type == NodeType::DECL_PARAM) {
+                    passedParam->typeInfo = declParam->declParamData.type;
+                } else if (declParam->type == NodeType::VALUE_PARAM) {
+                    passedParam->typeInfo = declParam->valueParamData.value->typeInfo;
+                } else {
+                    assert(false);
+                }
 
                 newParams[j] = passedParam;
                 openParams[j] = false;

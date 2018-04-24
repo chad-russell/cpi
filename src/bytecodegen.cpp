@@ -318,41 +318,189 @@ void BytecodeGen::gen(Node *node) {
             node->localOffset = resolved->localOffset;
         } break;
         case NodeType::BINOP: {
-            gen(node->binopData.lhs);
-            gen(node->binopData.rhs);
+            if (node->binopData.type == LexerTokenType::AND) {
+                // a and b ====> { result := false; if a { if b { result = true; } }
 
-            storeValue(node->binopData.lhs, node->binopData.lhsTemporary->localOffset);
-            storeValue(node->binopData.rhs, node->binopData.rhsTemporary->localOffset);
+                append(node->bytecode, Instruction::RELI32);
+                append(node->bytecode, toBytes(node->localOffset));
 
-            auto scale = node->binopData.rhsScale;
+                // initially store false
+                append(instructions, Instruction::STORECONST);
+                append(instructions, Instruction::RELCONSTI32);
+                append(instructions, toBytes(node->localOffset));
+                append(instructions, Instruction::CONSTI32);
+                append(instructions, toBytes32((int32_t) 0));
 
-            switch (node->binopData.type) {
-                case LexerTokenType::ADD: {
-                    if (scale > 1) {
-                        binopHelper("ADD_S_", node, scale);
-                    } else {
-                        binopHelper("ADD", node);
-                    }
-                } break;
-                case LexerTokenType::SUB: {
-                    binopHelper("SUB", node);
-                } break;
-                case LexerTokenType::MUL: {
-                    binopHelper("MUL", node);
-                } break;
-                case LexerTokenType::DIV: {
-                    binopHelper("SDIV", node);
-                } break;
-                case LexerTokenType::EQ_EQ: {
-                    binopHelper("EQ", node);
-                } break;
-                case LexerTokenType::NE: {
-                    binopHelper("NEQ", node);
-                } break;
-                case LexerTokenType::LT: {
-                    binopHelper("LT", node);
-                } break;
-                default: assert(false);
+                gen(node->binopData.lhs);
+
+                append(instructions, Instruction::JUMPIF);
+                append(instructions, node->binopData.lhs->bytecode);
+
+                append(instructions, Instruction::CONSTI32);
+                auto trueBranchOverwrite = instructions.size();
+                append(instructions, toBytes32(888));
+
+                append(instructions, Instruction::CONSTI32);
+                auto falseBranchOverwrite = instructions.size();
+                append(instructions, toBytes32(999));
+
+                auto instSize = static_cast<int32_t>(instructions.size());
+                memcpy(&instructions[trueBranchOverwrite], &instSize, sizeof(int32_t));
+
+                {
+                    // second 'if'
+                    gen(node->binopData.rhs);
+
+                    append(instructions, Instruction::JUMPIF);
+                    append(instructions, node->binopData.rhs->bytecode);
+
+                    append(instructions, Instruction::CONSTI32);
+                    auto trueBranchOverwrite2 = instructions.size();
+                    append(instructions, toBytes32(888));
+
+                    append(instructions, Instruction::CONSTI32);
+                    auto falseBranchOverwrite2 = instructions.size();
+                    append(instructions, toBytes32(999));
+
+                    instSize = static_cast<int32_t>(instructions.size());
+                    memcpy(&instructions[trueBranchOverwrite2], &instSize, sizeof(int32_t));
+
+                    // set to true
+                    append(instructions, Instruction::STORECONST);
+                    append(instructions, Instruction::RELCONSTI32);
+                    append(instructions, toBytes(node->localOffset));
+                    append(instructions, Instruction::CONSTI32);
+                    append(instructions, toBytes32((int32_t) 1));
+
+                    instSize = static_cast<int32_t>(instructions.size());
+                    memcpy(&instructions[falseBranchOverwrite2], &instSize, sizeof(int32_t));
+                }
+
+                unsigned long skipElseBranchOverwrite;
+                append(instructions, Instruction::JUMP);
+                skipElseBranchOverwrite = instructions.size();
+                append(instructions, toBytes32(999));
+
+                instSize = static_cast<int32_t>(instructions.size());
+                memcpy(&instructions[falseBranchOverwrite], &instSize, sizeof(int32_t));
+
+                instSize = static_cast<int32_t>(instructions.size());
+                memcpy(&instructions[skipElseBranchOverwrite], &instSize, sizeof(int32_t));
+            }
+            else if (node->binopData.type == LexerTokenType::OR) {
+                // a or b ====> { result := false; if a { result = true; } else if b { result = true; } }
+
+                append(node->bytecode, Instruction::RELI32);
+                append(node->bytecode, toBytes(node->localOffset));
+
+                // initially store true
+                append(instructions, Instruction::STORECONST);
+                append(instructions, Instruction::RELCONSTI32);
+                append(instructions, toBytes(node->localOffset));
+                append(instructions, Instruction::CONSTI32);
+                append(instructions, toBytes32((int32_t) 0));
+
+                gen(node->binopData.lhs);
+
+                append(instructions, Instruction::JUMPIF);
+                append(instructions, node->binopData.lhs->bytecode);
+
+                append(instructions, Instruction::CONSTI32);
+                auto trueBranchOverwrite = instructions.size();
+                append(instructions, toBytes32(888));
+
+                append(instructions, Instruction::CONSTI32);
+                auto falseBranchOverwrite = instructions.size();
+                append(instructions, toBytes32(999));
+
+                auto instSize = static_cast<int32_t>(instructions.size());
+                memcpy(&instructions[trueBranchOverwrite], &instSize, sizeof(int32_t));
+
+                // store true
+                append(instructions, Instruction::STORECONST);
+                append(instructions, Instruction::RELCONSTI32);
+                append(instructions, toBytes(node->localOffset));
+                append(instructions, Instruction::CONSTI32);
+                append(instructions, toBytes32((int32_t) 1));
+
+                unsigned long skipElseBranchOverwrite = 0;
+                auto hasElse = !node->ifData.elseStmts.empty();
+                append(instructions, Instruction::JUMP);
+                skipElseBranchOverwrite = instructions.size();
+                append(instructions, toBytes32(999));
+
+                instSize = static_cast<int32_t>(instructions.size());
+                memcpy(&instructions[falseBranchOverwrite], &instSize, sizeof(int32_t));
+
+                {
+                    // else stmts
+                    gen(node->binopData.rhs);
+
+                    append(instructions, Instruction::JUMPIF);
+                    append(instructions, node->binopData.rhs->bytecode);
+
+                    append(instructions, Instruction::CONSTI32);
+                    trueBranchOverwrite = instructions.size();
+                    append(instructions, toBytes32(888));
+
+                    append(instructions, Instruction::CONSTI32);
+                    falseBranchOverwrite = instructions.size();
+                    append(instructions, toBytes32(999));
+
+                    instSize = static_cast<int32_t>(instructions.size());
+                    memcpy(&instructions[trueBranchOverwrite], &instSize, sizeof(int32_t));
+
+                    // store true
+                    append(instructions, Instruction::STORECONST);
+                    append(instructions, Instruction::RELCONSTI32);
+                    append(instructions, toBytes(node->localOffset));
+                    append(instructions, Instruction::CONSTI32);
+                    append(instructions, toBytes32((int32_t) 1));
+
+                    instSize = static_cast<int32_t>(instructions.size());
+                    memcpy(&instructions[falseBranchOverwrite], &instSize, sizeof(int32_t));
+                }
+
+                instSize = static_cast<int32_t>(instructions.size());
+                memcpy(&instructions[skipElseBranchOverwrite], &instSize, sizeof(int32_t));
+            }
+            else {
+                gen(node->binopData.lhs);
+                gen(node->binopData.rhs);
+
+                storeValue(node->binopData.lhs, node->binopData.lhsTemporary->localOffset);
+                storeValue(node->binopData.rhs, node->binopData.rhsTemporary->localOffset);
+
+                auto scale = node->binopData.rhsScale;
+
+                switch (node->binopData.type) {
+                    case LexerTokenType::ADD: {
+                        if (scale > 1) {
+                            binopHelper("ADD_S_", node, scale);
+                        } else {
+                            binopHelper("ADD", node);
+                        }
+                    } break;
+                    case LexerTokenType::SUB: {
+                        binopHelper("SUB", node);
+                    } break;
+                    case LexerTokenType::MUL: {
+                        binopHelper("MUL", node);
+                    } break;
+                    case LexerTokenType::DIV: {
+                        binopHelper("SDIV", node);
+                    } break;
+                    case LexerTokenType::EQ_EQ: {
+                        binopHelper("EQ", node);
+                    } break;
+                    case LexerTokenType::NE: {
+                        binopHelper("NEQ", node);
+                    } break;
+                    case LexerTokenType::LT: {
+                        binopHelper("LT", node);
+                    } break;
+                    default: assert(false);
+                }
             }
         } break;
         case NodeType::FN_CALL: {

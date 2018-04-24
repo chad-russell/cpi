@@ -179,6 +179,8 @@ struct StructTypeData {
 
     bool isSecretlyArray = false;
     Node *secretArrayElementType = nullptr;
+
+    Node *coercedType = nullptr;
 };
 
 struct PointerTypeData {

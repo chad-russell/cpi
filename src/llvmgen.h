@@ -32,6 +32,8 @@ public:
     llvm::Constant *mallocFunc;
     llvm::Constant *freeFunc;
 
+    llvm::Type *voidTy;
+
     // Create a new pass manager attached to it.
     unique_ptr<llvm::legacy::FunctionPassManager> TheFPM;
 
