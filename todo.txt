@@ -1,10 +1,6 @@
 TODO:
-    - better llvm debug support
-
-    - better support for arrays
-        - array literals
-            - use malloc for now, but later on when we do allocators should be able to specify allocator
-        - foreach
+    - foreach over arrays
+        - break out the target into it's own declaration so it doesn't get calculated every time
 
     - enum / tagged union
 

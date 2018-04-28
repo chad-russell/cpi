@@ -189,11 +189,7 @@ fn testArray2() {
     e2: i32 = 2;
     e3: i32 = 3;
 
-    -- todo(chad): this doesn't work with llvm if you inline it...
-    hack1 := cast([]i32) {&{e1, e2, e3}, count};
-    boxed_array := {stuff: hack1};
-
-    assert(boxed_array.stuff[1] == 2);
+    assert([]{e1, e2, e3}[1] == 2);
 }
 
 fn testArray3() {
@@ -202,20 +198,18 @@ fn testArray3() {
     e2: i32 = 2;
     e3: i32 = 3;
 
-    -- todo(chad): llvm sigh...
-    hack1 := cast([]i32) {&{e1, e2, e3}, count};
-    a := {stuff: hack1};
-    copied := a.stuff;
+    arr := cast([]i32) {&{e1, e2, e3}, count};
+    copied := arr;
 
-    assert(a.stuff[1] == 2);
+    assert(arr[1] == 2);
     assert(copied[1] == 2);
 
-    a.stuff[1] = 18;
-    assert(a.stuff[1] == 18);
+    arr[1] = 18;
+    assert(arr[1] == 18);
     assert(copied[1] == 18);
 
     copied[1] = 99;
-    assert(a.stuff[1] == 99);
+    assert(arr[1] == 99);
     assert(copied[1] == 99);
 }
 
@@ -230,7 +224,7 @@ fn testArray4() {
     p: PointyPoint = {&&0, &&0};
     py := p.y;
 
-    a := cast([]PointyPoint) {&{{&&0, &&0}, p, {&&0, &&0}}, count};
+    a := []PointyPoint{{&&0, &&0}, p, {&&0, &&0}};
 
     ^^a[1].y = 18;
     assert(^^py == 18);
@@ -238,8 +232,12 @@ fn testArray4() {
 
 fn testArray5() {
     count: i32 = 1;
-    a2 := cast([][]i64) {&{{&3, count}}, count};
-    assert(a2[0][0] == 3);
+    a1 := cast([][]i64) {&{{&3, count}}, count};
+    assert(a1[0][0] == 3);
+
+    assert([]{1, 2, 3}[2] == 3);
+    a2 := []{[]{1, 2, 3}, []{4, 5, 6}, []{7, 8, 9}};
+    assert(a2[1][2] == 6);
 }
 
 fn assert(b: bool) {

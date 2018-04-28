@@ -9,7 +9,7 @@
 
 #include <unistd.h>
 
-#define DBUILDER 0
+#define DBUILDER 1
 
 void debugValue(void *val) {
     ((llvm::Value *) val)->print(llvm::errs());
@@ -316,22 +316,27 @@ void LlvmGen::gen(Node *node) {
 
     switch (node->type) {
         case NodeType::FN_DECL: {
+            auto declOnly = node->fnDeclData.body.empty();
+
             // debug info
             auto fnName = node->fnDeclData.name ? AtomTable::current->backwardAtoms[node->fnDeclData.name->symbolData.atomId] : "anon";
 
+            auto savedScope = currentScope;
+            auto savedScopeName = currentScopeName;
+
 #if DBUILDER
+            llvm::DISubprogram *SP = nullptr;
+            if (!declOnly) {
                 llvm::DIFile *unit = dBuilder->createFile(diCu->getFilename(), diCu->getDirectory());
-                auto *SP = dBuilder->createFunction(
+                 SP = dBuilder->createFunction(
                         unit, fnName, fnName, unit, (unsigned int) node->region.start.line,
                         static_cast<llvm::DISubroutineType *>(diTypeFor(this, node->typeInfo)),
                         false /* internal linkage */, true /* definition */, (unsigned int) node->region.start.line,
                         llvm::DINode::FlagZero, false, nullptr);
                 currentScope = SP;
                 currentScopeName = "SP_" + fnName;
+            }
 #endif
-
-            auto savedScope = currentScope;
-            auto savedScopeName = currentScopeName;
 
             std::vector<llvm::Type*> paramTypes = {};
             for (const auto& param : node->fnDeclData.params) {
@@ -345,15 +350,18 @@ void LlvmGen::gen(Node *node) {
 
             auto *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, fnName, module.get());
 
+            if (!declOnly) {
 #if DBUILDER
-            F->setSubprogram(SP);
+                emitDebugLocation(this, node);
+                F->setSubprogram(SP);
 #endif
+            }
 
             F->setCallingConv(llvm::CallingConv::C);
             node->llvmData = F;
 
             // if it's just a declaration, then we're done
-            if (node->fnDeclData.body.empty()) {
+            if (declOnly) {
                 return;
             }
 
@@ -388,23 +396,27 @@ void LlvmGen::gen(Node *node) {
 
                 if (shouldCreateAlloca) {
                     if (resolvedLocal->type == NodeType::DECL) {
-                        assert(resolvedLocal->declData.lvalue->type == NodeType::SYMBOL);
-                        auto atomId = resolvedLocal->declData.lvalue->symbolData.atomId;
+                        if (resolvedLocal->declData.lvalue != nullptr) {
+                            assert(resolvedLocal->declData.lvalue->type == NodeType::SYMBOL);
+                            auto atomId = resolvedLocal->declData.lvalue->symbolData.atomId;
 
-                        auto localName = AtomTable::current->backwardAtoms[atomId];
-                        resolvedLocal->llvmLocal = builder.CreateAlloca(typeToAlloca, nullptr, localName);
+                            auto localName = AtomTable::current->backwardAtoms[atomId];
+                            resolvedLocal->llvmLocal = builder.CreateAlloca(typeToAlloca, nullptr, localName);
 
-                        if (DBUILDER) {
-                            auto debugLoc = llvm::DebugLoc::get(
-                                    static_cast<unsigned int>(resolvedLocal->region.start.line),
-                                    static_cast<unsigned int>(resolvedLocal->region.start.col),
-                                    currentScope);
-                            auto diFile = dBuilder->createFile(diCu->getFilename(), diCu->getDirectory());
-                            auto diLocalVar = dBuilder->createAutoVariable(currentScope, localName, diFile,
-                                                                           static_cast<unsigned int>(resolvedLocal->region.start.line),
-                                                                           diTypeFor(this, resolvedLocal->typeInfo));
-                            dBuilder->insertDeclare((llvm::Value *) resolvedLocal->llvmLocal, diLocalVar,
-                                                    dBuilder->createExpression(), debugLoc, builder.GetInsertBlock());
+                            if (DBUILDER) {
+                                auto debugLoc = llvm::DebugLoc::get(
+                                        static_cast<unsigned int>(resolvedLocal->region.start.line),
+                                        static_cast<unsigned int>(resolvedLocal->region.start.col),
+                                        currentScope);
+                                auto diFile = dBuilder->createFile(diCu->getFilename(), diCu->getDirectory());
+                                auto diLocalVar = dBuilder->createAutoVariable(currentScope, localName, diFile,
+                                                                               static_cast<unsigned int>(resolvedLocal->region.start.line),
+                                                                               diTypeFor(this, resolvedLocal->typeInfo));
+                                dBuilder->insertDeclare((llvm::Value *) resolvedLocal->llvmLocal, diLocalVar,
+                                                        dBuilder->createExpression(), debugLoc, builder.GetInsertBlock());
+                            }
+                        } else {
+                            resolvedLocal->llvmLocal = builder.CreateAlloca(typeToAlloca, nullptr, "foreach_index");
                         }
                     } else {
                         resolvedLocal->llvmLocal = builder.CreateAlloca(typeToAlloca, nullptr, "local");
@@ -428,6 +440,7 @@ void LlvmGen::gen(Node *node) {
             currentScope = savedScope;
             currentScopeName = savedScopeName;
             currentFnDecl = savedFnDecl;
+            emitDebugLocation(this, node);
 
             allFns.push_back(F);
         } break;
@@ -911,6 +924,12 @@ void LlvmGen::gen(Node *node) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
         } break;
+        case NodeType::ARRAY_LITERAL: {
+            gen(node->arrayLiteralData.structLiteralRepresentation);
+
+            node->llvmData = node->arrayLiteralData.structLiteralRepresentation->llvmData;
+            node->llvmLocal = node->arrayLiteralData.structLiteralRepresentation->llvmLocal;
+        } break;
         case NodeType::CAST: {
             gen(node->castData.value);
 
@@ -998,6 +1017,11 @@ void LlvmGen::gen(Node *node) {
             auto sizeInBits = module->getDataLayout().getTypeSizeInBits(typeFor(node->nodeData));
             auto sizeInBytes = sizeInBits / 8;
             node->llvmData = llvm::ConstantInt::get(builder.getInt64Ty(), sizeInBytes);
+        } break;
+        case NodeType::FOR: {
+            for (auto n : node->forData.rewritten) {
+                gen(n);
+            }
         } break;
         default: assert(false);
     }

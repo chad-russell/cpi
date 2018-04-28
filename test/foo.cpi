@@ -1,11 +1,26 @@
-type Vec3 struct {
-    a: i64, b: i64, c: i64
-}
-
-fn foo(a: Vec3) {
-    ret a.a + a.b + a.c;
-}
-
 fn main() {
-    ret foo({12, 2, 3});
+    sum := 0;
+
+    for e: []{1, 2, 3} {
+        sum = sum + e;
+    }
+
+    ret sum;
+}
+
+fn array_for_add() {
+    for e: []{1, 2, 3} {
+    }
+
+    ret 666;
+}
+
+fn array_while_add() {
+    arr := []{1, 2, 3};
+    i := 0;
+    while i < arr.count {
+        e := arr[i];
+    }
+
+    ret 666;
 }

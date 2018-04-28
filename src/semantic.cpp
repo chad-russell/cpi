@@ -30,18 +30,12 @@ int32_t typeSize(Node *type) {
             assert(false);
         case NodeTypekind::STRUCT: {
             auto total = 0;
-            auto index = 0;
 
             for (auto param : resolved->typeData.structTypeData.params) {
                 param->localOffset = total;
 
-                if (resolved->typeData.structTypeData.isLiteral) {
-                    total += typeSize(param->valueParamData.value->typeInfo);
-                } else {
-                    total += typeSize(param->declParamData.type);
-                    index += 1;
-                }
-
+                assert(param->type == NodeType::DECL_PARAM);
+                total += typeSize(param->declParamData.type);
             }
 
             return total;
@@ -369,7 +363,6 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
     }
 
     auto paramOffset = -8;
-    localIndex = 0;
     for (auto declParam : node->fnDeclData.params) {
         // we push the params onto the stack in reverse order
         paramOffset -= typeSize(declParam->typeInfo);
@@ -433,13 +426,13 @@ void resolveArrayIndex(Semantic *semantic, Node *node) {
     aCasted->castData.type->typeData.pointerTypeData.underlyingType = node->typeInfo;
     aCasted->castData.value = node->arrayIndexData.target;
 
-    auto add = new Node(node->region.srcInfo, nullptr, NodeType::BINOP, node->scope);
+    auto add = new Node(node->region.srcInfo, NodeType::BINOP, node->scope);
     add->binopData.type = LexerTokenType::ADD;
     add->binopData.lhs = aCasted;
     add->binopData.rhs = node->arrayIndexData.indexValue;
     add->binopData.rhsScale = typeSize(node->typeInfo);
 
-    auto deref = new Node(node->region.srcInfo, nullptr, NodeType::DEREF, node->scope);
+    auto deref = new Node(node->region.srcInfo, NodeType::DEREF, node->scope);
     deref->derefData.target = add;
 
     semantic->addLocal(deref->derefData.target);
@@ -463,7 +456,7 @@ void resolveStringLiteral(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->typeInfo);
 
     // "hello" <==> {&{'h', 'e', 'l', 'l', 'o'}, 5};
-    auto arrayLiteral = new Node(node->region.srcInfo, nullptr, NodeType::STRUCT_LITERAL, node->scope);
+    auto arrayLiteral = new Node(node->region.srcInfo, NodeType::STRUCT_LITERAL, node->scope);
     arrayLiteral->region = node->region;
 
     // charArrayLiteral = {'h', 'e', 'l', 'l', 'o'}
@@ -1009,7 +1002,8 @@ Node *findParam(Semantic *semantic, Node *node) {
     Node *foundParam = nullptr;
     if (structData.isLiteral) {
         for (auto param : structData.params) {
-            if (param->valueParamData.name->symbolData.atomId == node->dotData.rhs->symbolData.atomId) {
+            if (param->declParamData.name != nullptr
+                && param->declParamData.name->symbolData.atomId == node->dotData.rhs->symbolData.atomId) {
                 foundParam = param;
                 break;
             }
@@ -1086,7 +1080,10 @@ void resolveStructLiteral(Semantic *semantic, Node *node) {
     auto paramIndex = 0;
     for (auto param : node->structLiteralData.params) {
         semantic->resolveTypes(param);
-        node->typeInfo->typeData.structTypeData.params.push_back(param);
+
+        auto wrapped = wrapInDeclParam(param->typeInfo, param->valueParamData.name, paramIndex);
+        node->typeInfo->typeData.structTypeData.params.push_back(wrapped);
+
         param->typeInfo = param->valueParamData.value->typeInfo;
 
         param->valueParamData.index = paramIndex;
@@ -1143,6 +1140,177 @@ void resolveFree(Semantic *semantic, Node *node) {
     }
 }
 
+void resolveArrayLiteral(Semantic *semantic, Node *node) {
+    for (auto elem : node->arrayLiteralData.elements) {
+        semantic->resolveTypes(elem);
+    }
+
+    if (node->arrayLiteralData.elementType == nullptr) {
+        if (node->arrayLiteralData.elements.empty()) {
+            semantic->reportError({node}, Error{
+                    node->region,
+                    "No type given for array literal and no elements from which to infer it"
+            });
+            return;
+        }
+        node->arrayLiteralData.elementType = node->arrayLiteralData.elements[0]->typeInfo;
+    }
+
+    semantic->resolveTypes(node->arrayLiteralData.elementType);
+
+    for (auto elem : node->arrayLiteralData.elements) {
+        if (!typesMatch(node->arrayLiteralData.elementType, elem->typeInfo, semantic)) {
+            semantic->reportError({node}, Error{
+                    node->region,
+                    "Type mismatch!"
+            });
+            return;
+        }
+    }
+
+    node->resolved = node->arrayLiteralData.structLiteralRepresentation;
+
+    semantic->resolveTypes(node->resolved);
+    node->resolved->typeInfo->typeData.structTypeData.isSecretlyArray = true;
+    node->resolved->typeInfo->typeData.structTypeData.secretArrayElementType = node->arrayLiteralData.elementType;
+
+    node->typeInfo = node->resolved->typeInfo;
+}
+
+void resolveFor(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->forData.target);
+
+    if (!(node->forData.target->typeInfo->typeData.kind == NodeTypekind::STRUCT
+          && node->forData.target->typeInfo->typeData.structTypeData.isSecretlyArray)) {
+        semantic->reportError({node, node->forData.target}, Error{
+                node->forData.target->region,
+                "'for' target must be an array"
+        });
+    }
+
+    // create a new declaration with the alias as the lvalue, and the array type as the type
+    auto elementDecl = new Node();
+    elementDecl->type = NodeType::DECL;
+    elementDecl->scope = node->scope;
+    elementDecl->region = node->forData.element_alias->region;
+    elementDecl->declData.type = node->forData.target->typeInfo->typeData.structTypeData.secretArrayElementType;
+    elementDecl->declData.lvalue = node->forData.element_alias;
+    elementDecl->isLocal = true;
+    semantic->currentFnDecl->locals.push_back(elementDecl);
+    semantic->resolveTypes(elementDecl);
+
+    // insert this new declaration into the scope of the 'for' statement
+    node->scope->symbols.insert({node->forData.element_alias->symbolData.atomId, elementDecl});
+
+    // arrayDecl
+    auto arrayDecl = new Node(node->region.srcInfo, NodeType::DECL, node->scope);
+    arrayDecl->declData.type = node->forData.target->typeInfo;
+    arrayDecl->declData.initialValue = node->forData.target;
+    arrayDecl->isLocal = true;
+    semantic->currentFnDecl->locals.push_back(arrayDecl);
+
+    for (auto& stmt : node->forData.stmts) {
+        semantic->resolveTypes(stmt);
+    }
+
+    // 0
+    auto zero = new Node();
+    zero->type = NodeType::INT_LITERAL;
+    zero->typeInfo = new Node(NodeTypekind::I32);
+    zero->intLiteralData.value = 0;
+
+    // indexDecl: i32 = 0
+    auto indexDecl = new Node();
+    indexDecl->type = NodeType::DECL;
+    indexDecl->scope = node->scope;
+    indexDecl->region = node->forData.element_alias->region;
+    indexDecl->declData.type = new Node(NodeTypekind::I32);
+    indexDecl->declData.lvalue = nullptr;
+    indexDecl->declData.initialValue = zero;
+    indexDecl->isLocal = true;
+    semantic->currentFnDecl->locals.push_back(indexDecl);
+
+    auto countSymbol = new Node();
+    countSymbol->scope = node->forData.target->scope;
+    countSymbol->type = NodeType::SYMBOL;
+    countSymbol->symbolData.atomId = AtomTable::current->insertStr("count");
+
+    auto arrayDotCount = new Node();
+    arrayDotCount->scope = node->scope;
+    arrayDotCount->type = NodeType::DOT;
+    arrayDotCount->dotData.lhs = arrayDecl;
+    arrayDotCount->dotData.rhs = countSymbol;
+
+    auto whileConditionBinop = new Node();
+    whileConditionBinop->type = NodeType::BINOP;
+    whileConditionBinop->binopData.type = LexerTokenType::LT;
+    whileConditionBinop->binopData.lhs = indexDecl;
+    whileConditionBinop->binopData.rhs = arrayDotCount;
+    semantic->currentFnDecl->locals.push_back(whileConditionBinop);
+    whileConditionBinop->isLocal = true;
+
+    // one
+    auto one = new Node();
+    one->type = NodeType::INT_LITERAL;
+    one->typeInfo = new Node(NodeTypekind::I32);
+    one->intLiteralData.value = 1;
+
+    // indexDecl + 1
+    auto incrementIndexBinop = new Node(node->region.srcInfo, NodeType::BINOP, node->scope);
+    incrementIndexBinop->type = NodeType::BINOP;
+    incrementIndexBinop->binopData.type = LexerTokenType::ADD;
+    incrementIndexBinop->binopData.lhs = indexDecl;
+    incrementIndexBinop->binopData.rhs = one;
+    semantic->currentFnDecl->locals.push_back(incrementIndexBinop);
+    incrementIndexBinop->isLocal = true;
+
+    auto incr = new Node(node->region.srcInfo, NodeType::ASSIGN, node->scope);
+    incr->assignData.lhs = indexDecl;
+    incr->assignData.rhs = incrementIndexBinop;
+
+    // arrIndex
+    auto arrIndex = new Node(node->region.srcInfo, NodeType::ARRAY_INDEX, node->scope);
+    arrIndex->arrayIndexData.target = arrayDecl;
+    arrIndex->arrayIndexData.indexValue = indexDecl;
+
+//    auto fuckme = new Node();
+//    fuckme->type = NodeType::INT_LITERAL;
+//    fuckme->typeInfo = new Node(NodeTypekind::I64);
+//    fuckme->intLiteralData.value = 432;
+
+    // elementAssign
+    auto elementAssign = new Node(node->region.srcInfo, NodeType::ASSIGN, node->scope);
+    elementAssign->assignData.lhs = elementDecl;
+    elementAssign->assignData.rhs = arrIndex;
+//    elementAssign->assignData.rhs = fuckme;
+
+    // while binop(lessThan, indexDecl, dot(array, 'count'))
+    // all stmts
+    // indexDecl = indexDecl + 1
+    auto while_ = new Node(node->region.srcInfo, NodeType::WHILE, node->scope);
+    while_->whileData.condition = whileConditionBinop;
+
+    // e := array[index]
+    while_->whileData.stmts.push_back(elementAssign);
+
+    // stmts
+    for (auto stmt : node->forData.stmts) {
+        while_->whileData.stmts.push_back(stmt);
+    }
+
+    // increment
+    while_->whileData.stmts.push_back(incr);
+
+    node->forData.rewritten.push_back(elementDecl);
+    node->forData.rewritten.push_back(arrayDecl);
+    node->forData.rewritten.push_back(indexDecl);
+    node->forData.rewritten.push_back(while_);
+
+    for (auto stmt : node->forData.rewritten) {
+        semantic->resolveTypes(stmt);
+    }
+}
+
 void resolveRun(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->nodeData);
 
@@ -1183,7 +1351,7 @@ void resolveRun(Semantic *semantic, Node *node) {
     switch (node->typeInfo->typeData.kind) {
         case NodeTypekind::I32:
         case NodeTypekind::I64: {
-            auto resolved = new Node(node->region.srcInfo, nullptr, NodeType::INT_LITERAL, node->scope);
+            auto resolved = new Node(node->region.srcInfo, NodeType::INT_LITERAL, node->scope);
             resolved->typeInfo = node->typeInfo;
             resolved->intLiteralData.value = interp->readFromStack<int32_t>(0);
             node->resolved = resolved;
@@ -1304,6 +1472,12 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::FREE: {
             resolveFree(this, node);
+        } break;
+        case NodeType::ARRAY_LITERAL: {
+            resolveArrayLiteral(this, node);
+        } break;
+        case NodeType::FOR: {
+            resolveFor(this, node);
         } break;
         default: assert(false);
     }

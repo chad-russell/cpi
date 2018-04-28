@@ -17,5 +17,6 @@ Node *wrapInValueParam(Node *value, string name);
 Node *wrapInValueParam(Node *value, int64_t atomId);
 
 Node *wrapInDeclParam(Node *value, string name, int index);
+Node *wrapInDeclParam(Node *value, Node *name, int index);
 
 #endif // NODE_H

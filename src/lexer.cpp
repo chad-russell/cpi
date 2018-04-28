@@ -172,6 +172,7 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "none", LexerTokenType::NONE)) { return; }
     if (tryEatKeyword(&next, "malloc", LexerTokenType::MALLOC)) { return; }
     if (tryEatKeyword(&next, "free", LexerTokenType::FREE)) { return; }
+    if (tryEatKeyword(&next, "for", LexerTokenType::FOR)) { return; }
 
     // BACK_TICK
     if (srcInfo.source[loc.byteIndex] == '`') {

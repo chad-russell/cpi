@@ -61,6 +61,8 @@ enum class NodeType {
     ARRAY_INDEX,
     MALLOC,
     FREE,
+    ARRAY_LITERAL,
+    FOR,
 };
 
 enum class NodeTypekind {
@@ -148,6 +150,7 @@ enum class LexerTokenType : int32_t {
     NONE,
     MALLOC,
     FREE,
+    FOR,
 };
 
 struct SourceInfo {
@@ -347,6 +350,23 @@ struct DerefData {
     Node *target = nullptr;
 };
 
+struct ArrayLiteralData {
+    Node *elementType = nullptr;
+    vector<Node *> elements;
+
+    Node *structLiteralRepresentation;
+};
+
+struct ForData {
+    Node *element_alias = nullptr;
+    Node *iterator_alias = nullptr;
+    Node *target = nullptr;
+
+    vector<Node *> stmts;
+
+    vector<Node *> rewritten;
+};
+
 class Scope {
 public:
     unordered_map<int64_t, Node *> symbols = {};
@@ -393,6 +413,8 @@ public:
     RetData retData;
     SymbolData symbolData;
     DerefData derefData;
+    ArrayLiteralData arrayLiteralData;
+    ForData forData;
     // };
 
     Node *staticValue = nullptr;
@@ -418,7 +440,7 @@ public:
 
     Node();
     Node(NodeTypekind typekind);
-    Node(SourceInfo srcInfo, vector<Node *> *allNodes, NodeType type_, Scope *scope_);
+    Node(SourceInfo srcInfo, NodeType type_, Scope *scope_);
 };
 
 template<typename T> 

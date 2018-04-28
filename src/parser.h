@@ -27,10 +27,8 @@ struct Parser {
     Lexer *lexer = nullptr;
     LexerToken last;
     Node *mainFn = nullptr;
-    vector<Node *> allNodes = {};
     stack<Scope *> scopes = {};
     Node *currentFnDecl = nullptr;
-    bool nodePolymorph = false;
 
     Parser(Lexer *lexer_);
 
@@ -54,10 +52,12 @@ struct Parser {
     Node *parseScopedStmt();
     Node *parseIf();
     Node *parseWhile();
+    Node *parseFor();
     Node *parseRet();
     Node *parseLvalue();
     Node *parseType();
     Node *parseStructLiteral();
+    Node *parseArrayLiteral();
     Node *parseRun();
     Node *parseTypeof();
     Node *parseSizeof();

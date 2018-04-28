@@ -1,6 +1,6 @@
 #include "node.h"
 
-Node::Node(SourceInfo srcInfo, vector<Node *> *allNodes, NodeType type_, Scope *scope_) : Node() {
+Node::Node(SourceInfo srcInfo, NodeType type_, Scope *scope_) : Node() {
     type = type_;
 
     scope = scope_;
@@ -8,10 +8,6 @@ Node::Node(SourceInfo srcInfo, vector<Node *> *allNodes, NodeType type_, Scope *
     typeInfo = nullptr;
     resolved = nullptr;
     region.srcInfo = srcInfo;
-
-    if (allNodes != nullptr) {
-        allNodes->push_back(this);
-    }
 }
 
 Node::Node(NodeTypekind typekind) : Node() {
@@ -164,6 +160,9 @@ ostream &operator<<(ostream &os, NodeType type) {
         case NodeType::FREE: {
             return os << "free";
         }
+        case NodeType::ARRAY_LITERAL: {
+            return os << "array literal";
+        }
     }
 }
 
@@ -218,16 +217,22 @@ Node *wrapInValueParam(Node *value, string name) {
 }
 
 Node *wrapInDeclParam(Node *type, string name, int index) {
+    Node *nameNode = nullptr;
+    if (!name.empty()) {
+        nameNode = new Node(NodeTypekind::SYMBOL);
+        nameNode->symbolData.atomId = AtomTable::current->insertStr(name);
+    }
+
+    return wrapInDeclParam(type, nameNode, index);
+}
+
+Node *wrapInDeclParam(Node *type, Node *name, int index) {
     auto param = new Node();
     param->type = NodeType::DECL_PARAM;
     param->declParamData.type = type;
     param->declParamData.index = index;
-
-    if (!name.empty()) {
-        auto nameNode = new Node(NodeTypekind::SYMBOL);
-        nameNode->symbolData.atomId = AtomTable::current->insertStr(name);
-        param->declParamData.name = nameNode;
-    }
+    param->declParamData.name = name;
+    param->typeInfo = type;
 
     return param;
 }

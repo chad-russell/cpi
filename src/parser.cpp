@@ -125,7 +125,7 @@ vector<Node *> Parser::parseDeclParams() {
             expect(LexerTokenType::COMMA, ",");
         }
 
-        auto node = new Node(lexer->srcInfo, &allNodes, NodeType::DECL_PARAM, scopes.top());
+        auto node = new Node(lexer->srcInfo, NodeType::DECL_PARAM, scopes.top());
 
         node->declParamData = param;
 
@@ -167,7 +167,7 @@ vector<Node *> Parser::parseValueParams() {
             expect(LexerTokenType::COMMA, ",");
         }
 
-        auto node = new Node(lexer->srcInfo, &allNodes, NodeType::VALUE_PARAM, scopes.top());
+        auto node = new Node(lexer->srcInfo, NodeType::VALUE_PARAM, scopes.top());
 
         node->valueParamData = param;
 
@@ -179,7 +179,7 @@ vector<Node *> Parser::parseValueParams() {
 }
 
 Node *Parser::parseFnDecl(bool polymorphCopy) {
-    auto decl = new Node(lexer->srcInfo, &allNodes, NodeType::FN_DECL, scopes.top());
+    auto decl = new Node(lexer->srcInfo, NodeType::FN_DECL, scopes.top());
     decl->region.start = lexer->front.region.start;
     decl->sourceMapStatement = true;
 
@@ -285,7 +285,6 @@ Node *Parser::parseTypeDecl() {
     expect(LexerTokenType::LCURLY, "{");
 
     auto typeDecl = new Node(lexer->srcInfo,
-                             &allNodes,
                              NodeType::TYPE,
                              scopes.top());
     typeDecl->typeData.kind = NodeTypekind::STRUCT;
@@ -306,7 +305,7 @@ Node *Parser::parseTypeDecl() {
 
 Node *Parser::parseSymbol() {
     LexerToken front = expect(LexerTokenType::SYMBOL, "identifier");
-    auto sym = new Node(lexer->srcInfo, &allNodes, NodeType::SYMBOL, scopes.top());
+    auto sym = new Node(lexer->srcInfo, NodeType::SYMBOL, scopes.top());
     sym->region = front.region;
     sym->symbolData.atomId = AtomTable::current->insert(sym->region);
     return sym;
@@ -353,6 +352,11 @@ Node *Parser::parseScopedStmt() {
         return freeStmt;
     }
 
+    // for
+    if (lexer->front.type == LexerTokenType::FOR) {
+        return parseFor();
+    }
+
     auto saved = lexer->front.region.start;
     auto lvalue = parseLvalue();
 
@@ -382,7 +386,7 @@ Node *Parser::parseScopedStmt() {
 
         expectSemicolon();
 
-        auto decl = new Node(lexer->srcInfo, &allNodes, NodeType::DECL, scopes.top());
+        auto decl = new Node(lexer->srcInfo, NodeType::DECL, scopes.top());
         addLocal(decl);
 
         decl->declData.lvalue = lvalue;
@@ -410,7 +414,7 @@ Node *Parser::parseScopedStmt() {
 
         expectSemicolon();
 
-        auto decl = new Node(lexer->srcInfo, &allNodes, NodeType::DECL, scopes.top());
+        auto decl = new Node(lexer->srcInfo, NodeType::DECL, scopes.top());
         addLocal(decl);
 
         decl->declData.lvalue = lvalue;
@@ -437,7 +441,7 @@ Node *Parser::parseScopedStmt() {
 
         expectSemicolon();
 
-        auto ass = new Node(lexer->srcInfo, &allNodes, NodeType::ASSIGN, scopes.top());
+        auto ass = new Node(lexer->srcInfo, NodeType::ASSIGN, scopes.top());
 
         ass->assignData.lhs = lvalue;
         ass->assignData.rhs = rvalue;
@@ -460,7 +464,7 @@ Node *Parser::parseIf() {
     auto saved = lexer->front.region.start;
     popFront();
 
-    auto if_ = new Node(lexer->srcInfo, &allNodes, NodeType::IF, scopes.top());
+    auto if_ = new Node(lexer->srcInfo, NodeType::IF, scopes.top());
     if_->region.start = saved;
     if_->ifData.condition = parseRvalue();
 
@@ -500,7 +504,7 @@ Node *Parser::parseWhile() {
     auto saved = lexer->front.region.start;
     popFront();
 
-    auto while_ = new Node(lexer->srcInfo, &allNodes, NodeType::WHILE, scopes.top());
+    auto while_ = new Node(lexer->srcInfo, NodeType::WHILE, scopes.top());
     while_->region.start = saved;
     while_->whileData.condition = parseRvalue();
 
@@ -521,11 +525,47 @@ Node *Parser::parseWhile() {
     return while_;
 }
 
+Node *Parser::parseFor() {
+    auto saved = lexer->front.region.start;
+    popFront();
+
+    // we get a new scope!
+    scopes.push(new Scope(scopes.top()));
+
+    auto for_ = new Node(lexer->srcInfo, NodeType::FOR, scopes.top());
+    for_->region.start = saved;
+
+    for_->forData.element_alias = parseSymbol();
+
+    // todo(chad): possibly parse itemAlias as well (look for comma and then another symbol)
+    expect(LexerTokenType::COLON, ":");
+
+    for_->forData.target = parseRvalue();
+
+    for_->sourceMapStatement = true;
+    for_->forData.target->sourceMapStatement = true;
+
+    expect(LexerTokenType::LCURLY, "{");
+    while (lexer->front.type != LexerTokenType::RCURLY) {
+        auto scopedStmt = parseScopedStmt();
+        if (scopedStmt) {
+            for_->forData.stmts.push_back(scopedStmt);
+        }
+    }
+
+    for_->region.end = lexer->front.region.end;
+    expect(LexerTokenType::RCURLY, "}");
+
+    scopes.pop();
+
+    return for_;
+}
+
 Node *Parser::parseRet() {
     auto saved = lexer->front.region.start;
     expect(LexerTokenType::RET, "return");
 
-    auto ret = new Node(lexer->srcInfo, &allNodes, NodeType::RET, scopes.top());
+    auto ret = new Node(lexer->srcInfo, NodeType::RET, scopes.top());
     ret->retData.value = parseRvalue();
     ret->region = {lexer->srcInfo, saved, ret->retData.value->region.end};
 
@@ -571,7 +611,6 @@ Node *Parser::buildDots(stack<Node *> rvalues) {
         rvalues.pop();
 
         auto dot = new Node(lexer->srcInfo,
-                            &allNodes,
                             NodeType::DOT,
                             scopes.top());
 
@@ -644,7 +683,7 @@ Node *Parser::parseLvalue() {
     // ^(lvalue)
     if (lexer->front.type == LexerTokenType::DEREF) {
         popFront();
-        auto deref = new Node(lexer->srcInfo, &allNodes, NodeType::DEREF, scopes.top());
+        auto deref = new Node(lexer->srcInfo, NodeType::DEREF, scopes.top());
         deref->derefData.target = parseRvalueSimple();
 
         addLocal(deref->derefData.target);
@@ -659,7 +698,7 @@ Node *Parser::parseLvalue() {
         }
         case LexerTokenType::PANIC: {
             popFront();
-            auto panicNode = new Node(lexer->srcInfo, &allNodes, NodeType::PANIC, scopes.top());
+            auto panicNode = new Node(lexer->srcInfo, NodeType::PANIC, scopes.top());
             expect(LexerTokenType::LPAREN, "(");
 
             panicNode->sourceMapStatement = true;
@@ -690,7 +729,7 @@ Node *Parser::parseType() {
         return parseTypeof();
     }
 
-    auto type = new Node(lexer->srcInfo, &allNodes, NodeType::TYPE, scopes.top());
+    auto type = new Node(lexer->srcInfo, NodeType::TYPE, scopes.top());
     type->region = saved.region;
 
     switch (saved.type) {
@@ -790,7 +829,7 @@ Node *Parser::parseType() {
 Node *Parser::parseStructLiteral() {
     expect(LexerTokenType::LCURLY, "{");
 
-    Node *node = new Node(lexer->srcInfo, &allNodes, NodeType::STRUCT_LITERAL, scopes.top());
+    Node *node = new Node(lexer->srcInfo, NodeType::STRUCT_LITERAL, scopes.top());
     node->structLiteralData.params = parseValueParams();
 
     expect(LexerTokenType::RCURLY, "}");
@@ -798,8 +837,50 @@ Node *Parser::parseStructLiteral() {
     return node;
 }
 
+Node *Parser::parseArrayLiteral() {
+    expect(LexerTokenType::LSQUARE, "[");
+    expect(LexerTokenType::RSQUARE, "]");
+
+    auto lit = new Node(lexer->srcInfo, NodeType::ARRAY_LITERAL, scopes.top());
+    auto elemsStruct = new Node(lexer->srcInfo, NodeType::STRUCT_LITERAL, scopes.top());
+
+    if (lexer->front.type != LexerTokenType::LCURLY) {
+        lit->arrayLiteralData.elementType = parseType();
+    }
+
+    expect(LexerTokenType::LCURLY, "{");
+    if (lexer->front.type != LexerTokenType::RCURLY) {
+
+        auto elem = parseRvalue();
+        lit->arrayLiteralData.elements.push_back(elem);
+        elemsStruct->structLiteralData.params.push_back(wrapInValueParam(elem, ""));
+    }
+    while (lexer->front.type != LexerTokenType::RCURLY) {
+        expect(LexerTokenType::COMMA, ",");
+
+        auto elem = parseRvalue();
+        lit->arrayLiteralData.elements.push_back(elem);
+        elemsStruct->structLiteralData.params.push_back(wrapInValueParam(elem, ""));
+    }
+    expect(LexerTokenType::RCURLY, "}");
+
+    auto addrOfElems = new Node(lexer->srcInfo, NodeType::ADDRESS_OF, scopes.top());
+    addrOfElems->nodeData = elemsStruct;
+    addLocal(elemsStruct);
+
+    auto countNode = new Node(lexer->srcInfo, NodeType::INT_LITERAL, scopes.top());
+    countNode->intLiteralData.value = static_cast<int64_t>(elemsStruct->structLiteralData.params.size());
+    countNode->typeInfo = new Node(NodeTypekind::I32);
+
+    lit->arrayLiteralData.structLiteralRepresentation = new Node(lexer->srcInfo, NodeType::STRUCT_LITERAL, scopes.top());
+    lit->arrayLiteralData.structLiteralRepresentation->structLiteralData.params.push_back(wrapInValueParam(addrOfElems, "data"));
+    lit->arrayLiteralData.structLiteralRepresentation->structLiteralData.params.push_back(wrapInValueParam(countNode, "count"));
+
+    return lit;
+}
+
 Node *Parser::parseRun() {
-    Node *node = new Node(lexer->srcInfo, &allNodes, NodeType::RUN, scopes.top());
+    Node *node = new Node(lexer->srcInfo, NodeType::RUN, scopes.top());
     node->region.start = lexer->front.region.start;
     popFront();
 
@@ -815,7 +896,7 @@ Node *Parser::parseRun() {
 }
 
 Node *Parser::parseTypeof() {
-    auto type = new Node(lexer->srcInfo, &allNodes, NodeType::TYPEOF, scopes.top());
+    auto type = new Node(lexer->srcInfo, NodeType::TYPEOF, scopes.top());
     type->region.start = lexer->front.region.start;
     popFront();
     expect(LexerTokenType::LPAREN, "(");
@@ -826,7 +907,7 @@ Node *Parser::parseTypeof() {
 }
 
 Node *Parser::parseSizeof() {
-    auto type = new Node(lexer->srcInfo, &allNodes, NodeType::SIZEOF, scopes.top());
+    auto type = new Node(lexer->srcInfo, NodeType::SIZEOF, scopes.top());
     type->region.start = lexer->front.region.start;
     popFront();
     expect(LexerTokenType::LPAREN, "(");
@@ -837,7 +918,7 @@ Node *Parser::parseSizeof() {
 }
 
 Node *Parser::parseMalloc() {
-    auto type = new Node(lexer->srcInfo, &allNodes, NodeType::MALLOC, scopes.top());
+    auto type = new Node(lexer->srcInfo, NodeType::MALLOC, scopes.top());
     type->region.start = lexer->front.region.start;
     popFront();
     expect(LexerTokenType::LPAREN, "(");
@@ -848,7 +929,7 @@ Node *Parser::parseMalloc() {
 }
 
 Node *Parser::parseFree() {
-    auto type = new Node(lexer->srcInfo, &allNodes, NodeType::FREE, scopes.top());
+    auto type = new Node(lexer->srcInfo, NodeType::FREE, scopes.top());
     type->region.start = lexer->front.region.start;
     popFront();
     expect(LexerTokenType::LPAREN, "(");
@@ -909,12 +990,12 @@ Node *Parser::parseLvalueOrLiteral() {
         symbol = parseFnDecl();
         symbol->fnDeclData.isLiteral = true;
     } else if (lexer->front.type == LexerTokenType::TRUE_) {
-        symbol = new Node(lexer->srcInfo, &allNodes, NodeType::BOOLEAN_LITERAL, scopes.top());
+        symbol = new Node(lexer->srcInfo, NodeType::BOOLEAN_LITERAL, scopes.top());
         symbol->boolLiteralData.value = true;
         symbol->region = lexer->front.region;
         popFront();
     } else if (lexer->front.type == LexerTokenType::FALSE_) {
-        symbol = new Node(lexer->srcInfo, &allNodes, NodeType::BOOLEAN_LITERAL, scopes.top());
+        symbol = new Node(lexer->srcInfo, NodeType::BOOLEAN_LITERAL, scopes.top());
         symbol->boolLiteralData.value = false;
         symbol->region = lexer->front.region;
         popFront();
@@ -929,6 +1010,8 @@ Node *Parser::parseLvalueOrLiteral() {
         symbol->region = lexer->front.region;
         symbol->type = NodeType::NIL_LITERAL;
         popFront();
+    } else if (lexer->front.type == LexerTokenType::LSQUARE) {
+        symbol = parseArrayLiteral();
     } else {
         symbol = parseSymbol();
     }
@@ -948,7 +1031,7 @@ Node *Parser::parseRvalueSimple() {
     // & (rvalue_simple)
     if (lexer->front.type == LexerTokenType::AMP) {
         popFront();
-        auto addrOf = new Node(lexer->srcInfo, &allNodes, NodeType::ADDRESS_OF, scopes.top());
+        auto addrOf = new Node(lexer->srcInfo, NodeType::ADDRESS_OF, scopes.top());
         addrOf->nodeData = parseRvalueSimple();
         addrOf->region = Region{lexer->srcInfo, saved, addrOf->nodeData->region.end};
 
@@ -960,7 +1043,7 @@ Node *Parser::parseRvalueSimple() {
     // ^ (rvalue_simple)
     if (lexer->front.type == LexerTokenType::DEREF) {
         popFront();
-        auto deref = new Node(lexer->srcInfo, &allNodes, NodeType::DEREF, scopes.top());
+        auto deref = new Node(lexer->srcInfo, NodeType::DEREF, scopes.top());
 
         deref->derefData.target = parseRvalueSimple();
 
@@ -972,7 +1055,7 @@ Node *Parser::parseRvalueSimple() {
 
     // cast
     if (lexer->front.type == LexerTokenType::CAST) {
-        auto cast = new Node(lexer->srcInfo, &allNodes, NodeType::CAST, scopes.top());
+        auto cast = new Node(lexer->srcInfo, NodeType::CAST, scopes.top());
         cast->region.start = lexer->front.region.start;
 
         popFront();
@@ -1033,7 +1116,7 @@ Node *Parser::parseRvalue() {
 
 Node *Parser::parseIntLiteral() {
     auto front = expect(LexerTokenType::INT_LITERAL, "integer literal");
-    auto node = new Node(lexer->srcInfo, &allNodes, NodeType::INT_LITERAL, scopes.top());
+    auto node = new Node(lexer->srcInfo, NodeType::INT_LITERAL, scopes.top());
     node->region = front.region;
 
     ostringstream s("");
@@ -1050,7 +1133,7 @@ Node *Parser::parseIntLiteral() {
 
 Node *Parser::parseFloatLiteral() {
     auto front = expect(LexerTokenType::FLOAT_LITERAL, "floating point literal");
-    auto node = new Node(lexer->srcInfo, &allNodes, NodeType::FLOAT_LITERAL, scopes.top());
+    auto node = new Node(lexer->srcInfo, NodeType::FLOAT_LITERAL, scopes.top());
     node->region = front.region;
 
     ostringstream s("");
@@ -1069,7 +1152,7 @@ Node *Parser::parseFloatLiteral() {
 Node *Parser::parseStringLiteral() {
     auto strTok = expect(LexerTokenType::DOUBLE_QUOTE, "\"");
 
-    auto node = new Node(lexer->srcInfo, &allNodes, NodeType::STRING_LITERAL, scopes.top());
+    auto node = new Node(lexer->srcInfo, NodeType::STRING_LITERAL, scopes.top());
     node->region = strTok.region;
 
     ostringstream s("");
@@ -1134,7 +1217,7 @@ Node *Parser::unwindPolish(stack<ShuntingYard> *values) {
     if (top.type == ShuntingYardType::NODE) {
         return top.data.node;
     } else {
-        Node *binop = new Node(lexer->srcInfo, &allNodes, NodeType::BINOP, scopes.top());
+        Node *binop = new Node(lexer->srcInfo, NodeType::BINOP, scopes.top());
 
         binop->binopData.type = top.data.type;
         binop->binopData.rhs = unwindPolish(values);
@@ -1160,7 +1243,7 @@ void Parser::addLocal(Node *local) {
 }
 
 Node *Parser::parseArrayIndex() {
-    auto node = new Node(lexer->srcInfo, &allNodes, NodeType::ARRAY_INDEX, scopes.top());
+    auto node = new Node(lexer->srcInfo, NodeType::ARRAY_INDEX, scopes.top());
 
     expect(LexerTokenType::LSQUARE, "[");
     node->arrayIndexData.indexValue = parseRvalue();
@@ -1173,7 +1256,7 @@ Node *Parser::parseArrayIndex() {
 }
 
 Node *Parser::parseFnCall() {
-    auto call = new Node(lexer->srcInfo, &allNodes, NodeType::FN_CALL, scopes.top());
+    auto call = new Node(lexer->srcInfo, NodeType::FN_CALL, scopes.top());
 
     if (lexer->front.type == LexerTokenType::NOT) {
         expect(LexerTokenType::NOT, "!");
