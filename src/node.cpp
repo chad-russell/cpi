@@ -160,6 +160,9 @@ ostream &operator<<(ostream &os, NodeType type) {
         case NodeType::FREE: {
             return os << "free";
         }
+        case NodeType::TAGCHECK: {
+            return os << "tagcheck";
+        }
         case NodeType::ARRAY_LITERAL: {
             return os << "array literal";
         }

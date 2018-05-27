@@ -1,8 +1,40 @@
 TODO:
-    - foreach over arrays
-        - break out the target into it's own declaration so it doesn't get calculated every time
+    - 'Type'
 
-    - enum / tagged union
+    - 'Any'
+
+    - decide when types are matched
+        - when are struct types matched nominally vs structurally?
+        - when are int/float types auto-converted/promoted?
+        - arrays, strings, etc.
+
+    - better interpreter debugging
+        - more accurate source information
+        - get list of stack variables and print their values by name
+
+    -- switch
+        -- on enum (tag)
+        switch a {
+        case x: {
+            ret 111;
+        }
+        case y: {
+            panic();
+        }
+        case default: {
+
+        }
+        }
+
+    - libraries / namespaces / modules
+
+    - pipe operator
+
+    - defer
+
+    - allocators
+        - first decide what strategy we want to use (probably some kind of arena-based thing) and then do a lot of that.
+        - next, decide what (if any) language-level features are needed to make this style really easy to do
 
     - signed vs unsigned ints
 
@@ -13,15 +45,6 @@ TODO:
         - hex (0x123)
         - binary (0b10010011)
 
-    - decide when types are matched
-        - when are struct types matched nominally vs structurally?
-        - when are int/float types auto-converted/promoted?
-        - arrays, strings, etc.
-
-    - pipe operator
-
-    - defer
-
     - attributes
 
     - 'do' keyword
@@ -29,18 +52,6 @@ TODO:
 
     - decide whether to do argument destructuring
         - would need an actual example of where it would be useful
-
-    - real implementation for 'Any' and 'Type'
-
-    - better interpreter debugging
-        - more accurate source information
-        - get list of stack variables and print their values by name
-
-    - allocators
-        - first decide what strategy we want to use (probably some kind of arena-based thing) and then do a lot of that.
-        - next, decide what (if any) language-level features are needed to make this style really easy to do
-
-    - libraries / namespaces / modules
 
     - array bounds checking
 

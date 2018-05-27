@@ -34,6 +34,7 @@ enum class NodeType {
     BINOP,
     PIPE,
     DOT,
+    DOT_QUESTION,
     FN_CALL,
     INT_LITERAL,
     FLOAT_LITERAL,
@@ -61,6 +62,7 @@ enum class NodeType {
     ARRAY_INDEX,
     MALLOC,
     FREE,
+    TAGCHECK,
     ARRAY_LITERAL,
     FOR,
 };
@@ -117,6 +119,7 @@ enum class LexerTokenType : int32_t {
     FN,
     TYPE,
     STRUCT,
+    UNION,
     SYMBOL,
     INT_LITERAL,
     FLOAT_LITERAL,
@@ -150,6 +153,7 @@ enum class LexerTokenType : int32_t {
     NONE,
     MALLOC,
     FREE,
+    TAGCHECK,
     FOR,
 };
 
@@ -182,6 +186,8 @@ struct StructTypeData {
 
     bool isSecretlyArray = false;
     Node *secretArrayElementType = nullptr;
+
+    bool isSecretlyUnion = false;
 
     Node *coercedType = nullptr;
 };
@@ -387,6 +393,8 @@ public:
     Node *resolved = nullptr;
     NodeType type;
 
+    vector<Node *> preStmts;
+
     // union {
     Node *nodeData;
     ModuleData moduleData;
@@ -421,6 +429,7 @@ public:
 
     bool isUsedInError = false;
     bool semantic = false;
+    bool tagCheck = false;
     bool gen = false;
     bool llvmGen = false;
     bool sourceMapStatement = false;

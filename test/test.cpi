@@ -122,10 +122,84 @@ fn main() {
 
     testDefault();
 
+    testFor1();
+    testFor2();
+    testFor3();
+    testFor4();
+
+    testUnion1();
+
     ret 0;
 }
 
 fn saved() {
+}
+
+fn testUnion1() {
+    type unionFoo struct {
+        f: i64
+    }
+
+    type unionBar struct {
+        b1: i32,
+        b2: i32
+    }
+
+    x: unionFoo = {18};
+    y: unionBar;
+
+    a : union {x: unionFoo, y: unionBar};
+
+    a.x = x;
+
+    assert(a.x.f == 18);
+    assert(a.tag == 1);
+
+    a.y = y;
+    assert(a.tag == 2);
+
+    a.x.f = 13;
+    assert(a.tag == 1);
+
+    a.y.b2 = 18;
+    assert(a.tag == 2);
+}
+
+fn testFor1() {
+    product := 1;
+    for e: []{2, 3, 4, 5} {
+        product = product * e;
+    }
+    assert(product == 120);
+}
+
+fn testFor2() {
+    fn add_array(arr: []i32) {
+        sum : i32 = 0;
+        for e: arr { sum = sum + e; }
+        ret sum;
+    }
+
+    assert(15 == add_array([]i32{1, 2, 3, 4, 5}));
+}
+
+fn testFor3() {
+    sum := 0;
+    for e: []{1, 2, 3} {
+        for e: []{4, 5, 6} {
+            sum = sum + e;
+        }
+        sum = sum + e;
+    }
+    assert(sum == 51);
+}
+
+fn testFor4() {
+    isum : i32 = 0;
+    for e, i: []{1, 1, 1, 1999, 1} {
+        isum = isum + i;
+    }
+    assert(isum == 10);
 }
 
 fn testDefault() {

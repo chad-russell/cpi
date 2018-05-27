@@ -94,6 +94,10 @@ void BytecodeGen::gen(Node *node) {
     if (node->gen) { return; }
     node->gen = true;
 
+    for (auto stmt : node->preStmts) {
+        gen(stmt);
+    }
+
     if (node->sourceMapStatement) {
         sourceMap.statements.push_back(SourceMapStatement{
                 instructions.size(),
@@ -268,8 +272,6 @@ void BytecodeGen::gen(Node *node) {
                 storeValue(data.rhs, data.rhs->localOffset);
 
                 gen(resolvedDecl);
-
-                auto foundParam = resolvedDecl->dotData.resolved;
 
                 append(instructions, Instruction::STORE);
 
@@ -715,8 +717,6 @@ void BytecodeGen::gen(Node *node) {
             }
 
             auto lhsRel = node->dotData.lhs->type == NodeType::DOT && node->dotData.lhs->dotData.pointerIsRelative;
-            auto lhsIsAutoDeref =
-                    node->dotData.lhs->type == NodeType::DOT && node->dotData.lhs->dotData.autoDerefStorage;
 
             // if we are an autoderef doing a dot on a relative lhs, then we need to
             // load it again, as it will be a double-pointer from our perspective
@@ -890,6 +890,11 @@ void BytecodeGen::gen(Node *node) {
             }
         }
             break;
+        case NodeType::TAGCHECK: {
+            assert(node->resolved);
+            gen(node->resolved);
+            node->bytecode = node->resolved->bytecode;
+        } break;
         default:
             assert(false);
     }

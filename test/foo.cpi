@@ -1,26 +1,17 @@
+fn foo() {
+    a: union { x: i32, y: f32 };
+    a.y = 13.2;
+    ret a;
+}
+
 fn main() {
-    sum := 0;
-
-    for e: []{1, 2, 3} {
-        sum = sum + e;
+    tmp := foo();
+    if tagcheck(tmp.x) {
+        ret 3;
+    }
+    else if tagcheck(tmp.y) {
+        ret 5;
     }
 
-    ret sum;
-}
-
-fn array_for_add() {
-    for e: []{1, 2, 3} {
-    }
-
-    ret 666;
-}
-
-fn array_while_add() {
-    arr := []{1, 2, 3};
-    i := 0;
-    while i < arr.count {
-        e := arr[i];
-    }
-
-    ret 666;
+    ret 0;
 }

@@ -147,6 +147,7 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "fn", LexerTokenType::FN)) { return; }
     if (tryEatKeyword(&next, "type", LexerTokenType::TYPE)) { return; }
     if (tryEatKeyword(&next, "struct", LexerTokenType::STRUCT)) { return; }
+    if (tryEatKeyword(&next, "union", LexerTokenType::UNION)) { return; }
     if (tryEatKeyword(&next, "ret", LexerTokenType::RET)) { return; }
     if (tryEatKeyword(&next, "string", LexerTokenType::STRING)) { return; }
     if (tryEatKeyword(&next, "bool", LexerTokenType::BOOLEAN)) { return; }
@@ -172,6 +173,7 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "none", LexerTokenType::NONE)) { return; }
     if (tryEatKeyword(&next, "malloc", LexerTokenType::MALLOC)) { return; }
     if (tryEatKeyword(&next, "free", LexerTokenType::FREE)) { return; }
+    if (tryEatKeyword(&next, "tagcheck", LexerTokenType::TAGCHECK)) { return; }
     if (tryEatKeyword(&next, "for", LexerTokenType::FOR)) { return; }
 
     // BACK_TICK
@@ -439,7 +441,8 @@ const vector<string> Lexer::lexerTokenTypeStrings = {
     "PANIC",
     "NONE",
     "MALLOC",
-    "FREE"
+    "FREE",
+    "TAGCHECK",
 };
 
 ostream &operator<<(ostream &os, LexerTokenType tokenType) {

@@ -344,6 +344,7 @@ const vector<string> AssemblyLexer::tokenTypeStrings = {
     "NONE",
     "MALLOC",
     "FREE",
+    "TAGCHECK",
 
     // literals
     "CONSTI8", "CONSTI16", "CONSTI32", "CONSTI64", "CONSTF32", "CONSTF64",

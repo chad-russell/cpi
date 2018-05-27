@@ -50,9 +50,7 @@ void Parser::scopeInsert(int64_t atomId, Node *node) {
     auto found = _scope->symbols.find(atomId);
     if (found != _scope->symbols.end()) {
         ostringstream s("");
-        s << "redeclaration of symbol '";
-        s << AtomTable::current->backwardAtoms[atomId];
-        s << "'";
+        s << "redeclaration of symbol '" << AtomTable::current->backwardAtoms[atomId] << "'";
         reportError(s.str());
     }
 
@@ -275,30 +273,15 @@ Node *Parser::parseFnDecl(bool polymorphCopy) {
 
 Node *Parser::parseTypeDecl() {
     auto saved = lexer->front.region.start;
+
     expect(LexerTokenType::TYPE, "type");
 
     auto typeName = parseSymbol();
 
-    // todo(chad): @Cleanup just parse a type here! should be able to declare any type
-    expect(LexerTokenType::STRUCT, "struct");
-
-    expect(LexerTokenType::LCURLY, "{");
-
-    auto typeDecl = new Node(lexer->srcInfo,
-                             NodeType::TYPE,
-                             scopes.top());
-    typeDecl->typeData.kind = NodeTypekind::STRUCT;
-    typeDecl->typeData.structTypeData.params = parseDeclParams();
-    typeDecl->typeData.structTypeData.isLiteral = false;
+    auto typeDecl = parseType();
     scopeInsert(typeName->symbolData.atomId, typeDecl);
 
-    auto end = lexer->front.region.end;
-    expect(LexerTokenType::RCURLY, "}");
-
-    // todo(chad): else  / else if
-
-    typeDecl->region = Region{lexer->srcInfo, saved, end};
-    typeDecl->sourceMapStatement = true;
+    typeDecl->region = Region{lexer->srcInfo, saved, typeDecl->region.end};
 
     return typeDecl;
 }
@@ -537,7 +520,11 @@ Node *Parser::parseFor() {
 
     for_->forData.element_alias = parseSymbol();
 
-    // todo(chad): possibly parse itemAlias as well (look for comma and then another symbol)
+    if (lexer->front.type == LexerTokenType::COMMA) {
+        popFront();
+        for_->forData.iterator_alias = parseSymbol();
+    }
+
     expect(LexerTokenType::COLON, ":");
 
     for_->forData.target = parseRvalue();
@@ -786,6 +773,37 @@ Node *Parser::parseType() {
 
             type->region.end = lexer->lastLoc;
         } break;
+        case LexerTokenType::UNION: {
+            expect(LexerTokenType::UNION, "union");
+
+            expect(LexerTokenType::LCURLY, "{");
+
+            type->typeData.kind = NodeTypekind::STRUCT;
+            type->typeData.structTypeData.isSecretlyUnion = true;
+
+            auto tagSymbol = new Node();
+            tagSymbol->type = NodeType::SYMBOL;
+
+            tagSymbol->symbolData.atomId = AtomTable::current->insertStr("tag");
+
+            auto tagParam = new Node(lexer->srcInfo, NodeType::DECL_PARAM, scopes.top());
+            tagParam->declParamData.index = 0;
+
+            // todo(chad): allow the user to specify the width of the tag
+            tagParam->declParamData.type = new Node(NodeTypekind::I32);
+            tagParam->declParamData.name = tagSymbol;
+
+            type->typeData.structTypeData.params.push_back(tagParam);
+            auto declaredParams = parseDeclParams();
+            for (auto dp : declaredParams) {
+                dp->declParamData.index += 1;
+                type->typeData.structTypeData.params.push_back(dp);
+            }
+
+            expect(LexerTokenType::RCURLY, "}");
+
+            type->region.end = lexer->lastLoc;
+        } break;
         case LexerTokenType::MUL: {
             popFront();
 
@@ -918,14 +936,25 @@ Node *Parser::parseSizeof() {
 }
 
 Node *Parser::parseMalloc() {
-    auto type = new Node(lexer->srcInfo, NodeType::MALLOC, scopes.top());
-    type->region.start = lexer->front.region.start;
+    auto mal = new Node(lexer->srcInfo, NodeType::MALLOC, scopes.top());
+    mal->region.start = lexer->front.region.start;
     popFront();
     expect(LexerTokenType::LPAREN, "(");
-    type->nodeData = parseRvalue();
-    type->region.end = lexer->front.region.end;
+    mal->nodeData = parseRvalue();
+    mal->region.end = lexer->front.region.end;
     expect(LexerTokenType::RPAREN, ")");
-    return type;
+    return mal;
+}
+
+Node *Parser::parseTagCheck() {
+    auto check = new Node(lexer->srcInfo, NodeType::TAGCHECK, scopes.top());
+    check->region.start = lexer->front.region.start;
+    popFront();
+    expect(LexerTokenType::LPAREN, "(");
+    check->nodeData = parseRvalue();
+    check->region.end = lexer->front.region.end;
+    expect(LexerTokenType::RPAREN, ")");
+    return check;
 }
 
 Node *Parser::parseFree() {
@@ -955,6 +984,10 @@ Node *Parser::parseLvalueOrLiteral() {
 
     if (lexer->front.type == LexerTokenType::MALLOC) {
         return parseMalloc();
+    }
+
+    if (lexer->front.type == LexerTokenType::TAGCHECK) {
+        return parseTagCheck();
     }
 
     auto saved = lexer->front.region.start;

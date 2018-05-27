@@ -30,12 +30,31 @@ int32_t typeSize(Node *type) {
             assert(false);
         case NodeTypekind::STRUCT: {
             auto total = 0;
+            auto largest = 0;
+
+            // todo(chad): this should be configurable based on the width specified by the user (if/when we allow that)
+            auto tagSizeInBytes = 4;
 
             for (auto param : resolved->typeData.structTypeData.params) {
-                param->localOffset = total;
-
+                // if it's a union and we're not assigning to the 'tag' part, then the offset is the size of the tag
+                if (resolved->typeData.structTypeData.isSecretlyUnion && param->declParamData.index > 0) {
+                    param->localOffset = tagSizeInBytes;
+                }
+                else {
+                    param->localOffset = total;
+                }
                 assert(param->type == NodeType::DECL_PARAM);
-                total += typeSize(param->declParamData.type);
+
+                auto size = typeSize(param->declParamData.type);
+                total += size;
+
+                if (size > largest) {
+                    largest = size;
+                }
+            }
+
+            if (resolved->typeData.structTypeData.isSecretlyUnion) {
+                return tagSizeInBytes + largest;
             }
 
             return total;
@@ -200,7 +219,9 @@ Node *defaultValueFor(Semantic *semantic, Node *type) {
 
             return def;
         }
-        case NodeTypekind::SYMBOL:
+        case NodeTypekind::SYMBOL: {
+            return defaultValueFor(semantic, resolve(type));
+        }
         // todo(chad): exposed_type and exposed_any are structs so they should have an actual default type at some point
         case NodeTypekind::EXPOSED_TYPE:
         case NodeTypekind::EXPOSED_ANY:
@@ -926,13 +947,102 @@ void resolveFnCall(Semantic *semantic, Node *node) {
     }
 }
 
+void possiblyResolveAssignToUnion(Semantic *semantic, Node *originalAssignment, Node *node) {
+    // if we are assigning to a union (or pointer to a union), add a 'pre-check' to set the tag
+
+    // it must be a dot
+    auto assigningToUnion = node->type == NodeType::DOT;
+
+    // it also must be a dot on a struct or a pointer to a struct
+    if (assigningToUnion) {
+        auto typeData = resolve(node->dotData.lhs->typeInfo)->typeData;
+        while (typeData.kind == NodeTypekind::POINTER) {
+            typeData = typeData.pointerTypeData.underlyingType->typeData;
+        }
+        assigningToUnion = typeData.kind == NodeTypekind::STRUCT && typeData.structTypeData.isSecretlyUnion;
+    }
+
+    // don't set the tag when assigning to the tag parameter
+    if (assigningToUnion) {
+        assigningToUnion = node->dotData.rhs->symbolData.atomId != AtomTable::current->insertStr("tag");
+    }
+
+    if (assigningToUnion) {
+        auto mostLhs = node->dotData.lhs;
+        auto secondmostLhs = node;
+
+        // get the type data
+        auto typeData = resolve(node->dotData.lhs->typeInfo)->typeData;
+        while (typeData.kind == NodeTypekind::POINTER) {
+            typeData = typeData.pointerTypeData.underlyingType->typeData;
+        }
+
+        // the resolved parameter is the 0th parameter of the type data
+        auto param0 = new Node();
+        param0->scope = node->dotData.lhs->scope;
+        param0->type = NodeType::SYMBOL;
+        param0->symbolData.atomId = AtomTable::current->insertStr("tag");
+        param0->resolved = typeData.structTypeData.params[0];
+        assert(typeData.structTypeData.params[0]->type == NodeType::DECL_PARAM);
+        param0->typeInfo = typeData.structTypeData.params[0]->declParamData.type;
+
+        auto tagDot = new Node();
+        tagDot->scope = originalAssignment->scope;
+        tagDot->type = NodeType::DOT;
+        tagDot->dotData.lhs = mostLhs;
+        tagDot->dotData.rhs = param0;
+        semantic->resolveTypes(tagDot);
+
+        uint64_t paramIndex;
+        auto foundParam = secondmostLhs->dotData.resolved;
+        if (foundParam->type == NodeType::DECL_PARAM) {
+            paramIndex = (uint64_t) foundParam->declParamData.index;
+        } else if (foundParam->type == NodeType::VALUE_PARAM) {
+            paramIndex = (uint64_t) foundParam->valueParamData.index;
+        } else {
+            assert(false);
+        }
+
+        // assign to 0th parameter the value of paramIndex
+        auto constParamIndex = new Node();
+        constParamIndex->scope = originalAssignment->scope;
+        constParamIndex->type = NodeType::INT_LITERAL;
+        constParamIndex->intLiteralData.value = paramIndex;
+
+        // we add a local here because when storing something to a dot, a local is always expected.
+        // todo(chad): optimizations for storing constant values to dots
+        semantic->addLocal(constParamIndex);
+
+        auto secretAss = new Node();
+        secretAss->scope = originalAssignment->scope;
+        secretAss->type = NodeType::ASSIGN;
+        secretAss->assignData.lhs = tagDot;
+        secretAss->assignData.rhs = constParamIndex;
+
+        originalAssignment->preStmts.push_back(secretAss);
+
+        semantic->resolveTypes(secretAss);
+    }
+    else if (node->type == NodeType::DOT && node->dotData.lhs->type == NodeType::DOT) {
+        possiblyResolveAssignToUnion(semantic, originalAssignment, node->dotData.lhs);
+    }
+}
+
 void resolveAssign(Semantic *semantic, Node *node) {
+    semantic->lvalueAssignmentContext = true;
     semantic->resolveTypes(node->assignData.lhs);
+    semantic->lvalueAssignmentContext = false;
+
     semantic->resolveTypes(node->assignData.rhs);
+
     if (!typesMatch(node->assignData.lhs->typeInfo, node->assignData.rhs->typeInfo, semantic)) {
         semantic->reportError({node, node->assignData.lhs, node->assignData.rhs},
                               Error{node->region, "assignment type mismatch"});
     }
+
+    semantic->lvalueAssignmentContext = true;
+    possiblyResolveAssignToUnion(semantic, node, node->assignData.lhs);
+    semantic->lvalueAssignmentContext = false;
 }
 
 void resolveDeclParam(Semantic *semantic, Node *node) {
@@ -1010,6 +1120,9 @@ Node *findParam(Semantic *semantic, Node *node) {
         }
     } else {
         for (auto param : structData.params) {
+            auto f1 = AtomTable::current->backwardAtoms[param->declParamData.name->symbolData.atomId];
+            auto f2 = AtomTable::current->backwardAtoms[node->dotData.rhs->symbolData.atomId];
+
             if (param->declParamData.name->symbolData.atomId == node->dotData.rhs->symbolData.atomId) {
                 foundParam = param;
                 break;
@@ -1022,8 +1135,86 @@ Node *findParam(Semantic *semantic, Node *node) {
     return foundParam;
 }
 
+void createTagCheck(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
+    // if (lhs.tag != tag_for_rhs) { panic(); }
+
+    if (node->tagCheck) { return; }
+    node->tagCheck = true;
+
+    // get the type data
+    auto typeData = resolve(node->dotData.lhs->typeInfo)->typeData;
+    while (typeData.kind == NodeTypekind::POINTER) {
+        typeData = typeData.pointerTypeData.underlyingType->typeData;
+    }
+
+    auto foundParam = findParam(semantic, node);
+    auto paramIndex = foundParam->declParamData.index;
+
+    // don't do a check if we're accessing the tag itself
+    if (paramIndex == 0) { return; }
+
+    auto constTag = new Node();
+    constTag->scope = node->dotData.lhs->scope;
+    constTag->type = NodeType::INT_LITERAL;
+    constTag->intLiteralData.value = paramIndex;
+    semantic->resolveTypes(constTag);
+
+    // the resolved parameter is the 0th parameter of the type data
+    auto param0 = new Node();
+    param0->scope = node->dotData.lhs->scope;
+    param0->type = NodeType::SYMBOL;
+    param0->symbolData.atomId = AtomTable::current->insertStr("tag");
+    param0->resolved = typeData.structTypeData.params[0];
+    assert(typeData.structTypeData.params[0]->type == NodeType::DECL_PARAM);
+    param0->typeInfo = typeData.structTypeData.params[0]->declParamData.type;
+
+    auto tagDot = new Node();
+    tagDot->scope = node->scope;
+    tagDot->type = NodeType::DOT;
+    tagDot->dotData.lhs = lhs;
+    tagDot->dotData.rhs = param0;
+    semantic->resolveTypes(tagDot);
+
+    auto neq = new Node();
+    neq->scope = node->scope;
+    neq->type = NodeType::BINOP;
+    neq->binopData.type = LexerTokenType::NE;
+    neq->binopData.lhs = tagDot;
+    neq->binopData.rhs = constTag;
+    semantic->resolveTypes(neq);
+
+    auto panicStmt = new Node();
+    panicStmt->scope = node->scope;
+    panicStmt->type = NodeType::PANIC;
+
+    // if
+    auto ifCheck = new Node();
+    ifCheck->scope = node->scope;
+    ifCheck->type = NodeType::IF;
+    ifCheck->ifData.condition = neq;
+    ifCheck->ifData.stmts.push_back(panicStmt);
+
+    node->preStmts.push_back(ifCheck);
+}
+
 void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
     auto resolvedLhs = resolve(lhs);
+    semantic->resolveTypes(resolvedLhs);
+
+    // follow the lhs all the way through pointers, symbols, etc. and assert it's a struct
+    if (!semantic->lvalueAssignmentContext) {
+        auto resolvedLhsTypeInfo = resolve(resolvedLhs->typeInfo);
+        while (resolvedLhsTypeInfo->typeData.kind == NodeTypekind::POINTER) {
+            resolvedLhsTypeInfo = resolve(resolvedLhsTypeInfo->typeData.pointerTypeData.underlyingType);
+        }
+        assert(resolvedLhsTypeInfo->typeData.kind == NodeTypekind::STRUCT);
+
+        auto isUnionAccess = resolvedLhsTypeInfo->typeData.structTypeData.isSecretlyUnion;
+
+        if (isUnionAccess) {
+            createTagCheck(semantic, node, lhs, rhs);
+        }
+    }
 
     if (resolvedLhs->type == NodeType::DOT) {
         resolveDot(semantic, resolvedLhs, resolvedLhs->dotData.lhs, resolvedLhs->dotData.rhs);
@@ -1033,7 +1224,6 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
         node->typeInfo = rhs->typeInfo;
     }
     else {
-        semantic->resolveTypes(resolvedLhs);
         if (resolvedLhs->typeInfo == nullptr) {
             semantic->reportError({node, resolvedLhs}, Error{resolvedLhs->region, "cannot resolve type of lhs of dot operation"});
             return;
@@ -1066,7 +1256,8 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
 }
 
 void resolveDot(Semantic *semantic, Node *node) {
-    resolveDot(semantic, node, resolve(node->dotData.lhs), node->dotData.rhs);
+    auto resolvedLhs = resolve(node->dotData.lhs);
+    resolveDot(semantic, node, resolvedLhs, node->dotData.rhs);
 }
 
 void resolvePanic(Semantic *semantic, Node *node) {
@@ -1202,17 +1393,6 @@ void resolveFor(Semantic *semantic, Node *node) {
     // insert this new declaration into the scope of the 'for' statement
     node->scope->symbols.insert({node->forData.element_alias->symbolData.atomId, elementDecl});
 
-    // arrayDecl
-    auto arrayDecl = new Node(node->region.srcInfo, NodeType::DECL, node->scope);
-    arrayDecl->declData.type = node->forData.target->typeInfo;
-    arrayDecl->declData.initialValue = node->forData.target;
-    arrayDecl->isLocal = true;
-    semantic->currentFnDecl->locals.push_back(arrayDecl);
-
-    for (auto& stmt : node->forData.stmts) {
-        semantic->resolveTypes(stmt);
-    }
-
     // 0
     auto zero = new Node();
     zero->type = NodeType::INT_LITERAL;
@@ -1223,12 +1403,34 @@ void resolveFor(Semantic *semantic, Node *node) {
     auto indexDecl = new Node();
     indexDecl->type = NodeType::DECL;
     indexDecl->scope = node->scope;
-    indexDecl->region = node->forData.element_alias->region;
+    if (node->forData.iterator_alias != nullptr) {
+        indexDecl->region = node->forData.iterator_alias->region;
+    }
     indexDecl->declData.type = new Node(NodeTypekind::I32);
-    indexDecl->declData.lvalue = nullptr;
+    indexDecl->declData.lvalue = node->forData.iterator_alias;
     indexDecl->declData.initialValue = zero;
     indexDecl->isLocal = true;
     semantic->currentFnDecl->locals.push_back(indexDecl);
+    semantic->resolveTypes(indexDecl);
+
+    auto index = indexDecl;
+    if (node->forData.iterator_alias != nullptr) {
+        node->forData.iterator_alias->resolved = indexDecl;
+        node->scope->symbols.insert({node->forData.iterator_alias->symbolData.atomId, indexDecl});
+
+        index = node->forData.iterator_alias;
+    }
+
+    // arrayDecl
+    auto arrayDecl = new Node(node->region.srcInfo, NodeType::DECL, node->scope);
+    arrayDecl->declData.type = node->forData.target->typeInfo;
+    arrayDecl->declData.initialValue = node->forData.target;
+    arrayDecl->isLocal = true;
+    semantic->currentFnDecl->locals.push_back(arrayDecl);
+
+    for (auto& stmt : node->forData.stmts) {
+        semantic->resolveTypes(stmt);
+    }
 
     auto countSymbol = new Node();
     countSymbol->scope = node->forData.target->scope;
@@ -1244,7 +1446,7 @@ void resolveFor(Semantic *semantic, Node *node) {
     auto whileConditionBinop = new Node();
     whileConditionBinop->type = NodeType::BINOP;
     whileConditionBinop->binopData.type = LexerTokenType::LT;
-    whileConditionBinop->binopData.lhs = indexDecl;
+    whileConditionBinop->binopData.lhs = index;
     whileConditionBinop->binopData.rhs = arrayDotCount;
     semantic->currentFnDecl->locals.push_back(whileConditionBinop);
     whileConditionBinop->isLocal = true;
@@ -1259,30 +1461,24 @@ void resolveFor(Semantic *semantic, Node *node) {
     auto incrementIndexBinop = new Node(node->region.srcInfo, NodeType::BINOP, node->scope);
     incrementIndexBinop->type = NodeType::BINOP;
     incrementIndexBinop->binopData.type = LexerTokenType::ADD;
-    incrementIndexBinop->binopData.lhs = indexDecl;
+    incrementIndexBinop->binopData.lhs = index;
     incrementIndexBinop->binopData.rhs = one;
     semantic->currentFnDecl->locals.push_back(incrementIndexBinop);
     incrementIndexBinop->isLocal = true;
 
     auto incr = new Node(node->region.srcInfo, NodeType::ASSIGN, node->scope);
-    incr->assignData.lhs = indexDecl;
+    incr->assignData.lhs = index;
     incr->assignData.rhs = incrementIndexBinop;
 
     // arrIndex
     auto arrIndex = new Node(node->region.srcInfo, NodeType::ARRAY_INDEX, node->scope);
     arrIndex->arrayIndexData.target = arrayDecl;
-    arrIndex->arrayIndexData.indexValue = indexDecl;
-
-//    auto fuckme = new Node();
-//    fuckme->type = NodeType::INT_LITERAL;
-//    fuckme->typeInfo = new Node(NodeTypekind::I64);
-//    fuckme->intLiteralData.value = 432;
+    arrIndex->arrayIndexData.indexValue = index;
 
     // elementAssign
     auto elementAssign = new Node(node->region.srcInfo, NodeType::ASSIGN, node->scope);
     elementAssign->assignData.lhs = elementDecl;
     elementAssign->assignData.rhs = arrIndex;
-//    elementAssign->assignData.rhs = fuckme;
 
     // while binop(lessThan, indexDecl, dot(array, 'count'))
     // all stmts
@@ -1303,12 +1499,76 @@ void resolveFor(Semantic *semantic, Node *node) {
 
     node->forData.rewritten.push_back(elementDecl);
     node->forData.rewritten.push_back(arrayDecl);
-    node->forData.rewritten.push_back(indexDecl);
+    node->forData.rewritten.push_back(index);
     node->forData.rewritten.push_back(while_);
 
     for (auto stmt : node->forData.rewritten) {
         semantic->resolveTypes(stmt);
     }
+}
+
+void resolveTagCheck(Semantic *semantic, Node *node) {
+    if (node->nodeData->type != NodeType::DOT) {
+        semantic->reportError({node, node->nodeData}, Error{
+                node->region,
+                "Expected dot for tagcheck"
+        });
+        return;
+    }
+
+    semantic->resolveTypes(node->nodeData);
+
+    assert(node->nodeData->dotData.lhs->typeInfo->typeData.kind == NodeTypekind::STRUCT);
+    if (!node->nodeData->dotData.lhs->typeInfo->typeData.structTypeData.isSecretlyUnion) {
+        semantic->reportError({node, node->nodeData}, Error{
+                node->region,
+                "Can only do a tagcheck on a union"
+        });
+    }
+
+    auto resolved = node->nodeData->dotData.resolved;
+    assert(resolved->type == NodeType::DECL_PARAM);
+
+    // eqeq
+    auto typeData = resolve(node->nodeData->dotData.lhs->typeInfo)->typeData;
+    while (typeData.kind == NodeTypekind::POINTER) {
+        typeData = typeData.pointerTypeData.underlyingType->typeData;
+    }
+
+    // the resolved parameter is the 0th parameter of the type data
+    auto param0 = new Node();
+    param0->scope = node->nodeData->dotData.lhs->scope;
+    param0->type = NodeType::SYMBOL;
+    param0->symbolData.atomId = AtomTable::current->insertStr("tag");
+    param0->resolved = typeData.structTypeData.params[0];
+    assert(typeData.structTypeData.params[0]->type == NodeType::DECL_PARAM);
+    param0->typeInfo = typeData.structTypeData.params[0]->declParamData.type;
+
+    auto tagDot = new Node();
+    tagDot->scope = node->scope;
+    tagDot->type = NodeType::DOT;
+    tagDot->dotData.lhs = node->nodeData->dotData.lhs;
+    tagDot->dotData.rhs = param0;
+    semantic->resolveTypes(tagDot);
+
+    auto paramIndex = resolved->declParamData.index;
+
+    // assign to 0th parameter the value of paramIndex
+    auto constParamIndex = new Node();
+    constParamIndex->scope = node->scope;
+    constParamIndex->type = NodeType::INT_LITERAL;
+    constParamIndex->intLiteralData.value = paramIndex;
+
+    auto eqeq = new Node();
+    eqeq->scope = node->scope;
+    eqeq->type = NodeType::BINOP;
+    eqeq->binopData.type = LexerTokenType::EQ_EQ;
+    eqeq->binopData.lhs = tagDot;
+    eqeq->binopData.rhs = constParamIndex;
+    semantic->resolveTypes(eqeq);
+
+    node->resolved = eqeq;
+    node->typeInfo = node->resolved->typeInfo;
 }
 
 void resolveRun(Semantic *semantic, Node *node) {
@@ -1478,6 +1738,9 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::FOR: {
             resolveFor(this, node);
+        } break;
+        case NodeType::TAGCHECK: {
+            resolveTagCheck(this, node);
         } break;
         default: assert(false);
     }
