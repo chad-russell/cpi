@@ -96,7 +96,7 @@ fn main() {
 
     assert(add_static!(3, 4)(5) == 12);
 
-    assert(apply_static!(add_one)(3) == 4);
+    assert(apply_static!(poly_inc)(3) == 4);
 
     assert(apply_static!(fn(x: i32) { ret x + 3; })(3) == 6);
 
@@ -320,11 +320,11 @@ fn assert(b: bool) {
     }
 }
 
-fn apply_static(f : Any)(t: i32) {
+fn apply_static(f: Any)(t: i32) {
     ret f(t);
 }
 
-fn add_one(T := typeof(n))(n: i32) {
+fn poly_inc(T := typeof(n))(n: i32) {
     ret n + 1;
 }
 

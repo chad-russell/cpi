@@ -81,8 +81,7 @@ enum class NodeTypekind {
     STRUCT,
     SYMBOL,
     POINTER,
-    EXPOSED_TYPE,
-    EXPOSED_ANY,
+    EXPOSED_AST,
 };
 
 enum class LexerTokenType : int32_t {
@@ -145,8 +144,7 @@ enum class LexerTokenType : int32_t {
     CAST,
     SEMICOLON,
     RUN,
-    EXPOSED_TYPE,
-    EXPOSED_ANY,
+    EXPOSED_AST,
     TYPEOF,
     SIZEOF,
     PANIC,

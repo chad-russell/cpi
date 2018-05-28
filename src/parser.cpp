@@ -86,7 +86,7 @@ Node *Parser::parseTopLevel() {
             return parseTypeDecl();
         }
 
-        reportError("Expected top level function declaration");
+        reportError("Expected top level declaration");
         exit(1);
 }
 
@@ -812,15 +812,10 @@ Node *Parser::parseType() {
 
             type->region.end = lexer->lastLoc;
         } break;
-        case LexerTokenType::EXPOSED_TYPE: {
+        case LexerTokenType::EXPOSED_AST: {
             type->region = lexer->front.region;
             popFront();
-            type->typeData.kind = NodeTypekind::EXPOSED_TYPE;
-        } break;
-        case LexerTokenType::EXPOSED_ANY: {
-            type->region = lexer->front.region;
-            popFront();
-            type->typeData.kind = NodeTypekind::EXPOSED_ANY;
+            type->typeData.kind = NodeTypekind::EXPOSED_AST;
         } break;
         case LexerTokenType::LSQUARE: {
             type->region.start = lexer->front.region.start;
@@ -974,7 +969,8 @@ Node *Parser::parseLvalueOrLiteral() {
         popFront();
     }
 
-    if (lexer->front.type == LexerTokenType::I32 || lexer->front.type == LexerTokenType::I64) {
+    if (lexer->front.type == LexerTokenType::I32 || lexer->front.type == LexerTokenType::I64 || lexer->front.type == LexerTokenType::I8
+        || lexer->front.type == LexerTokenType::F32 || lexer->front.type == LexerTokenType::F64) {
         return parseType();
     }
 

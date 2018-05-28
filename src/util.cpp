@@ -179,11 +179,8 @@ ostream &operator<<(ostream &os, NodeTypekind kind) {
         case NodeTypekind::POINTER: {
             return os << "a pointer";
         }
-        case NodeTypekind::EXPOSED_TYPE: {
-            return os << "type";
-        }
-        case NodeTypekind::EXPOSED_ANY: {
-            return os << "any";
+        case NodeTypekind::EXPOSED_AST: {
+            return os << "ast";
         }
         default: assert(false);
     }

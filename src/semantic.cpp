@@ -71,22 +71,12 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
     assert(desired->type == NodeType::TYPE);
     assert(actual->type == NodeType::TYPE);
 
-    // exposed types match exposed types, always
-    if (desired->typeData.kind == NodeTypekind::EXPOSED_TYPE && actual->typeData.kind == NodeTypekind::EXPOSED_TYPE) {
-        return true;
+    // if we're dealing with an EXPOSED_AST with a static value, then simply propagate that
+    if (actual->typeData.kind == NodeTypekind::EXPOSED_AST && actual->staticValue != nullptr) {
+        actual = actual->staticValue;
     }
-
-    // but exposed types also match concrete types if the exposed type has a static value
-    // and it matches the given type.
-    if (actual->typeData.kind == NodeTypekind::EXPOSED_TYPE) {
-        if (actual->staticValue != nullptr) {
-            actual = actual->staticValue;
-        }
-    }
-    if (desired->typeData.kind == NodeTypekind::EXPOSED_TYPE) {
-        if (desired->staticValue != nullptr) {
-            desired = desired->staticValue;
-        }
+    if (desired->typeData.kind == NodeTypekind::EXPOSED_AST && desired->staticValue != nullptr) {
+        desired = desired->staticValue;
     }
 
     // coercion from integer literal to any integer is valid
@@ -222,11 +212,10 @@ Node *defaultValueFor(Semantic *semantic, Node *type) {
         case NodeTypekind::SYMBOL: {
             return defaultValueFor(semantic, resolve(type));
         }
-        // todo(chad): exposed_type and exposed_any are structs so they should have an actual default type at some point
-        case NodeTypekind::EXPOSED_TYPE:
-        case NodeTypekind::EXPOSED_ANY:
         case NodeTypekind::NONE:
             return nullptr;
+        default:
+            assert(false);
     }
 }
 
@@ -676,8 +665,7 @@ void resolveType(Semantic *semantic, Node *node) {
     switch (node->typeData.kind) {
         case NodeTypekind::NONE:
         case NodeTypekind::BOOLEAN:
-        case NodeTypekind::EXPOSED_TYPE:
-        case NodeTypekind::EXPOSED_ANY:
+        case NodeTypekind::EXPOSED_AST:
         case NodeTypekind::INT_LITERAL:
         case NodeTypekind::FLOAT_LITERAL:
         case NodeTypekind::I8:
@@ -726,7 +714,7 @@ void resolveType(Semantic *semantic, Node *node) {
         default: assert(false);
     }
 
-    node->typeInfo = new Node(NodeTypekind::EXPOSED_TYPE);
+    node->typeInfo = new Node(NodeTypekind::EXPOSED_AST);
 }
 
 Node *makeTemporary(Semantic *semantic, Node *n) {
@@ -906,8 +894,8 @@ void resolveFnCall(Semantic *semantic, Node *node) {
             semantic->resolveTypes(givenParam);
 
             // if declParam is an exposed 'Any' type, convert the givenParam to that
-            if (declParam->typeInfo->typeData.kind == NodeTypekind::EXPOSED_ANY) {
-                givenParam->typeInfo = new Node(NodeTypekind::EXPOSED_ANY);
+            if (declParam->typeInfo->typeData.kind == NodeTypekind::EXPOSED_AST) {
+                givenParam->typeInfo = new Node(NodeTypekind::EXPOSED_AST);
                 givenParam->typeInfo->staticValue = givenParam;
             }
             else {
@@ -1625,7 +1613,7 @@ void resolveRun(Semantic *semantic, Node *node) {
 void resolveTypeof(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->nodeData);
 
-    node->typeInfo = new Node(NodeTypekind::EXPOSED_TYPE);
+    node->typeInfo = new Node(NodeTypekind::EXPOSED_AST);
 
     node->staticValue = node->nodeData->typeInfo;
 }

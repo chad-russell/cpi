@@ -1,17 +1,7 @@
-fn foo() {
-    a: union { x: i32, y: f32 };
-    a.y = 13.2;
-    ret a;
+fn foo(x: f32) {
+    ret x + 1.2;
 }
 
 fn main() {
-    tmp := foo();
-    if tagcheck(tmp.x) {
-        ret 3;
-    }
-    else if tagcheck(tmp.y) {
-        ret 5;
-    }
-
-    ret 0;
+    ret foo(3.1);
 }

@@ -1,7 +1,6 @@
 TODO:
-    - 'Type'
-
     - 'Any'
+        - serialization (type and pointer, very different from raw ast)
 
     - decide when types are matched
         - when are struct types matched nominally vs structurally?
@@ -39,7 +38,7 @@ TODO:
     - signed vs unsigned ints
 
     - parse symbols in ``
-        - `one:symbol` := 3;
+        - `0n3:s!mb()l` := 3;
 
     - more integer formats
         - hex (0x123)
