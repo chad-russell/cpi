@@ -68,6 +68,14 @@ enum class InputType {
     CBC
 };
 
+enum class OutputType {
+    NONE,
+    CAS,
+    CBC,
+    LL,
+    BINARY
+};
+
 InputType inputTypeFromExtension(const string &fileName) {
     if (endsWith(fileName, ".cpi")) { return InputType::CPI; }
     if (endsWith(fileName, ".cas")) { return InputType::CAS; }
@@ -137,6 +145,23 @@ int main(int argc, char **argv) {
 
     Parser *parser = nullptr;
 
+    auto outputType = OutputType::NONE;
+    if (outputFileName != nullptr) {
+        std::ofstream out(outputFileName);
+
+        if (endsWith(outputFileName, ".cas")) {
+            outputType = OutputType::CAS;
+        } else if (endsWith(outputFileName, ".cbc")) {
+            outputType = OutputType::CBC;
+        } else if (endsWith(outputFileName, ".ll")) {
+            outputType = OutputType::LL;
+        } else {
+            outputType = OutputType::BINARY;
+        }
+
+        out.close();
+    }
+
     if (inputType == InputType::CPI) {
         auto lexer = new Lexer(inputFile);
         parser = new Parser(lexer);
@@ -147,26 +172,28 @@ int main(int argc, char **argv) {
         semantic->resolveTypes(parser->mainFn);
         if (semantic->encounteredErrors) { return -1; }
 
-        auto gen = new BytecodeGen();
-        gen->isMainFn = true;
-        gen->sourceMap.sourceInfo = lexer->srcInfo;
-        gen->processFnDecls = true;
-
-        gen->gen(parser->mainFn);
-        while (!gen->toProcess.empty()) {
-            gen->isMainFn = false;
+        if (interpretFlag != 0 || outputType == OutputType::CAS || outputType == OutputType::CBC) {
+            auto gen = new BytecodeGen();
+            gen->isMainFn = true;
+            gen->sourceMap.sourceInfo = lexer->srcInfo;
             gen->processFnDecls = true;
-            gen->gen(gen->toProcess.front());
-            gen->toProcess.pop();
+
+            gen->gen(parser->mainFn);
+            while (!gen->toProcess.empty()) {
+                gen->isMainFn = false;
+                gen->processFnDecls = true;
+                gen->gen(gen->toProcess.front());
+                gen->toProcess.pop();
+            }
+            gen->fixup();
+
+            interp->instructions = gen->instructions;
+            interp->fnTable = gen->fnTable;
+            interp->sourceMap = gen->sourceMap;
+
+            instructions = gen->instructions;
+            fnTable = gen->fnTable;
         }
-        gen->fixup();
-
-        interp->instructions = gen->instructions;
-        interp->fnTable = gen->fnTable;
-        interp->sourceMap = gen->sourceMap;
-
-        instructions = gen->instructions;
-        fnTable = gen->fnTable;
     }
     else if (inputType == InputType::CAS) {
         auto assemblyLexer = new AssemblyLexer(inputFile);
@@ -239,10 +266,30 @@ int main(int argc, char **argv) {
         }
 
         cout << "ANSWER: ";
-//        cout << interp->readFromStack<int8_t>(0) << endl;
-        cout << interp->readFromStack<int32_t>(0) << endl;
-//        cout << interp->readFromStack<int64_t>(0) << endl;
-//        cout << interp->readFromStack<float>(0) << endl;
+
+        // todo(chad): look at the return type of the 'main' fn and determine which of these to print!!
+        auto mainReturnType = resolve(resolve(parser->mainFn)->fnDeclData.returnType);
+        assert(mainReturnType->type == NodeType::TYPE);
+
+        switch (mainReturnType->typeData.kind) {
+            case NodeTypekind::I8: {
+                cout << interp->readFromStack<int8_t>(0) << endl;
+            } break;
+            case NodeTypekind::INT_LITERAL:
+            case NodeTypekind::I64: {
+                cout << interp->readFromStack<int64_t>(0) << endl;
+            } break;
+            case NodeTypekind::F32:
+            case NodeTypekind::FLOAT_LITERAL: {
+                cout << interp->readFromStack<float>(0) << endl;
+            } break;
+            case NodeTypekind::F64: {
+                cout << interp->readFromStack<double>(0) << endl;
+            } break;
+            default: {
+                cout << interp->readFromStack<int32_t>(0) << endl;
+            }
+        }
     }
 
     if (outputFileName != nullptr) {

@@ -57,7 +57,7 @@ enum class TokenType : unsigned char {
     // types
     I8, I16, I32, I64, F32, F64,
 
-    RELCONSTI32, RELI32, RELCONSTI64, RELI64,
+    RELCONSTI32, RELI32, RELCONSTI64, RELI64, RELI8, RELI16, RELF32, RELF64,
 
     // end of instruction duplication, the rest are only tokens
     COMMENT, 
@@ -105,7 +105,11 @@ enum class Instruction : unsigned char {
     RET, 
     EXIT,
     PANIC,
+    // todo(chad): malloc should eventually use whatever allocator system we come up with
     MALLOC,
+    // todo(chad):
+    // free might eventually correspond to freeing a region rather than just a pointer.
+    // or, we may just keep malloc/free and introduce new instructions.
     FREE,
 
     // literals
@@ -115,7 +119,7 @@ enum class Instruction : unsigned char {
     I8, I16, I32, I64, F32, F64,
 
     // relative literals
-    RELCONSTI32, RELI32, RELCONSTI64, RELI64,
+    RELCONSTI32, RELI32, RELCONSTI64, RELI64, RELI8, RELI16, RELF32, RELF64
 };
 
 struct Token {

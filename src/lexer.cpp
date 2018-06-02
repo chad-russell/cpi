@@ -165,9 +165,11 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "module", LexerTokenType::MODULE)) { return; }
     if (tryEatKeyword(&next, "import", LexerTokenType::IMPORT)) { return; }
     if (tryEatKeyword(&next, "cast", LexerTokenType::CAST)) { return; }
-    if (tryEatKeyword(&next, "Any", LexerTokenType::EXPOSED_AST)) { return; }
+    if (tryEatKeyword(&next, "Ast", LexerTokenType::EXPOSED_AST)) { return; }
     if (tryEatKeyword(&next, "typeof", LexerTokenType::TYPEOF)) { return; }
     if (tryEatKeyword(&next, "sizeof", LexerTokenType::SIZEOF)) { return; }
+    if (tryEatKeyword(&next, "heap", LexerTokenType::HEAP)) { return; }
+    if (tryEatKeyword(&next, "anyof", LexerTokenType::ANYOF)) { return; }
     if (tryEatKeyword(&next, "panic", LexerTokenType::PANIC)) { return; }
     if (tryEatKeyword(&next, "none", LexerTokenType::NONE)) { return; }
     if (tryEatKeyword(&next, "malloc", LexerTokenType::MALLOC)) { return; }

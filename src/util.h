@@ -65,6 +65,8 @@ enum class NodeType {
     TAGCHECK,
     ARRAY_LITERAL,
     FOR,
+    HEAPIFY,
+    ANYOF,
 };
 
 enum class NodeTypekind {
@@ -153,6 +155,8 @@ enum class LexerTokenType : int32_t {
     FREE,
     TAGCHECK,
     FOR,
+    HEAP,
+    ANYOF,
 };
 
 struct SourceInfo {
@@ -187,6 +191,7 @@ struct StructTypeData {
 
     bool isSecretlyUnion = false;
 
+    // todo(chad): this should maybe just be rolled up into 'resolved'?
     Node *coercedType = nullptr;
 };
 
@@ -206,6 +211,9 @@ struct TypeData {
     StructTypeData structTypeData;
     PointerTypeData pointerTypeData;
     SymbolTypeData symbolTypeData;
+    double floatTypeData;
+    int64_t intTypeData;
+    bool boolTypeData;
 //     };
 };
 
@@ -436,8 +444,10 @@ public:
     vector<unsigned char> bytecode;
     bool isLocal = false;
 
+    bool isBytecodeLocal = false;
+
     // todo(chad): figure out a way to get rid of this
-    bool isAutoDerefStorage = false;
+//    bool isAutoDerefStorage = false;
 
     // the offset of the storage for this node from the current pointer
     int32_t localOffset = 0;
@@ -560,6 +570,7 @@ ostream &operator<<(ostream &os, HighlightedRegion region);
 ostream &operator<<(ostream &os, Color color);
 ostream &operator<<(ostream &os, NodeTypekind kind);
 ostream &operator<<(ostream &os, vector<unsigned char> v);
+ostream &operator<<(ostream &os, TypeData td);
 
 template<typename T>
 ostream &operator<<(ostream &os, Colored<T> colored) {

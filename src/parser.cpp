@@ -456,7 +456,10 @@ Node *Parser::parseIf() {
 
     expect(LexerTokenType::LCURLY, "{");
     while (lexer->front.type != LexerTokenType::RCURLY) {
-        if_->ifData.stmts.push_back(parseScopedStmt());
+        auto scopedStmt = parseScopedStmt();
+        if (scopedStmt != nullptr) {
+            if_->ifData.stmts.push_back(scopedStmt);
+        }
     }
 
     if_->region.end = lexer->front.region.end;
@@ -877,16 +880,17 @@ Node *Parser::parseArrayLiteral() {
     }
     expect(LexerTokenType::RCURLY, "}");
 
-    auto addrOfElems = new Node(lexer->srcInfo, NodeType::ADDRESS_OF, scopes.top());
-    addrOfElems->nodeData = elemsStruct;
+    auto heapified = new Node(lexer->srcInfo, NodeType::HEAPIFY, scopes.top());
+    heapified->nodeData = elemsStruct;
     addLocal(elemsStruct);
+    addLocal(heapified);
 
     auto countNode = new Node(lexer->srcInfo, NodeType::INT_LITERAL, scopes.top());
     countNode->intLiteralData.value = static_cast<int64_t>(elemsStruct->structLiteralData.params.size());
     countNode->typeInfo = new Node(NodeTypekind::I32);
 
     lit->arrayLiteralData.structLiteralRepresentation = new Node(lexer->srcInfo, NodeType::STRUCT_LITERAL, scopes.top());
-    lit->arrayLiteralData.structLiteralRepresentation->structLiteralData.params.push_back(wrapInValueParam(addrOfElems, "data"));
+    lit->arrayLiteralData.structLiteralRepresentation->structLiteralData.params.push_back(wrapInValueParam(heapified, "data"));
     lit->arrayLiteralData.structLiteralRepresentation->structLiteralData.params.push_back(wrapInValueParam(countNode, "count"));
 
     return lit;
@@ -919,6 +923,24 @@ Node *Parser::parseTypeof() {
     return type;
 }
 
+Node *Parser::parseHeapify() {
+    auto h = new Node(lexer->srcInfo, NodeType::HEAPIFY, scopes.top());
+    h->region.start = lexer->front.region.start;
+    popFront();
+    expect(LexerTokenType::LPAREN, "(");
+    h->nodeData = parseRvalue();
+    h->region.end = lexer->front.region.end;
+    expect(LexerTokenType::RPAREN, ")");
+
+    // local for h because we need somewhere to store the pointer
+    addLocal(h);
+
+    // local for h->nodeData because we need to store the nodeData to the pointer
+    addLocal(h->nodeData);
+
+    return h;
+}
+
 Node *Parser::parseSizeof() {
     auto type = new Node(lexer->srcInfo, NodeType::SIZEOF, scopes.top());
     type->region.start = lexer->front.region.start;
@@ -928,6 +950,20 @@ Node *Parser::parseSizeof() {
     type->region.end = lexer->front.region.end;
     expect(LexerTokenType::RPAREN, ")");
     return type;
+}
+
+Node *Parser::parseAnyof() {
+    auto value = new Node(lexer->srcInfo, NodeType::ANYOF, scopes.top());
+    value->region.start = lexer->front.region.start;
+    popFront();
+    expect(LexerTokenType::LPAREN, "(");
+    value->nodeData = parseRvalue();
+    value->region.end = lexer->front.region.end;
+    expect(LexerTokenType::RPAREN, ")");
+
+    addLocal(value->nodeData);
+
+    return value;
 }
 
 Node *Parser::parseMalloc() {
@@ -972,6 +1008,14 @@ Node *Parser::parseLvalueOrLiteral() {
     if (lexer->front.type == LexerTokenType::I32 || lexer->front.type == LexerTokenType::I64 || lexer->front.type == LexerTokenType::I8
         || lexer->front.type == LexerTokenType::F32 || lexer->front.type == LexerTokenType::F64) {
         return parseType();
+    }
+
+    if (lexer->front.type == LexerTokenType::HEAP) {
+        return parseHeapify();
+    }
+
+    if (lexer->front.type == LexerTokenType::ANYOF) {
+        return parseAnyof();
     }
 
     if (lexer->front.type == LexerTokenType::SIZEOF) {

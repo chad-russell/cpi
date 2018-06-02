@@ -247,11 +247,6 @@ void interpretJump(Interpreter *interp) {
 void interpretStore(Interpreter *interp) {
     auto storeOffset = interp->read<int32_t>();
 
-//    if (storeOffset >= interp->stackSize) {
-//        cout << "STACK OVERFLOW!!!!" << endl;
-//        exit(1);
-//    }
-
     auto maybeReadOffset = interp->tryRead<int32_t>();
     assert(maybeReadOffset.isPresent);
     auto readOffset = maybeReadOffset.value;
@@ -259,6 +254,9 @@ void interpretStore(Interpreter *interp) {
     auto size = interp->consume<int32_t>();
 
     memcpy(&interp->stack[storeOffset], &interp->stack[readOffset], static_cast<size_t>(size));
+
+    auto debugValue = *((int64_t *) (&interp->stack[storeOffset]));
+//    cout << "stored " << debugValue << " to " << storeOffset << " (from " << readOffset << ")" << endl;
 }
 
 void interpretStoreConst(Interpreter *interp) {

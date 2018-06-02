@@ -21,6 +21,7 @@ public:
     bool isMainFn;
 
     // for going back at the end and setting call/jump locations
+    // I guess this is like a poor man's linker
     unordered_map<int64_t, Node *> fixups = {};
 
     void binopHelper(string instructionStr, Node *node, int32_t scale = 1);

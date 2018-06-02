@@ -127,9 +127,9 @@ void LlvmGen::finalize() {
     }
 
     // DO_OPTIMIZE
-    for (auto fn : allFns) {
-        TheFPM->run(*fn);
-    }
+//    for (auto fn : allFns) {
+//        TheFPM->run(*fn);
+//    }
     verifyModule(*module, &llvm::errs());
 }
 
@@ -390,9 +390,12 @@ void LlvmGen::gen(Node *node) {
                     assert(false);
                 }
 
+                auto isAutoDerefStorage = resolvedLocal->type == NodeType::DOT
+                                          && resolvedLocal->dotData.lhs->typeInfo->typeData.kind == NodeTypekind::POINTER;
+
                 auto typeToAlloca = typeFor(nodeTypeToAlloca);
                 auto shouldCreateAlloca = nodeTypeToAlloca->typeData.kind != NodeTypekind::NONE
-                                          && !resolvedLocal->isAutoDerefStorage;
+                                            && !isAutoDerefStorage;
 
                 if (shouldCreateAlloca) {
                     if (resolvedLocal->type == NodeType::DECL) {
@@ -452,18 +455,34 @@ void LlvmGen::gen(Node *node) {
         case NodeType::INT_LITERAL: {
             emitDebugLocation(this, node);
             node->llvmData = llvm::ConstantInt::get(typeFor(node->typeInfo), (uint64_t) node->intLiteralData.value);
+
+            if (node->isLocal) {
+                store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
+            }
         } break;
         case NodeType::FLOAT_LITERAL: {
             emitDebugLocation(this, node);
             node->llvmData = llvm::ConstantFP::get(typeFor(node->typeInfo), (float) node->floatLiteralData.value);
+
+            if (node->isLocal) {
+                store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
+            }
         } break;
         case NodeType::NIL_LITERAL: {
             emitDebugLocation(this, node);
             node->llvmData = llvm::ConstantPointerNull::get(builder.getInt8PtrTy(0));
+
+            if (node->isLocal) {
+                store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
+            }
         } break;
         case NodeType::BOOLEAN_LITERAL: {
             emitDebugLocation(this, node);
             node->llvmData = llvm::ConstantInt::get(typeFor(node->typeInfo), (uint64_t) node->boolLiteralData.value ? 1 : 0);
+
+            if (node->isLocal) {
+                store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
+            }
         } break;
         case NodeType::DECL: {
             auto data = node->declData;
@@ -673,6 +692,12 @@ void LlvmGen::gen(Node *node) {
                             case LexerTokenType::LT: {
                                 value = builder.CreateICmpSLT(lhsValue, rhsValue);
                             } break;
+                            case LexerTokenType::GE: {
+                                value = builder.CreateICmpSGE(lhsValue, rhsValue);
+                            } break;
+                            case LexerTokenType::LE: {
+                                value = builder.CreateICmpSLE(lhsValue, rhsValue);
+                            } break;
                             default: assert(false);
                         }
                     }
@@ -786,11 +811,11 @@ void LlvmGen::gen(Node *node) {
         case NodeType::DOT: {
             auto foundParam = node->dotData.resolved;
 
-            uint64_t paramIndex;
+            uint32_t paramIndex;
             if (foundParam->type == NodeType::DECL_PARAM) {
-                paramIndex = (uint64_t) foundParam->declParamData.index;
+                paramIndex = static_cast<uint32_t>(foundParam->declParamData.index);
             } else if (foundParam->type == NodeType::VALUE_PARAM) {
-                paramIndex = (uint64_t) foundParam->valueParamData.index;
+                paramIndex = static_cast<uint32_t>(foundParam->valueParamData.index);
             } else {
                 assert(false);
             }
@@ -971,6 +996,7 @@ void LlvmGen::gen(Node *node) {
                 if (node->llvmLocal && resolve(node->castData.type)->typeData.kind == NodeTypekind::POINTER) {
                     node->llvmLocal = builder.CreateBitCast((llvm::Value *) node->llvmLocal, typeFor(node->castData.type)->getPointerTo(0));
                 }
+
                 node->isLocal = node->castData.value->isLocal;
             }
         } break;
@@ -1022,6 +1048,26 @@ void LlvmGen::gen(Node *node) {
             for (auto n : node->forData.rewritten) {
                 gen(n);
             }
+        } break;
+        case NodeType::HEAPIFY: {
+            // gen the value and store it into it's slot
+            gen(node->nodeData);
+            store(rvalueFor(node->nodeData), static_cast<llvm::Value *>(node->nodeData->llvmLocal));
+
+            // call malloc with the correct size, store into it's local if necessary
+            emitDebugLocation(this, node);
+
+//            node->llvmData = builder.CreateCall(mallocFunc, { rvalueFor(node->nodeData) });
+            auto sizeInBits = module->getDataLayout().getTypeSizeInBits(typeFor(node->nodeData->typeInfo));
+            auto sizeInBytes = sizeInBits / 8;
+
+            node->llvmData = builder.CreateCall(mallocFunc, { builder.getInt64(sizeInBytes) });
+            if (node->isLocal) {
+                store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
+            }
+
+            // store the value into the malloc
+            store(rvalueFor(node->nodeData), static_cast<llvm::Value *>(node->llvmData));
         } break;
         default: assert(false);
     }

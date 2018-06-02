@@ -129,6 +129,8 @@ fn main() {
 
     testUnion1();
 
+    testBuffer();
+
     ret 0;
 }
 
@@ -180,6 +182,7 @@ fn testFor2() {
         ret sum;
     }
 
+    arr: []i32 = []i32{1, 2, 3, 4, 5};
     assert(15 == add_array([]i32{1, 2, 3, 4, 5}));
 }
 
@@ -320,7 +323,7 @@ fn assert(b: bool) {
     }
 }
 
-fn apply_static(f: Any)(t: i32) {
+fn apply_static(f: Ast)(t: i32) {
     ret f(t);
 }
 
@@ -724,4 +727,63 @@ fn test23() {
     assert(3 == ^^bar.baz.qux.value);
     assert(3 == ^^baz.qux.value);
     assert(3 == ^^qux.value);
+}
+
+fn buffer(T: Ast)(capacity: i64) {
+    buf: []T;
+    buf.data = cast(*T) malloc(capacity * sizeof(T));
+
+    ret {
+        capacity: capacity,
+        buf: buf
+    };
+}
+
+fn ensureCapacity( T := typeof(b), E := typeof(b.buf[0]) )(b: T, index: i64) {
+    if b.capacity == 0 {
+        b.capacity = 1;
+    }
+
+    while index >= b.capacity {
+        b.capacity = b.capacity * 2;
+
+        newBuf: []E;
+        newBuf.data = cast(*E) malloc(b.capacity * sizeof(E));
+
+        idx := 0;
+        while idx < b.buf.count {
+            newBuf[idx] = b.buf[idx];
+            idx = idx + 1;
+        }
+
+        b.buf = newBuf;
+    }
+}
+
+fn buffer_set( T := typeof(b), E := typeof(b.buf[0]) )(b: T, index: i64, e: E) {
+    ensureCapacity(b, index);
+
+    b.buf[index] = e;
+    ret b.capacity;
+}
+
+fn buffer_get( T := typeof(b) )(b: T, index: i64) {
+    ensureCapacity(b, index);
+    ret b.buf[index];
+}
+
+fn testBuffer() {
+    type foo struct {
+        x: i32,
+        y: i32
+    }
+
+    b := buffer!(foo)(0);
+
+    f: foo;
+    f.x = 3;
+    f.y = 4;
+
+    buffer_set(b, 200, f);
+    ret buffer_get(b, 200).y;
 }

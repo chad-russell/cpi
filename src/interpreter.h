@@ -271,9 +271,9 @@ public:
 
       // RELCONST
       Instruction relConstInst;
-      if (is_same<T, int32_t>::value) {
+      if (is_same<T, int32_t>::value || is_same<T, float>::value) {
           relConstInst = Instruction::RELCONSTI32;
-      } else if (is_same<T, int64_t>::value) {
+      } else if (is_same<T, int64_t>::value || is_same<T, double>::value) {
           relConstInst = Instruction::RELCONSTI64;
       } else {
           assert(false);
@@ -288,9 +288,9 @@ public:
 
       // REL
       Instruction relInst;
-      if (is_same<T, int32_t>::value) {
+      if (is_same<T, int32_t>::value || is_same<T, float>::value) {
           relInst = Instruction::RELI32;
-      } else if (is_same<T, int64_t>::value) {
+      } else if (is_same<T, int64_t>::value || is_same<T, double>::value) {
           relInst = Instruction::RELI64;
       } else {
           assert(false);

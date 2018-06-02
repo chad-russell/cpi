@@ -200,7 +200,16 @@ void AssemblyLexer::popFront() {
         || sourceMap.sourceInfo.source[loc.byteIndex] == '.') {
         eat();
     }
+
     auto toParse = sourceMap.sourceInfo.source.substr(startIndex, loc.byteIndex - startIndex);
+
+    if (toParse.empty()) {
+        newNext.type = TokenType::EOF_;
+        argCount = 0;
+        popFrontFinalize(newNext, {});
+
+        return;
+    }
 
     if (toParse.find('.') != string::npos) {
         auto parsed = stod(toParse);
@@ -352,7 +361,7 @@ const vector<string> AssemblyLexer::tokenTypeStrings = {
     // types
     "I8", "I16", "I32", "I64", "F32", "F64",
 
-    "RELCONSTI32", "RELI32", "RELCONSTI64", "RELI64",
+    "RELCONSTI32", "RELI32", "RELCONSTI64", "RELI64", "RELI8", "RELI16", "RELF32", "RELF64",
 
     // end of instruction duplication, the rest are only tokens
     "COMMENT", 
@@ -409,7 +418,7 @@ const vector<string> AssemblyLexer::instructionStrings = {
     // types
     "I8", "I16", "I32", "I64", "F32", "F64",
 
-    "RELCONSTI32", "RELI32", "RELCONSTI64", "RELI64"
+    "RELCONSTI32", "RELI32", "RELCONSTI64", "RELI64", "RELI8", "RELI16", "RELF32", "RELF64",
 };
 
 
@@ -571,7 +580,8 @@ void MnemonicPrinter::readTypeAndIntOrFloat()
     } else if (inst.find('F') != string::npos) {
         readTypeAndFloat();
     } else {
-        assert(false);
+        instructionString.append("<<error readTypeAndIntOrFloat>>");
+//        assert(false);
     }
 }
 
@@ -605,15 +615,24 @@ void MnemonicPrinter::readTypeAndInt()
 
 void MnemonicPrinter::readTypeAndFloat()
 {
-    auto inst = AssemblyLexer::instructionStrings[instructions[pc]];
+    auto inst = instructions[pc];
+    auto debugInst = static_cast<Instruction>(instructions[pc]);
+    auto instStr = AssemblyLexer::instructionStrings[inst];
 
+    instructionString.append(instStr);
     instructionString.append(" ");
     pc += 1;
 
-    if (endsWith(inst, "F32")) {
+    if (endsWith(instStr, "CONSTF32")) {
         instructionString.append(to_string(consume<float>()));
-    } else if (endsWith(inst, "F64")) {
+    }
+    else if (endsWith(instStr, "CONSTF64")) {
         instructionString.append(to_string(consume<double>()));
+    }
+    else if (endsWith(instStr, "32")) {
+        instructionString.append(to_string(consume<int32_t>()));
+    } else if (endsWith(instStr, "64")) {
+        instructionString.append(to_string(consume<int64_t>()));
     } else {
         instructionString.append("<<<error>>>");
     }

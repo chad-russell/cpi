@@ -19,10 +19,21 @@ void BytecodeGen::binopHelper(string instructionStr, Node *node, int32_t scale) 
     auto resolvedRhsType = resolve(node->binopData.lhs->typeInfo);
 
     NodeTypekind kind;
-    if (resolvedLhsType->typeData.kind == NodeTypekind::POINTER ||
-        resolvedRhsType->typeData.kind == NodeTypekind::POINTER) {
+    if (resolvedLhsType->typeData.kind == NodeTypekind::POINTER || resolvedRhsType->typeData.kind == NodeTypekind::POINTER) {
+        // pointer arithmetic
         kind = NodeTypekind::POINTER;
+    } else if (startsWith(instructionStr, "EQ") || startsWith(instructionStr, "NEQ")
+            || startsWith(instructionStr, "GT") || startsWith(instructionStr, "GE")
+            || startsWith(instructionStr, "LT") || startsWith(instructionStr, "LE")
+            || startsWith(instructionStr, "GT") || startsWith(instructionStr, "GE")
+            || startsWith(instructionStr, "UGT") || startsWith(instructionStr, "UGE")
+            || startsWith(instructionStr, "ULT") || startsWith(instructionStr, "ULE")
+            || startsWith(instructionStr, "SGT") || startsWith(instructionStr, "SGE")
+            || startsWith(instructionStr, "SLT") || startsWith(instructionStr, "SLE")) {
+        // comparison, so boolean
+        kind = NodeTypekind::BOOLEAN;
     } else {
+        // whatever, man
         kind = resolvedLhsType->typeData.kind;
     }
 
@@ -141,8 +152,7 @@ void BytecodeGen::gen(Node *node) {
             }
 
             currentFnStackSize = savedCurrentFnStackSize;
-        }
-            break;
+        } break;
         case NodeType::RET: {
             // todo(chad): don't do any storing if this is just 'ret' with no value
 
@@ -155,8 +165,7 @@ void BytecodeGen::gen(Node *node) {
             } else {
                 append(instructions, Instruction::RET);
             }
-        }
-            break;
+        } break;
         case NodeType::INT_LITERAL: {
             switch (node->typeInfo->typeData.kind) {
                 case NodeTypekind::I32: {
@@ -181,19 +190,16 @@ void BytecodeGen::gen(Node *node) {
                 default:
                     assert(false);
             }
-        }
-            break;
+        } break;
         case NodeType::SIZEOF: {
             append(node->bytecode, Instruction::CONSTI64);
             auto litData = static_cast<int64_t>(typeSize(node->nodeData));
             append(node->bytecode, toBytes(litData));
-        }
-            break;
+        } break;
         case NodeType::NIL_LITERAL: {
             append(node->bytecode, Instruction::CONSTI64);
             append(node->bytecode, toBytes64(0));
-        }
-            break;
+        } break;
         case NodeType::FLOAT_LITERAL: {
             switch (node->typeInfo->typeData.kind) {
                 case NodeTypekind::FLOAT_LITERAL:
@@ -218,12 +224,10 @@ void BytecodeGen::gen(Node *node) {
             append(node->bytecode, Instruction::CONSTI32);
             auto litData = static_cast<int32_t>(node->boolLiteralData.value ? 1 : 0);
             append(node->bytecode, toBytes(litData));
-        }
-            break;
+        } break;
         case NodeType::STRUCT_LITERAL: {
             // nothing to do here! wait until we actually need to store it somewhere
-        }
-            break;
+        } break;
         case NodeType::DECL: {
             auto data = node->declData;
             if (data.initialValue == nullptr) { return; }
@@ -238,8 +242,7 @@ void BytecodeGen::gen(Node *node) {
             if (data.initialValue) {
                 storeValue(data.initialValue, localOffset);
             }
-        }
-            break;
+        } break;
         case NodeType::ASSIGN: {
             auto data = node->assignData;
 
@@ -290,8 +293,7 @@ void BytecodeGen::gen(Node *node) {
             } else {
                 assert(false);
             }
-        }
-            break;
+        } break;
         case NodeType::SYMBOL: {
             auto resolved = resolve(node);
             auto resolvedType = resolve(resolved->typeInfo);
@@ -308,48 +310,41 @@ void BytecodeGen::gen(Node *node) {
                         append(node->bytecode, Instruction::RELI32);
                         append(node->bytecode, toBytes32(localOffset));
                     }
-                }
-                    break;
+                } break;
                 case NodeTypekind::I8: {
-                    append(node->bytecode, Instruction::I8);
+                    append(node->bytecode, Instruction::RELI8);
                     append(node->bytecode, toBytes32(localOffset));
-                }
-                    break;
+                } break;
                 case NodeTypekind::BOOLEAN:
                 case NodeTypekind::I32: {
-                    append(node->bytecode, Instruction::I32);
+                    append(node->bytecode, Instruction::RELI32);
                     append(node->bytecode, toBytes32(localOffset));
-                }
-                    break;
+                } break;
                 case NodeTypekind::POINTER:
                 case NodeTypekind::INT_LITERAL:
                 case NodeTypekind::I64: {
-                    append(node->bytecode, Instruction::I64);
+                    append(node->bytecode, Instruction::RELI64);
                     append(node->bytecode, toBytes32(localOffset));
-                }
-                    break;
+                } break;
                 case NodeTypekind::FLOAT_LITERAL:
                 case NodeTypekind::F32: {
-                    append(node->bytecode, Instruction::F32);
+                    append(node->bytecode, Instruction::RELF32);
                     append(node->bytecode, toBytes32(localOffset));
-                }
-                    break;
+                } break;
                 case NodeTypekind::F64: {
-                    append(node->bytecode, Instruction::F64);
+                    append(node->bytecode, Instruction::RELF64);
                     append(node->bytecode, toBytes32(localOffset));
-                }
-                    break;
+                } break;
+                case NodeTypekind::NONE:
                 case NodeTypekind::STRUCT: {
                     // nothing to do
-                }
-                    break;
+                } break;
                 default:
                     assert(false);
             }
 
             node->localOffset = resolved->localOffset;
-        }
-            break;
+        } break;
         case NodeType::BINOP: {
             if (node->binopData.type == LexerTokenType::AND) {
                 // a and b ====> { result := false; if a { if b { result = true; } }
@@ -511,42 +506,36 @@ void BytecodeGen::gen(Node *node) {
                         } else {
                             binopHelper("ADD", node);
                         }
-                    }
-                        break;
+                    } break;
                     case LexerTokenType::SUB: {
                         binopHelper("SUB", node);
-                    }
-                        break;
+                    } break;
                     case LexerTokenType::MUL: {
                         binopHelper("MUL", node);
-                    }
-                        break;
+                    } break;
                     case LexerTokenType::DIV: {
                         binopHelper("SDIV", node);
-                    }
-                        break;
+                    } break;
                     case LexerTokenType::EQ_EQ: {
                         binopHelper("EQ", node);
-                    }
-                        break;
+                    } break;
                     case LexerTokenType::NE: {
                         binopHelper("NEQ", node);
-                    }
-                        break;
+                    } break;
                     case LexerTokenType::LT: {
                         binopHelper("SLT", node);
-                    }
-                        break;
+                    } break;
                     case LexerTokenType::GT: {
                         binopHelper("SGT", node);
-                    }
-                        break;
+                    } break;
+                    case LexerTokenType::GE: {
+                        binopHelper("SGE", node);
+                    } break;
                     default:
                         assert(false);
                 }
             }
-        }
-            break;
+        } break;
         case NodeType::FN_CALL: {
             if (!node->fnCallData.hasRuntimeParams) { break; }
 
@@ -599,7 +588,7 @@ void BytecodeGen::gen(Node *node) {
 
                 storeValue(resolvedFn, node->fnCallData.fn->localOffset);
 
-                assert(resolvedFn->isLocal);
+                assert(resolvedFn->isLocal || resolvedFn->isBytecodeLocal);
                 append(instructions, Instruction::CALLI);
                 append(instructions, Instruction::RELI32);
                 append(instructions, toBytes(resolvedFn->localOffset));
@@ -629,19 +618,17 @@ void BytecodeGen::gen(Node *node) {
             append(node->bytecode, toBytes32(node->localOffset));
 
             toProcess.push(resolvedFn);
-        }
-            break;
+        } break;
         case NodeType::DECL_PARAM: {
             append(node->bytecode, Instruction::RELI32);
             append(node->bytecode, toBytes32(node->localOffset));
-        }
-            break;
+        } break;
         case NodeType::DEREF: {
             gen(node->derefData.target);
 
             storeValue(node->derefData.target, node->derefData.target->localOffset);
 
-            if (node->isLocal) {
+            if (node->isLocal || node->isBytecodeLocal) {
                 append(instructions, Instruction::STORE);
                 append(instructions, Instruction::RELCONSTI32);
                 append(instructions, toBytes(node->localOffset));
@@ -649,8 +636,7 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, toBytes(node->derefData.target->localOffset));
                 append(instructions, toBytes(typeSize(node->typeInfo)));
             }
-        }
-            break;
+        } break;
         case NodeType::ADDRESS_OF: {
             gen(node->nodeData);
 
@@ -662,19 +648,17 @@ void BytecodeGen::gen(Node *node) {
             append(node->bytecode, Instruction::RELCONSTI32);
             append(node->bytecode, toBytes(node->nodeData->localOffset));
 
-            if (node->isLocal) {
+            if (node->isLocal || node->isBytecodeLocal) {
                 append(instructions, Instruction::STORECONST);
                 append(instructions, Instruction::RELCONSTI32);
                 append(instructions, toBytes(node->localOffset));
                 append(instructions, Instruction::RELCONSTI32);
                 append(instructions, toBytes(node->nodeData->localOffset));
             }
-        }
-            break;
+        } break;
         case NodeType::TYPE: {
             // just a type declaration, nothing to do here!
-        }
-            break;
+        } break;
         case NodeType::DOT: {
             auto foundParam = node->dotData.resolved;
             auto offsetWords = foundParam->localOffset;
@@ -761,17 +745,18 @@ void BytecodeGen::gen(Node *node) {
 
                 append(instructions, toBytes(hijackedOffsetLocation));
 
+                node->isBytecodeLocal = true;
                 node->localOffset = hijackedOffsetLocation;
             } else {
                 node->dotData.pointerIsRelative = false;
+
+                node->isBytecodeLocal = true;
                 node->localOffset = hijackedOffsetLocation + offsetWords;
             }
-        }
-            break;
+        } break;
         case NodeType::PANIC: {
             append(instructions, Instruction::PANIC);
-        }
-            break;
+        } break;
         case NodeType::IF: {
             gen(node->ifData.condition);
 
@@ -813,8 +798,7 @@ void BytecodeGen::gen(Node *node) {
                 instSize = static_cast<int32_t>(instructions.size());
                 memcpy(&instructions[skipElseBranchOverwrite], &instSize, sizeof(int32_t));
             }
-        }
-            break;
+        } break;
         case NodeType::WHILE: {
             auto jumpBackToInst = instructions.size();
 
@@ -843,57 +827,86 @@ void BytecodeGen::gen(Node *node) {
 
             instSize = static_cast<int32_t>(instructions.size());
             memcpy(&instructions[falseBranchOverwrite], &instSize, sizeof(int32_t));
-        }
-            break;
+        } break;
         case NodeType::RUN: {
             // work should already be done, just need to go with whatever it resolved itself to
             gen(node->resolved);
-        }
-            break;
+        } break;
         case NodeType::ARRAY_INDEX: {
             gen(node->resolved);
-        }
-            break;
+        } break;
         case NodeType::CAST: {
             gen(node->castData.value);
-        }
-            break;
+        } break;
         case NodeType::STRING_LITERAL: {
             gen(node->resolved);
-        }
-            break;
+        } break;
         case NodeType::UNARY_NEG: {
             gen(node->nodeData);
-        }
-            break;
+        } break;
         case NodeType::MALLOC: {
             gen(node->nodeData);
 
             append(node->bytecode, Instruction::MALLOC);
             append(node->bytecode, node->nodeData->bytecode);
-        }
-            break;
+        } break;
         case NodeType::FREE: {
             gen(node->nodeData);
 
-            append(instructions, Instruction::FREE);
-            append(instructions, node->nodeData->bytecode);
-        }
-            break;
+            if (node->nodeData->isLocal || node->nodeData->isBytecodeLocal) {
+                storeValue(node->nodeData, node->nodeData->localOffset);
+                append(instructions, Instruction::FREE);
+                append(instructions, Instruction::RELI64);
+                append(instructions, toBytes32(node->nodeData->localOffset));
+            }
+            else {
+                assert(!node->nodeData->bytecode.empty());
+
+                append(instructions, Instruction::FREE);
+                append(instructions, node->nodeData->bytecode);
+            }
+        } break;
         case NodeType::ARRAY_LITERAL: {
             // nothing to do here! wait until we actually need to store it somewhere
-        }
-            break;
+        } break;
         case NodeType::FOR: {
             for (auto n : node->forData.rewritten) {
                 gen(n);
             }
-        }
-            break;
+        } break;
         case NodeType::TAGCHECK: {
             assert(node->resolved);
             gen(node->resolved);
             node->bytecode = node->resolved->bytecode;
+        } break;
+        case NodeType::HEAPIFY: {
+            gen(node->nodeData);
+            storeValue(node->nodeData, node->nodeData->localOffset);
+
+            auto sizeInBytes = typeSize(node->typeInfo->typeData.pointerTypeData.underlyingType);
+
+            // malloc numBytes and put the pointer in our localOffset
+            append(instructions, Instruction::MALLOC);
+            append(instructions, Instruction::CONSTI64);
+            append(instructions, toBytes64(sizeInBytes));
+            append(instructions, toBytes(node->localOffset));
+
+            // store into the value pointed to by our local offset the value in nodeData
+            append(instructions, Instruction::STORE);
+
+            append(instructions, Instruction::RELI32);
+            append(instructions, toBytes(node->localOffset));
+
+            append(instructions, Instruction::RELCONSTI32);
+            append(instructions, toBytes(node->nodeData->localOffset));
+
+            append(instructions, toBytes32(sizeInBytes));
+
+            append(node->bytecode, Instruction::RELCONSTI64);
+            append(node->bytecode, toBytes32(node->localOffset));
+        } break;
+        case NodeType::ANYOF: {
+            gen(node->resolved);
         } break;
         default:
             assert(false);
@@ -927,8 +940,7 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
             append(instructions, toBytes(offset));
 
             append(instructions, node->bytecode);
-        }
-            break;
+        } break;
         case NodeType::INT_LITERAL:
         case NodeType::SIZEOF: {
             append(instructions, Instruction::STORECONST);
@@ -937,8 +949,7 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
             append(instructions, toBytes(offset));
 
             append(instructions, node->bytecode);
-        }
-            break;
+        } break;
         case NodeType::NIL_LITERAL: {
             append(instructions, Instruction::STORECONST);
 
@@ -946,8 +957,7 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
             append(instructions, toBytes(offset));
 
             append(instructions, node->bytecode);
-        }
-            break;
+        } break;
         case NodeType::FLOAT_LITERAL: {
             append(instructions, Instruction::STORECONST);
 
@@ -955,8 +965,7 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
             append(instructions, toBytes(offset));
 
             append(instructions, node->bytecode);
-        }
-            break;
+        } break;
         case NodeType::FN_DECL: {
             append(instructions, Instruction::STORECONST);
 
@@ -965,8 +974,7 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
 
             append(instructions, Instruction::CONSTI32);
             append(instructions, toBytes32(node->fnDeclData.tableIndex));
-        }
-            break;
+        } break;
         case NodeType::ADDRESS_OF: {
             append(instructions, Instruction::STORECONST);
 
@@ -975,8 +983,7 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
 
             append(instructions, Instruction::RELCONSTI32);
             append(instructions, toBytes(node->nodeData->localOffset));
-        }
-            break;
+        } break;
         case NodeType::DEREF: {
             append(instructions, Instruction::STORE);
 
@@ -988,8 +995,7 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
             append(instructions, toBytes(resolvedDeref->localOffset));
 
             append(instructions, toBytes32(typeSize(node->typeInfo)));
-        }
-            break;
+        } break;
         case NodeType::DECL_PARAM:
         case NodeType::FN_CALL:
         case NodeType::BINOP:
@@ -1003,8 +1009,7 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
             append(instructions, toBytes(node->localOffset));
 
             append(instructions, toBytes(typeSize(node->typeInfo)));
-        }
-            break;
+        } break;
         case NodeType::DOT: {
             gen(node);
 
@@ -1021,35 +1026,64 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
             }
 
             append(instructions, toBytes32(typeSize(node->typeInfo)));
-        }
-            break;
+        } break;
         case NodeType::STRUCT_LITERAL: {
-            auto sizeSoFar = 0;
-            for (const auto &param : node->structLiteralData.params) {
-                gen(param->valueParamData.value);
+            if (node->typeInfo->typeData.structTypeData.coercedType != nullptr
+                && node->typeInfo->typeData.structTypeData.coercedType->typeData.structTypeData.isSecretlyUnion) {
+                // we need to store the tag and the value.
+                auto tagIndex = node->typeInfo->typeData.structTypeData.params[0]->declParamData.index;
+                auto value = node->structLiteralData.params[0];
 
-                storeValue(param->valueParamData.value, offset + sizeSoFar);
-                sizeSoFar += typeSize(param->valueParamData.value->typeInfo);
+                auto tagValue = new Node();
+                tagValue->type = NodeType::INT_LITERAL;
+                // todo(chad): allow the user to specify the size of the tag (or maybe do it automatically?)
+                // todo(chad): maybe do this sooner - like in semantic back when we recognize this case?
+                tagValue->typeInfo = new Node(NodeTypekind::I32);
+                tagValue->intLiteralData.value = tagIndex;
+
+                assert(value->type == NodeType::VALUE_PARAM);
+
+                gen(tagValue);
+                gen(value->valueParamData.value);
+
+                storeValue(tagValue, offset);
+                storeValue(value->valueParamData.value, offset + 4);
             }
-        }
-            break;
+            else {
+                auto sizeSoFar = 0;
+                for (const auto &param : node->structLiteralData.params) {
+                    gen(param->valueParamData.value);
+
+                    storeValue(param->valueParamData.value, offset + sizeSoFar);
+                    sizeSoFar += typeSize(param->valueParamData.value->typeInfo);
+                }
+            }
+        } break;
         case NodeType::ARRAY_LITERAL: {
             storeValue(node->arrayLiteralData.structLiteralRepresentation, offset);
-        }
-            break;
+        } break;
         case NodeType::CAST: {
             storeValue(node->castData.value, offset);
-        }
-            break;
+        } break;
         case NodeType::UNARY_NEG: {
             storeValue(node->nodeData, offset);
-        }
-            break;
+        } break;
         case NodeType::MALLOC: {
             append(node->bytecode, toBytes(offset));
             append(instructions, node->bytecode);
-        }
-            break;
+        } break;
+        case NodeType::HEAPIFY: {
+            append(instructions, Instruction::STORE);
+
+            append(instructions, Instruction::RELCONSTI32);
+            append(instructions, toBytes32(offset));
+
+            append(instructions, Instruction::RELCONSTI32);
+            append(instructions, toBytes(node->localOffset));
+
+            auto ts = typeSize(node->nodeData->typeInfo);
+            append(instructions, toBytes32(ts));
+        } break;
         default:
             assert(false);
     }

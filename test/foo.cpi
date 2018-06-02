@@ -1,7 +1,25 @@
-fn foo(x: f32) {
-    ret x + 1.2;
+fn assert(b: bool) {
+    if (b == false) {
+        panic();
+    }
+}
+
+type point struct {
+    x: i64,
+    y: i64
 }
 
 fn main() {
-    ret foo(3.1);
+    count: i32 = 3;
+
+    point_array := cast([]point) {&{{1, 1}, {2, 3}, {4, 5}}, count};
+
+    assert(point_array[1].y == 3);
+
+    count = 3;
+    e1: i32 = 1;
+    e2: i32 = 2;
+    e3: i32 = 3;
+
+    assert([]{e1, e2, e3}[1] == 2);
 }

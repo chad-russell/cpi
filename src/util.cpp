@@ -193,6 +193,52 @@ ostream &operator<<(ostream &os, vector<unsigned char> v) {
     return os;
 }
 
+ostream &operator<<(ostream &os, TypeData td) {
+    switch (td.kind) {
+        case NodeTypekind::NONE:
+        case NodeTypekind::INT_LITERAL:
+        case NodeTypekind::I8:
+        case NodeTypekind::I32:
+        case NodeTypekind::I64:
+        case NodeTypekind::FLOAT_LITERAL:
+        case NodeTypekind::BOOLEAN:
+        case NodeTypekind::F32:
+        case NodeTypekind::F64:
+        case NodeTypekind::EXPOSED_AST: {
+            os << td.kind;
+        } break;
+        case NodeTypekind::FN: {
+            os << "fn (";
+            for (auto param : td.fnTypeData.params) {
+                assert(param->type == NodeType::DECL_PARAM);
+                os << param->declParamData.type->typeData << ", ";
+            }
+            os << ")";
+            os << td.fnTypeData.returnType->typeData;
+        } break;
+
+        case NodeTypekind::STRUCT: {
+            os << "struct {";
+
+            // todo(chad): @Incomplete -- handle array/union types here too
+            for (auto param : td.structTypeData.params) {
+                os << param->declParamData.type->typeData << ", ";
+            }
+
+            os << "}";
+        } break;
+        case NodeTypekind::SYMBOL: {
+            os << AtomTable::current->backwardAtoms[td.symbolTypeData.atomId];
+        } break;
+        case NodeTypekind::POINTER: {
+            os << "*";
+            os << td.pointerTypeData.underlyingType->typeData;
+        } break;
+    }
+
+    return os;
+}
+
 /////////////
 //  ATOMS  //
 /////////////
