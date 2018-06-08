@@ -215,7 +215,7 @@ llvm::Type *LlvmGen::typeFor(Node *node) {
                 // value
                 elementTypes.push_back(llvm::ArrayType::get(builder.getInt8Ty(), dataSizeInBytes));
 
-                return llvm::StructType::get(context, elementTypes, true);
+                return llvm::StructType::get(context, elementTypes);
             }
 
             else if (node->llvmData) {
@@ -1066,12 +1066,15 @@ void LlvmGen::gen(Node *node) {
                 gen(value->valueParamData.value);
 
                 auto structType = llvm::StructType::get(builder.getContext(),
-                                                        {builder.getInt32Ty(), typeFor(value->valueParamData.value->typeInfo)},
-                                                        true);
+                                                        {builder.getInt32Ty(), typeFor(value->valueParamData.value->typeInfo)});
                 auto blankSlate = (llvm::Value *) llvm::ConstantStruct::get(structType);
 
                 blankSlate = builder.CreateInsertValue(blankSlate, builder.getInt32(static_cast<uint32_t>(tagIndex)), 0);
-                blankSlate = builder.CreateInsertValue(blankSlate, rvalueFor(value->valueParamData.value), 1);
+
+                auto blankSlateIdxType = structType->getTypeAtIndex(1);
+                auto paramValue = rvalueFor(value->valueParamData.value);
+                auto castedValue = builder.CreateBitCast(paramValue, blankSlateIdxType);
+                blankSlate = builder.CreateInsertValue(blankSlate, castedValue, 1);
 
                 node->llvmData = blankSlate;
 
@@ -1099,7 +1102,6 @@ void LlvmGen::gen(Node *node) {
 
                     values.push_back(valueToInsert);
                     types.push_back(valueToInsert->getType());
-//                    types.push_back(computedType);
 
                     idx += 1;
                 }
@@ -1112,7 +1114,9 @@ void LlvmGen::gen(Node *node) {
                     auto valueType = value->getType();
                     auto blankSlateIdxType = structType->getTypeAtIndex(idx);
 
-                    blankSlate = builder.CreateInsertValue(blankSlate, value, idx);
+                    auto castedValue = builder.CreateBitCast(value, blankSlateIdxType);
+                    blankSlate = builder.CreateInsertValue(blankSlate, castedValue, idx);
+
                     idx += 1;
                 }
 

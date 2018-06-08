@@ -812,6 +812,9 @@ void resolveDecl(Semantic *semantic, Node *node) {
     else if (node->declData.type == nullptr) {
         node->declData.type = node->declData.initialValue->typeInfo;
     }
+//    else if (node->declData.initialValue == nullptr) {
+//        node->declData.initialValue = defaultValueFor(semantic, node->declData.type);
+//    }
 
     auto resolvedDeclDataType = resolve(node->declData.type);
     node->typeInfo = node->declData.type;
@@ -1303,8 +1306,8 @@ Node *findParam(Semantic *semantic, Node *node) {
 }
 
 void createTagCheck(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
-//    if (node->tagCheck) { return; }
-//    node->tagCheck = true;
+    if (node->tagCheck) { return; }
+    node->tagCheck = true;
 
     // get the type data
     auto typeData = resolve(node->dotData.lhs->typeInfo)->typeData;
@@ -1346,6 +1349,7 @@ void createTagCheck(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
     neq->binopData.type = LexerTokenType::NE;
     neq->binopData.lhs = tagDot;
     neq->binopData.rhs = constTag;
+    semantic->addLocal(neq);
     semantic->resolveTypes(neq);
 
     auto panicStmt = new Node();
@@ -1378,10 +1382,9 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
 
         auto isUnionAccess = resolvedLhsTypeInfo->typeData.structTypeData.isSecretlyUnion;
 
-        // findme(chad)
-//        if (isUnionAccess) {
-//            createTagCheck(semantic, node, lhs, rhs);
-//        }
+        if (isUnionAccess) {
+            createTagCheck(semantic, node, lhs, rhs);
+        }
     }
 
     if (resolvedLhs->type == NodeType::DOT) {

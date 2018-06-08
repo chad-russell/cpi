@@ -334,6 +334,32 @@ ostream &operator<<(ostream &os, Node *node) {
         case NodeType::CAST: {
             cout << "cast(" << node->castData.type << ") " << node->castData.value;
         } break;
+        case NodeType::STRING_LITERAL: {
+            cout << "\"" << node->stringLiteralData.value << "\"";
+        } break;
+        case NodeType::ADDRESS_OF: {
+            cout << "&" << node->nodeData;
+        } break;
+        case NodeType::IF: {
+            cout << "if " << node->ifData.condition << " {" << endl;
+            for (auto s : node->ifData.stmts) {
+                cout << s;
+            }
+            // todo(chad): else clause
+            cout << "}" << endl;
+        } break;
+        case NodeType::BINOP: {
+            cout << node->binopData.lhs << " " << node->binopData.type << " " << node->binopData.rhs;
+        } break;
+        case NodeType::PANIC: {
+            cout << "panic()" << endl;
+        } break;
+        case NodeType::DECL_PARAM: {
+            // ???
+        } break;
+        case NodeType::ARRAY_INDEX: {
+            cout << node->arrayIndexData.target << "[" << node->arrayIndexData.indexValue << "]";
+        } break;
         default: assert(false);
     }
 

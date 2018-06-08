@@ -566,6 +566,7 @@ struct Colored {
     bool bold = false;
 };
 
+ostream &operator<<(ostream &os, LexerTokenType tokenType);
 ostream &operator<<(ostream &os, Node *node);
 ostream &operator<<(ostream &os, Location location);
 ostream &operator<<(ostream &os, Region location);

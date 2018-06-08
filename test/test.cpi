@@ -120,8 +120,6 @@ fn main() {
 
     testMalloc();
 
-    testDefault();
-
     testFor1();
     testFor2();
     testFor3();
@@ -129,7 +127,10 @@ fn main() {
 
     testUnion1();
 
-    testBuffer();
+    -- testDefault();
+    -- testBuffer();
+
+    testAnySimple1();
 
     ret 0;
 }
@@ -786,4 +787,70 @@ fn testBuffer() {
 
     buffer_set(&b, 200, f);
     ret buffer_get(&b, 200).y;
+}
+
+fn testAnySimple1() {
+    type ParamData struct {
+        name:  []i8,
+        _type: *TypeInfo
+    }
+
+    type StructData struct {
+        params: []ParamData
+    }
+
+    type EnumData struct {
+        params: []ParamData
+    }
+
+    type FnData struct {
+        params:     []ParamData,
+        returnType: *TypeInfo
+    }
+
+    type PointerData struct {
+        underlyingType: *TypeInfo
+    }
+
+    type ArrayData struct {
+        elementType: *TypeInfo
+    }
+
+    type TypeInfo union {
+        NONE:          none,
+        INT_LITERAL:   i64,
+        I8:            none,
+        I32:           none,
+        I64:           none,
+        FLOAT_LITERAL: f64,
+        BOOLEAN:       none,
+        F32:           none,
+        F64:           none,
+        FN:            FnData,
+        STRUCT:        StructData,
+        POINTER:       PointerData,
+        ENUM:          EnumData,
+        ARRAY:         ArrayData,
+    }
+
+    type Any struct {
+        _type:  TypeInfo,
+        value:  *none
+    }
+
+    a : Any = {
+        _type: {
+            STRUCT: {
+                params: []ParamData{
+                    {
+                        name: "fuck",
+                        _type: &{I8: {}},
+                    }
+                }
+            }
+        },
+        value: cast(*none) &77
+    };
+
+    assert(a._type.STRUCT.params[0]._type.tag == 3);
 }

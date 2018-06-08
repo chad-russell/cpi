@@ -47,18 +47,18 @@ type Any struct {
 }
 
 fn main() {
-    a: Any = {
+    a : Any = {
         _type: {
             STRUCT: {
                 params: []ParamData{
                     {
-                        name: "fuck you",
-                        _type: &{I64: {}},
+                        name: "fuck",
+                        _type: &{I8: {}},
                     }
                 }
             }
         },
-        value: cast(*none) &83
+        value: cast(*none) &77
     };
 
     ret a._type.STRUCT.params[0]._type.tag;
