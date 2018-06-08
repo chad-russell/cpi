@@ -34,7 +34,6 @@ enum class NodeType {
     BINOP,
     PIPE,
     DOT,
-    DOT_QUESTION,
     FN_CALL,
     INT_LITERAL,
     FLOAT_LITERAL,
@@ -193,6 +192,8 @@ struct StructTypeData {
 
     // todo(chad): this should maybe just be rolled up into 'resolved'?
     Node *coercedType = nullptr;
+
+    bool enumCoerced = false;
 };
 
 struct PointerTypeData {
@@ -400,6 +401,7 @@ public:
     NodeType type;
 
     vector<Node *> preStmts;
+    vector<Node *> postStmts;
 
     // union {
     Node *nodeData;
@@ -435,6 +437,7 @@ public:
 
     bool isUsedInError = false;
     bool semantic = false;
+    bool printed = false;
     bool tagCheck = false;
     bool gen = false;
     bool llvmGen = false;
@@ -445,6 +448,7 @@ public:
     bool isLocal = false;
 
     bool isBytecodeLocal = false;
+    bool skipAllButPostStmts = false;
 
     // todo(chad): figure out a way to get rid of this
 //    bool isAutoDerefStorage = false;
@@ -562,6 +566,7 @@ struct Colored {
     bool bold = false;
 };
 
+ostream &operator<<(ostream &os, Node *node);
 ostream &operator<<(ostream &os, Location location);
 ostream &operator<<(ostream &os, Region location);
 ostream &operator<<(ostream &os, SourceInfoRegion srcInfo);

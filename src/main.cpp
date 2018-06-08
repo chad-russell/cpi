@@ -46,6 +46,7 @@ unsigned long fnTableId;
 int debugFlag;
 
 static int printAsmFlag = 0;
+static int printAstFlag = 0;
 static int interpretFlag = 0;
 
 void printHelp() {
@@ -54,6 +55,7 @@ void printHelp() {
          << "-- args --"                                                                     << endl
          << "==========="                                                                    << endl
          << "--print-asm   (-p):               Print assembly instructions"                  << endl
+         << "--print-ast   (-a):               Print lowered AST"                            << endl
          << "--debug       (-d):               Start the program in debug mode"              << endl
          << "--output-file (-o) <filename>:    File to write to"                             << endl
          << "--interpret   (-i):               Run the interpreter"                          << endl
@@ -95,6 +97,7 @@ int main(int argc, char **argv) {
     // ./cpi [-o outputFile] [--print-asm] [--debug] inputFile
     static struct option longOptions[] = {
             {"print-asm",   no_argument,       &printAsmFlag,  'p'},
+            {"print-ast",   no_argument,       &printAstFlag,  'a'},
             {"debug",       no_argument,       &debugFlag,     'd'},
             {"output-file", required_argument, nullptr,        'o'},
             {"interpret",   no_argument,       &interpretFlag, 'i'},
@@ -139,6 +142,7 @@ int main(int argc, char **argv) {
     auto inputType = inputTypeFromExtension(inputFile);
 
     auto interp = new Interpreter();
+    Semantic *semantic;
 
     vector<unsigned char> instructions;
     unordered_map<uint32_t, uint32_t> fnTable;
@@ -172,7 +176,7 @@ int main(int argc, char **argv) {
         semantic->resolveTypes(parser->mainFn);
         if (semantic->encounteredErrors) { return -1; }
 
-        if (interpretFlag != 0 || outputType == OutputType::CAS || outputType == OutputType::CBC) {
+        if (interpretFlag != 0 || outputType == OutputType::CAS || outputType == OutputType::CBC || printAsmFlag != 0) {
             auto gen = new BytecodeGen();
             gen->isMainFn = true;
             gen->sourceMap.sourceInfo = lexer->srcInfo;
@@ -245,6 +249,10 @@ int main(int argc, char **argv) {
         cout << printer->debugString() << endl;
     }
 
+    if (printAstFlag != 0) {
+        cout << parser->mainFn << endl;
+    }
+
     if (interpretFlag != 0) {
         if (debugFlag == 0) {
             interp->continuing = true;
@@ -292,7 +300,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    if (outputFileName != nullptr) {
+    if (outputFileName != nullptr && semantic != nullptr && !semantic->encounteredErrors) {
         std::ofstream out(outputFileName);
 
         if (endsWith(outputFileName, ".cas")) {

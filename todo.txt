@@ -1,9 +1,23 @@
 TODO:
-    - get all tests passing with llvm again
+    - struct literal refactor
+        - rewrite as a declaration and then assigments through dots
+        - need to be careful when pointers are involved (i.e. taking the address of something inline)
+        - should trigger when:
+            - decl/assignment combo
+            - assignment
+            - passing through struct parameters
+
+    - when there is no initialValue on a declaration, the backend should zero the memory
+
+    - merge the concepts of declParam and valueParam. It's too confusing at this point and we are needing to switch between them too often
+
+    - support 'putchar' in interpreter
+
+    - fix buffer test
+        - infinite loops in llvm
+        - returns 0 everywhere if you try to use pointers... :(
 
     - replace 'anyof' with 'typeinfo', and finish implementing buildTypeInfoStructLiteral for struct/fn types
-
-    - support printing
 
     - better interpreter debugging
         - more accurate source information, stopping, etc.
@@ -54,7 +68,3 @@ TODO:
         - a := [10]i32{}; a|append(3); ret a[1];
         - maybe just get rid of `[]` syntax... instead of giving all types a way to
             access to special syntax, we can just have less special syntax
-
-    - decide if we want to support inline conversion
-        - e.g. 'a := Foo{1, 2, 3}'
-        - probably no for now

@@ -8,6 +8,7 @@
 #include "llvm/Target/TargetOptions.h"
 
 #include <unistd.h>
+#include <sstream>
 
 #define DBUILDER 1
 
@@ -134,6 +135,8 @@ void LlvmGen::finalize() {
 }
 
 llvm::Type *LlvmGen::typeFor(Node *node) {
+    node = resolve(node);
+
     assert(node->type == NodeType::TYPE);
     switch (node->typeData.kind) {
         case NodeTypekind::I8: {
@@ -189,6 +192,34 @@ llvm::Type *LlvmGen::typeFor(Node *node) {
                 elementTypes.push_back(builder.getInt32Ty());
 
                 return llvm::StructType::get(context, elementTypes);
+            }
+
+            else if (node->typeData.structTypeData.isSecretlyUnion) {
+                vector<llvm::Type *> elementTypes;
+
+                // tag
+                elementTypes.push_back(builder.getInt32Ty());
+
+                // value size
+                uint64_t dataSizeInBytes = 0;
+                for (auto param : node->typeData.structTypeData.params) {
+                    if (resolve(param->typeInfo)->typeData.kind != NodeTypekind::NONE) {
+                        // todo(chad): this might not always be accurate -- should write a routine to consult with llvm...
+                        auto potentiallyLarger = typeSize(param->typeInfo);
+                        if (potentiallyLarger > dataSizeInBytes) {
+                            dataSizeInBytes = static_cast<uint64_t>(potentiallyLarger);
+                        }
+                    }
+                }
+
+                // value
+                elementTypes.push_back(llvm::ArrayType::get(builder.getInt8Ty(), dataSizeInBytes));
+
+                return llvm::StructType::get(context, elementTypes, true);
+            }
+
+            else if (node->llvmData) {
+                return (llvm::Type *) node->llvmData;
             }
 
             auto ty = llvm::StructType::create(context);
@@ -263,6 +294,7 @@ llvm::DIType *diTypeFor(LlvmGen *gen, Node *type) {
             auto diFile = gen->dBuilder->createFile(gen->diCu->getFilename(), gen->diCu->getDirectory());
 
             auto ty = gen->typeFor(resolved);
+
             auto structLayout = gen->module->getDataLayout().getStructLayout(reinterpret_cast<llvm::StructType *>(ty));
 
             auto alignment = structLayout->getAlignment();
@@ -270,25 +302,70 @@ llvm::DIType *diTypeFor(LlvmGen *gen, Node *type) {
 
             llvm::SmallVector<llvm::Metadata *, 8> elements = {};
             unsigned int idx = 0;
-            for (auto param : type->typeData.structTypeData.params) {
-                auto basicType = diTypeFor(gen, param->typeInfo);
 
-                string name;
-                if (param->type == NodeType::VALUE_PARAM && param->valueParamData.name != nullptr) {
-                    name = AtomTable::current->backwardAtoms[param->valueParamData.name->symbolData.atomId];
-                }
-                else if (param->type == NodeType::DECL_PARAM && param->declParamData.name != nullptr) {
-                    name = AtomTable::current->backwardAtoms[param->declParamData.name->symbolData.atomId];
-                }
-                auto sizeInBits = basicType->getSizeInBits();
-                auto alignInBits = basicType->getAlignInBits();
-                auto offsetInBits = structLayout->getElementOffsetInBits(idx);
+            auto isUnion = type->typeData.structTypeData.isSecretlyUnion;
+            auto paramCount = type->typeData.structTypeData.params.size();
+            if (isUnion) {
+                paramCount = 2;
+            }
 
-                elements.push_back(gen->dBuilder->createMemberType(gen->diCu, name, diFile,
-                                                                   static_cast<unsigned int>(param->region.start.line),
-                                                                   sizeInBits, alignInBits, offsetInBits,
-                                                                   llvm::DINode::FlagZero, basicType));
-                idx += 1;
+            for (auto i = 0; i < paramCount; i++) {
+                if (isUnion) {
+                    llvm::DIType *basicType;
+                    string name;
+
+                    if (i == 0) {
+                        basicType = gen->dBuilder->createBasicType("i32", 32, llvm::dwarf::DW_ATE_signed);
+                        name = "tag";
+                    }
+                    else {
+                        // value size
+                        uint64_t dataSizeInBytes = 0;
+                        for (auto param : type->typeData.structTypeData.params) {
+                            auto potentiallyLarger = gen->module->getDataLayout().getTypeSizeInBits(gen->typeFor(param->typeInfo));
+                            if (potentiallyLarger > dataSizeInBytes) {
+                                dataSizeInBytes = potentiallyLarger;
+                            }
+                        }
+                        dataSizeInBytes /= 8;
+
+                        auto byteType = gen->dBuilder->createBasicType("i8", 8, llvm::dwarf::DW_ATE_signed);
+
+                        basicType = gen->dBuilder->createArrayType(dataSizeInBytes, byteType->getAlignInBits(), byteType, {});
+                        name = "value";
+                    }
+
+                    auto sizeInBits = basicType->getSizeInBits();
+                    auto alignInBits = basicType->getAlignInBits();
+                    auto offsetInBits = structLayout->getElementOffsetInBits(idx);
+
+                    elements.push_back(gen->dBuilder->createMemberType(gen->diCu, name, diFile,
+                                                                       static_cast<unsigned int>(type->typeData.structTypeData.params[0]->region.start.line),
+                                                                       sizeInBits, alignInBits, offsetInBits,
+                                                                       llvm::DINode::FlagZero, basicType));
+                }
+                else {
+                    auto param = type->typeData.structTypeData.params[i];
+
+                    auto basicType = diTypeFor(gen, param->typeInfo);
+
+                    string name;
+                    if (param->type == NodeType::VALUE_PARAM && param->valueParamData.name != nullptr) {
+                        name = AtomTable::current->backwardAtoms[param->valueParamData.name->symbolData.atomId];
+                    }
+                    else if (param->type == NodeType::DECL_PARAM && param->declParamData.name != nullptr) {
+                        name = AtomTable::current->backwardAtoms[param->declParamData.name->symbolData.atomId];
+                    }
+                    auto sizeInBits = basicType->getSizeInBits();
+                    auto alignInBits = basicType->getAlignInBits();
+                    auto offsetInBits = structLayout->getElementOffsetInBits(idx);
+
+                    elements.push_back(gen->dBuilder->createMemberType(gen->diCu, name, diFile,
+                                                                       static_cast<unsigned int>(param->region.start.line),
+                                                                       sizeInBits, alignInBits, offsetInBits,
+                                                                       llvm::DINode::FlagZero, basicType));
+                    idx += 1;
+                }
             }
 
             auto ct = gen->dBuilder->createStructType(gen->diCu, "composite_type", diFile, 0, size,
@@ -313,6 +390,18 @@ llvm::DIType *diTypeFor(LlvmGen *gen, Node *type) {
 void LlvmGen::gen(Node *node) {
     if (node->llvmGen) { return; }
     node->llvmGen = true;
+
+    for (auto stmt : node->preStmts) {
+        gen(stmt);
+    }
+
+    if (node->skipAllButPostStmts) {
+        for (auto stmt : node->postStmts) {
+            gen(stmt);
+        }
+
+        return;
+    }
 
     switch (node->type) {
         case NodeType::FN_DECL: {
@@ -422,7 +511,10 @@ void LlvmGen::gen(Node *node) {
                             resolvedLocal->llvmLocal = builder.CreateAlloca(typeToAlloca, nullptr, "foreach_index");
                         }
                     } else {
-                        resolvedLocal->llvmLocal = builder.CreateAlloca(typeToAlloca, nullptr, "local");
+                        ostringstream oss("");
+                        oss << "local" << resolvedLocal->id << "_";
+
+                        resolvedLocal->llvmLocal = builder.CreateAlloca(typeToAlloca, nullptr, oss.str());
                     }
                 }
             }
@@ -702,7 +794,11 @@ void LlvmGen::gen(Node *node) {
                         }
                     }
 
-                    store(value, (llvm::Value *) node->llvmLocal);
+                    node->llvmData = value;
+
+                    if (node->isLocal) {
+                        store(value, (llvm::Value *) node->llvmLocal);
+                    }
                 }
             }
         } break;
@@ -782,6 +878,10 @@ void LlvmGen::gen(Node *node) {
                 auto foundParam = resolvedDecl->dotData.resolved;
                 auto paramIndex = (uint64_t) foundParam->declParamData.index;
 
+                if (resolve(resolvedDecl->dotData.lhs->typeInfo)->typeData.structTypeData.isSecretlyUnion && paramIndex != 0) {
+                    paramIndex = 1;
+                }
+
                 gen(resolvedDecl->dotData.lhs);
 
                 auto gepTarget = (llvm::Value *) resolvedDecl->dotData.lhs->llvmLocal;
@@ -802,7 +902,11 @@ void LlvmGen::gen(Node *node) {
                 geps.push_back(builder.getInt32((uint32_t) paramIndex));
                 auto gep = builder.CreateGEP(gepTarget, geps);
                 emitDebugLocation(this, node);
-                store(rvalueFor(resolvedRhs), gep);
+
+                if (resolvedRhs->typeInfo->typeData.kind != NodeTypekind::NONE) {
+                    store(rvalueFor(resolvedRhs), gep);
+                }
+
                 node->llvmData = gep;
             } else {
                 assert(false);
@@ -812,12 +916,27 @@ void LlvmGen::gen(Node *node) {
             auto foundParam = node->dotData.resolved;
 
             uint32_t paramIndex;
+            int64_t tag = 0;
             if (foundParam->type == NodeType::DECL_PARAM) {
                 paramIndex = static_cast<uint32_t>(foundParam->declParamData.index);
+                tag = foundParam->declParamData.name->symbolData.atomId;
             } else if (foundParam->type == NodeType::VALUE_PARAM) {
                 paramIndex = static_cast<uint32_t>(foundParam->valueParamData.index);
+                tag = foundParam->declParamData.name->symbolData.atomId;
             } else {
                 assert(false);
+            }
+
+            auto tagAtom = AtomTable::current->insertStr("tag");
+            auto resolvedTypeInfo = resolve(node->dotData.lhs->typeInfo);
+            while (resolvedTypeInfo->typeData.kind == NodeTypekind::POINTER) {
+                resolvedTypeInfo = resolve(resolvedTypeInfo->typeData.pointerTypeData.underlyingType);
+            }
+
+            auto isSecretlyUnion = false;
+            if (resolvedTypeInfo->typeData.structTypeData.isSecretlyUnion) {
+                isSecretlyUnion = true;
+                paramIndex = tag == tagAtom ? 0 : 1;
             }
 
             gen(node->dotData.lhs);
@@ -834,7 +953,8 @@ void LlvmGen::gen(Node *node) {
                 gepTarget = (llvm::Value *) resolvedLhs->llvmData;
             }
 
-            auto resolvedTypeInfo = resolve(resolvedLhs->typeInfo);
+            resolvedTypeInfo = resolve(resolvedLhs->typeInfo);
+
             auto pointerCount = 0;
             while (resolvedTypeInfo->typeData.kind == NodeTypekind::POINTER) {
                 resolvedTypeInfo = resolve(resolvedTypeInfo->typeData.pointerTypeData.underlyingType);
@@ -848,6 +968,17 @@ void LlvmGen::gen(Node *node) {
 
             if (node->dotData.lhs->isLocal) {
                 auto gep = builder.CreateGEP(gepTarget, geps);
+
+                if (isSecretlyUnion && paramIndex == 1) {
+                    // bitcast gepTarget to the correct thing...
+                    if (resolve(foundParam->typeInfo)->typeData.kind == NodeTypekind::NONE) {
+                        gep = builder.CreateBitCast(gep, builder.getInt8PtrTy(0));
+                    }
+                    else {
+                        gep = builder.CreateBitCast(gep, typeFor(foundParam->typeInfo)->getPointerTo(0));
+                    }
+                }
+
                 node->llvmData = gep;
 
                 if (node->isLocal) {
@@ -924,29 +1055,72 @@ void LlvmGen::gen(Node *node) {
             builder.CreateCall(panicFunc, { builder.CreateGlobalStringPtr("assertion failed!!!") });
         } break;
         case NodeType::STRUCT_LITERAL: {
-            auto structType = (llvm::StructType *) typeFor(node->typeInfo);
-            auto blankSlate = (llvm::Value *) llvm::ConstantStruct::get(structType);
+            if (node->typeInfo->typeData.structTypeData.coercedType != nullptr && node->typeInfo->typeData.structTypeData.coercedType->typeData.structTypeData.isSecretlyUnion) {
+                // we need to store the tag and the value.
+                auto tagIndex = node->typeInfo->typeData.structTypeData.params[0]->declParamData.index;
 
-            unsigned int idx = 0;
-            for (auto param : node->structLiteralData.params) {
-                gen(param);
+                assert(node->structLiteralData.params.size() == 1);
+                auto value = node->structLiteralData.params[0];
+                assert(value->type == NodeType::VALUE_PARAM);
 
-                auto valueToInsert = rvalueFor(param->valueParamData.value);
-                assert(valueToInsert);
+                gen(value->valueParamData.value);
 
-                if (node->typeInfo->typeData.structTypeData.isSecretlyArray && idx == 0) {
-                    valueToInsert = builder.CreateBitCast(valueToInsert,
-                                                          typeFor(node->typeInfo->typeData.structTypeData.secretArrayElementType)->getPointerTo(0));
+                auto structType = llvm::StructType::get(builder.getContext(),
+                                                        {builder.getInt32Ty(), typeFor(value->valueParamData.value->typeInfo)},
+                                                        true);
+                auto blankSlate = (llvm::Value *) llvm::ConstantStruct::get(structType);
+
+                blankSlate = builder.CreateInsertValue(blankSlate, builder.getInt32(static_cast<uint32_t>(tagIndex)), 0);
+                blankSlate = builder.CreateInsertValue(blankSlate, rvalueFor(value->valueParamData.value), 1);
+
+                node->llvmData = blankSlate;
+
+                if (node->isLocal) {
+                    store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
                 }
-                blankSlate = builder.CreateInsertValue(blankSlate, valueToInsert, idx);
-
-                idx += 1;
             }
+            else {
+                std::vector<llvm::Value *> values;
+                std::vector<llvm::Type *> types;
 
-            node->llvmData = blankSlate;
+                unsigned int idx = 0;
+                for (auto param : node->structLiteralData.params) {
+                    gen(param);
 
-            if (node->isLocal) {
-                store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
+                    auto valueToInsert = rvalueFor(param->valueParamData.value);
+                    auto computedType = typeFor(param->valueParamData.value->typeInfo);
+                    assert(valueToInsert);
+
+                    if (node->typeInfo->typeData.structTypeData.isSecretlyArray && idx == 0) {
+                        valueToInsert = builder.CreateBitCast(valueToInsert,
+                                                              typeFor(node->typeInfo->typeData.structTypeData.secretArrayElementType)->getPointerTo(0));
+                        computedType = typeFor(node->typeInfo->typeData.structTypeData.secretArrayElementType)->getPointerTo(0);
+                    }
+
+                    values.push_back(valueToInsert);
+                    types.push_back(valueToInsert->getType());
+//                    types.push_back(computedType);
+
+                    idx += 1;
+                }
+
+                auto structType = llvm::StructType::get(builder.getContext(), types);
+                auto blankSlate = (llvm::Value *) llvm::ConstantStruct::get(structType);
+
+                idx = 0;
+                for (auto value : values) {
+                    auto valueType = value->getType();
+                    auto blankSlateIdxType = structType->getTypeAtIndex(idx);
+
+                    blankSlate = builder.CreateInsertValue(blankSlate, value, idx);
+                    idx += 1;
+                }
+
+                node->llvmData = blankSlate;
+
+                if (node->isLocal) {
+                    store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
+                }
             }
         } break;
         case NodeType::ARRAY_LITERAL: {
@@ -1055,20 +1229,21 @@ void LlvmGen::gen(Node *node) {
             store(rvalueFor(node->nodeData), static_cast<llvm::Value *>(node->nodeData->llvmLocal));
 
             // call malloc with the correct size, store into it's local if necessary
-            emitDebugLocation(this, node);
+            auto sizeInBytes = module->getDataLayout().getTypeSizeInBits(typeFor(node->nodeData->typeInfo)) / 8;
 
-//            node->llvmData = builder.CreateCall(mallocFunc, { rvalueFor(node->nodeData) });
-            auto sizeInBits = module->getDataLayout().getTypeSizeInBits(typeFor(node->nodeData->typeInfo));
-            auto sizeInBytes = sizeInBits / 8;
-
-            node->llvmData = builder.CreateCall(mallocFunc, { builder.getInt64(sizeInBytes) });
+            auto mallocCall = builder.CreateCall(mallocFunc, { builder.getInt64(sizeInBytes) });
+            node->llvmData = mallocCall;
             if (node->isLocal) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
 
             // store the value into the malloc
-            store(rvalueFor(node->nodeData), static_cast<llvm::Value *>(node->llvmData));
+            store(rvalueFor(node->nodeData), mallocCall);
         } break;
         default: assert(false);
+    }
+
+    for (auto stmt : node->postStmts) {
+        gen(stmt);
     }
 }

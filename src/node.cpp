@@ -198,8 +198,12 @@ Node *wrapInValueParam(Node *value, int64_t atomId) {
     valueParam->type = NodeType::VALUE_PARAM;
     valueParam->valueParamData.value = value;
 
-    auto nameNode = new Node(NodeTypekind::SYMBOL);
+    auto nameNode = new Node();
+    nameNode->type = NodeType::SYMBOL;
+    nameNode->scope = value->scope;
+    nameNode->region = value->region;
     nameNode->symbolData.atomId = atomId;
+
     valueParam->valueParamData.name = nameNode;
 
     return valueParam;
@@ -211,7 +215,11 @@ Node *wrapInValueParam(Node *value, string name) {
     valueParam->valueParamData.value = value;
 
     if (!name.empty()) {
-        auto nameNode = new Node(NodeTypekind::SYMBOL);
+        auto nameNode = new Node();
+        nameNode->type = NodeType::SYMBOL;
+        nameNode->scope = value->scope;
+        nameNode->region = value->region;
+
         nameNode->symbolData.atomId = AtomTable::current->insertStr(name);
         valueParam->valueParamData.name = nameNode;
     }
@@ -222,7 +230,9 @@ Node *wrapInValueParam(Node *value, string name) {
 Node *wrapInDeclParam(Node *type, string name, int index) {
     Node *nameNode = nullptr;
     if (!name.empty()) {
-        nameNode = new Node(NodeTypekind::SYMBOL);
+        nameNode = new Node();
+        nameNode->type = NodeType::SYMBOL;
+
         nameNode->symbolData.atomId = AtomTable::current->insertStr(name);
     }
 

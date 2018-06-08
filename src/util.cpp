@@ -222,7 +222,12 @@ ostream &operator<<(ostream &os, TypeData td) {
 
             // todo(chad): @Incomplete -- handle array/union types here too
             for (auto param : td.structTypeData.params) {
-                os << param->declParamData.type->typeData << ", ";
+                if (param->declParamData.type) {
+                    os << param->declParamData.type->typeData << ", ";
+                }
+                else {
+                    os << "<<unresolved>>" << ", ";
+                }
             }
 
             os << "}";
@@ -234,6 +239,106 @@ ostream &operator<<(ostream &os, TypeData td) {
             os << "*";
             os << td.pointerTypeData.underlyingType->typeData;
         } break;
+    }
+
+    return os;
+}
+
+ostream &operator<<(ostream &os, Node *node) {
+    if (node->printed) { return os; }
+
+    node->printed = true;
+
+    for (auto ps: node->preStmts) {
+        cout << ps;
+    }
+
+    if (node->skipAllButPostStmts) {
+        for (auto stmt : node->postStmts) {
+            cout << stmt;
+        }
+
+        return os;
+    }
+
+    switch (node->type) {
+        case NodeType::FN_DECL: {
+            cout << "fn (...) {" << endl;
+            for (auto b : node->fnDeclData.body) {
+                cout << b;
+            }
+            cout << "}" << endl;
+        } break;
+        case NodeType::SYMBOL:{
+            auto sym = AtomTable::current->backwardAtoms[node->symbolData.atomId];
+            cout << sym;
+        } break;
+        case NodeType::DECL: {
+            if (node->declData.type == nullptr) {
+                cout << node->declData.lvalue << " := " << node->declData.initialValue;
+            }
+            else if (node->declData.initialValue == nullptr) {
+                cout << node->declData.lvalue << " : " << node->declData.type;
+            }
+            else {
+                cout << node->declData.lvalue << " : " << node->declData.type << " = " << node->declData.initialValue;
+            }
+
+            cout << ";" << endl;
+        } break;
+        case NodeType::TYPE: {
+            cout << node->typeData;
+        } break;
+        case NodeType::STRUCT_LITERAL: {
+            cout << "{ ";
+            for (auto p : node->structLiteralData.params) {
+                cout << p << ", ";
+            }
+            cout << " }";
+        } break;
+        case NodeType::VALUE_PARAM: {
+            if (node->valueParamData.name != nullptr) {
+                cout << node->valueParamData.name << " : " << node->valueParamData.value;
+            }
+            else {
+                cout << node->valueParamData.value;
+            }
+        } break;
+        case NodeType::INT_LITERAL: {
+            cout << node->intLiteralData.value;
+        } break;
+        case NodeType::ASSIGN: {
+            cout << node->assignData.lhs << " = " << node->assignData.rhs << ";" << endl;
+        } break;
+        case NodeType::DOT: {
+            cout << node->dotData.lhs << "." << node->dotData.rhs;
+        } break;
+        case NodeType::NIL_LITERAL: {
+            cout << "nil";
+        } break;
+        case NodeType::ARRAY_LITERAL: {
+//            cout << "[]" << node->arrayLiteralData.elementType << "{";
+//            for (auto e : node->arrayLiteralData.elements) {
+//                cout << e << ", ";
+//            }
+//            cout << "}";
+
+             cout << node->arrayLiteralData.structLiteralRepresentation;
+        } break;
+        case NodeType::RET: {
+            cout << "ret " << node->retData.value << ";" << endl;
+        } break;
+        case NodeType::HEAPIFY: {
+            cout << "heap(" << node->nodeData << ")";
+        } break;
+        case NodeType::CAST: {
+            cout << "cast(" << node->castData.type << ") " << node->castData.value;
+        } break;
+        default: assert(false);
+    }
+
+    for (auto stmt : node->postStmts) {
+        cout << stmt;
     }
 
     return os;

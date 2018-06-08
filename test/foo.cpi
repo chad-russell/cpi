@@ -1,25 +1,65 @@
-fn assert(b: bool) {
-    if (b == false) {
-        panic();
-    }
+type ParamData struct {
+    name:  []i8,
+    _type: *TypeInfo
 }
 
-type point struct {
-    x: i64,
-    y: i64
+type StructData struct {
+    params: []ParamData
+}
+
+type EnumData struct {
+    params: []ParamData
+}
+
+type FnData struct {
+    params:     []ParamData,
+    returnType: *TypeInfo
+}
+
+type PointerData struct {
+    underlyingType: *TypeInfo
+}
+
+type ArrayData struct {
+    elementType: *TypeInfo
+}
+
+type TypeInfo union {
+    NONE:          none,
+    INT_LITERAL:   i64,
+    I8:            none,
+    I32:           none,
+    I64:           none,
+    FLOAT_LITERAL: f64,
+    BOOLEAN:       none,
+    F32:           none,
+    F64:           none,
+    FN:            FnData,
+    STRUCT:        StructData,
+    POINTER:       PointerData,
+    ENUM:          EnumData,
+    ARRAY:         ArrayData,
+}
+
+type Any struct {
+    _type:  TypeInfo,
+    value:  *none
 }
 
 fn main() {
-    count: i32 = 3;
+    a: Any = {
+        _type: {
+            STRUCT: {
+                params: []ParamData{
+                    {
+                        name: "fuck you",
+                        _type: &{I64: {}},
+                    }
+                }
+            }
+        },
+        value: cast(*none) &83
+    };
 
-    point_array := cast([]point) {&{{1, 1}, {2, 3}, {4, 5}}, count};
-
-    assert(point_array[1].y == 3);
-
-    count = 3;
-    e1: i32 = 1;
-    e2: i32 = 2;
-    e3: i32 = 3;
-
-    assert([]{e1, e2, e3}[1] == 2);
+    ret a._type.STRUCT.params[0]._type.tag;
 }

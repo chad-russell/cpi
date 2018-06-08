@@ -109,6 +109,14 @@ void BytecodeGen::gen(Node *node) {
         gen(stmt);
     }
 
+    if (node->skipAllButPostStmts) {
+        for (auto stmt : node->postStmts) {
+            gen(stmt);
+        }
+
+        return;
+    }
+
     if (node->sourceMapStatement) {
         sourceMap.statements.push_back(SourceMapStatement{
                 instructions.size(),
@@ -230,7 +238,8 @@ void BytecodeGen::gen(Node *node) {
         } break;
         case NodeType::DECL: {
             auto data = node->declData;
-            if (data.initialValue == nullptr) { return; }
+
+            if (data.initialValue == nullptr) { break; }
 
             gen(data.initialValue);
 
@@ -910,6 +919,10 @@ void BytecodeGen::gen(Node *node) {
         } break;
         default:
             assert(false);
+    }
+
+    for (auto stmt : node->postStmts) {
+        gen(stmt);
     }
 
     if (node->sourceMapStatement) {

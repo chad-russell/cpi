@@ -885,12 +885,29 @@ Node *Parser::parseArrayLiteral() {
     addLocal(elemsStruct);
     addLocal(heapified);
 
+    Node *typeOfElem = nullptr;
+    if (lit->arrayLiteralData.elementType != nullptr) {
+        typeOfElem = lit->arrayLiteralData.elementType;
+    }
+    else if (!lit->arrayLiteralData.elements.empty()) {
+        typeOfElem = new Node(lexer->srcInfo, NodeType::TYPEOF, scopes.top());
+        typeOfElem->nodeData = lit->arrayLiteralData.elements[0];
+    }
+
+    auto pointerToTypeOfElem = new Node(NodeTypekind::POINTER);
+    pointerToTypeOfElem->typeData.pointerTypeData.underlyingType = typeOfElem;
+
+    auto castedHeapified = new Node(lexer->srcInfo, NodeType::CAST, scopes.top());
+    castedHeapified->type = NodeType::CAST;
+    castedHeapified->castData.type = pointerToTypeOfElem;
+    castedHeapified->castData.value = heapified;
+
     auto countNode = new Node(lexer->srcInfo, NodeType::INT_LITERAL, scopes.top());
     countNode->intLiteralData.value = static_cast<int64_t>(elemsStruct->structLiteralData.params.size());
     countNode->typeInfo = new Node(NodeTypekind::I32);
 
     lit->arrayLiteralData.structLiteralRepresentation = new Node(lexer->srcInfo, NodeType::STRUCT_LITERAL, scopes.top());
-    lit->arrayLiteralData.structLiteralRepresentation->structLiteralData.params.push_back(wrapInValueParam(heapified, "data"));
+    lit->arrayLiteralData.structLiteralRepresentation->structLiteralData.params.push_back(wrapInValueParam(castedHeapified, "data"));
     lit->arrayLiteralData.structLiteralRepresentation->structLiteralData.params.push_back(wrapInValueParam(countNode, "count"));
 
     return lit;
