@@ -1,27 +1,16 @@
 TODO:
-    - struct literal refactor
-        - rewrite as a declaration and then assigments through dots
-        - need to be careful when pointers are involved (i.e. taking the address of something inline)
-        - should trigger when:
-            - decl/assignment combo
-            - assignment
-            - passing through struct parameters
-
-    - when there is no initialValue on a declaration, the backend should zero the memory
+    - make default stuff work again for declarations / fn params
 
     - merge the concepts of declParam and valueParam. It's too confusing at this point and we are needing to switch between them too often
 
-    - support 'putchar' in interpreter
-
-    - fix buffer test
-        - infinite loops in llvm
-        - returns 0 everywhere if you try to use pointers... :(
+    - support 'putchar'
 
     - replace 'anyof' with 'typeinfo', and finish implementing buildTypeInfoStructLiteral for struct/fn types
 
     - better interpreter debugging
         - more accurate source information, stopping, etc.
         - get list of stack variables and print their values by name
+        - implement option to have memory as a rope structure -- infinite undo/redo of program execution state
 
     - libraries / namespaces / modules
 
@@ -53,7 +42,7 @@ TODO:
 
     - signed vs unsigned ints
 
-    - parse symbols in ``
+    - parse symbols in backticks
         - `0n3:s!mb()l` := 3;
 
     - more integer formats

@@ -160,9 +160,15 @@ void interpretPanic(Interpreter *interp) {
 void interpretMalloc(Interpreter *interp) {
     auto numBytes = interp->read<int64_t>();
     auto storeOffset = interp->consume<int32_t>();
+
+//    cout << "allocating " << numBytes << " bytes...";
+
     auto allocated = malloc(static_cast<size_t>(numBytes));
-    int64_t offset_from_stack = static_cast<int64_t>((int8_t *) allocated - (int8_t *) interp->stack.data());
+    auto offset_from_stack = static_cast<int64_t>((int8_t *) allocated - (int8_t *) interp->stack.data());
+//    cout << " offset -- " << offset_from_stack << " ...";
     interp->copyToStack(offset_from_stack, interp->bp + storeOffset);
+
+//    cout << " done!" << endl;
 }
 
 void interpretFree(Interpreter *interp) {
@@ -251,11 +257,15 @@ void interpretStore(Interpreter *interp) {
     assert(maybeReadOffset.isPresent);
     auto readOffset = maybeReadOffset.value;
 
+//    if (readOffset > 5000 || readOffset < 0) {
+//        cout << "storing from read offset -- " << readOffset << endl;
+//    }
+
     auto size = interp->consume<int32_t>();
 
     memcpy(&interp->stack[storeOffset], &interp->stack[readOffset], static_cast<size_t>(size));
 
-    auto debugValue = *((int64_t *) (&interp->stack[storeOffset]));
+//    auto debugValue = *((int64_t *) (&interp->stack[storeOffset]));
 //    cout << "stored " << debugValue << " to " << storeOffset << " (from " << readOffset << ")" << endl;
 }
 

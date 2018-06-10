@@ -898,7 +898,6 @@ Node *Parser::parseArrayLiteral() {
     pointerToTypeOfElem->typeData.pointerTypeData.underlyingType = typeOfElem;
 
     auto castedHeapified = new Node(lexer->srcInfo, NodeType::CAST, scopes.top());
-    castedHeapified->type = NodeType::CAST;
     castedHeapified->castData.type = pointerToTypeOfElem;
     castedHeapified->castData.value = heapified;
 

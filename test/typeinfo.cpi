@@ -74,5 +74,6 @@ fn main() {
         },
         value: cast(*none) &77
     };
+
     ret a._type.STRUCT.params[0]._type.tag;
 }

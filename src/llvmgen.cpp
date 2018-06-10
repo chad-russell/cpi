@@ -10,7 +10,7 @@
 #include <unistd.h>
 #include <sstream>
 
-#define DBUILDER 1
+#define DBUILDER 0
 
 void debugValue(void *val) {
     ((llvm::Value *) val)->print(llvm::errs());
@@ -81,6 +81,13 @@ LlvmGen::LlvmGen(const char *fileName) : builder(context), module(llvm::make_uni
     llvm::FunctionType *mallocType = llvm::FunctionType::get(builder.getInt8Ty()->getPointerTo(), { builder.getInt64Ty() }, false);
     mallocFunc = module->getOrInsertFunction("malloc", mallocType);
 
+    llvm::FunctionType *memsetType = llvm::FunctionType::get(builder.getInt8Ty()->getPointerTo(), {
+            builder.getInt8Ty()->getPointerTo(),
+            builder.getInt64Ty(), // todo(chad): how to get natural word size for machine?
+            builder.getInt64Ty(),
+    }, false);
+    memsetFunc = module->getOrInsertFunction("memset", memsetType);
+
     llvm::FunctionType *freeType = llvm::FunctionType::get(voidTy, { builder.getInt8Ty()->getPointerTo() }, false);
     freeFunc = module->getOrInsertFunction("free", freeType);
 
@@ -128,9 +135,9 @@ void LlvmGen::finalize() {
     }
 
     // DO_OPTIMIZE
-//    for (auto fn : allFns) {
-//        TheFPM->run(*fn);
-//    }
+    for (auto fn : allFns) {
+        TheFPM->run(*fn);
+    }
     verifyModule(*module, &llvm::errs());
 }
 
@@ -542,7 +549,17 @@ void LlvmGen::gen(Node *node) {
         case NodeType::RET: {
             gen(node->retData.value);
             emitDebugLocation(this, node);
-            builder.CreateRet(rvalueFor(node->retData.value));
+
+            auto rvalue = rvalueFor(node->retData.value);
+
+            auto retType = rvalue->getType();
+            auto realRetType = typeFor(currentFnDecl->fnDeclData.returnType);
+
+            // todo(chad): @Hack there doesn't seem to be another way to cast things...
+            auto realRet = builder.CreateAlloca(realRetType, nullptr, "realRet");
+            builder.CreateStore(rvalue, builder.CreateBitCast(realRet, retType->getPointerTo(0)));
+
+            builder.CreateRet(builder.CreateLoad(realRet));
         } break;
         case NodeType::INT_LITERAL: {
             emitDebugLocation(this, node);
@@ -581,15 +598,27 @@ void LlvmGen::gen(Node *node) {
 
             emitDebugLocation(this, node);
 
-            if (data.initialValue == nullptr) { return; }
+            if (data.initialValue == nullptr) {
+                assert(node->llvmLocal);
 
-            gen(data.initialValue);
+//                auto zeroArrayType = llvm::ArrayType::get(builder.getInt8Ty(), 20);
+//                auto st = llvm::StructType::get(builder.getInt32Ty(), zeroArrayType);
+//                store(llvm::ConstantStruct::get(st), (llvm::Value *) node->llvmLocal);
 
-            auto resolvedInitialValue = resolve(data.initialValue);
-            gen(resolvedInitialValue);
+                // memset the local to zero
+                auto sizeInBytes = module->getDataLayout().getTypeSizeInBits(typeFor(data.type)) / 8;
+                auto castedLocal = builder.CreateBitCast((llvm::Value *) node->llvmLocal, builder.getInt8PtrTy(0));
+                auto memsetCall = builder.CreateCall(memsetFunc, { castedLocal, builder.getInt64(0), builder.getInt64(sizeInBytes) });
+            }
+            else {
+                gen(data.initialValue);
 
-            if (data.initialValue->typeInfo->typeData.kind != NodeTypekind::NONE) {
-                store(rvalueFor(data.initialValue), (llvm::Value *) node->llvmLocal);
+                auto resolvedInitialValue = resolve(data.initialValue);
+                gen(resolvedInitialValue);
+
+                if (data.initialValue->typeInfo->typeData.kind != NodeTypekind::NONE) {
+                    store(rvalueFor(data.initialValue), (llvm::Value *) node->llvmLocal);
+                }
             }
         } break;
         case NodeType::SYMBOL: {
@@ -1064,15 +1093,16 @@ void LlvmGen::gen(Node *node) {
                 assert(value->type == NodeType::VALUE_PARAM);
 
                 gen(value->valueParamData.value);
+                auto paramValue = rvalueFor(value->valueParamData.value);
 
                 auto structType = llvm::StructType::get(builder.getContext(),
-                                                        {builder.getInt32Ty(), typeFor(value->valueParamData.value->typeInfo)});
+                                                        { builder.getInt32Ty(), paramValue->getType() },
+                                                        true);
                 auto blankSlate = (llvm::Value *) llvm::ConstantStruct::get(structType);
 
                 blankSlate = builder.CreateInsertValue(blankSlate, builder.getInt32(static_cast<uint32_t>(tagIndex)), 0);
 
                 auto blankSlateIdxType = structType->getTypeAtIndex(1);
-                auto paramValue = rvalueFor(value->valueParamData.value);
                 auto castedValue = builder.CreateBitCast(paramValue, blankSlateIdxType);
                 blankSlate = builder.CreateInsertValue(blankSlate, castedValue, 1);
 
@@ -1135,6 +1165,7 @@ void LlvmGen::gen(Node *node) {
         } break;
         case NodeType::CAST: {
             gen(node->castData.value);
+            storeIfNeeded(node->castData.value);
 
             auto toType = resolve(node->castData.type);
             auto fromType = resolve(node->castData.value->typeInfo);
@@ -1167,15 +1198,21 @@ void LlvmGen::gen(Node *node) {
             else {
                 node->llvmData = (llvm::Value *) node->castData.value->llvmData;
                 if (node->llvmData && resolve(node->castData.type)->typeData.kind == NodeTypekind::POINTER) {
-                    node->llvmData = builder.CreateBitCast((llvm::Value *) node->llvmData, typeFor(node->castData.type));
+                    node->llvmData = builder.CreateBitCast(rvalueFor(node->castData.value), typeFor(node->castData.type));
                 }
 
-                node->llvmLocal = (llvm::Value *) node->castData.value->llvmLocal;
-                if (node->llvmLocal && resolve(node->castData.type)->typeData.kind == NodeTypekind::POINTER) {
-                    node->llvmLocal = builder.CreateBitCast((llvm::Value *) node->llvmLocal, typeFor(node->castData.type)->getPointerTo(0));
-                }
+//                node->llvmLocal = (llvm::Value *) node->castData.value->llvmLocal;
+//                if (node->llvmLocal && resolve(node->castData.type)->typeData.kind == NodeTypekind::POINTER) {
+//                    node->llvmLocal = builder.CreateBitCast((llvm::Value *) node->llvmLocal, typeFor(node->castData.type)->getPointerTo(0));
+//                }
 
-                node->isLocal = node->castData.value->isLocal;
+                if (node->llvmLocal) {
+                    store(rvalueFor(node->castData.value), (llvm::Value *) node->llvmLocal);
+                }
+            }
+
+            if (node->llvmData && node->llvmLocal) {
+                store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
         } break;
         case NodeType::ARRAY_INDEX: {

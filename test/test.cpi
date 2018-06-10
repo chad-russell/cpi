@@ -127,15 +127,15 @@ fn main() {
 
     testUnion1();
 
-    -- testDefault();
-    -- testBuffer();
-
     testAnySimple1();
+
+    testBuffer();
 
     ret 0;
 }
 
 fn saved() {
+    -- testDefault();
 }
 
 fn testUnion1() {
@@ -732,6 +732,7 @@ fn test23() {
 
 fn buffer(T: Ast)(capacity: i64) {
     buf: []T;
+    buf.count = 0;
     buf.data = cast(*T) malloc(capacity * sizeof(T));
 
     ret {
@@ -748,16 +749,17 @@ fn ensureCapacity( T := typeof(b), E := typeof(b.buf[0]) )(b: T, index: i64) {
     while index >= b.capacity {
         b.capacity = b.capacity * 2;
 
-        -- newBuf: []E;
-        -- newBuf.data = cast(*E) malloc(b.capacity * sizeof(E));
+        newBuf: []E;
+        newBuf.count = b.buf.count;
+        newBuf.data = cast(*E) malloc(b.capacity * sizeof(E));
 
-        -- idx := 0;
-        -- while idx < b.buf.count {
-            -- newBuf[idx] = b.buf[idx];
-            -- idx = idx + 1;
-        -- }
+        idx := 0;
+        while idx < b.buf.count {
+            newBuf[idx] = b.buf[idx];
+            idx = idx + 1;
+        }
 
-        -- b.buf = newBuf;
+        b.buf = newBuf;
     }
 }
 
@@ -768,7 +770,7 @@ fn buffer_set( T := typeof(^b), E := typeof(b.buf[0]) )(b: *T, index: i64, e: E)
     ret b.capacity;
 }
 
-fn buffer_get( T := typeof(^b) )(b: *T, index: i64) {
+fn buffer_get( T := typeof(b) )(b: T, index: i64) {
     ensureCapacity(b, index);
     ret b.buf[index];
 }
@@ -786,7 +788,9 @@ fn testBuffer() {
     f.y = 4;
 
     buffer_set(&b, 200, f);
-    ret buffer_get(&b, 200).y;
+
+    assert(buffer_get(&b, 200).x == 3);
+    assert(buffer_get(&b, 200).y == 4);
 }
 
 fn testAnySimple1() {

@@ -30,6 +30,7 @@ public:
 
     llvm::Constant *panicFunc;
     llvm::Constant *mallocFunc;
+    llvm::Constant *memsetFunc;
     llvm::Constant *freeFunc;
 
     llvm::Type *voidTy;

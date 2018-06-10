@@ -616,12 +616,15 @@ void BytecodeGen::gen(Node *node) {
             }
 
             // copy bytes
-            append(instructions, Instruction::STORE);
-            append(instructions, Instruction::RELCONSTI32);
-            append(instructions, toBytes32(node->localOffset));
-            append(instructions, Instruction::RELCONSTI32);
-            append(instructions, toBytes32(currentFnStackSize + totalParamsSize + 8));
-            append(instructions, toBytes32(typeSize(resolvedFn->typeInfo->typeData.fnTypeData.returnType)));
+            auto returnTypeSize = typeSize(resolvedFn->typeInfo->typeData.fnTypeData.returnType);
+            if (returnTypeSize > 0) {
+                append(instructions, Instruction::STORE);
+                append(instructions, Instruction::RELCONSTI32);
+                append(instructions, toBytes32(node->localOffset));
+                append(instructions, Instruction::RELCONSTI32);
+                append(instructions, toBytes32(currentFnStackSize + totalParamsSize + 8));
+                append(instructions, toBytes32(returnTypeSize));
+            }
 
             append(node->bytecode, Instruction::RELI32);
             append(node->bytecode, toBytes32(node->localOffset));

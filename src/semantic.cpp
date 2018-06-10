@@ -288,77 +288,77 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
     return desired->typeData.kind == actual->typeData.kind;
 }
 
-//Node *defaultValueFor(Semantic *semantic, Node *type) {
-//    assert(type->type == NodeType::TYPE);
-//
-//    switch (type->typeData.kind) {
-//        case NodeTypekind::INT_LITERAL:
-//        case NodeTypekind::I8:
-//        case NodeTypekind::I32:
-//        case NodeTypekind::I64: {
-//            auto def = new Node();
-//            def->type = NodeType::INT_LITERAL;
-//            def->intLiteralData.value = 0;
-//            def->typeInfo = type;
-//            return def;
-//        }
-//        case NodeTypekind::FLOAT_LITERAL:
-//        case NodeTypekind::F32:
-//        case NodeTypekind::F64: {
-//            auto def = new Node();
-//            def->type = NodeType::FLOAT_LITERAL;
-//            def->floatLiteralData.value = 0;
-//            def->typeInfo = type;
-//            return def;
-//        }
-//        case NodeTypekind::BOOLEAN: {
-//            auto def = new Node();
-//            def->type = NodeType::BOOLEAN_LITERAL;
-//            def->boolLiteralData.value = false;
-//            def->typeInfo = type;
-//            return def;
-//        }
-//        case NodeTypekind::FN:
-//        case NodeTypekind::POINTER: {
-//            auto def = new Node();
-//            def->type = NodeType::NIL_LITERAL;
-//            def->typeInfo = type;
-//            return def;
-//        }
-//        case NodeTypekind::STRUCT: {
-//            auto def = new Node();
-//            def->type = NodeType::STRUCT_LITERAL;
-//
-//            for (auto param : type->typeData.structTypeData.params) {
-//                auto vp = param->declParamData.initialValue;
-//                if (vp == nullptr) {
-//                    vp = wrapInValueParam(defaultValueFor(semantic, param->typeInfo), param->declParamData.name->symbolData.atomId);
-//                }
-//                else {
-//                    vp = wrapInValueParam(vp, param->declParamData.name->symbolData.atomId);
-//                }
-//
-//                semantic->resolveTypes(vp);
-//                def->structLiteralData.params.push_back(vp);
-//            }
-//
-//            def->typeInfo = type;
-//
-//            return def;
-//        }
-//        case NodeTypekind::SYMBOL: {
-//            return defaultValueFor(semantic, resolve(type));
-//        }
-//        case NodeTypekind::NONE: {
-//            auto def = new Node();
-//            def->type = NodeType::STRUCT_LITERAL;
-//            def->typeInfo = type;
-//            return def;
-//        }
-//        default:
-//            assert(false);
-//    }
-//}
+Node *defaultValueFor(Semantic *semantic, Node *type) {
+    assert(type->type == NodeType::TYPE);
+
+    switch (type->typeData.kind) {
+        case NodeTypekind::INT_LITERAL:
+        case NodeTypekind::I8:
+        case NodeTypekind::I32:
+        case NodeTypekind::I64: {
+            auto def = new Node();
+            def->type = NodeType::INT_LITERAL;
+            def->intLiteralData.value = 0;
+            def->typeInfo = type;
+            return def;
+        }
+        case NodeTypekind::FLOAT_LITERAL:
+        case NodeTypekind::F32:
+        case NodeTypekind::F64: {
+            auto def = new Node();
+            def->type = NodeType::FLOAT_LITERAL;
+            def->floatLiteralData.value = 0;
+            def->typeInfo = type;
+            return def;
+        }
+        case NodeTypekind::BOOLEAN: {
+            auto def = new Node();
+            def->type = NodeType::BOOLEAN_LITERAL;
+            def->boolLiteralData.value = false;
+            def->typeInfo = type;
+            return def;
+        }
+        case NodeTypekind::FN:
+        case NodeTypekind::POINTER: {
+            auto def = new Node();
+            def->type = NodeType::NIL_LITERAL;
+            def->typeInfo = type;
+            return def;
+        }
+        case NodeTypekind::STRUCT: {
+            auto def = new Node();
+            def->type = NodeType::STRUCT_LITERAL;
+
+            for (auto param : type->typeData.structTypeData.params) {
+                auto vp = param->declParamData.initialValue;
+                if (vp == nullptr) {
+                    vp = wrapInValueParam(defaultValueFor(semantic, param->typeInfo), param->declParamData.name->symbolData.atomId);
+                }
+                else {
+                    vp = wrapInValueParam(vp, param->declParamData.name->symbolData.atomId);
+                }
+
+                semantic->resolveTypes(vp);
+                def->structLiteralData.params.push_back(vp);
+            }
+
+            def->typeInfo = type;
+
+            return def;
+        }
+        case NodeTypekind::SYMBOL: {
+            return defaultValueFor(semantic, resolve(type));
+        }
+        case NodeTypekind::NONE: {
+            auto def = new Node();
+            def->type = NodeType::STRUCT_LITERAL;
+            def->typeInfo = type;
+            return def;
+        }
+        default:
+            assert(false);
+    }
+}
 
 void Semantic::reportError(vector<Node *> nodes, Error error) {
     encounteredErrors = true;
@@ -1416,7 +1416,7 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
 
     // if the lhs is a pointer, then our dot needs a pointer-sized local
     semantic->resolveTypes(node->dotData.lhs);
-    if (node->dotData.lhs->typeInfo->typeData.kind == NodeTypekind::POINTER) {
+    if (resolve(node->dotData.lhs->typeInfo)->typeData.kind == NodeTypekind::POINTER) {
         auto local = new Node(NodeTypekind::POINTER);
         local->typeInfo = local;
         local->isLocal = true;

@@ -263,7 +263,11 @@ ostream &operator<<(ostream &os, Node *node) {
 
     switch (node->type) {
         case NodeType::FN_DECL: {
-            cout << "fn (...) {" << endl;
+            cout << "fn (";
+            for (auto p : node->fnDeclData.params) {
+                cout << p << ", ";
+            }
+            cout << ") {" << endl;
             for (auto b : node->fnDeclData.body) {
                 cout << b;
             }
@@ -355,10 +359,24 @@ ostream &operator<<(ostream &os, Node *node) {
             cout << "panic()" << endl;
         } break;
         case NodeType::DECL_PARAM: {
-            // ???
+            cout << node->declParamData.name;
+            if (node->declParamData.type != nullptr) {
+                cout << " : " << resolve(node->declParamData.type);
+            }
+            if (node->declParamData.initialValue != nullptr) {
+                cout << " = " << node->declParamData.initialValue;
+            }
         } break;
         case NodeType::ARRAY_INDEX: {
             cout << node->arrayIndexData.target << "[" << node->arrayIndexData.indexValue << "]";
+        } break;
+        case NodeType::FN_CALL: {
+            cout << node->fnCallData.fn->resolved;
+            cout << "(";
+            for (auto p : node->fnCallData.params) {
+                cout << p << ", ";
+            }
+            cout << ")";
         } break;
         default: assert(false);
     }
@@ -416,6 +434,7 @@ bool hasNoLocalByDefault(Node *node) {
         case NodeType::FN_DECL:
         case NodeType::STRUCT_LITERAL:
         case NodeType::UNARY_NEG:
+        case NodeType::CAST:
             return true;
         default: return false;
     }
