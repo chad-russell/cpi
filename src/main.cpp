@@ -271,6 +271,7 @@ int main(int argc, char **argv) {
             interp->bp = 0;
 
             interp->interpret();
+//            cout << "executed " << interp->stepCount << " instructions" << endl;
         }
 
         cout << "ANSWER: ";

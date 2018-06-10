@@ -18,6 +18,8 @@ void BytecodeGen::binopHelper(string instructionStr, Node *node, int32_t scale) 
     auto resolvedLhsType = resolve(node->binopData.lhs->typeInfo);
     auto resolvedRhsType = resolve(node->binopData.lhs->typeInfo);
 
+    auto isBoolean = false;
+
     NodeTypekind kind;
     if (resolvedLhsType->typeData.kind == NodeTypekind::POINTER || resolvedRhsType->typeData.kind == NodeTypekind::POINTER) {
         // pointer arithmetic
@@ -31,49 +33,53 @@ void BytecodeGen::binopHelper(string instructionStr, Node *node, int32_t scale) 
             || startsWith(instructionStr, "SGT") || startsWith(instructionStr, "SGE")
             || startsWith(instructionStr, "SLT") || startsWith(instructionStr, "SLE")) {
         // comparison, so boolean
-        kind = NodeTypekind::BOOLEAN;
-    } else {
-        // whatever, man
+        isBoolean = true;
+        kind = resolvedLhsType->typeData.kind;
+//        kind = NodeTypekind::BOOLEAN;
+    }
+    else {
         kind = resolvedLhsType->typeData.kind;
     }
 
+    string toAppend;
     switch (kind) {
+        case NodeTypekind::I8: {
+            toAppend = "I8";
+            bytecodeStr = "RELI8";
+        } break;
         case NodeTypekind::BOOLEAN:
         case NodeTypekind::I32: {
-            instructionStr.append("I32");
+            toAppend = "I32";
             bytecodeStr = "RELI32";
-        }
-            break;
+        } break;
         case NodeTypekind::POINTER:
         case NodeTypekind::I64: {
-            instructionStr.append("I64");
+            toAppend = "I64";
             bytecodeStr = "RELI64";
-        }
-            break;
+        } break;
         case NodeTypekind::F32: {
-            instructionStr.append("F32");
+            toAppend = "F32";
             bytecodeStr = "RELF32";
-        }
-            break;
+        } break;
         case NodeTypekind::F64: {
-            instructionStr.append("F64");
+            toAppend = "F64";
             bytecodeStr = "RELF64";
-        }
-            break;
+        } break;
         default:
             assert(false);
     }
+
+    if (isBoolean) {
+        bytecodeStr = "RELI32";
+    }
+
+    instructionStr.append(toAppend);
 
     auto inst = AssemblyLexer::nameToInstruction[instructionStr];
     append(instructions, inst);
 
     auto bytecodeInst = AssemblyLexer::nameToInstruction[bytecodeStr];
-    if (startsWith(instructionStr, "EQ") || startsWith(instructionStr, "NE")) {
-        // if this is an EQ or a NE instruction, our bytecode is a boolean and therefore *always* an i32
-        append(node->bytecode, Instruction::RELI32);
-    } else {
-        append(node->bytecode, bytecodeInst);
-    }
+    append(node->bytecode, bytecodeInst);
 
     append(instructions, bytecodeInst);
     append(instructions, toBytes(node->binopData.lhsTemporary->localOffset));

@@ -132,19 +132,12 @@ void Interpreter::interpret() {
         }
 
         if (!terminated) {
-            step();
+            stepCount++;
+            table.at(instructions[pc++])(this);
         }
     }
 
     delete mp;
-}
-
-void Interpreter::step() {
-    stepCount++;
-
-    unsigned long inst = instructions[pc];
-    pc += 1;
-    table.at(inst)(this);
 }
 
 void interpretExit(Interpreter *interp) {
@@ -256,10 +249,6 @@ void interpretStore(Interpreter *interp) {
     auto maybeReadOffset = interp->tryRead<int32_t>();
     assert(maybeReadOffset.isPresent);
     auto readOffset = maybeReadOffset.value;
-
-//    if (readOffset > 5000 || readOffset < 0) {
-//        cout << "storing from read offset -- " << readOffset << endl;
-//    }
 
     auto size = interp->consume<int32_t>();
 

@@ -275,6 +275,8 @@ public:
           relConstInst = Instruction::RELCONSTI32;
       } else if (is_same<T, int64_t>::value || is_same<T, double>::value) {
           relConstInst = Instruction::RELCONSTI64;
+      } else if (is_same<T, int8_t>::value) {
+          relConstInst = Instruction::RELCONSTI32;
       } else {
           assert(false);
       }
@@ -288,10 +290,14 @@ public:
 
       // REL
       Instruction relInst;
-      if (is_same<T, int32_t>::value || is_same<T, float>::value) {
+      if (is_same<T, int8_t>::value) {
+          relInst = Instruction::RELI8;
+      } else if (is_same<T, int32_t>::value || is_same<T, float>::value) {
           relInst = Instruction::RELI32;
       } else if (is_same<T, int64_t>::value || is_same<T, double>::value) {
           relInst = Instruction::RELI64;
+      } else if (is_same<T, int8_t>::value) {
+              relInst = Instruction::RELI32;
       } else {
           assert(false);
       }
@@ -305,7 +311,9 @@ public:
 
       // CONST
       Instruction constInst;
-      if (is_same<T, int32_t>::value) {
+      if (is_same<T, int8_t>::value) {
+          constInst = Instruction::CONSTI8;
+      } else if (is_same<T, int32_t>::value) {
           constInst = Instruction::CONSTI32;
       } else if (is_same<T, int64_t>::value) {
           constInst = Instruction::CONSTI64;
