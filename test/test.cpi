@@ -1,10 +1,4 @@
 fn main() {
-    testBug1();
-
-    ret 0;
-}
-
-fn saved() {
     f := fn() {
         ret fn() {
             ret foo;
@@ -134,6 +128,10 @@ fn saved() {
 
     testBuffer();
 
+    ret 0;
+}
+
+fn saved() {
     -- testDefault();
 }
 

@@ -270,18 +270,7 @@ public:
       auto inst = static_cast<Instruction>(instructions[pc]);
 
       // RELCONST
-      Instruction relConstInst;
-      if (is_same<T, int32_t>::value || is_same<T, float>::value) {
-          relConstInst = Instruction::RELCONSTI32;
-      } else if (is_same<T, int64_t>::value || is_same<T, double>::value) {
-          relConstInst = Instruction::RELCONSTI64;
-      } else if (is_same<T, int8_t>::value) {
-          relConstInst = Instruction::RELCONSTI32;
-      } else {
-          assert(false);
-      }
-
-      if (inst == relConstInst) {
+      if (inst == Instruction::RELCONSTI32 || inst == Instruction::RELCONSTI64) {
           pc += 1;
           auto consumed = consume<T>();
           consumed += static_cast<T>(bp);
@@ -289,20 +278,9 @@ public:
       }
 
       // REL
-      Instruction relInst;
-      if (is_same<T, int8_t>::value) {
-          relInst = Instruction::RELI8;
-      } else if (is_same<T, int32_t>::value || is_same<T, float>::value) {
-          relInst = Instruction::RELI32;
-      } else if (is_same<T, int64_t>::value || is_same<T, double>::value) {
-          relInst = Instruction::RELI64;
-      } else if (is_same<T, int8_t>::value) {
-              relInst = Instruction::RELI32;
-      } else {
-          assert(false);
-      }
-
-      if (inst == relInst) {
+      if (inst == Instruction::RELI8 || inst == Instruction::RELI16
+          || inst == Instruction::RELI32 || inst == Instruction::RELI64
+          || inst == Instruction::RELF32 || inst == Instruction::RELF64) {
           pc += 1;
           auto consumed = consume<int32_t>();
           auto value = readFromStack<T>(consumed + bp);
@@ -310,30 +288,23 @@ public:
       }
 
       // CONST
-      Instruction constInst;
-      if (is_same<T, int8_t>::value) {
-          constInst = Instruction::CONSTI8;
-      } else if (is_same<T, int32_t>::value) {
-          constInst = Instruction::CONSTI32;
-      } else if (is_same<T, int64_t>::value) {
-          constInst = Instruction::CONSTI64;
-      } else {
-          assert(false);
-      }
-
-      if (inst == constInst) {
+      if (inst == Instruction::CONSTI8 || inst == Instruction::CONSTI16
+          || inst == Instruction::CONSTI32 || inst == Instruction::CONSTI64
+          || inst == Instruction::CONSTF32 || inst == Instruction::CONSTF64) {
           pc += 1;
           auto consumed = consume<T>();
           return Optional<T>{true, consumed};
       }
 
+      assert(false && "unrecognized inst for read<T>");
+
       // todo(chad): dangerous?
       // before this would fail if T was int64_t but the instruction we were reading was Instruction::I32 for example
       // this just blindly reads
-      pc += 1;
-      auto consumed = consume<int32_t>();
-      auto value = readFromStack<T>(consumed);
-      return Optional<T>{true, value};
+//      pc += 1;
+//      auto consumed = consume<int32_t>();
+//      auto value = readFromStack<T>(consumed);
+//      return Optional<T>{true, value};
   }
 
   auto readBits8() {
