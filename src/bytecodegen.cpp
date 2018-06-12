@@ -245,17 +245,13 @@ void BytecodeGen::gen(Node *node) {
         case NodeType::DECL: {
             auto data = node->declData;
 
-            if (data.initialValue == nullptr) { break; }
-
-            gen(data.initialValue);
-
-            auto resolvedInitialValue = resolve(data.initialValue);
-            gen(resolvedInitialValue);
-
             auto localOffset = node->localOffset;
 
-            if (data.initialValue) {
-                storeValue(data.initialValue, localOffset);
+            if (data.initialValue != nullptr) {
+                gen(data.initialValue);
+                auto resolvedInitialValue = resolve(data.initialValue);
+                gen(resolvedInitialValue);
+                storeValue(resolvedInitialValue, localOffset);
             }
         } break;
         case NodeType::ASSIGN: {
@@ -926,6 +922,15 @@ void BytecodeGen::gen(Node *node) {
         case NodeType::ANYOF: {
             gen(node->resolved);
         } break;
+        case NodeType::PUTS: {
+            gen(node->nodeData);
+
+            assert(node->nodeData->isLocal || node->nodeData->isBytecodeLocal);
+            storeValue(node->nodeData, node->nodeData->localOffset);
+            append(instructions, Instruction::PUTS);
+            append(instructions, Instruction::RELCONSTI32);
+            append(instructions, toBytes32(node->nodeData->localOffset));
+        } break;
         default:
             assert(false);
     }
@@ -1103,8 +1108,8 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
             append(instructions, Instruction::RELCONSTI32);
             append(instructions, toBytes(node->localOffset));
 
-            auto ts = typeSize(node->nodeData->typeInfo);
-            append(instructions, toBytes32(ts));
+            // the size is the size of a pointer -- or 8 bytes
+            append(instructions, toBytes32(8));
         } break;
         default:
             assert(false);

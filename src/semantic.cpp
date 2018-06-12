@@ -122,7 +122,7 @@ int maybeMatchUnionToStructLiteral(Node *desired, Node *actual) {
     }
 }
 
-bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
+bool typesMatch(Node *desired, Node *actual, Semantic *semantic, Node *actualValue = nullptr) {
     desired = resolve(desired);
     actual = resolve(actual);
 
@@ -228,6 +228,10 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
             return true;
         }
 
+        if (desired->typeData.structTypeData.params.size() != actual->typeData.structTypeData.params.size()) {
+            return false;
+        }
+
         auto encounteredError = assignParams(semantic, actual, desired->typeData.structTypeData.params, actual->typeData.structTypeData.params);
 
         if (!encounteredError) {
@@ -282,6 +286,7 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
         if (desired->typeData.kind == NodeTypekind::POINTER) {
             return typesMatch(actual->typeData.pointerTypeData.underlyingType, desired->typeData.pointerTypeData.underlyingType, semantic);
         }
+
         else { return false; }
     }
 
@@ -765,7 +770,7 @@ bool assignParams(Semantic *semantic,
         auto declParam = declParams[i];
 
         // if the decl parameter is unassigned but there is a default value, then fill in that param with the default
-        auto openParamsI = openParams[i];
+        bool openParamsI = openParams[i];
         if (declParam->declParamData.initialValue != nullptr && openParamsI) {
             openParams[i] = false;
             declParam->declParamData.initialValue->typeInfo = declParam->declParamData.type;
@@ -802,7 +807,7 @@ void resolveDecl(Semantic *semantic, Node *node) {
     auto shouldCheckTypeMatch = node->declData.initialValue != nullptr
                                 && node->declData.initialValue->typeInfo != nullptr
                                 && node->declData.type != nullptr;
-    if (shouldCheckTypeMatch && !typesMatch(node->declData.type, node->declData.initialValue->typeInfo, semantic)) {
+    if (shouldCheckTypeMatch && !typesMatch(node->declData.type, node->declData.initialValue->typeInfo, semantic, node->declData.initialValue)) {
         ostringstream s("");
         s << "Type mismatch! wanted " << node->declData.type->typeData
           << ", got " << node->declData.initialValue->typeInfo->typeData;
@@ -812,9 +817,9 @@ void resolveDecl(Semantic *semantic, Node *node) {
     else if (node->declData.type == nullptr) {
         node->declData.type = node->declData.initialValue->typeInfo;
     }
-//    else if (node->declData.initialValue == nullptr) {
-//        node->declData.initialValue = defaultValueFor(semantic, node->declData.type);
-//    }
+    else if (node->declData.initialValue == nullptr) {
+        node->declData.initialValue = defaultValueFor(semantic, node->declData.type);
+    }
 
     auto resolvedDeclDataType = resolve(node->declData.type);
     node->typeInfo = node->declData.type;
@@ -1015,9 +1020,9 @@ void resolveFnCall(Semantic *semantic, Node *node) {
             if (ctParam->type == NodeType::VALUE_PARAM) {
                 auto ctValue = ctParam->valueParamData.value;
                 semantic->resolveTypes(ctValue);
-                ctDeclParams[i]->staticValue = ctValue;
+                ctDeclParams[i]->staticValue = resolve(ctValue);
             } else {
-                ctDeclParams[i]->staticValue = ctParam;
+                ctDeclParams[i]->staticValue = resolve(ctParam);
             }
 
             semantic->resolveTypes(ctParam);
@@ -1744,7 +1749,10 @@ void resolveTagCheck(Semantic *semantic, Node *node) {
 }
 
 void resolveHeapify(Semantic *semantic, Node *node) {
+    semantic->addLocal(node);
+
     semantic->resolveTypes(node->nodeData);
+
     auto pointerTypeInfo = new Node(NodeTypekind::POINTER);
     pointerTypeInfo->typeData.pointerTypeData.underlyingType = node->nodeData->typeInfo;
     node->typeInfo = pointerTypeInfo;
@@ -1858,6 +1866,18 @@ void resolveAnyof(Semantic *semantic, Node *node) {
 
     semantic->resolveTypes(node->resolved);
     node->typeInfo = node->resolved->typeInfo;
+}
+
+void resolvePuts(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->nodeData);
+    auto resolvedType = resolve(node->nodeData->typeInfo);
+    if (resolvedType->typeData.kind == NodeTypekind::STRUCT 
+        && resolvedType->typeData.structTypeData.isSecretlyArray 
+        && resolvedType->typeData.structTypeData.secretArrayElementType->typeData.kind == NodeTypekind::I8) {
+        return;
+    }
+
+    semantic->reportError({node}, Error{node->region, "Expected string for call to puts..."});
 }
 
 void resolveRun(Semantic *semantic, Node *node) {
@@ -2036,6 +2056,9 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::ANYOF: {
             resolveAnyof(this, node);
+        } break;
+        case NodeType::PUTS: {
+            resolvePuts(this, node);
         } break;
         default: assert(false);
     }

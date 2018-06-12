@@ -1,11 +1,10 @@
 TODO:
-    - make default stuff work again for declarations / fn params
-
-    - merge the concepts of declParam and valueParam. It's too confusing at this point and we are needing to switch between them too often
-
     - support 'putchar'
 
     - replace 'anyof' with 'typeinfo', and finish implementing buildTypeInfoStructLiteral for struct/fn types
+        - consider
+
+    - merge the concepts of declParam and valueParam. It's too confusing at this point and we are needing to switch between them too often
 
     - better interpreter debugging
         - more accurate source information, stopping, etc.

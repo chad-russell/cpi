@@ -1,3 +1,7 @@
+fn println(s: []i8) {
+    puts(s); puts("\n");
+}
+
 fn main() {
-    ret "fuck"[3] == "duck"[3];
+    println("fuck 🐒");
 }

@@ -61,6 +61,7 @@ enum class NodeType {
     ARRAY_INDEX,
     MALLOC,
     FREE,
+    PUTS,
     TAGCHECK,
     ARRAY_LITERAL,
     FOR,
@@ -152,6 +153,7 @@ enum class LexerTokenType : int32_t {
     NONE,
     MALLOC,
     FREE,
+    PUTS,
     TAGCHECK,
     FOR,
     HEAP,
@@ -265,6 +267,7 @@ struct FnDeclData {
 struct DeclData {
     Node *lvalue = nullptr;
     Node *type = nullptr;
+
     Node *initialValue = nullptr;
 };
 
@@ -450,10 +453,8 @@ public:
     bool isBytecodeLocal = false;
     bool skipAllButPostStmts = false;
 
-    // todo(chad): figure out a way to get rid of this
-//    bool isAutoDerefStorage = false;
-
     // the offset of the storage for this node from the current pointer
+    // todo(chad): make this 64 bits
     int32_t localOffset = 0;
 
     void *llvmLocal = nullptr;

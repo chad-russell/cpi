@@ -335,6 +335,11 @@ Node *Parser::parseScopedStmt() {
         return freeStmt;
     }
 
+    // puts
+    if (lexer->front.type == LexerTokenType::PUTS) {
+        return parsePuts();
+    }
+
     // for
     if (lexer->front.type == LexerTokenType::FOR) {
         return parseFor();
@@ -966,6 +971,21 @@ Node *Parser::parseSizeof() {
     type->region.end = lexer->front.region.end;
     expect(LexerTokenType::RPAREN, ")");
     return type;
+}
+
+Node *Parser::parsePuts() {
+    auto value = new Node(lexer->srcInfo, NodeType::PUTS, scopes.top());
+    value->region.start = lexer->front.region.start;
+    popFront();
+    expect(LexerTokenType::LPAREN, "(");
+    value->nodeData = parseRvalue();
+    value->region.end = lexer->front.region.end;
+    expect(LexerTokenType::RPAREN, ")");
+    expectSemicolon();
+
+    addLocal(value->nodeData);
+
+    return value;
 }
 
 Node *Parser::parseAnyof() {

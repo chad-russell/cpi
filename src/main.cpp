@@ -171,7 +171,7 @@ int main(int argc, char **argv) {
         parser = new Parser(lexer);
         parser->parseRoot();
 
-        auto semantic = new Semantic();
+        semantic = new Semantic();
         semantic->lexer = lexer;
         semantic->resolveTypes(parser->mainFn);
         if (semantic->encounteredErrors) { return -1; }
@@ -282,20 +282,25 @@ int main(int argc, char **argv) {
 
         switch (mainReturnType->typeData.kind) {
             case NodeTypekind::I8: {
+                cout << "(i8) ";
                 cout << interp->readFromStack<int8_t>(0) << endl;
             } break;
             case NodeTypekind::INT_LITERAL:
             case NodeTypekind::I64: {
+                cout << "(i64) ";
                 cout << interp->readFromStack<int64_t>(0) << endl;
             } break;
             case NodeTypekind::F32:
             case NodeTypekind::FLOAT_LITERAL: {
+                cout << "(f32) ";
                 cout << interp->readFromStack<float>(0) << endl;
             } break;
             case NodeTypekind::F64: {
+                cout << "(f64) ";
                 cout << interp->readFromStack<double>(0) << endl;
             } break;
             default: {
+                cout << "(other) ";
                 cout << interp->readFromStack<int32_t>(0) << endl;
             }
         }
@@ -363,7 +368,7 @@ int main(int argc, char **argv) {
             system("/usr/local/Cellar/llvm/5.0.1/bin/llc --filetype=obj ./output.bc");
 
             ostringstream command;
-            command << "clang -O0 -o" << outputFileName << " output.o";
+            command << "clang -O0 -o " << outputFileName << " output.o";
             system(command.str().c_str());
 
             // need to keep the .o file because apparently that's where the debug info is stored

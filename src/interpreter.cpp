@@ -170,6 +170,17 @@ void interpretFree(Interpreter *interp) {
     free(ptr_to_free);
 }
 
+// puts
+void interpretPuts(Interpreter *interp) {
+    auto offset_from_stack = interp->read<int32_t>();
+    auto ptr_to_offset = (int32_t *) ((int8_t *) interp->stack.data() + offset_from_stack);
+    auto followed_ptr = (char *) ((int8_t *) interp->stack.data() + *ptr_to_offset);
+
+    auto ptr_to_count = (int32_t *) ((int8_t *) interp->stack.data() + offset_from_stack + 8);
+
+    fwrite(followed_ptr, sizeof(char), *((int *) ptr_to_count), stdout);
+}
+
 // calli
 void interpretCalli(Interpreter *interp) {
     auto fnTableIndex = interp->read<int32_t>();

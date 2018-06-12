@@ -32,6 +32,7 @@ public:
     llvm::Constant *mallocFunc;
     llvm::Constant *memsetFunc;
     llvm::Constant *freeFunc;
+    llvm::Constant *printfFunc;
 
     llvm::Type *voidTy;
 

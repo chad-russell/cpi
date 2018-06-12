@@ -170,6 +170,7 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "sizeof", LexerTokenType::SIZEOF)) { return; }
     if (tryEatKeyword(&next, "heap", LexerTokenType::HEAP)) { return; }
     if (tryEatKeyword(&next, "anyof", LexerTokenType::ANYOF)) { return; }
+    if (tryEatKeyword(&next, "puts", LexerTokenType::PUTS)) { return; }
     if (tryEatKeyword(&next, "panic", LexerTokenType::PANIC)) { return; }
     if (tryEatKeyword(&next, "none", LexerTokenType::NONE)) { return; }
     if (tryEatKeyword(&next, "malloc", LexerTokenType::MALLOC)) { return; }
@@ -442,6 +443,7 @@ const vector<string> Lexer::lexerTokenTypeStrings = {
     "NONE",
     "MALLOC",
     "FREE",
+    "PUTS",
     "TAGCHECK",
 };
 

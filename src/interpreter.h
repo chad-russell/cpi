@@ -70,6 +70,7 @@ void interpretExit(Interpreter *interp);
 void interpretPanic(Interpreter *interp);
 void interpretMalloc(Interpreter *interp);
 void interpretFree(Interpreter *interp);
+void interpretPuts(Interpreter *interp);
 
 class Interpreter {
 public:
@@ -226,7 +227,8 @@ public:
             interpretExit,
             interpretPanic,
             interpretMalloc,
-            interpretFree};
+            interpretFree,
+            interpretPuts};
   }
 
     void interpret();
@@ -297,14 +299,6 @@ public:
       }
 
       assert(false && "unrecognized inst for read<T>");
-
-      // todo(chad): dangerous?
-      // before this would fail if T was int64_t but the instruction we were reading was Instruction::I32 for example
-      // this just blindly reads
-//      pc += 1;
-//      auto consumed = consume<int32_t>();
-//      auto value = readFromStack<T>(consumed);
-//      return Optional<T>{true, value};
   }
 
   auto readBits8() {

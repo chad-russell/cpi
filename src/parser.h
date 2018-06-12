@@ -62,6 +62,7 @@ struct Parser {
     Node *parseTypeof();
     Node *parseSizeof();
     Node *parseAnyof();
+    Node *parsePuts();
     Node *parseHeapify();
     Node *parseMalloc();
     Node *parseTagCheck();

@@ -121,7 +121,8 @@ int AssemblyLexer::getArgCount(TokenType tt) {
                || tt == TokenType::CALL
                || tt == TokenType::CALLI
                || tt == TokenType::STORECONST
-               || tt == TokenType::FREE) {
+               || tt == TokenType::FREE
+               || tt == TokenType::PUTS) {
         return 1;
     } else if (tt == TokenType::RET
                || tt == TokenType::EXIT
@@ -345,7 +346,7 @@ const vector<string> AssemblyLexer::tokenTypeStrings = {
     "BUMPSP",
     "JUMPIF",
     "JUMP",
-    "CALLI", 
+    "CALLI",
     "CALL", 
     "RET", 
     "EXIT",
@@ -353,6 +354,7 @@ const vector<string> AssemblyLexer::tokenTypeStrings = {
     "NONE",
     "MALLOC",
     "FREE",
+    "PUTS",
     "TAGCHECK",
 
     // literals
@@ -411,6 +413,7 @@ const vector<string> AssemblyLexer::instructionStrings = {
     "PANIC",
     "MALLOC",
     "FREE",
+    "PUTS",
 
     // literals
     "CONSTI8", "CONSTI16", "CONSTI32", "CONSTI64", "CONSTF32", "CONSTF64",

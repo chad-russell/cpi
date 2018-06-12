@@ -81,6 +81,11 @@ LlvmGen::LlvmGen(const char *fileName) : builder(context), module(llvm::make_uni
     llvm::FunctionType *mallocType = llvm::FunctionType::get(builder.getInt8Ty()->getPointerTo(), { builder.getInt64Ty() }, false);
     mallocFunc = module->getOrInsertFunction("malloc", mallocType);
 
+    llvm::FunctionType *printfType = llvm::FunctionType::get(builder.getInt32Ty(), { builder.getInt8Ty()->getPointerTo() }, true);
+    printfFunc = module->getOrInsertFunction("printf", printfType);
+    
+    // printf("%.*s", *((int *) ptr_to_count), followed_ptr);
+
     llvm::FunctionType *memsetType = llvm::FunctionType::get(builder.getInt8Ty()->getPointerTo(), {
             builder.getInt8Ty()->getPointerTo(),
             builder.getInt64Ty(), // todo(chad): how to get natural word size for machine?
@@ -1280,6 +1285,21 @@ void LlvmGen::gen(Node *node) {
 
             // store the value into the malloc
             store(rvalueFor(node->nodeData), mallocCall);
+        } break;
+        case NodeType::PUTS: {
+            gen(node->nodeData);
+
+            auto firstChar = builder.CreateExtractValue(rvalueFor(node->nodeData), { 0 });
+            auto count = builder.CreateExtractValue(rvalueFor(node->nodeData), { 1 });
+
+            auto formatStr = builder.CreateGlobalStringPtr("%.*s", "printfFmtStr");
+            builder.CreateCall(printfFunc, { formatStr, count, firstChar });
+
+//            auto formatStr = builder.CreateGlobalStringPtr("%d", "printfFmtStr");
+//            builder.CreateCall(printfFunc, { formatStr, count, firstChar });
+
+//            auto formatStr = builder.CreateGlobalStringPtr("hello");
+//            builder.CreateCall(printfFunc, { formatStr });
         } break;
         default: assert(false);
     }
