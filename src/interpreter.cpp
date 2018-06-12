@@ -18,7 +18,9 @@ void printStmt(Interpreter *interp, int32_t pcStmtStart, bool withLineInfo = fal
             if (withLineInfo) {
                 cout << "[" << stmt.startLine << "] ";
             }
-            cout << interp->sourceMap.sourceInfo.source.substr(startByte, endByte - startByte) << endl;
+
+            // todo(chad): this is a normal 'const char *' now
+//            cout << interp->sourceMap.sourceInfo.source.substr(startByte, endByte - startByte) << endl;
         }
     }
 }
@@ -75,7 +77,7 @@ void Interpreter::interpret() {
                     }
                     cout << "]";
                     cout << endl;
-                } else if (startsWith(line, "break ")) {
+                } else if (startsWith(&line, "break ")) {
                     int32_t bNum;
                     sscanf(line.c_str(), "break %d", &bNum);
 
@@ -257,9 +259,8 @@ void interpretJump(Interpreter *interp) {
 void interpretStore(Interpreter *interp) {
     auto storeOffset = interp->read<int32_t>();
 
-    auto maybeReadOffset = interp->tryRead<int32_t>();
-    assert(maybeReadOffset.isPresent);
-    auto readOffset = maybeReadOffset.value;
+    auto maybeReadOffset = interp->read<int32_t>();
+    auto readOffset = maybeReadOffset;
 
     auto size = interp->consume<int32_t>();
 

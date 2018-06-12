@@ -49,7 +49,11 @@ Lexer::Lexer(string fileName) {
     fileBytes.assign((istreambuf_iterator<char>(t)),
                 istreambuf_iterator<char>());
 
-    srcInfo = {fileName, fileBytes, {0}};
+    auto lines = new vector<unsigned long>();
+    lines->push_back(0);
+
+    srcInfo = {new string(fileName), new string(fileBytes), lines};
+
     lastLoc = {0, 1, 1};
     loc = {0, 1, 1};
 
@@ -82,14 +86,14 @@ void Lexer::popFront() {
     LexerToken next;
 
     // ignore whitespace
-    while (loc.byteIndex < srcInfo.source.length() && isspace(srcInfo.source[loc.byteIndex])) {
+    while (loc.byteIndex < srcInfo.source->length() && isspace(srcInfo.source->at(loc.byteIndex))) {
         eat();
     }
 
     // Comment
     if (prefix("--")) {
         // eat until newline
-        while (srcInfo.source[loc.byteIndex] != '\n') {
+        while (srcInfo.source->at(loc.byteIndex) != '\n') {
             eat();
         }
 
@@ -99,12 +103,12 @@ void Lexer::popFront() {
     }
 
     // ignore whitespace
-    while (loc.byteIndex < srcInfo.source.length() && isspace(srcInfo.source[loc.byteIndex])) {
+    while (loc.byteIndex < srcInfo.source->length() && isspace(srcInfo.source->at(loc.byteIndex))) {
         eat();
     }
 
     // look for EOF
-    if (loc.byteIndex >= srcInfo.source.length()) {
+    if (loc.byteIndex >= srcInfo.source->length()) {
         next.type = LexerTokenType::EOF_;
         popFrontFinalize(next);
         return;
@@ -169,7 +173,7 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "typeof", LexerTokenType::TYPEOF)) { return; }
     if (tryEatKeyword(&next, "sizeof", LexerTokenType::SIZEOF)) { return; }
     if (tryEatKeyword(&next, "heap", LexerTokenType::HEAP)) { return; }
-    if (tryEatKeyword(&next, "anyof", LexerTokenType::ANYOF)) { return; }
+    if (tryEatKeyword(&next, "typeinfo", LexerTokenType::TYPEINFO)) { return; }
     if (tryEatKeyword(&next, "puts", LexerTokenType::PUTS)) { return; }
     if (tryEatKeyword(&next, "panic", LexerTokenType::PANIC)) { return; }
     if (tryEatKeyword(&next, "none", LexerTokenType::NONE)) { return; }
@@ -179,16 +183,16 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "for", LexerTokenType::FOR)) { return; }
 
     // BACK_TICK
-    if (srcInfo.source[loc.byteIndex] == '`') {
+    if (srcInfo.source->at(loc.byteIndex) == '`') {
         next.type = LexerTokenType::BACK_TICK;
         auto saved_loc = loc;
 
         eat(); // eat first back tick
-        while (loc.byteIndex < srcInfo.source.length() && srcInfo.source[loc.byteIndex] != '`') {
+        while (loc.byteIndex < srcInfo.source->length() && srcInfo.source->at(loc.byteIndex) != '`') {
             eat();
         }
 
-        if (loc.byteIndex >= srcInfo.source.length()) {
+        if (loc.byteIndex >= srcInfo.source->length()) {
             Note note = {{srcInfo, saved_loc, saved_loc}, "Leading ` here"};
 
             reportError({{srcInfo, loc, loc},
@@ -203,16 +207,16 @@ void Lexer::popFront() {
     }
 
     // SINGLE_QUOTE
-    if (srcInfo.source[loc.byteIndex] == '\'') {
+    if (srcInfo.source->at(loc.byteIndex) == '\'') {
         next.type = LexerTokenType::BACK_TICK;
         auto savedLoc = loc;
 
         eat(); // eat first single quote
-        while (loc.byteIndex < srcInfo.source.length() && srcInfo.source[loc.byteIndex] != '\'') {
+        while (loc.byteIndex < srcInfo.source->length() && srcInfo.source->at(loc.byteIndex) != '\'') {
             eat();
         }
 
-        if (loc.byteIndex >= srcInfo.source.length()) {
+        if (loc.byteIndex >= srcInfo.source->length()) {
             Note note = {{srcInfo, savedLoc, savedLoc}, "Leading ' here"};
             Error error = {{srcInfo, lastLoc, loc},
                            "reached EOF without closing '",
@@ -227,17 +231,17 @@ void Lexer::popFront() {
     }
 
     // DOUBLE_QUOTE
-    if (srcInfo.source[loc.byteIndex] == '"') {
+    if (srcInfo.source->at(loc.byteIndex) == '"') {
         next.type = LexerTokenType::DOUBLE_QUOTE;
         auto savedLoc = loc;
 
         eat(); // eat first double quote
-        while (loc.byteIndex < srcInfo.source.length()) {
-            if (srcInfo.source[loc.byteIndex] == '\\') {
+        while (loc.byteIndex < srcInfo.source->length()) {
+            if (srcInfo.source->at(loc.byteIndex) == '\\') {
                 // eat the next 2 tokens
                 eat();
 
-                if (loc.byteIndex >= srcInfo.source.length()) {
+                if (loc.byteIndex >= srcInfo.source->length()) {
                     Note note = {{srcInfo, savedLoc, savedLoc}, "String started here"};
                     Error error = {{srcInfo, loc, loc},
                                    "reached EOF after an escape character while parsing a string. WTF are you even doing??",
@@ -249,14 +253,14 @@ void Lexer::popFront() {
                 continue;
             }
 
-            if (srcInfo.source[loc.byteIndex] == '"') {
+            if (srcInfo.source->at(loc.byteIndex) == '"') {
                 break;
             }
 
             eat();
         }
 
-        if (loc.byteIndex >= srcInfo.source.length()) {
+        if (loc.byteIndex >= srcInfo.source->length()) {
             Note note = {{srcInfo, loc, loc}, "Leading \" here"};
             Error error = {{srcInfo, savedLoc, loc},
                            "reached EOF without closing '\"'",
@@ -271,16 +275,16 @@ void Lexer::popFront() {
     }
 
     // int
-    if (isdigit(srcInfo.source[loc.byteIndex])) {
+    if (isdigit(srcInfo.source->at(loc.byteIndex))) {
         next.type = LexerTokenType::INT_LITERAL;
-        while (isdigit(srcInfo.source[loc.byteIndex]) || srcInfo.source[loc.byteIndex] == '_') {
+        while (isdigit(srcInfo.source->at(loc.byteIndex)) || srcInfo.source->at(loc.byteIndex) == '_') {
             eat();
         }
 
-        if (srcInfo.source[loc.byteIndex] == '.') {
+        if (srcInfo.source->at(loc.byteIndex) == '.') {
             next.type = LexerTokenType::FLOAT_LITERAL;
             eat();
-            while (isdigit(srcInfo.source[loc.byteIndex]) || srcInfo.source[loc.byteIndex] == '_') {
+            while (isdigit(srcInfo.source->at(loc.byteIndex)) || srcInfo.source->at(loc.byteIndex) == '_') {
                 eat();
             }
         }
@@ -295,7 +299,7 @@ void Lexer::popFront() {
 
     // SYMBOL
     next.type = LexerTokenType::SYMBOL;
-    while (loc.byteIndex < srcInfo.source.length() && !isSpecial(srcInfo.source[loc.byteIndex])) {
+    while (loc.byteIndex < srcInfo.source->length() && !isSpecial(srcInfo.source->at(loc.byteIndex))) {
         eat();
     }
     popFrontFinalize(0, next);
@@ -308,14 +312,14 @@ void Lexer::eat(int eatLength) {
 }
 
 void Lexer::eat() {
-    auto frontChar = srcInfo.source[loc.byteIndex];
+    auto frontChar = srcInfo.source->at(loc.byteIndex);
 
     if (frontChar == '\n') {
         loc.line += 1;
         loc.col = 1;
 
         unsigned long byteIndex = loc.byteIndex + 1;
-        srcInfo.lines.push_back(byteIndex);
+        srcInfo.lines->push_back(byteIndex);
     } else {
         loc.col += 1;
     }
@@ -329,17 +333,26 @@ void Lexer::popFrontFinalize(int eatLength, LexerToken newNext) {
 }
 
 void Lexer::popFrontFinalize(LexerToken newNext) {
-    newNext.region = {srcInfo, lastLoc, loc};
+    newNext.region.srcInfo = srcInfo;
+
+    newNext.region.start.byteIndex = lastLoc.byteIndex;
+    newNext.region.start.line = lastLoc.line;
+    newNext.region.start.col = lastLoc.col;
+
+    newNext.region.end.byteIndex = loc.byteIndex;
+    newNext.region.end.line = loc.line;
+    newNext.region.end.col = loc.col;
+
     next = newNext;
 }
 
 bool Lexer::prefix(string pre) {
-    if (srcInfo.source.length() - loc.byteIndex < pre.length()) {
+    if (srcInfo.source->length() - loc.byteIndex < pre.length()) {
         return 0;
     }
 
     for (int32_t i = 0; i < pre.length(); i++) {
-        if (srcInfo.source[loc.byteIndex + i] != pre[i]) {
+        if (srcInfo.source->at(loc.byteIndex + i) != pre[i]) {
             return 0;
         }
     }
@@ -348,12 +361,12 @@ bool Lexer::prefix(string pre) {
 }
 
 bool Lexer::prefixKeyword(string pre) {
-    if (srcInfo.source.length() - loc.byteIndex < pre.length() + 1) {
+    if (srcInfo.source->length() - loc.byteIndex < pre.length() + 1) {
         return 0;
     }
 
     // if we have a match but there are more non-special characters, then it's not a match
-    return prefix(pre) && isSpecial(srcInfo.source[loc.byteIndex + pre.length()]);
+    return prefix(pre) && isSpecial(srcInfo.source->at(loc.byteIndex + pre.length()));
 }
 
 void Lexer::reportError(Error error) {

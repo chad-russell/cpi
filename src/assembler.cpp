@@ -24,8 +24,8 @@ void AssemblyLexer::populateMaps() {
 }
 
 void AssemblyLexer::readFnTable() {
-    auto firstLinePos = sourceMap.sourceInfo.source.find('\n');
-    auto firstLine = sourceMap.sourceInfo.source.substr(0, firstLinePos);
+    auto firstLinePos = sourceMap.sourceInfo.source->find('\n');
+    auto firstLine = sourceMap.sourceInfo.source->substr(0, firstLinePos);
 
     istringstream iss(firstLine);
     int32_t count;
@@ -37,8 +37,9 @@ void AssemblyLexer::readFnTable() {
         fnTable.insert({fnIndex, instIndex});
     }
 
-    sourceMap.sourceInfo.source = sourceMap.sourceInfo.source.substr(firstLine.length() + 1,
-                                                                     sourceMap.sourceInfo.source.size() - firstLine.length());
+    sourceMap.sourceInfo.source = new string(
+            sourceMap.sourceInfo.source->substr(firstLine.length() + 1,
+                                                sourceMap.sourceInfo.source->size() - firstLine.length()));
 }
 
 AssemblyLexer::AssemblyLexer(string fileName)  {
@@ -52,7 +53,10 @@ AssemblyLexer::AssemblyLexer(string fileName)  {
     fileBytes.assign((istreambuf_iterator<char>(t)),
                 istreambuf_iterator<char>());
 
-    sourceMap.sourceInfo = {fileName, fileBytes, {0}};
+    auto lines = new vector<unsigned long>();
+    lines->push_back(0);
+
+    sourceMap.sourceInfo = {new string(fileName), new string(fileBytes), lines};
     lastLoc = {0, 0, 0};
     loc = {0, 0, 0};
 
@@ -72,50 +76,50 @@ int AssemblyLexer::getArgCount(TokenType tt) {
 
     if (ttName == "ADD_S_I64") {
         return 4;
-    } else if (startsWith(ttName, "ADD")
-        || startsWith(ttName, "SUB")
-        || startsWith(ttName, "MUL")
-        || startsWith(ttName, "DIV")
-        || startsWith(ttName, "UDIV")
-        || startsWith(ttName, "SDIV")
-        || startsWith(ttName, "REM")
-        || startsWith(ttName, "UREM")
-        || startsWith(ttName, "SREM")
-        || startsWith(ttName, "EQ")
-        || startsWith(ttName, "NEQ")
-        || startsWith(ttName, "GT")
-        || startsWith(ttName, "GE")
-        || startsWith(ttName, "UGT")
-        || startsWith(ttName, "SGT")
-        || startsWith(ttName, "UGE")
-        || startsWith(ttName, "SGE")
-        || startsWith(ttName, "LT")
-        || startsWith(ttName, "ULT")
-        || startsWith(ttName, "SLT")
-        || startsWith(ttName, "LE")
-        || startsWith(ttName, "ULE")
-        || startsWith(ttName, "SLE")
-        || startsWith(ttName, "AND8")
-        || startsWith(ttName, "AND16")
-        || startsWith(ttName, "AND32")
-        || startsWith(ttName, "AND64")
-        || startsWith(ttName, "OR8")
-        || startsWith(ttName, "OR16")
-        || startsWith(ttName, "OR32")
-        || startsWith(ttName, "OR64")
-        || startsWith(ttName, "XOR8")
-        || startsWith(ttName, "XOR16")
-        || startsWith(ttName, "XOR32")
-        || startsWith(ttName, "XOR64")
+    } else if (startsWith(&ttName, "ADD")
+        || startsWith(&ttName, "SUB")
+        || startsWith(&ttName, "MUL")
+        || startsWith(&ttName, "DIV")
+        || startsWith(&ttName, "UDIV")
+        || startsWith(&ttName, "SDIV")
+        || startsWith(&ttName, "REM")
+        || startsWith(&ttName, "UREM")
+        || startsWith(&ttName, "SREM")
+        || startsWith(&ttName, "EQ")
+        || startsWith(&ttName, "NEQ")
+        || startsWith(&ttName, "GT")
+        || startsWith(&ttName, "GE")
+        || startsWith(&ttName, "UGT")
+        || startsWith(&ttName, "SGT")
+        || startsWith(&ttName, "UGE")
+        || startsWith(&ttName, "SGE")
+        || startsWith(&ttName, "LT")
+        || startsWith(&ttName, "ULT")
+        || startsWith(&ttName, "SLT")
+        || startsWith(&ttName, "LE")
+        || startsWith(&ttName, "ULE")
+        || startsWith(&ttName, "SLE")
+        || startsWith(&ttName, "AND8")
+        || startsWith(&ttName, "AND16")
+        || startsWith(&ttName, "AND32")
+        || startsWith(&ttName, "AND64")
+        || startsWith(&ttName, "OR8")
+        || startsWith(&ttName, "OR16")
+        || startsWith(&ttName, "OR32")
+        || startsWith(&ttName, "OR64")
+        || startsWith(&ttName, "XOR8")
+        || startsWith(&ttName, "XOR16")
+        || startsWith(&ttName, "XOR32")
+        || startsWith(&ttName, "XOR64")
         || tt == TokenType::STORE
         || tt == TokenType::JUMPIF) {
         return 3;
     } else if (tt == TokenType::MALLOC) {
         return 2;
-    } else if (startsWith(ttName, "CONST")
-               || startsWith(ttName, "REL")
-               || startsWith(ttName, "I")
-               || startsWith(ttName, "F")
+    } else if (startsWith(&ttName, "CONST")
+               || startsWith(&ttName, "REL")
+               || startsWith(&ttName, "I")
+               || startsWith(&ttName, "F")
                || tt == TokenType::BUMPSP
                || tt == TokenType::JUMP
                || tt == TokenType::CALL
@@ -140,7 +144,7 @@ void AssemblyLexer::popFront() {
     Token newNext;
 
     // ignore whitespace
-    while (loc.byteIndex < sourceMap.sourceInfo.source.length() && isspace(sourceMap.sourceInfo.source[loc.byteIndex])) {
+    while (loc.byteIndex < sourceMap.sourceInfo.source->length() && isspace(sourceMap.sourceInfo.source->at(loc.byteIndex))) {
         eat();
     }
     lastLoc = loc;
@@ -148,7 +152,7 @@ void AssemblyLexer::popFront() {
     // Comment
     if (startsWith(sourceMap.sourceInfo.source, loc.byteIndex, "--")) {
         // eat until newline
-        while (loc.byteIndex < sourceMap.sourceInfo.source.length() && sourceMap.sourceInfo.source[loc.byteIndex] != '\n') {
+        while (loc.byteIndex < sourceMap.sourceInfo.source->length() && sourceMap.sourceInfo.source->at(loc.byteIndex) != '\n') {
             eat();
         }
 
@@ -160,13 +164,13 @@ void AssemblyLexer::popFront() {
     }
 
     // ignore whitespace (again)
-    while (loc.byteIndex < sourceMap.sourceInfo.source.length() && isspace(sourceMap.sourceInfo.source[loc.byteIndex])) {
+    while (loc.byteIndex < sourceMap.sourceInfo.source->length() && isspace(sourceMap.sourceInfo.source->at(loc.byteIndex))) {
         eat();
     }
     lastLoc = loc;
 
     // look for EOF
-    if (loc.byteIndex >= sourceMap.sourceInfo.source.length()) {
+    if (loc.byteIndex >= sourceMap.sourceInfo.source->length()) {
         newNext.type = TokenType::EOF_;
         argCount = 0;
         popFrontFinalize(newNext, {});
@@ -175,7 +179,7 @@ void AssemblyLexer::popFront() {
     }
 
     // try parsing all the tokens
-    for (auto memberName : tokenTypeStrings) {
+    for (const auto &memberName : tokenTypeStrings) {
         auto member = nameToTokenType.at(memberName);
 
         if (startsWith(sourceMap.sourceInfo.source, loc.byteIndex, memberName)) {
@@ -187,7 +191,7 @@ void AssemblyLexer::popFront() {
                 eat();
             }
 
-            auto newInst = nameToInstruction.at(sourceMap.sourceInfo.source.substr(startIndex, memberName.length()));
+            auto newInst = nameToInstruction.at(sourceMap.sourceInfo.source->substr(startIndex, memberName.length()));
             popFrontFinalize(newNext, {static_cast<unsigned char>(newInst)});
 
             return;
@@ -196,13 +200,13 @@ void AssemblyLexer::popFront() {
 
     // maybe it's an integer or floating point literal
     auto startIndex = loc.byteIndex;
-    while (sourceMap.sourceInfo.source[loc.byteIndex] == '-'
-        || isdigit(sourceMap.sourceInfo.source[loc.byteIndex]) 
-        || sourceMap.sourceInfo.source[loc.byteIndex] == '.') {
+    while (sourceMap.sourceInfo.source->at(loc.byteIndex) == '-'
+        || isdigit(sourceMap.sourceInfo.source->at(loc.byteIndex))
+        || sourceMap.sourceInfo.source->at(loc.byteIndex) == '.') {
         eat();
     }
 
-    auto toParse = sourceMap.sourceInfo.source.substr(startIndex, loc.byteIndex - startIndex);
+    auto toParse = sourceMap.sourceInfo.source->substr(startIndex, loc.byteIndex - startIndex);
 
     if (toParse.empty()) {
         newNext.type = TokenType::EOF_;
@@ -263,7 +267,7 @@ void AssemblyLexer::popFront() {
     cout << "could not parse token at byteIndex "
          << loc.byteIndex
          << "("
-         << sourceMap.sourceInfo.source.substr(loc.byteIndex, 10)
+         << sourceMap.sourceInfo.source->substr(loc.byteIndex, 10)
          << ")...";
 
     assert(false);
@@ -285,7 +289,7 @@ void AssemblyLexer::popFrontFinalize(Token newNext, vector<unsigned char> newIns
         });
 
         // ignore whitespace
-        while (loc.byteIndex < sourceMap.sourceInfo.source.length() && isspace(sourceMap.sourceInfo.source[loc.byteIndex])) {
+        while (loc.byteIndex < sourceMap.sourceInfo.source->length() && isspace(sourceMap.sourceInfo.source->at(loc.byteIndex))) {
             eat();
         }
         savedLoc = loc;
@@ -297,13 +301,13 @@ void AssemblyLexer::popFrontFinalize(Token newNext, vector<unsigned char> newIns
 }
 
 void AssemblyLexer::eat() {
-    auto frontChar = sourceMap.sourceInfo.source[loc.byteIndex];
+    auto frontChar = sourceMap.sourceInfo.source->at(loc.byteIndex);
 
     if (frontChar == '\n') {
         loc.line += 1;
         loc.col = 1;
 
-        sourceMap.sourceInfo.lines.push_back(loc.byteIndex + 1);
+        sourceMap.sourceInfo.lines->push_back(loc.byteIndex + 1);
     }
     else {
         loc.col += 1;
@@ -461,23 +465,23 @@ void MnemonicPrinter::step() {
     auto inst = AssemblyLexer::instructionStrings[instructions[pc]];
     pc += 1;
 
-    if (startsWith(inst, "ADDI")
-        || startsWith(inst, "SUBI")
-        || startsWith(inst, "MULI")
-        || startsWith(inst, "UDIVI")
-        || startsWith(inst, "SDIVI")
-        || startsWith(inst, "UREMI")
-        || startsWith(inst, "SREMI")
-        || startsWith(inst, "EQI")
-        || startsWith(inst, "NEQI")
-        || startsWith(inst, "UGTI")
-        || startsWith(inst, "SGTI")
-        || startsWith(inst, "UGEI")
-        || startsWith(inst, "SGEI")
-        || startsWith(inst, "ULTI")
-        || startsWith(inst, "SLTI")
-        || startsWith(inst, "ULEI")
-        || startsWith(inst, "SLEI")) {
+    if (startsWith(&inst, "ADDI")
+        || startsWith(&inst, "SUBI")
+        || startsWith(&inst, "MULI")
+        || startsWith(&inst, "UDIVI")
+        || startsWith(&inst, "SDIVI")
+        || startsWith(&inst, "UREMI")
+        || startsWith(&inst, "SREMI")
+        || startsWith(&inst, "EQI")
+        || startsWith(&inst, "NEQI")
+        || startsWith(&inst, "UGTI")
+        || startsWith(&inst, "SGTI")
+        || startsWith(&inst, "UGEI")
+        || startsWith(&inst, "SGEI")
+        || startsWith(&inst, "ULTI")
+        || startsWith(&inst, "SLTI")
+        || startsWith(&inst, "ULEI")
+        || startsWith(&inst, "SLEI")) {
             instructionString.append(inst);
             instructionString.append(" ");
             readTypeAndInt();
@@ -499,17 +503,17 @@ void MnemonicPrinter::step() {
 
         instructionString.append(" ");
         instructionString.append(to_string(consume<int32_t>()));
-    } else if (startsWith(inst, "ADDF")
-        || startsWith(inst, "SUBF")
-        || startsWith(inst, "MULF")
-        || startsWith(inst, "DIVF")
-        || startsWith(inst, "REMF")
-        || startsWith(inst, "EQF")
-        || startsWith(inst, "NEQF")
-        || startsWith(inst, "LTF")
-        || startsWith(inst, "LEF")
-        || startsWith(inst, "GTF")
-        || startsWith(inst, "GEF")) {
+    } else if (startsWith(&inst, "ADDF")
+        || startsWith(&inst, "SUBF")
+        || startsWith(&inst, "MULF")
+        || startsWith(&inst, "DIVF")
+        || startsWith(&inst, "REMF")
+        || startsWith(&inst, "EQF")
+        || startsWith(&inst, "NEQF")
+        || startsWith(&inst, "LTF")
+        || startsWith(&inst, "LEF")
+        || startsWith(&inst, "GTF")
+        || startsWith(&inst, "GEF")) {
             instructionString.append(inst);
             instructionString.append(" ");
             readTypeAndFloat();
@@ -517,19 +521,19 @@ void MnemonicPrinter::step() {
             readTypeAndFloat();
             instructionString.append(" ");
             instructionString.append(to_string(consume<int32_t>()));
-    } else if (startsWith(inst, "AND") || startsWith(inst, "OR") || startsWith(inst, "XOR")) {
+    } else if (startsWith(&inst, "AND") || startsWith(&inst, "OR") || startsWith(&inst, "XOR")) {
         instructionString.append(" ");
         readTypeAndIntOrFloat();
         instructionString.append(" ");
         readTypeAndIntOrFloat();
-    } else if (startsWith(inst, "STORECONST")) {
+    } else if (startsWith(&inst, "STORECONST")) {
         instructionString.append(inst);
         instructionString.append(" ");
         readTypeAndInt();
         instructionString.append(" ");
         readTypeAndIntOrFloat();
         instructionString.append(" ");
-    } else if (startsWith(inst, "STORE")) {
+    } else if (startsWith(&inst, "STORE")) {
         instructionString.append(inst);
         instructionString.append(" ");
 
@@ -540,7 +544,7 @@ void MnemonicPrinter::step() {
         instructionString.append(" ");
 
         instructionString.append(to_string(consume<int32_t>()));
-    } else if (startsWith(inst, "JUMPIF")) {
+    } else if (startsWith(&inst, "JUMPIF")) {
         instructionString.append(inst);
         instructionString.append(" ");
         readTypeAndInt();
@@ -548,23 +552,23 @@ void MnemonicPrinter::step() {
         readTypeAndInt();
         instructionString.append(" ");
         readTypeAndInt();
-    } else if (startsWith(inst, "CALLI")) {
+    } else if (startsWith(&inst, "CALLI")) {
         instructionString.append(inst);
         instructionString.append(" ");
         readTypeAndInt();
-    } else if (startsWith(inst, "BUMPSP") || startsWith(inst, "JUMP") || startsWith(inst, "CALL")) {
+    } else if (startsWith(&inst, "BUMPSP") || startsWith(&inst, "JUMP") || startsWith(&inst, "CALL")) {
         instructionString.append(inst);
         instructionString.append(" ");
         auto callPc = consume<int32_t>();
         instructionString.append(to_string(callPc));
-    } else if (startsWith(inst, "MALLOC")) {
+    } else if (startsWith(&inst, "MALLOC")) {
         instructionString.append(inst);
         instructionString.append(" ");
         readTypeAndInt();
         instructionString.append(" ");
         auto storageOffset = consume<int32_t>();
         instructionString.append(to_string(storageOffset));
-    } else if (startsWith(inst, "FREE")) {
+    } else if (startsWith(&inst, "FREE")) {
         instructionString.append(inst);
         instructionString.append(" ");
         readTypeAndInt();
@@ -598,18 +602,18 @@ void MnemonicPrinter::readTypeAndInt()
     instructionString.append(" ");
     pc += 1;
 
-    if (endsWith(instStr, "CONSTI8")) {
+    if (endsWith(&instStr, "CONSTI8")) {
         instructionString.append(to_string(consume<int8_t>()));
-    } else if (endsWith(instStr, "CONSTI16")) {
+    } else if (endsWith(&instStr, "CONSTI16")) {
         instructionString.append(to_string(consume<int16_t>()));
-    } else if (endsWith(instStr, "CONSTI32")) {
+    } else if (endsWith(&instStr, "CONSTI32")) {
         instructionString.append(to_string(consume<int32_t>()));
-    } else if (endsWith(instStr, "CONSTI64")) {
+    } else if (endsWith(&instStr, "CONSTI64")) {
         instructionString.append(to_string(consume<int64_t>()));
-    } else if (endsWith(instStr, "I8")
-        || endsWith(instStr, "I16")
-        || endsWith(instStr, "I32")
-        || endsWith(instStr, "I64")) {
+    } else if (endsWith(&instStr, "I8")
+        || endsWith(&instStr, "I16")
+        || endsWith(&instStr, "I32")
+        || endsWith(&instStr, "I64")) {
         instructionString.append(to_string(consume<int32_t>()));
     } else {
         instructionString.append("<<<ERROR>>>");
@@ -626,15 +630,15 @@ void MnemonicPrinter::readTypeAndFloat()
     instructionString.append(" ");
     pc += 1;
 
-    if (endsWith(instStr, "CONSTF32")) {
+    if (endsWith(&instStr, "CONSTF32")) {
         instructionString.append(to_string(consume<float>()));
     }
-    else if (endsWith(instStr, "CONSTF64")) {
+    else if (endsWith(&instStr, "CONSTF64")) {
         instructionString.append(to_string(consume<double>()));
     }
-    else if (endsWith(instStr, "32")) {
+    else if (endsWith(&instStr, "32")) {
         instructionString.append(to_string(consume<int32_t>()));
-    } else if (endsWith(instStr, "64")) {
+    } else if (endsWith(&instStr, "64")) {
         instructionString.append(to_string(consume<int64_t>()));
     } else {
         instructionString.append("<<<error>>>");

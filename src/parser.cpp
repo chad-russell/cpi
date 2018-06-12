@@ -988,8 +988,8 @@ Node *Parser::parsePuts() {
     return value;
 }
 
-Node *Parser::parseAnyof() {
-    auto value = new Node(lexer->srcInfo, NodeType::ANYOF, scopes.top());
+Node *Parser::parseTypeInfo() {
+    auto value = new Node(lexer->srcInfo, NodeType::TypeInfo, scopes.top());
     value->region.start = lexer->front.region.start;
     popFront();
     expect(LexerTokenType::LPAREN, "(");
@@ -1050,8 +1050,8 @@ Node *Parser::parseLvalueOrLiteral() {
         return parseHeapify();
     }
 
-    if (lexer->front.type == LexerTokenType::ANYOF) {
-        return parseAnyof();
+    if (lexer->front.type == LexerTokenType::TYPEINFO) {
+        return parseTypeInfo();
     }
 
     if (lexer->front.type == LexerTokenType::SIZEOF) {
@@ -1230,8 +1230,8 @@ Node *Parser::parseIntLiteral() {
 
     ostringstream s("");
     for (auto i = node->region.start.byteIndex; i < node->region.end.byteIndex; i++) {
-        if (lexer->srcInfo.source[i] != '_') {
-            s << lexer->srcInfo.source[i];
+        if (lexer->srcInfo.source->at(i) != '_') {
+            s << lexer->srcInfo.source->at(i);
         }
     }
 
@@ -1247,8 +1247,8 @@ Node *Parser::parseFloatLiteral() {
 
     ostringstream s("");
     for (auto i = node->region.start.byteIndex; i < node->region.end.byteIndex; i++) {
-        if (lexer->srcInfo.source[i] != '_') {
-            s << lexer->srcInfo.source[i];
+        if (lexer->srcInfo.source->at(i) != '_') {
+            s << lexer->srcInfo.source->at(i);
         }
     }
 
@@ -1266,9 +1266,9 @@ Node *Parser::parseStringLiteral() {
 
     ostringstream s("");
     for (auto i = node->region.start.byteIndex + 1; i < node->region.end.byteIndex - 1; i++) {
-        if (node->region.srcInfo.source[i] == '\\') {
-            assert(node->region.srcInfo.source.size() > i + 1);
-            switch (node->region.srcInfo.source[i + 1]) {
+        if (node->region.srcInfo.source->at(i) == '\\') {
+            assert(node->region.srcInfo.source->size() > i + 1);
+            switch (node->region.srcInfo.source->at(i + 1)) {
                 case 'n': {
                     s << '\n';
                 } break;
@@ -1282,7 +1282,7 @@ Node *Parser::parseStringLiteral() {
             i = i + 1;
         }
         else {
-            s << node->region.srcInfo.source[i];
+            s << node->region.srcInfo.source->at(i);
         }
     }
     node->stringLiteralData.value = s.str();
@@ -1385,7 +1385,7 @@ Node *Parser::parseFnCall() {
 
     call->region.end = last.region.end;
 
-    // todo(chad): do we need this??
+    // todo(chad): why do we need this??
     addLocal(call);
 
     return call;

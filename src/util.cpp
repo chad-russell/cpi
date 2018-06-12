@@ -3,6 +3,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <utility>
 
 const char *readFile(const char *fileName) {
     ifstream fileStream;
@@ -32,26 +33,26 @@ int bytesInCodepoint(char firstByte) {
     assert(false);
 }
 
-bool startsWith(string s, string pre) {
-    return startsWith(s, 0, pre);
+bool startsWith(string *s, string pre) {
+    return startsWith(s, 0, std::move(pre));
 }
 
-bool startsWith(string s, unsigned long startPos, string pre) {
-    if (s.length() - startPos < pre.length()) { return false; }
+bool startsWith(string *s, unsigned long startPos, string pre) {
+    if (s->length() - startPos < pre.length()) { return false; }
 
     for (auto index = 0; index < pre.length(); index++) {
-        if (s[startPos + index] != pre[index]) { return false; }
+        if (s->at(startPos + index) != pre[index]) { return false; }
     }
 
     return true;
 }
 
-bool endsWith(string s, string suf) {
-    if (s.length() < suf.length()) {
+bool endsWith(string *s, string suf) {
+    if (s->length() < suf.length()) {
         return false;
     }
 
-    return (0 == s.compare(s.length() - suf.length(), suf.length(), suf));
+    return (0 == s->compare(s->length() - suf.length(), suf.length(), suf));
 }
 
 ostream &operator<<(ostream &os, Location location) {
@@ -65,7 +66,7 @@ ostream &operator<<(ostream &os, Region region) {
 }
 
 ostream &operator<<(ostream &os, SourceRegion region) {
-    return os << region.region.srcInfo.source.substr(region.region.start.byteIndex,
+    return os << region.region.srcInfo.source->substr(region.region.start.byteIndex,
                                              region.region.end.byteIndex - region.region.start.byteIndex);
 }
 
@@ -78,14 +79,15 @@ ostream &operator<<(ostream &os, SourceInfoRegion region) {
 }
 
 ostream &operator<<(ostream &os, HighlightedRegion region) {
-    if (region.region.srcInfo.fileName == "") {
+    if (region.region.srcInfo.fileName->empty()) {
         return os << "NO SOURCE INFO" << endl;
     }
 
     auto startLine = region.region.start.line;
     if (startLine > 0) { startLine -= 1; }
-    auto startSrc = region.region.srcInfo.lines[startLine];
-    for (auto i = startSrc; i < region.region.srcInfo.source.length() && region.region.srcInfo.source[i] != '\n'; i++) {
+
+    auto startSrc = region.region.srcInfo.lines->at(startLine);
+    for (auto i = startSrc; i < region.region.srcInfo.source->length() && region.region.srcInfo.source->at(i) != '\n'; i++) {
         Colored<string> colored;
         if (i == region.region.start.byteIndex) {
             os << "\e[" << Color::BG_MAGENTA << ";" << Color::FG_DARK_GREY << "m";
@@ -94,7 +96,7 @@ ostream &operator<<(ostream &os, HighlightedRegion region) {
             os << Colored<string>{"", {}};
         }
 
-        os << region.region.srcInfo.source[i];
+        os << region.region.srcInfo.source->at(i);
     }
 
     return os << Colored<string>{"", {}} << endl;
@@ -409,10 +411,8 @@ int64_t AtomTable::insertStr(string s) {
     return tableIndex;
 }
 
-int64_t AtomTable::insert(Region r) {
-    ostringstream s("");
-    s << SourceRegion{r};
-    auto sourceStr = s.str();
+int64_t AtomTable::insert(Region &r) {
+    auto sourceStr = r.srcInfo.source->substr(r.start.byteIndex, r.end.byteIndex - r.start.byteIndex);
 
     auto found = atoms.find(sourceStr);
     if (found != atoms.end()) {

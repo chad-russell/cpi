@@ -16,10 +16,10 @@ extern int debugFlag;
 
 const char *readFile(const char *fileName);
 
-bool startsWith(string s, unsigned long startPos, string pre);
-bool startsWith(string s, string pre);
+bool startsWith(string *s, unsigned long startPos, string pre);
+bool startsWith(string *s, string pre);
 
-bool endsWith(string s, string suf);
+bool endsWith(string *s, string suf);
 
 int bytesInCodepoint(char firstByte);
 
@@ -66,7 +66,7 @@ enum class NodeType {
     ARRAY_LITERAL,
     FOR,
     HEAPIFY,
-    ANYOF,
+    TypeInfo,
 };
 
 enum class NodeTypekind {
@@ -157,13 +157,14 @@ enum class LexerTokenType : int32_t {
     TAGCHECK,
     FOR,
     HEAP,
-    ANYOF,
+    TYPEINFO,
 };
 
 struct SourceInfo {
-    string fileName = "";
-    string source = "";
-    vector<unsigned long> lines = {};
+    string *fileName = nullptr;
+    string *source = nullptr;
+
+    vector<unsigned long> *lines;
 };
 
 struct Location {
@@ -490,10 +491,7 @@ vector<unsigned char> toBytes64(const T object) {
 
 template<typename T>
 T bytesTo(const vector<unsigned char> &bytes, int32_t start) {
-    T object;
-    unsigned char *begin_object = reinterpret_cast<unsigned char *>(&object);
-    memcpy(begin_object, &bytes[start], sizeof(T));
-    return object;
+    return *(reinterpret_cast<const T *>(&bytes[start] + start));
 }
 
 template<>
@@ -542,7 +540,6 @@ struct Note {
 struct Error {
     Region region = {};
     string message = "";
-
     vector<Note> notes = {};
 };
 
@@ -611,7 +608,7 @@ public:
     unordered_map<string, int64_t> atoms = {};
     vector<string> backwardAtoms = {};
 
-    int64_t insert(Region r);
+    int64_t insert(Region &r);
     int64_t insertStr(string s);
 
     AtomTable();

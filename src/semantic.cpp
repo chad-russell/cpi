@@ -724,7 +724,7 @@ bool assignParams(Semantic *semantic,
             }
             if (!found) {
                 encounteredError = true;
-                semantic->reportError({errorReportTarget}, Error{"unable to find one of the parameters"});
+                semantic->reportError({errorReportTarget}, Error{errorReportTarget->region, "unable to find one of the parameters"});
             }
         }
         else {
@@ -733,7 +733,7 @@ bool assignParams(Semantic *semantic,
             while (j < newParams.size() && !(openParams[j])) { j += 1; }
             if (j >= newParams.size()) {
                 encounteredError = true;
-                semantic->reportError({errorReportTarget}, Error{"too many parameters passed!"});
+                semantic->reportError({errorReportTarget}, Error{errorReportTarget->region, "too many parameters passed!"});
             }
             else {
                 auto declParam = declParams[j];
@@ -1849,7 +1849,7 @@ Node *buildTypeInfoStructLiteral(Semantic *semantic, Node *node) {
     return returnStructNode;
 }
 
-void resolveAnyof(Semantic *semantic, Node *node) {
+void resolveTypeinfo(Semantic *semantic, Node *node) {
     auto heapifiedValue = new Node();
     heapifiedValue->type = NodeType::HEAPIFY;
     semantic->resolveTypes(node->nodeData);
@@ -1859,10 +1859,7 @@ void resolveAnyof(Semantic *semantic, Node *node) {
     auto typeInfo = buildTypeInfoStructLiteral(semantic, node->nodeData->typeInfo);
     semantic->resolveTypes(typeInfo);
 
-    node->resolved = new Node();
-    node->resolved->type = NodeType::STRUCT_LITERAL;
-    node->resolved->structLiteralData.params.push_back(wrapInValueParam(typeInfo, "_type"));
-    node->resolved->structLiteralData.params.push_back(wrapInValueParam(heapifiedValue, "value"));
+    node->resolved = typeInfo;
 
     semantic->resolveTypes(node->resolved);
     node->typeInfo = node->resolved->typeInfo;
@@ -2054,8 +2051,8 @@ void Semantic::resolveTypes(Node *node) {
         case NodeType::HEAPIFY: {
             resolveHeapify(this, node);
         } break;
-        case NodeType::ANYOF: {
-            resolveAnyof(this, node);
+        case NodeType::TypeInfo: {
+            resolveTypeinfo(this, node);
         } break;
         case NodeType::PUTS: {
             resolvePuts(this, node);

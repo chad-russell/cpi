@@ -261,14 +261,7 @@ public:
   }
 
   template <typename T>
-  inline T read() {
-      auto found = tryRead<T>();
-      assert(found.isPresent);
-      return found.value;
-  }
-
-  template <typename T>
-  Optional<T> tryRead() {
+  T read() {
       auto inst = static_cast<Instruction>(instructions[pc]);
 
       // RELCONST
@@ -276,7 +269,7 @@ public:
           pc += 1;
           auto consumed = consume<T>();
           consumed += static_cast<T>(bp);
-          return Optional<T>{true, consumed};
+          return consumed;
       }
 
       // REL
@@ -285,8 +278,7 @@ public:
           || inst == Instruction::RELF32 || inst == Instruction::RELF64) {
           pc += 1;
           auto consumed = consume<int32_t>();
-          auto value = readFromStack<T>(consumed + bp);
-          return Optional<T>{true, value};
+          return readFromStack<T>(consumed + bp);
       }
 
       // CONST
@@ -294,81 +286,26 @@ public:
           || inst == Instruction::CONSTI32 || inst == Instruction::CONSTI64
           || inst == Instruction::CONSTF32 || inst == Instruction::CONSTF64) {
           pc += 1;
-          auto consumed = consume<T>();
-          return Optional<T>{true, consumed};
+          return consume<T>();
       }
 
       assert(false && "unrecognized inst for read<T>");
   }
 
   auto readBits8() {
-      // expect u8 or i8
-      auto u8Value = tryRead<uint8_t>();
-      if (u8Value.isPresent) {
-          return *((int8_t *)&u8Value.value);
-      }
-
-      auto i8Value = tryRead<int8_t>();
-      if (i8Value.isPresent) {
-          return i8Value.value;
-      }
-
-      assert(false);
+      return read<int8_t>();
   }
 
   auto readBits16() {
-      // expect uint16_t or int16_t
-      auto uint16_tValue = tryRead<uint16_t>();
-      if (uint16_tValue.isPresent) {
-          return *((int16_t *)&uint16_tValue.value);
-      }
-
-      auto int16_tValue = tryRead<int16_t>();
-      if (int16_tValue.isPresent) {
-          return int16_tValue.value;
-      }
-
-      assert(false);
+      return read<int16_t>();
   }
 
   auto readBits32() {
-      // expect uint32_t, int32_t, or float
-      auto uint32_tValue = tryRead<uint32_t>();
-      if (uint32_tValue.isPresent) {
-          return *((int32_t *)&uint32_tValue.value);
-      }
-
-      auto int32_tValue = tryRead<int32_t>();
-      if (int32_tValue.isPresent) {
-          return int32_tValue.value;
-      }
-
-      auto floatValue = tryRead<float>();
-      if (floatValue.isPresent) {
-          return *((int32_t *)&floatValue.value);
-      }
-
-      assert(false);
+      return read<int32_t>();
   }
 
   auto readBits64() {
-      // expect uint64_t, int64_t, or double
-      auto uint64_tValue = tryRead<uint64_t>();
-      if (uint64_tValue.isPresent) {
-          return *((int64_t *)&uint64_tValue.value);
-      }
-
-      auto int64_tValue = tryRead<int64_t>();
-      if (int64_tValue.isPresent) {
-          return int64_tValue.value;
-      }
-
-      auto doubleValue = tryRead<double>();
-      if (doubleValue.isPresent) {
-          return *((int64_t *)&doubleValue.value);
-      }
-
-      assert(false);
+      return read<int64_t>();
   }
 
   template<int32_t bits, typename T>

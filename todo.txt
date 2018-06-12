@@ -1,6 +1,4 @@
 TODO:
-    - support 'putchar'
-
     - replace 'anyof' with 'typeinfo', and finish implementing buildTypeInfoStructLiteral for struct/fn types
         - consider
 

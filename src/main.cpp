@@ -79,9 +79,9 @@ enum class OutputType {
 };
 
 InputType inputTypeFromExtension(const string &fileName) {
-    if (endsWith(fileName, ".cpi")) { return InputType::CPI; }
-    if (endsWith(fileName, ".cas")) { return InputType::CAS; }
-    if (endsWith(fileName, ".cbc")) { return InputType::CBC; }
+    if (endsWith(const_cast<string *>(&fileName), ".cpi")) { return InputType::CPI; }
+    if (endsWith(const_cast<string *>(&fileName), ".cas")) { return InputType::CAS; }
+    if (endsWith(const_cast<string *>(&fileName), ".cbc")) { return InputType::CBC; }
 
     printHelp();
     assert(false);
@@ -153,11 +153,13 @@ int main(int argc, char **argv) {
     if (outputFileName != nullptr) {
         std::ofstream out(outputFileName);
 
-        if (endsWith(outputFileName, ".cas")) {
+        auto outputNameString = new string(outputFileName);
+
+        if (endsWith(outputNameString, ".cas")) {
             outputType = OutputType::CAS;
-        } else if (endsWith(outputFileName, ".cbc")) {
+        } else if (endsWith(outputNameString, ".cbc")) {
             outputType = OutputType::CBC;
-        } else if (endsWith(outputFileName, ".ll")) {
+        } else if (endsWith(outputNameString, ".ll")) {
             outputType = OutputType::LL;
         } else {
             outputType = OutputType::BINARY;
@@ -309,11 +311,13 @@ int main(int argc, char **argv) {
     if (outputFileName != nullptr && semantic != nullptr && !semantic->encounteredErrors) {
         std::ofstream out(outputFileName);
 
-        if (endsWith(outputFileName, ".cas")) {
+        auto outputFileNameString = new string(outputFileName);
+
+        if (endsWith(outputFileNameString, ".cas")) {
             auto printer = new MnemonicPrinter(instructions);
             printer->fnTable = fnTable;
             out << printer->debugString();
-        } else if (endsWith(outputFileName, ".cbc")) {
+        } else if (endsWith(outputFileNameString, ".cbc")) {
             // .cbc
 
             // fn table
@@ -324,7 +328,7 @@ int main(int argc, char **argv) {
 
             // instructions
             out << instructions;
-        } else if (endsWith(outputFileName, ".ll")) {
+        } else if (endsWith(outputFileNameString, ".ll")) {
             // .ll
             auto llvmGen = new LlvmGen(inputFile);
 

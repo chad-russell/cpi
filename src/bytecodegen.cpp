@@ -24,14 +24,14 @@ void BytecodeGen::binopHelper(string instructionStr, Node *node, int32_t scale) 
     if (resolvedLhsType->typeData.kind == NodeTypekind::POINTER || resolvedRhsType->typeData.kind == NodeTypekind::POINTER) {
         // pointer arithmetic
         kind = NodeTypekind::POINTER;
-    } else if (startsWith(instructionStr, "EQ") || startsWith(instructionStr, "NEQ")
-            || startsWith(instructionStr, "GT") || startsWith(instructionStr, "GE")
-            || startsWith(instructionStr, "LT") || startsWith(instructionStr, "LE")
-            || startsWith(instructionStr, "GT") || startsWith(instructionStr, "GE")
-            || startsWith(instructionStr, "UGT") || startsWith(instructionStr, "UGE")
-            || startsWith(instructionStr, "ULT") || startsWith(instructionStr, "ULE")
-            || startsWith(instructionStr, "SGT") || startsWith(instructionStr, "SGE")
-            || startsWith(instructionStr, "SLT") || startsWith(instructionStr, "SLE")) {
+    } else if (startsWith(&instructionStr, "EQ") || startsWith(&instructionStr, "NEQ")
+            || startsWith(&instructionStr, "GT") || startsWith(&instructionStr, "GE")
+            || startsWith(&instructionStr, "LT") || startsWith(&instructionStr, "LE")
+            || startsWith(&instructionStr, "GT") || startsWith(&instructionStr, "GE")
+            || startsWith(&instructionStr, "UGT") || startsWith(&instructionStr, "UGE")
+            || startsWith(&instructionStr, "ULT") || startsWith(&instructionStr, "ULE")
+            || startsWith(&instructionStr, "SGT") || startsWith(&instructionStr, "SGE")
+            || startsWith(&instructionStr, "SLT") || startsWith(&instructionStr, "SLE")) {
         // comparison, so boolean
         isBoolean = true;
         kind = resolvedLhsType->typeData.kind;
@@ -919,7 +919,7 @@ void BytecodeGen::gen(Node *node) {
             append(node->bytecode, Instruction::RELCONSTI64);
             append(node->bytecode, toBytes32(node->localOffset));
         } break;
-        case NodeType::ANYOF: {
+        case NodeType::TypeInfo: {
             gen(node->resolved);
         } break;
         case NodeType::PUTS: {

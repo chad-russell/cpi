@@ -1294,12 +1294,6 @@ void LlvmGen::gen(Node *node) {
 
             auto formatStr = builder.CreateGlobalStringPtr("%.*s", "printfFmtStr");
             builder.CreateCall(printfFunc, { formatStr, count, firstChar });
-
-//            auto formatStr = builder.CreateGlobalStringPtr("%d", "printfFmtStr");
-//            builder.CreateCall(printfFunc, { formatStr, count, firstChar });
-
-//            auto formatStr = builder.CreateGlobalStringPtr("hello");
-//            builder.CreateCall(printfFunc, { formatStr });
         } break;
         default: assert(false);
     }
