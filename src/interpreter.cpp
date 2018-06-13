@@ -179,8 +179,9 @@ void interpretPuts(Interpreter *interp) {
     auto followed_ptr = (char *) ((int8_t *) interp->stack.data() + *ptr_to_offset);
 
     auto ptr_to_count = (int32_t *) ((int8_t *) interp->stack.data() + offset_from_stack + 8);
+    auto count = static_cast<size_t>(*ptr_to_count);
 
-    fwrite(followed_ptr, sizeof(char), *((int *) ptr_to_count), stdout);
+    fwrite(followed_ptr, sizeof(char), count, stdout);
 }
 
 // calli

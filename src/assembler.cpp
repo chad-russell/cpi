@@ -568,7 +568,7 @@ void MnemonicPrinter::step() {
         instructionString.append(" ");
         auto storageOffset = consume<int32_t>();
         instructionString.append(to_string(storageOffset));
-    } else if (startsWith(&inst, "FREE")) {
+    } else if (startsWith(&inst, "FREE") || startsWith(&inst, "PUTS")) {
         instructionString.append(inst);
         instructionString.append(" ");
         readTypeAndInt();

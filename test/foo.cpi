@@ -25,20 +25,21 @@ type ArrayData struct {
 }
 
 type TypeInfo union {
-    NONE:          none,
-    INT_LITERAL:   i64,
-    I8:            none,
-    I32:           none,
-    I64:           none,
-    FLOAT_LITERAL: f64,
-    BOOLEAN:       none,
-    F32:           none,
-    F64:           none,
-    FN:            FnData,
-    STRUCT:        StructData,
-    POINTER:       PointerData,
-    ENUM:          EnumData,
-    ARRAY:         ArrayData,
+    NONE:             none,
+    INT_LITERAL:      i64,
+    I8:               none,
+    I32:              none,
+    I64:              none,
+    FLOAT_LITERAL:    f64,
+    BOOLEAN:          none,
+    BOOLEAN_LITERAL:  bool,
+    F32:              none,
+    F64:              none,
+    FN:               FnData,
+    STRUCT:           StructData,
+    POINTER:          PointerData,
+    ENUM:             EnumData,
+    ARRAY:            ArrayData,
 }
 
 type Any struct {
@@ -46,8 +47,40 @@ type Any struct {
     value:  *none
 }
 
+fn st() {
+}
+
+fn ar() {
+    a: TypeInfo = {
+        ARRAY: {
+            elementType: &{I8: {}}
+        }
+    };
+
+    ret a.ARRAY.elementType.tag;
+}
+
+fn f() {
+    v := fn(i: i32) { ret i + 1; };
+    a: TypeInfo = typeinfo(v);
+    for param : a.FN.params {
+        puts("found a param: '");
+        puts(param.name);
+        println("'");
+    }
+    ret a.FN.params[0]._type.tag;
+}
+
 fn main() {
-    a := typeInfo
+    x : i32 = 3;
+    v := {x: x, y: 4};
+    a : TypeInfo = typeinfo(v);
+    for param : a.STRUCT.params {
+        puts("found a param: '");
+        puts(param.name);
+        println("'");
+    }
+    ret a.STRUCT.params[0]._type.tag;
 }
 
 fn println(s: []i8) {

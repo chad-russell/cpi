@@ -491,7 +491,7 @@ vector<unsigned char> toBytes64(const T object) {
 
 template<typename T>
 T bytesTo(const vector<unsigned char> &bytes, int32_t start) {
-    return *(reinterpret_cast<const T *>(&bytes[start] + start));
+    return *(reinterpret_cast<const T *>(&bytes[start]));
 }
 
 template<>

@@ -72,7 +72,7 @@ ostream &operator<<(ostream &os, SourceRegion region) {
 
 ostream &operator<<(ostream &os, SourceInfoRegion region) {
     ostringstream message("");
-    message << region.region.srcInfo.fileName
+    message << *region.region.srcInfo.fileName
             << ":" << region.region.start.line
             << ":" << region.region.start.col << ": ";
     return os << Colored<string>{message.str(), {Color::FG_DEFAULT}, 1};
@@ -379,6 +379,9 @@ ostream &operator<<(ostream &os, Node *node) {
                 cout << p << ", ";
             }
             cout << ")";
+        } break;
+        case NodeType::TypeInfo: {
+            cout << resolve(node) << endl;
         } break;
         default: assert(false);
     }

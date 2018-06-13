@@ -30,7 +30,7 @@ struct Parser {
     stack<Scope *> scopes = {};
     Node *currentFnDecl = nullptr;
 
-    Parser(Lexer *lexer_);
+    explicit Parser(Lexer *lexer_);
 
     void popFront();
     void reportError(string error);

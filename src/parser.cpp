@@ -17,7 +17,7 @@ void Parser::popFront() {
 }
 
 void Parser::reportError(string error) {
-    cout << last.region.srcInfo.fileName << ":"
+    cout << *last.region.srcInfo.fileName << ":"
          << last.region.start.line << ":"
          << last.region.start.col << ":"
          << Colored<string>{"error: ", {Color::FG_RED}, true}
@@ -863,7 +863,6 @@ Node *Parser::parseArrayLiteral() {
     expect(LexerTokenType::RSQUARE, "]");
 
     auto lit = new Node(lexer->srcInfo, NodeType::ARRAY_LITERAL, scopes.top());
-    auto elemsStruct = new Node(lexer->srcInfo, NodeType::STRUCT_LITERAL, scopes.top());
 
     if (lexer->front.type != LexerTokenType::LCURLY) {
         lit->arrayLiteralData.elementType = parseType();
@@ -871,48 +870,16 @@ Node *Parser::parseArrayLiteral() {
 
     expect(LexerTokenType::LCURLY, "{");
     if (lexer->front.type != LexerTokenType::RCURLY) {
-
         auto elem = parseRvalue();
         lit->arrayLiteralData.elements.push_back(elem);
-        elemsStruct->structLiteralData.params.push_back(wrapInValueParam(elem, ""));
     }
     while (lexer->front.type != LexerTokenType::RCURLY) {
         expect(LexerTokenType::COMMA, ",");
 
         auto elem = parseRvalue();
         lit->arrayLiteralData.elements.push_back(elem);
-        elemsStruct->structLiteralData.params.push_back(wrapInValueParam(elem, ""));
     }
     expect(LexerTokenType::RCURLY, "}");
-
-    auto heapified = new Node(lexer->srcInfo, NodeType::HEAPIFY, scopes.top());
-    heapified->nodeData = elemsStruct;
-    addLocal(elemsStruct);
-    addLocal(heapified);
-
-    Node *typeOfElem = nullptr;
-    if (lit->arrayLiteralData.elementType != nullptr) {
-        typeOfElem = lit->arrayLiteralData.elementType;
-    }
-    else if (!lit->arrayLiteralData.elements.empty()) {
-        typeOfElem = new Node(lexer->srcInfo, NodeType::TYPEOF, scopes.top());
-        typeOfElem->nodeData = lit->arrayLiteralData.elements[0];
-    }
-
-    auto pointerToTypeOfElem = new Node(NodeTypekind::POINTER);
-    pointerToTypeOfElem->typeData.pointerTypeData.underlyingType = typeOfElem;
-
-    auto castedHeapified = new Node(lexer->srcInfo, NodeType::CAST, scopes.top());
-    castedHeapified->castData.type = pointerToTypeOfElem;
-    castedHeapified->castData.value = heapified;
-
-    auto countNode = new Node(lexer->srcInfo, NodeType::INT_LITERAL, scopes.top());
-    countNode->intLiteralData.value = static_cast<int64_t>(elemsStruct->structLiteralData.params.size());
-    countNode->typeInfo = new Node(NodeTypekind::I32);
-
-    lit->arrayLiteralData.structLiteralRepresentation = new Node(lexer->srcInfo, NodeType::STRUCT_LITERAL, scopes.top());
-    lit->arrayLiteralData.structLiteralRepresentation->structLiteralData.params.push_back(wrapInValueParam(castedHeapified, "data"));
-    lit->arrayLiteralData.structLiteralRepresentation->structLiteralData.params.push_back(wrapInValueParam(countNode, "count"));
 
     return lit;
 }
