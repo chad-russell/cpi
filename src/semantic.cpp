@@ -1740,6 +1740,10 @@ void resolveTagCheck(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->nodeData);
 
     auto resolvedType = resolve(node->nodeData->dotData.lhs->typeInfo);
+    while (resolvedType->typeData.kind == NodeTypekind::POINTER) {
+        resolvedType = resolve(resolvedType->typeData.pointerTypeData.underlyingType);
+    }
+
     assert(resolvedType->typeData.kind == NodeTypekind::STRUCT);
     if (!resolvedType->typeData.structTypeData.isSecretlyUnion) {
         semantic->reportError({node, node->nodeData}, Error{
@@ -1754,7 +1758,7 @@ void resolveTagCheck(Semantic *semantic, Node *node) {
     // eqeq
     auto typeData = resolve(node->nodeData->dotData.lhs->typeInfo)->typeData;
     while (typeData.kind == NodeTypekind::POINTER) {
-        typeData = typeData.pointerTypeData.underlyingType->typeData;
+        typeData = resolve(typeData.pointerTypeData.underlyingType)->typeData;
     }
 
     // the resolved parameter is the 0th parameter of the type data
@@ -2005,7 +2009,7 @@ Node *buildTypeInfoStructLiteral(Semantic *semantic, Scope *scope, Node *node) {
         } break;
         case NodeTypekind::SYMBOL: {
             return buildTypeInfoStructLiteral(semantic, scope, resolve(node));
-        }
+        } break;
         case NodeTypekind::POINTER: {
             fieldName = "POINTER";
 

@@ -47,40 +47,28 @@ type Any struct {
     value:  *none
 }
 
-fn st() {
-}
-
-fn ar() {
-    a: TypeInfo = {
-        ARRAY: {
-            elementType: &{I8: {}}
+fn printTypeInfo(t: *TypeInfo) {
+    if tagcheck(t.STRUCT) {
+        puts("struct{");
+        for param : t.STRUCT.params {
+            puts(param.name);
+            puts(": ");
+            printTypeInfo(param._type);
+            puts(", ");
         }
-    };
-
-    ret a.ARRAY.elementType.tag;
+        puts("}");
+    }
+    else if tagcheck(t.INT_LITERAL) {
+        puts("i32");
+    }
 }
 
-fn f() {
-    v := fn(i: i32) { ret i + 1; };
-    a: TypeInfo = typeinfo(v);
-    for param : a.FN.params {
-        puts("found a param: '");
-        puts(param.name);
-        println("'");
-    }
-    ret a.FN.params[0]._type.tag;
+fn printType( T := typeof(t) )(t: T) {
+    printTypeInfo(&typeinfo(t));
 }
 
 fn main() {
-    x : i32 = 3;
-    v := {x: x, y: 4};
-    a : TypeInfo = typeinfo(v);
-    for param : a.STRUCT.params {
-        puts("found a param: '");
-        puts(param.name);
-        println("'");
-    }
-    ret a.STRUCT.params[0]._type.tag;
+    printType({x: 3, y: 4});
 }
 
 fn println(s: []i8) {
