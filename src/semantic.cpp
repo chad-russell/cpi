@@ -151,7 +151,7 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
         desired = desired->staticValue;
     }
 
-    // corecion from boolean to boolean literal or vice versa is valid
+    // coercion from boolean to boolean literal or vice versa is valid
     if (desired->typeData.kind == NodeTypekind::BOOLEAN && actual->typeData.kind == NodeTypekind::BOOLEAN_LITERAL) {
         desired->typeData.kind = actual->typeData.kind;
         desired->typeData.boolTypeData = actual->typeData.boolTypeData;
@@ -271,17 +271,8 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
             auto desiredParamI = desired->typeData.structTypeData.params[i];
             auto actualParamI = actual->typeData.structTypeData.params[i];
 
-            Node *newT1;
-            Node *newT2;
-
-            if (desiredParamI->type == NodeType::DECL_PARAM) {
-                newT1 = resolve(desiredParamI->declParamData.type);
-            } else {
-                assert(desiredParamI->type == NodeType::VALUE_PARAM);
-                newT1 = resolve(desiredParamI->typeInfo);
-            }
-
-            newT2 = resolve(actualParamI->typeInfo);
+            Node *newT1 = resolve(desiredParamI->typeInfo);
+            Node *newT2 = resolve(actualParamI->typeInfo);
 
             auto t1Pointiness = 0;
             auto t2Pointiness = 0;
@@ -761,9 +752,15 @@ bool assignParams(Semantic *semantic,
                         semantic->reportError({errorReportTarget},
                                               Error{errorReportTarget->region, "passed a parameter twice"});
                     }
-                    passedParam->typeInfo = declParam->declParamData.type;
-                    newParams[j] = passedParam;
-                    openParams[j] = false;
+
+                    if (typesMatch(declParam->typeInfo, passedParam->typeInfo, semantic)) {
+                        passedParam->typeInfo = declParam->declParamData.type;
+                        newParams[j] = passedParam;
+                        openParams[j] = false;
+                    }
+                    else {
+                        encounteredError = true;
+                    }
                 }
             }
             if (!found) {

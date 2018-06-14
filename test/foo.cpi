@@ -149,10 +149,8 @@ fn main() {
         }
     };
 
-    -- assert(a._type.STRUCT.params[0]._type.tag == 3);
-    -- assert(a._type.STRUCT.params[0].name[3] == "duck"[3]);
-
-    return a._type.tag;
+    assert(a._type.STRUCT.params[0]._type.tag == 3);
+    assert(a._type.STRUCT.params[0].name[3] == "duck"[3]);
 }
 
 fn println(s: []i8) {
