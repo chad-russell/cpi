@@ -1,6 +1,5 @@
 TODO:
-    - replace 'anyof' with 'typeinfo', and finish implementing buildTypeInfoStructLiteral for struct/fn types
-        - consider
+    - typeinfo for pointer types
 
     - merge the concepts of declParam and valueParam. It's too confusing at this point and we are needing to switch between them too often
 
@@ -25,7 +24,7 @@ TODO:
         -- on enum (tag)
         switch a {
         case x: {
-            ret 111;
+            return 111;
         }
         case y: {
             panic();
@@ -50,7 +49,7 @@ TODO:
 
     - how to make custom stretchy buffer that's also pretty
         - support a pre-check for opEquals and opEqualsAssign (?)
-        - a := buf!(i32)(10); a|append(3); ret a|at(1);
-        - a := [10]i32{}; a|append(3); ret a[1];
+        - a := buf!(i32)(10); a|append(3); return a|at(1);
+        - a := [10]i32{}; a|append(3); return a[1];
         - maybe just get rid of `[]` syntax... instead of giving all types a way to
             access to special syntax, we can just have less special syntax

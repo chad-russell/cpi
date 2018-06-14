@@ -24,7 +24,7 @@ type ArrayData struct {
     elementType: *TypeInfo
 }
 
-type TypeInfo union {
+type TypeInfo enum {
     NONE:             none,
     INT_LITERAL:      i64,
     I8:               none,
@@ -37,7 +37,7 @@ type TypeInfo union {
     F64:              none,
     FN:               FnData,
     STRUCT:           StructData,
-    POINTER:          PointerData,
+    POINTER:          *TypeInfo,
     ENUM:             EnumData,
     ARRAY:            ArrayData,
 }
@@ -47,19 +47,80 @@ type Any struct {
     value:  *none
 }
 
+fn printParams(params: []ParamData) {
+    for param : params {
+        puts(param.name);
+        puts(": ");
+        printTypeInfo(param._type);
+        puts(", ");
+    }
+}
+
 fn printTypeInfo(t: *TypeInfo) {
     if tagcheck(t.STRUCT) {
         puts("struct{");
-        for param : t.STRUCT.params {
-            puts(param.name);
-            puts(": ");
-            printTypeInfo(param._type);
-            puts(", ");
-        }
+        printParams(t.STRUCT.params);
         puts("}");
     }
+    else if tagcheck(t.ENUM) {
+        puts("enum{");
+        printParams(t.ENUM.params);
+        puts("}");
+    }
+    else if tagcheck(t.ARRAY) {
+        puts("[]");
+        printTypeInfo(t.ARRAY.elementType);
+    }
+    else if tagcheck(t.NONE) {
+        puts("none");
+    }
     else if tagcheck(t.INT_LITERAL) {
+        puts("int");
+    }
+    else if tagcheck(t.I8) {
+        puts("i8");
+    }
+    else if tagcheck(t.I32) {
         puts("i32");
+    }
+    else if tagcheck(t.I64) {
+        puts("i64");
+    }
+    else if tagcheck(t.FLOAT_LITERAL) {
+        puts("float");
+    }
+    else if tagcheck(t.BOOLEAN) {
+        puts("boolean");
+    }
+    else if tagcheck(t.BOOLEAN_LITERAL) {
+        if t.BOOLEAN_LITERAL { puts("true"); }
+        else { puts("false"); }
+    }
+    else if tagcheck(t.F32) {
+        puts("f32");
+    }
+    else if tagcheck(t.F64) {
+        puts("f64");
+    }
+    else if tagcheck(t.FN) {
+        puts("fn(");
+        printParams(t.FN.params);
+        puts(") ");
+        printTypeInfo(t.FN.returnType);
+    }
+    else if tagcheck(t.POINTER) {
+        puts("*");
+        printTypeInfo(t.POINTER);
+    }
+}
+
+fn printTypeInfoSimple(t: TypeInfo) {
+    if tagcheck(t.POINTER) {
+        puts("*");
+        printTypeInfoSimple(^t.POINTER);
+    }
+    else {
+        puts("other");
     }
 }
 
@@ -67,8 +128,31 @@ fn printType( T := typeof(t) )(t: T) {
     printTypeInfo(&typeinfo(t));
 }
 
+type linkedList struct {
+    value: i32,
+    next: *none
+}
+
 fn main() {
-    printType({x: 3, y: 4});
+    type TypeInfoS enum {
+        I32: none,
+        I64: none
+    }
+
+    type Any struct {
+        _type:  TypeInfoS
+    }
+
+    a : Any = {
+        _type: {
+            I64: {}
+        }
+    };
+
+    -- assert(a._type.STRUCT.params[0]._type.tag == 3);
+    -- assert(a._type.STRUCT.params[0].name[3] == "duck"[3]);
+
+    return a._type.tag;
 }
 
 fn println(s: []i8) {

@@ -35,7 +35,6 @@ void BytecodeGen::binopHelper(string instructionStr, Node *node, int32_t scale) 
         // comparison, so boolean
         isBoolean = true;
         kind = resolvedLhsType->typeData.kind;
-//        kind = NodeTypekind::BOOLEAN;
     }
     else {
         kind = resolvedLhsType->typeData.kind;
@@ -48,6 +47,7 @@ void BytecodeGen::binopHelper(string instructionStr, Node *node, int32_t scale) 
             bytecodeStr = "RELI8";
         } break;
         case NodeTypekind::BOOLEAN:
+        case NodeTypekind::BOOLEAN_LITERAL:
         case NodeTypekind::I32: {
             toAppend = "I32";
             bytecodeStr = "RELI32";
@@ -326,6 +326,7 @@ void BytecodeGen::gen(Node *node) {
                     append(node->bytecode, Instruction::RELI8);
                     append(node->bytecode, toBytes32(localOffset));
                 } break;
+                case NodeTypekind::BOOLEAN_LITERAL:
                 case NodeTypekind::BOOLEAN:
                 case NodeTypekind::I32: {
                     append(node->bytecode, Instruction::RELI32);
@@ -462,7 +463,6 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, toBytes32((int32_t) 1));
 
                 unsigned long skipElseBranchOverwrite = 0;
-                auto hasElse = !node->ifData.elseStmts.empty();
                 append(instructions, Instruction::JUMP);
                 skipElseBranchOverwrite = instructions.size();
                 append(instructions, toBytes32(999));
@@ -745,6 +745,7 @@ void BytecodeGen::gen(Node *node) {
 
                 append(instructions, toBytes(node->dotData.autoDerefStorage->localOffset));
 
+                node->isBytecodeLocal = true;
                 node->localOffset = node->dotData.autoDerefStorage->localOffset;
             } else if (lhsRel) {
                 node->dotData.pointerIsRelative = true;
@@ -773,9 +774,22 @@ void BytecodeGen::gen(Node *node) {
         } break;
         case NodeType::IF: {
             gen(node->ifData.condition);
+            if (node->ifData.condition->isLocal || node->ifData.condition->isBytecodeLocal) {
+                storeValue(node->ifData.condition, node->ifData.condition->localOffset);
+            }
 
             append(instructions, Instruction::JUMPIF);
-            append(instructions, node->ifData.condition->bytecode);
+
+            if (node->ifData.condition->isLocal || node->ifData.condition->isBytecodeLocal) {
+                assert(node->ifData.condition->isLocal || node->ifData.condition->isBytecodeLocal);
+
+                append(instructions, Instruction::RELI32);
+                append(instructions, toBytes(node->ifData.condition->localOffset));
+            }
+            else {
+                assert(!node->ifData.condition->bytecode.empty());
+                append(instructions, node->ifData.condition->bytecode);
+            }
 
             append(instructions, Instruction::CONSTI32);
             auto trueBranchOverwrite = instructions.size();
@@ -892,6 +906,10 @@ void BytecodeGen::gen(Node *node) {
             assert(node->resolved);
             gen(node->resolved);
             node->bytecode = node->resolved->bytecode;
+
+            if (node->isLocal || node->isBytecodeLocal) {
+                storeValue(node->nodeData, node->nodeData->localOffset);
+            }
         } break;
         case NodeType::HEAPIFY: {
             gen(node->nodeData);
@@ -919,7 +937,7 @@ void BytecodeGen::gen(Node *node) {
             append(node->bytecode, Instruction::RELCONSTI64);
             append(node->bytecode, toBytes32(node->localOffset));
         } break;
-        case NodeType::TypeInfo: {
+        case NodeType::TYPEINFO: {
             gen(node->resolved);
         } break;
         case NodeType::PUTS: {
@@ -1056,7 +1074,7 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
         } break;
         case NodeType::STRUCT_LITERAL: {
             if (node->typeInfo->typeData.structTypeData.coercedType != nullptr
-                && node->typeInfo->typeData.structTypeData.coercedType->typeData.structTypeData.isSecretlyUnion) {
+                && node->typeInfo->typeData.structTypeData.coercedType->typeData.structTypeData.isSecretlyEnum) {
                 // we need to store the tag and the value.
                 auto tagIndex = node->typeInfo->typeData.structTypeData.params[0]->declParamData.index;
                 auto value = node->structLiteralData.params[0];

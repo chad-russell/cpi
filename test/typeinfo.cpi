@@ -34,7 +34,7 @@ type ArrayData struct {
     elementType: *TypeInfo
 }
 
-type TypeInfo union {
+type TypeInfo enum {
     NONE:          none,
     INT_LITERAL:   i64,
     I8:            none,

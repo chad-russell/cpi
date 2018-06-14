@@ -17,6 +17,7 @@ int32_t typeSize(Node *type) {
         case NodeTypekind::I8:
             return 1;
         case NodeTypekind::BOOLEAN:
+        case NodeTypekind::BOOLEAN_LITERAL:
         case NodeTypekind::I32:
         case NodeTypekind::FN:
         case NodeTypekind::FLOAT_LITERAL:
@@ -42,7 +43,7 @@ int32_t typeSize(Node *type) {
 
             for (auto param : resolved->typeData.structTypeData.params) {
                 // if it's a union and we're not assigning to the 'tag' part, then the offset is the size of the tag
-                if (resolved->typeData.structTypeData.isSecretlyUnion && param->declParamData.index > 0) {
+                if (resolved->typeData.structTypeData.isSecretlyEnum && param->declParamData.index > 0) {
                     param->localOffset = tagSizeInBytes;
                 }
                 else {
@@ -58,7 +59,7 @@ int32_t typeSize(Node *type) {
                 }
             }
 
-            if (resolved->typeData.structTypeData.isSecretlyUnion) {
+            if (resolved->typeData.structTypeData.isSecretlyEnum) {
                 return tagSizeInBytes + largest;
             }
 
@@ -75,14 +76,14 @@ int32_t typeSize(Node *type) {
 bool typesMatch(Node *desired, Node *actual, Semantic *semantic);
 
 int maybeMatchUnionToStructLiteral(Node *desired, Node *actual, Semantic *semantic) {
-    if ((actual->typeData.structTypeData.isSecretlyUnion && !desired->typeData.structTypeData.isSecretlyUnion)
-        || (desired->typeData.structTypeData.isSecretlyUnion && !actual->typeData.structTypeData.isSecretlyUnion)) {
+    if ((actual->typeData.structTypeData.isSecretlyEnum && !desired->typeData.structTypeData.isSecretlyEnum)
+        || (desired->typeData.structTypeData.isSecretlyEnum && !actual->typeData.structTypeData.isSecretlyEnum)) {
         // if the other one is a struct literal, then we just need to match that there is only one param,
         // and that it matches something in the other one
 
         Node *unionToMatchAgainst = desired;
         Node *other = actual;
-        if (actual->typeData.structTypeData.isSecretlyUnion) {
+        if (actual->typeData.structTypeData.isSecretlyEnum) {
             unionToMatchAgainst = actual;
             other = desired;
         }
@@ -110,15 +111,15 @@ int maybeMatchUnionToStructLiteral(Node *desired, Node *actual, Semantic *semant
             auto pAtomId = p->declParamData.name->symbolData.atomId;
 
             if (pAtomId == otherAtomId) {
-                if (typesMatch(p->declParamData.type, other->typeData.structTypeData.params[0]->declParamData.type, semantic)) {
-                    other->typeData.structTypeData.coercedType = unionToMatchAgainst;
-                    other->typeData.structTypeData.params[0]->declParamData.index = paramIndex;
-                    other->typeData.structTypeData.enumCoerced = true;
-
-                    return 2;
+                if (!typesMatch(p->declParamData.type, other->typeData.structTypeData.params[0]->declParamData.type, semantic)) {
+                    return 1;
                 }
 
-                return 1;
+                other->typeData.structTypeData.coercedType = unionToMatchAgainst;
+                other->typeData.structTypeData.params[0]->declParamData.index = paramIndex;
+                other->typeData.structTypeData.enumCoerced = true;
+
+                return 2;
             }
 
             paramIndex += 1;
@@ -148,6 +149,20 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
     }
     if (desired->typeData.kind == NodeTypekind::EXPOSED_AST && desired->staticValue != nullptr) {
         desired = desired->staticValue;
+    }
+
+    // corecion from boolean to boolean literal or vice versa is valid
+    if (desired->typeData.kind == NodeTypekind::BOOLEAN && actual->typeData.kind == NodeTypekind::BOOLEAN_LITERAL) {
+        desired->typeData.kind = actual->typeData.kind;
+        desired->typeData.boolTypeData = actual->typeData.boolTypeData;
+
+        return true;
+    }
+    if (actual->typeData.kind == NodeTypekind::BOOLEAN && desired->typeData.kind == NodeTypekind::BOOLEAN_LITERAL) {
+        actual->typeData.kind = desired->typeData.kind;
+        actual->typeData.boolTypeData = desired->typeData.boolTypeData;
+
+        return true;
     }
 
     // coercion from integer literal to any integer is valid
@@ -266,19 +281,21 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
                 newT1 = resolve(desiredParamI->typeInfo);
             }
 
-            if (actualParamI->type == NodeType::DECL_PARAM) {
-                newT2 = resolve(actualParamI->declParamData.type);
-            } else {
-                assert(actualParamI->type == NodeType::VALUE_PARAM);
-                newT2 = resolve(actualParamI->typeInfo);
-            }
+            newT2 = resolve(actualParamI->typeInfo);
+
+            auto t1Pointiness = 0;
+            auto t2Pointiness = 0;
 
             while (newT1->typeData.kind == NodeTypekind::POINTER) {
+                t1Pointiness += 1;
                 newT1 = resolve(newT1->typeData.pointerTypeData.underlyingType);
             }
             while (newT2->typeData.kind == NodeTypekind::POINTER) {
+                t2Pointiness += 1;
                 newT2 = resolve(newT2->typeData.pointerTypeData.underlyingType);
             }
+
+            if (t1Pointiness != t2Pointiness) { return false; }
 
             // if we get to a situation where two types match iff they match, then they match
             auto tautology = (newT1 == desired && newT2 == actual) || (newT1 == actual && newT2 == desired);
@@ -322,6 +339,13 @@ Node *defaultValueFor(Semantic *semantic, Node *type) {
             auto def = new Node();
             def->type = NodeType::FLOAT_LITERAL;
             def->floatLiteralData.value = 0;
+            def->typeInfo = type;
+            return def;
+        }
+        case NodeTypekind::BOOLEAN_LITERAL: {
+            auto def = new Node();
+            def->type = NodeType::BOOLEAN_LITERAL;
+            def->boolLiteralData.value = type->boolLiteralData.value;
             def->typeInfo = type;
             return def;
         }
@@ -556,7 +580,7 @@ void resolveIntLiteral(Semantic *semantic, Node *node) {
 }
 
 void resolveBooleanLiteral(Semantic *semantic, Node *node) {
-    node->typeInfo = new Node(NodeTypekind::BOOLEAN);
+    node->typeInfo = new Node(NodeTypekind::BOOLEAN_LITERAL);
     node->typeInfo->typeData.boolTypeData = node->boolLiteralData.value;
 }
 
@@ -711,14 +735,25 @@ bool assignParams(Semantic *semantic,
     auto encounteredError = false;
 
     for (auto passedParam : givenParams) {
-        if (passedParam->type == NodeType::VALUE_PARAM && passedParam->valueParamData.name != nullptr) {
+        auto valueAndNameNotNull = passedParam->type == NodeType::VALUE_PARAM && passedParam->valueParamData.name != nullptr;
+        auto declAndNameNotNull = passedParam->type == NodeType::DECL_PARAM && passedParam->declParamData.name != nullptr;
+
+        if (valueAndNameNotNull || declAndNameNotNull) {
             // look up that name in the declaration
             auto found = false;
             for (unsigned long j = 0; j < declParams.size(); j++) {
                 auto declParam = declParams[j];
                 assert(declParam->type == NodeType::DECL_PARAM);
 
-                if (declParam->declParamData.name->symbolData.atomId == passedParam->valueParamData.name->symbolData.atomId) {
+                int64_t passedParamAtomId;
+                if (passedParam->type == NodeType::VALUE_PARAM) {
+                    passedParamAtomId = passedParam->valueParamData.name->symbolData.atomId;
+                }
+                else {
+                    passedParamAtomId = passedParam->declParamData.name->symbolData.atomId;
+                }
+
+                if (declParam->declParamData.name->symbolData.atomId == passedParamAtomId) {
                     found = true;
                     auto openParam = openParams.at(j);
                     if (!openParam) {
@@ -847,6 +882,7 @@ void resolveType(Semantic *semantic, Node *node) {
     switch (node->typeData.kind) {
         case NodeTypekind::NONE:
         case NodeTypekind::BOOLEAN:
+        case NodeTypekind::BOOLEAN_LITERAL:
         case NodeTypekind::EXPOSED_AST:
         case NodeTypekind::INT_LITERAL:
         case NodeTypekind::FLOAT_LITERAL:
@@ -895,15 +931,12 @@ void resolveType(Semantic *semantic, Node *node) {
         } break;
         default: assert(false);
     }
-
-    node->typeInfo = new Node(NodeTypekind::EXPOSED_AST);
 }
 
 Node *makeTemporary(Semantic *semantic, Node *n) {
     auto node = new Node();
     node->typeInfo = n->typeInfo;
-    node->isLocal = true;
-    semantic->currentFnDecl->locals.push_back(node);
+    semantic->addLocal(node);
     return node;
 }
 
@@ -919,16 +952,14 @@ void resolveBinop(Semantic *semantic, Node *node) {
         newLocalStorage->type = NodeType::TYPE;
         newLocalStorage->typeInfo = node->binopData.lhs->typeInfo;
 
-        newLocalStorage->isLocal = true;
-        semantic->currentFnDecl->locals.push_back(newLocalStorage);
+        semantic->addLocal(newLocalStorage);
     }
     if (node->binopData.rhs->type == NodeType::DOT) {
         auto newLocalStorage = new Node();
         newLocalStorage->type = NodeType::TYPE;
         newLocalStorage->typeInfo = node->binopData.rhs->typeInfo;
 
-        newLocalStorage->isLocal = true;
-        semantic->currentFnDecl->locals.push_back(newLocalStorage);
+        semantic->addLocal(newLocalStorage);
     }
 
     if (node->binopData.lhs->typeInfo->typeData.kind == NodeTypekind::POINTER
@@ -1131,7 +1162,7 @@ void possiblyResolveAssignToUnion(Semantic *semantic, Node *originalAssignment, 
         while (typeData.kind == NodeTypekind::POINTER) {
             typeData = typeData.pointerTypeData.underlyingType->typeData;
         }
-        assigningToUnion = typeData.kind == NodeTypekind::STRUCT && typeData.structTypeData.isSecretlyUnion;
+        assigningToUnion = typeData.kind == NodeTypekind::STRUCT && typeData.structTypeData.isSecretlyEnum;
     }
 
     // don't set the tag when assigning to the tag parameter
@@ -1319,62 +1350,40 @@ Node *findParam(Semantic *semantic, Node *node) {
     return foundParam;
 }
 
-void createTagCheck(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
-    if (node->tagCheck) { return; }
-    node->tagCheck = true;
+void createTagCheck(Semantic *semantic, Node *node) {
+    // tagcheck(a.b)
+    auto tagCheck = new Node();
+    tagCheck->scope = node->scope;
+    tagCheck->type = NodeType::TAGCHECK;
+    tagCheck->nodeData = node;
+    semantic->resolveTypes(tagCheck);
 
-    // get the type data
-    auto typeData = resolve(node->dotData.lhs->typeInfo)->typeData;
-    while (typeData.kind == NodeTypekind::POINTER) {
-        typeData = resolve(typeData.pointerTypeData.underlyingType)->typeData;
-    }
+    // false
+    auto falseConst = new Node();
+    falseConst->scope = node->scope;
+    falseConst->type = NodeType::BOOLEAN_LITERAL;
+    falseConst->boolLiteralData.value = false;
 
-    auto foundParam = findParam(semantic, node);
-    auto paramIndex = foundParam->declParamData.index;
+    // tagcheck(a.b) == false
+    auto eqFalse = new Node();
+    eqFalse->scope = node->scope;
+    eqFalse->type = NodeType::BINOP;
+    eqFalse->binopData.type = LexerTokenType::EQ_EQ;
+    eqFalse->binopData.lhs = tagCheck;
+    eqFalse->binopData.rhs = falseConst;
+    semantic->addLocal(eqFalse);
+    semantic->resolveTypes(eqFalse);
 
-    // don't do a check if we're accessing the tag itself
-    if (paramIndex == 0) { return; }
-
-    auto constTag = new Node();
-    constTag->scope = node->dotData.lhs->scope;
-    constTag->type = NodeType::INT_LITERAL;
-    constTag->intLiteralData.value = paramIndex;
-    semantic->resolveTypes(constTag);
-
-    // the resolved parameter is the 0th parameter of the type data
-    auto param0 = new Node();
-    param0->scope = node->dotData.lhs->scope;
-    param0->type = NodeType::SYMBOL;
-    param0->symbolData.atomId = AtomTable::current->insertStr("tag");
-    param0->resolved = typeData.structTypeData.params[0];
-    assert(typeData.structTypeData.params[0]->type == NodeType::DECL_PARAM);
-    param0->typeInfo = typeData.structTypeData.params[0]->declParamData.type;
-
-    auto tagDot = new Node();
-    tagDot->scope = node->scope;
-    tagDot->type = NodeType::DOT;
-    tagDot->dotData.lhs = lhs;
-    tagDot->dotData.rhs = param0;
-    semantic->resolveTypes(tagDot);
-
-    auto neq = new Node();
-    neq->scope = node->scope;
-    neq->type = NodeType::BINOP;
-    neq->binopData.type = LexerTokenType::NE;
-    neq->binopData.lhs = tagDot;
-    neq->binopData.rhs = constTag;
-    semantic->addLocal(neq);
-    semantic->resolveTypes(neq);
-
+    // panic();
     auto panicStmt = new Node();
     panicStmt->scope = node->scope;
     panicStmt->type = NodeType::PANIC;
 
-    // if
+    // if tagcheck(a.b) == false { panic(); }
     auto ifCheck = new Node();
     ifCheck->scope = node->scope;
     ifCheck->type = NodeType::IF;
-    ifCheck->ifData.condition = neq;
+    ifCheck->ifData.condition = eqFalse;
     ifCheck->ifData.stmts.push_back(panicStmt);
 
     node->preStmts.push_back(ifCheck);
@@ -1385,20 +1394,15 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
 
     auto resolvedLhs = resolve(lhs);
     semantic->resolveTypes(resolvedLhs);
+    Node *resolvedLhsTypeInfo;
 
     // follow the lhs all the way through pointers, symbols, etc. and assert it's a struct
     if (!semantic->lvalueAssignmentContext) {
-        auto resolvedLhsTypeInfo = resolve(resolvedLhs->typeInfo);
+        resolvedLhsTypeInfo = resolve(resolvedLhs->typeInfo);
         while (resolvedLhsTypeInfo->typeData.kind == NodeTypekind::POINTER) {
             resolvedLhsTypeInfo = resolve(resolvedLhsTypeInfo->typeData.pointerTypeData.underlyingType);
         }
         assert(resolvedLhsTypeInfo->typeData.kind == NodeTypekind::STRUCT);
-
-        auto isUnionAccess = resolvedLhsTypeInfo->typeData.structTypeData.isSecretlyUnion;
-
-        if (isUnionAccess) {
-            createTagCheck(semantic, node, lhs, rhs);
-        }
     }
 
     if (resolvedLhs->type == NodeType::DOT) {
@@ -1433,10 +1437,20 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
     if (resolve(node->dotData.lhs->typeInfo)->typeData.kind == NodeTypekind::POINTER) {
         auto local = new Node(NodeTypekind::POINTER);
         local->typeInfo = local;
-        local->isLocal = true;
-        semantic->currentFnDecl->locals.push_back(local);
+        semantic->addLocal(local);
 
         node->dotData.autoDerefStorage = local;
+    }
+
+    if (!semantic->lvalueAssignmentContext) {
+        auto isUnionAccess = resolvedLhsTypeInfo->typeData.structTypeData.isSecretlyEnum;
+
+        // todo(chad): keep the atomId for "tag" handy so we don't have to look it up all the time...
+        auto isTagAccess = node->dotData.rhs->symbolData.atomId == AtomTable::current->insertStr("tag");
+
+        if (isUnionAccess && !isTagAccess) {
+            createTagCheck(semantic, node);
+        }
     }
 }
 
@@ -1470,7 +1484,7 @@ void resolveStructLiteral(Semantic *semantic, Node *node) {
 void resolveIf(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->ifData.condition);
 
-    if (node->ifData.condition->typeInfo->typeData.kind != NodeTypekind::BOOLEAN) {
+    if (node->ifData.condition->typeInfo->typeData.kind != NodeTypekind::BOOLEAN && node->ifData.condition->typeInfo->typeData.kind != NodeTypekind::BOOLEAN_LITERAL) {
         semantic->reportError({node, node->ifData.condition}, Error{node->ifData.condition->region, "Condition for 'if' must be a boolean!"});
     }
 
@@ -1485,7 +1499,7 @@ void resolveIf(Semantic *semantic, Node *node) {
 void resolveWhile(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->whileData.condition);
 
-    if (node->whileData.condition->typeInfo->typeData.kind != NodeTypekind::BOOLEAN) {
+    if (node->whileData.condition->typeInfo->typeData.kind != NodeTypekind::BOOLEAN && node->ifData.condition->typeInfo->typeData.kind != NodeTypekind::BOOLEAN_LITERAL) {
         semantic->reportError({node, node->whileData.condition}, Error{node->whileData.condition->region, "Condition for 'while' must be a boolean!"});
     }
 
@@ -1607,8 +1621,7 @@ void resolveFor(Semantic *semantic, Node *node) {
     elementDecl->region = node->forData.element_alias->region;
     elementDecl->declData.type = node->forData.target->typeInfo->typeData.structTypeData.secretArrayElementType;
     elementDecl->declData.lvalue = node->forData.element_alias;
-    elementDecl->isLocal = true;
-    semantic->currentFnDecl->locals.push_back(elementDecl);
+    semantic->addLocal(elementDecl);
     semantic->resolveTypes(elementDecl);
 
     // insert this new declaration into the scope of the 'for' statement
@@ -1630,8 +1643,7 @@ void resolveFor(Semantic *semantic, Node *node) {
     indexDecl->declData.type = new Node(NodeTypekind::I32);
     indexDecl->declData.lvalue = node->forData.iterator_alias;
     indexDecl->declData.initialValue = zero;
-    indexDecl->isLocal = true;
-    semantic->currentFnDecl->locals.push_back(indexDecl);
+    semantic->addLocal(indexDecl);
     semantic->resolveTypes(indexDecl);
 
     auto index = indexDecl;
@@ -1646,8 +1658,7 @@ void resolveFor(Semantic *semantic, Node *node) {
     auto arrayDecl = new Node(node->region.srcInfo, NodeType::DECL, node->scope);
     arrayDecl->declData.type = node->forData.target->typeInfo;
     arrayDecl->declData.initialValue = node->forData.target;
-    arrayDecl->isLocal = true;
-    semantic->currentFnDecl->locals.push_back(arrayDecl);
+    semantic->addLocal(arrayDecl);
 
     for (auto& stmt : node->forData.stmts) {
         semantic->resolveTypes(stmt);
@@ -1669,8 +1680,7 @@ void resolveFor(Semantic *semantic, Node *node) {
     whileConditionBinop->binopData.type = LexerTokenType::LT;
     whileConditionBinop->binopData.lhs = index;
     whileConditionBinop->binopData.rhs = arrayDotCount;
-    semantic->currentFnDecl->locals.push_back(whileConditionBinop);
-    whileConditionBinop->isLocal = true;
+    semantic->addLocal(whileConditionBinop);
 
     // one
     auto one = new Node();
@@ -1684,8 +1694,7 @@ void resolveFor(Semantic *semantic, Node *node) {
     incrementIndexBinop->binopData.type = LexerTokenType::ADD;
     incrementIndexBinop->binopData.lhs = index;
     incrementIndexBinop->binopData.rhs = one;
-    semantic->currentFnDecl->locals.push_back(incrementIndexBinop);
-    incrementIndexBinop->isLocal = true;
+    semantic->addLocal(incrementIndexBinop);
 
     auto incr = new Node(node->region.srcInfo, NodeType::ASSIGN, node->scope);
     incr->assignData.lhs = index;
@@ -1729,6 +1738,9 @@ void resolveFor(Semantic *semantic, Node *node) {
 }
 
 void resolveTagCheck(Semantic *semantic, Node *node) {
+    if (node->tagCheck) { return; }
+    node->tagCheck = true;
+
     if (node->nodeData->type != NodeType::DOT) {
         semantic->reportError({node, node->nodeData}, Error{
                 node->region,
@@ -1745,7 +1757,7 @@ void resolveTagCheck(Semantic *semantic, Node *node) {
     }
 
     assert(resolvedType->typeData.kind == NodeTypekind::STRUCT);
-    if (!resolvedType->typeData.structTypeData.isSecretlyUnion) {
+    if (!resolvedType->typeData.structTypeData.isSecretlyEnum) {
         semantic->reportError({node, node->nodeData}, Error{
                 node->region,
                 "Can only do a tagcheck on a union"
@@ -1791,6 +1803,7 @@ void resolveTagCheck(Semantic *semantic, Node *node) {
     eqeq->binopData.type = LexerTokenType::EQ_EQ;
     eqeq->binopData.lhs = tagDot;
     eqeq->binopData.rhs = constParamIndex;
+    semantic->addLocal(eqeq);
     semantic->resolveTypes(eqeq);
 
     node->resolved = eqeq;
@@ -1835,6 +1848,13 @@ Node *buildTypeInfoStructLiteral(Semantic *semantic, Scope *scope, Node *node) {
 //    ENUM:             EnumData,
 //    ARRAY:            ArrayData,
 
+    if (node->typeInfoStructLiteral != nullptr) {
+        return node->typeInfoStructLiteral;
+    }
+
+    auto returnStructNode = new Node();
+    node->typeInfoStructLiteral = returnStructNode;
+
     auto noneField = new Node();
     noneField->type = NodeType::STRUCT_LITERAL;
     noneField->typeInfo = new Node(NodeTypekind::NONE);
@@ -1873,6 +1893,9 @@ Node *buildTypeInfoStructLiteral(Semantic *semantic, Scope *scope, Node *node) {
             fieldName = "FLOAT_LITERAL";
         } break;
         case NodeTypekind::BOOLEAN: {
+            fieldName = "BOOLEAN";
+        } break;
+        case NodeTypekind::BOOLEAN_LITERAL: {
             auto lit = new Node();
             lit->type = NodeType::BOOLEAN_LITERAL;
             lit->boolLiteralData.value = node->typeData.boolTypeData;
@@ -1925,10 +1948,10 @@ Node *buildTypeInfoStructLiteral(Semantic *semantic, Scope *scope, Node *node) {
             auto fnRetType = buildTypeInfoStructLiteral(semantic, scope, node->typeData.fnTypeData.returnType);
             semantic->addLocal(fnRetType);
 
-            auto ptrToElementType = new Node();
-            ptrToElementType->scope = scope;
-            ptrToElementType->type = NodeType::ADDRESS_OF;
-            ptrToElementType->nodeData = fnRetType;
+            auto ptrToReturnType = new Node();
+            ptrToReturnType->scope = scope;
+            ptrToReturnType->type = NodeType::ADDRESS_OF;
+            ptrToReturnType->nodeData = fnRetType;
 
             // literal
             valueField = new Node();
@@ -1936,10 +1959,8 @@ Node *buildTypeInfoStructLiteral(Semantic *semantic, Scope *scope, Node *node) {
             valueField->type = NodeType::STRUCT_LITERAL;
             valueField->structLiteralData.params = {
                     wrapInValueParam(paramDataArray, "params"),
-                    wrapInValueParam(fnRetType, "returnType")
+                    wrapInValueParam(ptrToReturnType, "returnType")
             };
-
-            semantic->resolveTypes(valueField);
         } break;
         case NodeTypekind::STRUCT: {
             if (node->typeData.structTypeData.isSecretlyArray) {
@@ -1957,11 +1978,9 @@ Node *buildTypeInfoStructLiteral(Semantic *semantic, Scope *scope, Node *node) {
                 valueField->scope = scope;
                 valueField->type = NodeType::STRUCT_LITERAL;
                 valueField->structLiteralData.params.push_back(wrapInValueParam(ptrToElementType, "elementType"));
-
-                semantic->resolveTypes(valueField);
             }
             else {
-                if (node->typeData.structTypeData.isSecretlyUnion) {
+                if (node->typeData.structTypeData.isSecretlyEnum) {
                     fieldName = "ENUM";
                 }
                 else {
@@ -2003,18 +2022,23 @@ Node *buildTypeInfoStructLiteral(Semantic *semantic, Scope *scope, Node *node) {
                 valueField->scope = scope;
                 valueField->type = NodeType::STRUCT_LITERAL;
                 valueField->structLiteralData.params = { wrapInValueParam(paramDataArray, "params") };
-
-                semantic->resolveTypes(valueField);
             }
         } break;
         case NodeTypekind::SYMBOL: {
             return buildTypeInfoStructLiteral(semantic, scope, resolve(node));
         } break;
         case NodeTypekind::POINTER: {
-            fieldName = "POINTER";
+            auto underlyingType = buildTypeInfoStructLiteral(semantic, scope, node->typeData.pointerTypeData.underlyingType);
+            semantic->addLocal(underlyingType);
 
-            // todo(chad): build pointer type
-            assert(false);
+            auto ptrToParamDataType = new Node();
+            ptrToParamDataType->scope = scope;
+            ptrToParamDataType->type = NodeType::ADDRESS_OF;
+            ptrToParamDataType->nodeData = underlyingType;
+
+            valueField = ptrToParamDataType;
+
+            fieldName = "POINTER";
         } break;
         default: assert(false);
     }
@@ -2023,9 +2047,11 @@ Node *buildTypeInfoStructLiteral(Semantic *semantic, Scope *scope, Node *node) {
     typeInfoType->symbolData.atomId = AtomTable::current->insertStr("TypeInfo");
 
     assert(valueField != nullptr);
-    auto returnStructNode = new Node();
     returnStructNode->type = NodeType::STRUCT_LITERAL;
     returnStructNode->structLiteralData.params.push_back(wrapInValueParam(valueField, fieldName));
+    returnStructNode->typeInfo = typeInfoType;
+
+//    semantic->resolveTypes(returnStructNode);
 
     return returnStructNode;
 }
@@ -2041,8 +2067,8 @@ void resolveTypeinfo(Semantic *semantic, Node *node) {
     semantic->resolveTypes(typeInfo);
 
     node->resolved = typeInfo;
-
     semantic->resolveTypes(node->resolved);
+
     node->typeInfo = node->resolved->typeInfo;
 }
 
@@ -2232,7 +2258,7 @@ void Semantic::resolveTypes(Node *node) {
         case NodeType::HEAPIFY: {
             resolveHeapify(this, node);
         } break;
-        case NodeType::TypeInfo: {
+        case NodeType::TYPEINFO: {
             resolveTypeinfo(this, node);
         } break;
         case NodeType::PUTS: {

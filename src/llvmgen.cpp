@@ -48,7 +48,8 @@ LlvmGen::LlvmGen(const char *fileName) : builder(context), module(llvm::make_uni
     llvm::InitializeAllAsmParsers();
     llvm::InitializeAllAsmPrinters();
 
-    voidTy = builder.getVoidTy();
+//    voidTy = builder.getVoidTy();
+    voidTy = llvm::StructType::get(context, {});
 
     auto CPU = "generic";
     auto Features = "";
@@ -140,9 +141,9 @@ void LlvmGen::finalize() {
     }
 
     // DO_OPTIMIZE
-    for (auto fn : allFns) {
-        TheFPM->run(*fn);
-    }
+//    for (auto fn : allFns) {
+//        TheFPM->run(*fn);
+//    }
     verifyModule(*module, &llvm::errs());
 }
 
@@ -151,6 +152,9 @@ llvm::Type *LlvmGen::typeFor(Node *node) {
 
     assert(node->type == NodeType::TYPE);
     switch (node->typeData.kind) {
+        case NodeTypekind::BOOLEAN_LITERAL: {
+            return builder.getInt1Ty();
+        }
         case NodeTypekind::I8: {
             return builder.getInt8Ty();
         }
@@ -206,7 +210,7 @@ llvm::Type *LlvmGen::typeFor(Node *node) {
                 return llvm::StructType::get(context, elementTypes);
             }
 
-            else if (node->typeData.structTypeData.isSecretlyUnion) {
+            else if (node->typeData.structTypeData.isSecretlyEnum) {
                 vector<llvm::Type *> elementTypes;
 
                 // tag
@@ -252,7 +256,7 @@ llvm::Type *LlvmGen::typeFor(Node *node) {
             return llvm::IntegerType::getInt1Ty(context);
         }
         case NodeTypekind::NONE: {
-            return voidTy;
+            return llvm::StructType::get(context, false);
         }
         default: assert(false);
     }
@@ -261,7 +265,7 @@ llvm::Type *LlvmGen::typeFor(Node *node) {
 llvm::Value *LlvmGen::rvalueFor(Node *node) {
     auto resolved = resolve(node);
 
-    if (resolved->typeInfo->typeData.kind == NodeTypekind::NONE) { return nullptr; }
+    if (resolved->typeInfo->typeData.kind == NodeTypekind::NONE) { return llvm::ConstantStruct::get(llvm::StructType::get(context, false), {}); }
 
     if (resolved->isLocal) {
         return builder.CreateLoad((llvm::Value *) resolved->llvmLocal);
@@ -315,7 +319,7 @@ llvm::DIType *diTypeFor(LlvmGen *gen, Node *type) {
             llvm::SmallVector<llvm::Metadata *, 8> elements = {};
             unsigned int idx = 0;
 
-            auto isUnion = type->typeData.structTypeData.isSecretlyUnion;
+            auto isUnion = type->typeData.structTypeData.isSecretlyEnum;
             auto paramCount = type->typeData.structTypeData.params.size();
             if (isUnion) {
                 paramCount = 2;
@@ -537,7 +541,8 @@ void LlvmGen::gen(Node *node) {
                 gen(stmt);
             }
             if (!didTerminate) {
-                builder.CreateRetVoid();
+//                builder.CreateRetVoid();
+                builder.CreateRet(llvm::ConstantStruct::get(llvm::StructType::get(context, {}), {}));
             }
 
             if (currentBB) {
@@ -912,7 +917,7 @@ void LlvmGen::gen(Node *node) {
                 auto foundParam = resolvedDecl->dotData.resolved;
                 auto paramIndex = (uint64_t) foundParam->declParamData.index;
 
-                if (resolve(resolvedDecl->dotData.lhs->typeInfo)->typeData.structTypeData.isSecretlyUnion && paramIndex != 0) {
+                if (resolve(resolvedDecl->dotData.lhs->typeInfo)->typeData.structTypeData.isSecretlyEnum && paramIndex != 0) {
                     paramIndex = 1;
                 }
 
@@ -967,9 +972,9 @@ void LlvmGen::gen(Node *node) {
                 resolvedTypeInfo = resolve(resolvedTypeInfo->typeData.pointerTypeData.underlyingType);
             }
 
-            auto isSecretlyUnion = false;
-            if (resolvedTypeInfo->typeData.structTypeData.isSecretlyUnion) {
-                isSecretlyUnion = true;
+            auto isSecretlyEnum = false;
+            if (resolvedTypeInfo->typeData.structTypeData.isSecretlyEnum) {
+                isSecretlyEnum = true;
                 paramIndex = tag == tagAtom ? 0 : 1;
             }
 
@@ -1003,7 +1008,7 @@ void LlvmGen::gen(Node *node) {
             if (node->dotData.lhs->isLocal) {
                 auto gep = builder.CreateGEP(gepTarget, geps);
 
-                if (isSecretlyUnion && paramIndex == 1) {
+                if (isSecretlyEnum && paramIndex == 1) {
                     // bitcast gepTarget to the correct thing...
                     if (resolve(foundParam->typeInfo)->typeData.kind == NodeTypekind::NONE) {
                         gep = builder.CreateBitCast(gep, builder.getInt8PtrTy(0));
@@ -1089,7 +1094,7 @@ void LlvmGen::gen(Node *node) {
             builder.CreateCall(panicFunc, { builder.CreateGlobalStringPtr("assertion failed!!!") });
         } break;
         case NodeType::STRUCT_LITERAL: {
-            if (node->typeInfo->typeData.structTypeData.coercedType != nullptr && node->typeInfo->typeData.structTypeData.coercedType->typeData.structTypeData.isSecretlyUnion) {
+            if (node->typeInfo->typeData.structTypeData.coercedType != nullptr && node->typeInfo->typeData.structTypeData.coercedType->typeData.structTypeData.isSecretlyEnum) {
                 // we need to store the tag and the value.
                 auto tagIndex = node->typeInfo->typeData.structTypeData.params[0]->declParamData.index;
 
@@ -1294,6 +1299,15 @@ void LlvmGen::gen(Node *node) {
 
             auto formatStr = builder.CreateGlobalStringPtr("%.*s", "printfFmtStr");
             builder.CreateCall(printfFunc, { formatStr, count, firstChar });
+        } break;
+        case NodeType::TAGCHECK: {
+            assert(node->resolved);
+            gen(node->resolved);
+
+            node->llvmData = node->resolved->llvmData;
+            if (node->isLocal) {
+                store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
+            }
         } break;
         default: assert(false);
     }

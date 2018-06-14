@@ -40,6 +40,7 @@ enum class NodeType {
     STRING_LITERAL,
     NIL_LITERAL,
     BOOLEAN_LITERAL,
+    BOOLEAN,
     UNARY_NEG,
     RET,
     IF,
@@ -66,7 +67,7 @@ enum class NodeType {
     ARRAY_LITERAL,
     FOR,
     HEAPIFY,
-    TypeInfo,
+    TYPEINFO,
 };
 
 enum class NodeTypekind {
@@ -76,10 +77,11 @@ enum class NodeTypekind {
     I32,
     I64,
     FLOAT_LITERAL,
-    BOOLEAN,
     F32,
     F64,
     FN,
+    BOOLEAN_LITERAL,
+    BOOLEAN,
     STRUCT,
     SYMBOL,
     POINTER,
@@ -120,7 +122,7 @@ enum class LexerTokenType : int32_t {
     FN,
     TYPE,
     STRUCT,
-    UNION,
+    ENUM,
     SYMBOL,
     INT_LITERAL,
     FLOAT_LITERAL,
@@ -191,7 +193,7 @@ struct StructTypeData {
     bool isSecretlyArray = false;
     Node *secretArrayElementType = nullptr;
 
-    bool isSecretlyUnion = false;
+    bool isSecretlyEnum = false;
 
     // todo(chad): this should maybe just be rolled up into 'resolved'?
     Node *coercedType = nullptr;
@@ -438,6 +440,7 @@ public:
     // };
 
     Node *staticValue = nullptr;
+    Node *typeInfoStructLiteral = nullptr;
 
     bool isUsedInError = false;
     bool semantic = false;
@@ -454,7 +457,7 @@ public:
     bool isBytecodeLocal = false;
     bool skipAllButPostStmts = false;
 
-    // the offset of the storage for this node from the current pointer
+    // the offset of the storage for this node from the current base pointer
     // todo(chad): make this 64 bits
     int32_t localOffset = 0;
 
@@ -462,17 +465,17 @@ public:
     void *llvmData = nullptr;
 
     Node();
-    Node(NodeTypekind typekind);
+    explicit Node(NodeTypekind typekind);
     Node(SourceInfo srcInfo, NodeType type_, Scope *scope_);
 };
 
 template<typename T> 
-vector<unsigned char> toBytes(const T object) {
+vector<unsigned char> toBytes(T object) {
     vector<unsigned char> bytes;
     bytes.reserve(sizeof(T));
 
-    const unsigned char *beg = reinterpret_cast<const unsigned char *>(addressof(object));
-    const unsigned char *end = beg + sizeof(T);
+    const auto *beg = reinterpret_cast<const unsigned char *>(addressof(object));
+    const auto *end = beg + sizeof(T);
 
     copy(beg, end, back_inserter(bytes));
 

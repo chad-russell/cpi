@@ -781,13 +781,13 @@ Node *Parser::parseType() {
 
             type->region.end = lexer->lastLoc;
         } break;
-        case LexerTokenType::UNION: {
-            expect(LexerTokenType::UNION, "union");
+        case LexerTokenType::ENUM: {
+            expect(LexerTokenType::ENUM, "enum");
 
             expect(LexerTokenType::LCURLY, "{");
 
             type->typeData.kind = NodeTypekind::STRUCT;
-            type->typeData.structTypeData.isSecretlyUnion = true;
+            type->typeData.structTypeData.isSecretlyEnum = true;
 
             auto tagSymbol = new Node();
             tagSymbol->type = NodeType::SYMBOL;
@@ -850,7 +850,7 @@ Node *Parser::parseType() {
 Node *Parser::parseStructLiteral() {
     expect(LexerTokenType::LCURLY, "{");
 
-    Node *node = new Node(lexer->srcInfo, NodeType::STRUCT_LITERAL, scopes.top());
+    auto *node = new Node(lexer->srcInfo, NodeType::STRUCT_LITERAL, scopes.top());
     node->structLiteralData.params = parseValueParams();
 
     expect(LexerTokenType::RCURLY, "}");
@@ -956,7 +956,7 @@ Node *Parser::parsePuts() {
 }
 
 Node *Parser::parseTypeInfo() {
-    auto value = new Node(lexer->srcInfo, NodeType::TypeInfo, scopes.top());
+    auto value = new Node(lexer->srcInfo, NodeType::TYPEINFO, scopes.top());
     value->region.start = lexer->front.region.start;
     popFront();
     expect(LexerTokenType::LPAREN, "(");
@@ -1293,7 +1293,7 @@ Node *Parser::unwindPolish(stack<ShuntingYard> *values) {
     if (top.type == ShuntingYardType::NODE) {
         return top.data.node;
     } else {
-        Node *binop = new Node(lexer->srcInfo, NodeType::BINOP, scopes.top());
+        auto binop = new Node(lexer->srcInfo, NodeType::BINOP, scopes.top());
 
         binop->binopData.type = top.data.type;
         binop->binopData.rhs = unwindPolish(values);

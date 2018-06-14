@@ -72,6 +72,11 @@ ostream &operator<<(ostream &os, SourceRegion region) {
 
 ostream &operator<<(ostream &os, SourceInfoRegion region) {
     ostringstream message("");
+
+    if (region.region.srcInfo.fileName == nullptr) {
+        return os;
+    }
+
     message << *region.region.srcInfo.fileName
             << ":" << region.region.start.line
             << ":" << region.region.start.col << ": ";
@@ -79,7 +84,7 @@ ostream &operator<<(ostream &os, SourceInfoRegion region) {
 }
 
 ostream &operator<<(ostream &os, HighlightedRegion region) {
-    if (region.region.srcInfo.fileName->empty()) {
+    if (region.region.srcInfo.fileName == nullptr) {
         return os << "NO SOURCE INFO" << endl;
     }
 
@@ -204,6 +209,7 @@ ostream &operator<<(ostream &os, TypeData td) {
         case NodeTypekind::I64:
         case NodeTypekind::FLOAT_LITERAL:
         case NodeTypekind::BOOLEAN:
+        case NodeTypekind::BOOLEAN_LITERAL:
         case NodeTypekind::F32:
         case NodeTypekind::F64:
         case NodeTypekind::EXPOSED_AST: {
@@ -332,7 +338,7 @@ ostream &operator<<(ostream &os, Node *node) {
              cout << node->arrayLiteralData.structLiteralRepresentation;
         } break;
         case NodeType::RET: {
-            cout << "ret " << node->retData.value << ";" << endl;
+            cout << "return " << node->retData.value << ";" << endl;
         } break;
         case NodeType::HEAPIFY: {
             cout << "heap(" << node->nodeData << ")";
@@ -380,8 +386,29 @@ ostream &operator<<(ostream &os, Node *node) {
             }
             cout << ")";
         } break;
-        case NodeType::TypeInfo: {
+        case NodeType::TYPEINFO: {
             cout << resolve(node) << endl;
+        } break;
+        case NodeType::TAGCHECK: {
+            cout << "tagcheck(" << node->nodeData << ")";
+        } break;
+        case NodeType::BOOLEAN_LITERAL: {
+            cout << node->boolLiteralData.value;
+        } break;
+        case NodeType::PUTS: {
+            cout << "puts(" << node->nodeData << ")";
+        } break;
+        case NodeType::FOR: {
+            cout << "for " << node->forData.element_alias << " : " << node->forData.target << " {" << endl;
+            for (auto stmt : node->forData.stmts) {
+                cout << stmt;
+                cout << endl;
+            }
+            cout << "}";
+            cout << endl;
+        } break;
+        case NodeType::DEREF: {
+            cout << "^" << node->derefData.target;
         } break;
         default: assert(false);
     }
@@ -432,6 +459,7 @@ bool hasNoLocalByDefault(Node *node) {
     switch (resolve(node)->type) {
         case NodeType::INT_LITERAL:
         case NodeType::FLOAT_LITERAL:
+        case NodeType::BOOLEAN_LITERAL:
         case NodeType::ADDRESS_OF:
         case NodeType::DEREF:
         case NodeType::FN_DECL:

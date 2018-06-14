@@ -283,27 +283,28 @@ int main(int argc, char **argv) {
         assert(mainReturnType->type == NodeType::TYPE);
 
         switch (mainReturnType->typeData.kind) {
+            case NodeTypekind::BOOLEAN: {
+                cout << "(bool) " << interp->readFromStack<int32_t>(0) << endl;
+            } break;
             case NodeTypekind::I8: {
-                cout << "(i8) ";
-                cout << interp->readFromStack<int8_t>(0) << endl;
+                cout << "(i8) " << interp->readFromStack<int8_t>(0) << endl;
+            } break;
+            case NodeTypekind::I32: {
+                cout << "(i32) " << interp->readFromStack<int32_t>(0) << endl;
             } break;
             case NodeTypekind::INT_LITERAL:
             case NodeTypekind::I64: {
-                cout << "(i64) ";
-                cout << interp->readFromStack<int64_t>(0) << endl;
+                cout << "(i64) " << interp->readFromStack<int64_t>(0) << endl;
             } break;
             case NodeTypekind::F32:
             case NodeTypekind::FLOAT_LITERAL: {
-                cout << "(f32) ";
-                cout << interp->readFromStack<float>(0) << endl;
+                cout << "(f32) " << interp->readFromStack<float>(0) << endl;
             } break;
             case NodeTypekind::F64: {
-                cout << "(f64) ";
-                cout << interp->readFromStack<double>(0) << endl;
+                cout << "(f64) " << interp->readFromStack<double>(0) << endl;
             } break;
             default: {
-                cout << "(other) ";
-                cout << interp->readFromStack<int32_t>(0) << endl;
+                cout << "(other) " << interp->readFromStack<int32_t>(0) << endl;
             }
         }
     }

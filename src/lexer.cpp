@@ -151,12 +151,12 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "fn", LexerTokenType::FN)) { return; }
     if (tryEatKeyword(&next, "type", LexerTokenType::TYPE)) { return; }
     if (tryEatKeyword(&next, "struct", LexerTokenType::STRUCT)) { return; }
-    if (tryEatKeyword(&next, "union", LexerTokenType::UNION)) { return; }
-    if (tryEatKeyword(&next, "ret", LexerTokenType::RET)) { return; }
+    if (tryEatKeyword(&next, "enum", LexerTokenType::ENUM)) { return; }
+    if (tryEatKeyword(&next, "return", LexerTokenType::RET)) { return; }
     if (tryEatKeyword(&next, "string", LexerTokenType::STRING)) { return; }
     if (tryEatKeyword(&next, "bool", LexerTokenType::BOOLEAN)) { return; }
-    if (tryEatKeyword(&next, "i32", LexerTokenType::I32)) { return;}
     if (tryEatKeyword(&next, "i8", LexerTokenType::I8)) { return;}
+    if (tryEatKeyword(&next, "i32", LexerTokenType::I32)) { return;}
     if (tryEatKeyword(&next, "i64", LexerTokenType::I64)) { return;}
     if (tryEatKeyword(&next, "f32", LexerTokenType::F32)) { return;}
     if (tryEatKeyword(&next, "f64", LexerTokenType::F64)) { return;}
