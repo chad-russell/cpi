@@ -3,14 +3,6 @@ type ParamData struct {
     _type: *TypeInfo
 }
 
-type StructData struct {
-    params: []ParamData
-}
-
-type EnumData struct {
-    params: []ParamData
-}
-
 type FnData struct {
     params:     []ParamData,
     returnType: *TypeInfo
@@ -115,16 +107,10 @@ type linkedList struct {
 }
 
 fn main() {
-    -- t: TypeInfo;
-    -- t.STRUCT.params = []ParamData{
-        -- {"next", &{POINTER: &t}}
-    -- };
-
-    u: TypeInfo = {I64: {}};
-
-    t: TypeInfo = {
+    t: TypeInfo;
+    t = {
         STRUCT: []ParamData{
-            {"next", &{POINTER: &u}}
+            {name: "next", _type: &{ POINTER: &t }}
         }
     };
 

@@ -2072,7 +2072,14 @@ Node *buildTypeInfoStructLiteral(Semantic *semantic, Scope *scope, Node *node) {
     returnStructNode->type = NodeType::STRUCT_LITERAL;
     returnStructNode->structLiteralData.params.push_back(wrapInValueParam(valueField, fieldName));
 
-    shadowDecl->declData.initialValue = returnStructNode;
+    auto ass = new Node();
+    ass->scope = node->scope;
+    ass->type = NodeType::ASSIGN;
+    ass->assignData.lhs = shadowDecl;
+    ass->assignData.rhs = returnStructNode;
+    semantic->resolveTypes(ass);
+
+    shadowDecl->postStmts.push_back(ass);
 
     return uniqueName;
 }

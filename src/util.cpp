@@ -410,6 +410,9 @@ ostream &operator<<(ostream &os, Node *node) {
         case NodeType::DEREF: {
             cout << "^" << node->derefData.target;
         } break;
+        case NodeType::FLOAT_LITERAL: {
+            cout << node->floatLiteralData.value;
+        } break;
         default: assert(false);
     }
 
