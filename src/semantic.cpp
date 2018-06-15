@@ -1872,6 +1872,7 @@ Node *buildTypeInfoStructLiteral(Semantic *semantic, Scope *scope, Node *node) {
     typeinfoType->symbolData.atomId = AtomTable::current->insertStr("TypeInfo");
     semantic->resolveTypes(typeinfoType);
     shadowDecl->declData.type = typeinfoType;
+    semantic->resolveTypes(shadowDecl);
     semantic->addLocal(shadowDecl);
 
     // insert this new declaration into the scope
@@ -2079,7 +2080,7 @@ Node *buildTypeInfoStructLiteral(Semantic *semantic, Scope *scope, Node *node) {
     ass->assignData.rhs = returnStructNode;
     semantic->resolveTypes(ass);
 
-    shadowDecl->postStmts.push_back(ass);
+    shadowDecl->preStmts.push_back(ass);
 
     return uniqueName;
 }

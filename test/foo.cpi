@@ -103,23 +103,21 @@ fn printType( T := typeof(t) )(t: T) {
 }
 
 type linkedList struct {
-    next: *linkedList
+    next: *none
 }
 
 fn main() {
-    t: TypeInfo;
-    t = {
-        STRUCT: []ParamData{
-            {name: "next", _type: &{ POINTER: &t }}
-        }
-    };
+    -- t: TypeInfo;
+    -- t = {
+        -- STRUCT: []ParamData{
+            -- {name: "next", _type: &{ POINTER: &t }}
+        -- }
+    -- };
+    -- printTypeInfo(&t);
 
-    -- ll: linkedList;
-    -- t : TypeInfo = typeinfo(ll);
-
-    printTypeInfo(&t);
-
-    return 0;
+    ll: linkedList;
+    t := typeinfo(ll);
+    return t.tag;
 }
 
 fn println(s: []i8) {
