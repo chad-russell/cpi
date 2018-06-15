@@ -114,43 +114,28 @@ fn printTypeInfo(t: *TypeInfo) {
     }
 }
 
-fn printTypeInfoSimple(t: TypeInfo) {
-    if tagcheck(t.POINTER) {
-        puts("*");
-        printTypeInfoSimple(^t.POINTER);
-    }
-    else {
-        puts("other");
-    }
-}
-
 fn printType( T := typeof(t) )(t: T) {
     printTypeInfo(&typeinfo(t));
 }
 
 type linkedList struct {
     value: i32,
-    next: *none
+    next: *linkedList
 }
 
 fn main() {
-    type TypeInfoS enum {
-        I32: none,
-        I64: none
-    }
+    -- t: TypeInfo;
+    -- t.STRUCT.params = []ParamData{
+        -- {"value", &{I32: {}}},
+        -- {"next", &t}
+    -- };
 
-    type Any struct {
-        _type:  TypeInfoS
-    }
+    ll: linkedList;
+    t : TypeInfo = typeinfo(ll);
 
-    a : Any = {
-        _type: {
-            I64: {}
-        }
-    };
+    printTypeInfo(&t);
 
-    assert(a._type.STRUCT.params[0]._type.tag == 3);
-    assert(a._type.STRUCT.params[0].name[3] == "duck"[3]);
+    return 0;
 }
 
 fn println(s: []i8) {

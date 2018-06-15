@@ -825,7 +825,11 @@ bool assignParams(Semantic *semantic,
         auto openParamsI = openParams[i];
         if (openParamsI || newParams[i] == nullptr) {
             encounteredError = true;
-            semantic->reportError({errorReportTarget}, Error{errorReportTarget->region, "unassigned parameter!"});
+
+            ostringstream s("");
+            s << "unassigned parameter: " << AtomTable::current->backwardAtoms[declParams[i]->declParamData.name->symbolData.atomId];
+            auto sstr = s.str();
+            semantic->reportError({errorReportTarget}, Error{errorReportTarget->region, sstr});
         }
     }
 
@@ -1984,6 +1988,8 @@ Node *buildTypeInfoStructLiteral(Semantic *semantic, Scope *scope, Node *node) {
                     fieldName = "STRUCT";
                 }
 
+                // declare a struct first
+
                 vector<Node *> members = {};
                 for (auto m : node->typeData.structTypeData.params) {
                     assert(m->type == NodeType::DECL_PARAM);
@@ -2022,10 +2028,11 @@ Node *buildTypeInfoStructLiteral(Semantic *semantic, Scope *scope, Node *node) {
             }
         } break;
         case NodeTypekind::SYMBOL: {
+            // todo(chad): include both the symbol (string) and the resolved in some kind of struct here
             return buildTypeInfoStructLiteral(semantic, scope, resolve(node));
         } break;
         case NodeTypekind::POINTER: {
-            auto underlyingType = buildTypeInfoStructLiteral(semantic, scope, node->typeData.pointerTypeData.underlyingType);
+            auto underlyingType = buildTypeInfoStructLiteral(semantic, scope, resolve(node->typeData.pointerTypeData.underlyingType));
             semantic->addLocal(underlyingType);
 
             auto ptrToParamDataType = new Node();
@@ -2048,8 +2055,6 @@ Node *buildTypeInfoStructLiteral(Semantic *semantic, Scope *scope, Node *node) {
     returnStructNode->structLiteralData.params.push_back(wrapInValueParam(valueField, fieldName));
     returnStructNode->typeInfo = typeInfoType;
 
-//    semantic->resolveTypes(returnStructNode);
-
     return returnStructNode;
 }
 
@@ -2060,12 +2065,8 @@ void resolveTypeinfo(Semantic *semantic, Node *node) {
     heapifiedValue->nodeData = node->nodeData;
     semantic->addLocal(node->nodeData);
 
-    auto typeInfo = buildTypeInfoStructLiteral(semantic, node->scope, node->nodeData->typeInfo);
-    semantic->resolveTypes(typeInfo);
-
-    node->resolved = typeInfo;
+    node->resolved = buildTypeInfoStructLiteral(semantic, node->scope, node->nodeData->typeInfo);
     semantic->resolveTypes(node->resolved);
-
     node->typeInfo = node->resolved->typeInfo;
 }
 
