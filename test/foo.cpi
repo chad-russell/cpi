@@ -16,14 +16,6 @@ type FnData struct {
     returnType: *TypeInfo
 }
 
-type PointerData struct {
-    underlyingType: *TypeInfo
-}
-
-type ArrayData struct {
-    elementType: *TypeInfo
-}
-
 type TypeInfo enum {
     NONE:             none,
     INT_LITERAL:      i64,
@@ -36,10 +28,10 @@ type TypeInfo enum {
     F32:              none,
     F64:              none,
     FN:               FnData,
-    STRUCT:           StructData,
+    STRUCT:           []ParamData,
     POINTER:          *TypeInfo,
-    ENUM:             EnumData,
-    ARRAY:            ArrayData,
+    ENUM:             []ParamData,
+    ARRAY:            *TypeInfo,
 }
 
 type Any struct {
@@ -59,17 +51,17 @@ fn printParams(params: []ParamData) {
 fn printTypeInfo(t: *TypeInfo) {
     if tagcheck(t.STRUCT) {
         puts("struct{");
-        printParams(t.STRUCT.params);
+        printParams(t.STRUCT);
         puts("}");
     }
     else if tagcheck(t.ENUM) {
         puts("enum{");
-        printParams(t.ENUM.params);
+        printParams(t.ENUM);
         puts("}");
     }
     else if tagcheck(t.ARRAY) {
         puts("[]");
-        printTypeInfo(t.ARRAY.elementType);
+        printTypeInfo(t.ARRAY);
     }
     else if tagcheck(t.NONE) {
         puts("none");
@@ -119,19 +111,25 @@ fn printType( T := typeof(t) )(t: T) {
 }
 
 type linkedList struct {
-    value: i32,
     next: *linkedList
 }
 
 fn main() {
     -- t: TypeInfo;
     -- t.STRUCT.params = []ParamData{
-        -- {"value", &{I32: {}}},
-        -- {"next", &t}
+        -- {"next", &{POINTER: &t}}
     -- };
 
-    ll: linkedList;
-    t : TypeInfo = typeinfo(ll);
+    u: TypeInfo = {I64: {}};
+
+    t: TypeInfo = {
+        STRUCT: []ParamData{
+            {"next", &{POINTER: &u}}
+        }
+    };
+
+    -- ll: linkedList;
+    -- t : TypeInfo = typeinfo(ll);
 
     printTypeInfo(&t);
 

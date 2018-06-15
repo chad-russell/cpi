@@ -863,7 +863,7 @@ void resolveDecl(Semantic *semantic, Node *node) {
         node->declData.type = node->declData.initialValue->typeInfo;
     }
     else if (node->declData.initialValue == nullptr) {
-        node->declData.initialValue = defaultValueFor(semantic, node->declData.type);
+        node->declData.initialValue = defaultValueFor(semantic, resolve(node->declData.type));
     }
 
     auto resolvedDeclDataType = resolve(node->declData.type);
@@ -1853,8 +1853,35 @@ Node *buildTypeInfoStructLiteral(Semantic *semantic, Scope *scope, Node *node) {
         return node->typeInfoStructLiteral;
     }
 
+    auto shadowDecl = new Node();
+    shadowDecl->scope = node->scope;
+    shadowDecl->type = NodeType::DECL;
+
+    ostringstream uniqueNameStr("");
+    uniqueNameStr << "unique__" << shadowDecl->id;
+
+    auto uniqueName = new Node();
+    uniqueName->scope = node->scope;
+    uniqueName->type = NodeType::SYMBOL;
+    uniqueName->symbolData.atomId = AtomTable::current->insertStr(uniqueNameStr.str());
+    shadowDecl->declData.lvalue = uniqueName;
+
+    auto typeinfoType = new Node();
+    typeinfoType->scope = node->scope;
+    typeinfoType->type = NodeType::SYMBOL;
+    typeinfoType->symbolData.atomId = AtomTable::current->insertStr("TypeInfo");
+    semantic->resolveTypes(typeinfoType);
+    shadowDecl->declData.type = typeinfoType;
+    semantic->addLocal(shadowDecl);
+
+    // insert this new declaration into the scope
+    node->scope->symbols.insert({uniqueName->symbolData.atomId, shadowDecl});
+
+//    node->typeInfoStructLiteral = shadowDecl;
+    node->typeInfoStructLiteral = uniqueName;
+
     auto returnStructNode = new Node();
-    node->typeInfoStructLiteral = returnStructNode;
+    returnStructNode->type = NodeType::STRUCT_LITERAL;
 
     auto noneField = new Node();
     noneField->type = NodeType::STRUCT_LITERAL;
@@ -1975,10 +2002,7 @@ Node *buildTypeInfoStructLiteral(Semantic *semantic, Scope *scope, Node *node) {
                 ptrToElementType->type = NodeType::ADDRESS_OF;
                 ptrToElementType->nodeData = elementType;
 
-                valueField = new Node();
-                valueField->scope = scope;
-                valueField->type = NodeType::STRUCT_LITERAL;
-                valueField->structLiteralData.params.push_back(wrapInValueParam(ptrToElementType, "elementType"));
+                valueField = ptrToElementType;
             }
             else {
                 if (node->typeData.structTypeData.isSecretlyEnum) {
@@ -2021,10 +2045,7 @@ Node *buildTypeInfoStructLiteral(Semantic *semantic, Scope *scope, Node *node) {
                 elementType->symbolData.atomId = AtomTable::current->insertStr("ParamData");
                 auto paramDataArray = buildArrayLiteral(scope, members, elementType);
 
-                valueField = new Node();
-                valueField->scope = scope;
-                valueField->type = NodeType::STRUCT_LITERAL;
-                valueField->structLiteralData.params = { wrapInValueParam(paramDataArray, "params") };
+                valueField = paramDataArray;
             }
         } break;
         case NodeTypekind::SYMBOL: {
@@ -2047,15 +2068,13 @@ Node *buildTypeInfoStructLiteral(Semantic *semantic, Scope *scope, Node *node) {
         default: assert(false);
     }
 
-    auto typeInfoType = new Node(NodeTypekind::SYMBOL);
-    typeInfoType->symbolData.atomId = AtomTable::current->insertStr("TypeInfo");
-
     assert(valueField != nullptr);
     returnStructNode->type = NodeType::STRUCT_LITERAL;
     returnStructNode->structLiteralData.params.push_back(wrapInValueParam(valueField, fieldName));
-    returnStructNode->typeInfo = typeInfoType;
 
-    return returnStructNode;
+    shadowDecl->declData.initialValue = returnStructNode;
+
+    return uniqueName;
 }
 
 void resolveTypeinfo(Semantic *semantic, Node *node) {
