@@ -485,15 +485,18 @@ void LlvmGen::gen(Node *node) {
                 if (resolvedLocal != local && resolvedLocal->isLocal) { continue; }
 
                 Node *nodeTypeToAlloca = nullptr;
-                if (resolvedLocal->typeInfo->type == NodeType::TYPE) {
-                    nodeTypeToAlloca = resolvedLocal->typeInfo;
-                } else if (resolvedLocal->typeInfo->type == NodeType::TYPEOF) {
+                auto resolvedTypeInfo = resolve(resolvedLocal->typeInfo);
+                if (resolvedTypeInfo->type == NodeType::TYPE) {
+                    nodeTypeToAlloca = resolve(resolvedLocal->typeInfo);
+                } else if (resolvedTypeInfo->type == NodeType::TYPEOF) {
                     // todo(chad): this should probably be disallowed, and we should instead find a way to always have typeInfo be NodeType::TYPE
                     assert(resolvedLocal->typeInfo->staticValue);
                     nodeTypeToAlloca = resolvedLocal->typeInfo->staticValue;
                 } else {
                     assert(false);
                 }
+
+                assert(nodeTypeToAlloca->type == NodeType::TYPE);
 
                 auto isAutoDerefStorage = resolvedLocal->type == NodeType::DOT
                                           && resolvedLocal->dotData.lhs->typeInfo->typeData.kind == NodeTypekind::POINTER;
@@ -985,7 +988,7 @@ void LlvmGen::gen(Node *node) {
 
             auto resolvedLhs = resolve(node->dotData.lhs);
 
-            llvm::Value *gepTarget;
+            llvm::Value *gepTarget = nullptr;
             if (node->dotData.lhs->isLocal) {
                 gepTarget = (llvm::Value *) resolvedLhs->llvmLocal;
             } else {
@@ -1308,6 +1311,12 @@ void LlvmGen::gen(Node *node) {
             if (node->isLocal) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
+        } break;
+        case NodeType::TYPEINFO: {
+            assert(node->resolved);
+            gen(node->resolved);
+
+            node->llvmData = node->resolved->llvmData;
         } break;
         default: assert(false);
     }

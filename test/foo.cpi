@@ -40,7 +40,9 @@ fn printParams(params: []ParamData) {
     }
 }
 
-fn printTypeInfo(t: *TypeInfo) {
+fn printTypeInfo(hack: *TypeInfo) {
+    t := hack;
+
     if tagcheck(t.STRUCT) {
         puts("struct{");
         printParams(t.STRUCT);
@@ -102,20 +104,7 @@ fn printType( T := typeof(t) )(t: T) {
     printTypeInfo(&typeinfo(t));
 }
 
-type linkedList struct {
-    next: *none
-}
-
 fn main() {
-    -- t: TypeInfo;
-    -- t = {
-        -- STRUCT: []ParamData{
-            -- {name: "next", _type: &{ POINTER: &t }}
-        -- }
-    -- };
-    -- printTypeInfo(&t);
-
-    ll: linkedList;
     t := typeinfo(ll);
     return t.tag;
 }

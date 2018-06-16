@@ -53,3 +53,31 @@ TODO:
         - a := [10]i32{}; a|append(3); return a[1];
         - maybe just get rid of `[]` syntax... instead of giving all types a way to
             access to special syntax, we can just have less special syntax
+
+
+    ----------------------
+    ------ BUG 1 ---------
+    ----------------------
+    type TypeInfoS enum {
+        STRUCT: []ParamDataS,
+    }
+
+    type ParamDataS struct {
+        _type: *TypeInfoS
+    }
+
+    fn printParamsS(params : []ParamDataS) {
+        printTypeInfoS(params[0]._type);
+    }
+
+    fn printTypeInfoS(t: *TypeInfoS) {
+        printParamsS(t.STRUCT);
+    }
+
+    fn main() {
+        params: []ParamDataS;
+        printTypeInfoS(params[0]._type);
+    }
+    ----------------------
+    ----- END BUG 1 ------
+    ----------------------

@@ -2080,7 +2080,7 @@ Node *buildTypeInfoStructLiteral(Semantic *semantic, Scope *scope, Node *node) {
     ass->assignData.rhs = returnStructNode;
     semantic->resolveTypes(ass);
 
-    shadowDecl->preStmts.push_back(ass);
+    shadowDecl->postStmts.push_back(ass);
 
     return uniqueName;
 }
