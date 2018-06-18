@@ -176,7 +176,7 @@ vector<Node *> Parser::parseValueParams() {
     return params;
 }
 
-Node *Parser::parseFnDecl(bool polymorphCopy) {
+Node *Parser::parseFnDecl() {
     auto decl = new Node(lexer->srcInfo, NodeType::FN_DECL, scopes.top());
     decl->region.start = lexer->front.region.start;
     decl->sourceMapStatement = true;
@@ -199,7 +199,7 @@ Node *Parser::parseFnDecl(bool polymorphCopy) {
             mainFn = decl;
         }
 
-        if (!polymorphCopy) {
+        if (!this->isCopying) {
             scopeInsert(decl->fnDeclData.name->symbolData.atomId, decl);
         }
     }
@@ -341,7 +341,7 @@ Node *Parser::parseScopedStmt() {
     }
 
     // for
-    if (lexer->front.type == LexerTokenType::FOR) {
+    if (lexer->front.type == LexerTokenType::FOR || lexer->front.type == LexerTokenType::STATIC_FOR) {
         return parseFor();
     }
 
@@ -518,6 +518,8 @@ Node *Parser::parseWhile() {
 
 Node *Parser::parseFor() {
     auto saved = lexer->front.region.start;
+
+    auto isStatic = lexer->front.type == LexerTokenType::STATIC_FOR;
     popFront();
 
     // we get a new scope!
@@ -526,6 +528,7 @@ Node *Parser::parseFor() {
     auto for_ = new Node(lexer->srcInfo, NodeType::FOR, scopes.top());
     for_->region.start = saved;
 
+    for_->forData.isStatic = isStatic;
     for_->forData.element_alias = parseSymbol();
 
     if (lexer->front.type == LexerTokenType::COMMA) {
@@ -955,20 +958,6 @@ Node *Parser::parsePuts() {
     return value;
 }
 
-Node *Parser::parseTypeInfo() {
-    auto value = new Node(lexer->srcInfo, NodeType::TYPEINFO, scopes.top());
-    value->region.start = lexer->front.region.start;
-    popFront();
-    expect(LexerTokenType::LPAREN, "(");
-    value->nodeData = parseRvalue();
-    value->region.end = lexer->front.region.end;
-    expect(LexerTokenType::RPAREN, ")");
-
-    addLocal(value->nodeData);
-
-    return value;
-}
-
 Node *Parser::parseMalloc() {
     auto mal = new Node(lexer->srcInfo, NodeType::MALLOC, scopes.top());
     mal->region.start = lexer->front.region.start;
@@ -1015,10 +1004,6 @@ Node *Parser::parseLvalueOrLiteral() {
 
     if (lexer->front.type == LexerTokenType::HEAP) {
         return parseHeapify();
-    }
-
-    if (lexer->front.type == LexerTokenType::TYPEINFO) {
-        return parseTypeInfo();
     }
 
     if (lexer->front.type == LexerTokenType::SIZEOF) {

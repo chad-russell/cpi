@@ -1,7 +1,32 @@
 TODO:
-    - typeinfo for pointer types
-
     - merge the concepts of declParam and valueParam. It's too confusing at this point and we are needing to switch between them too often
+
+    - #for (static foreach)
+        - array literal
+            - #for it: []{1, 2, 3} { ... }
+        - struct
+            - #for it: {x: 18, y: "foobar"} { ... }
+        - example -- printing enums
+            - #for i, _: enumValue {
+                if t.tag == i {
+                    print(cast(#fieldtypeof(T, i)) t.data);
+                }
+            }
+    - #iskind
+        - `iskind(a, i32)`, `iskind(b, array)`, `iskind(c, struct)`, `iskind(d, fn)`, etc.
+    - #fieldcount
+    - #fieldnameof
+        - names of struct  -- #fieldnameof(struct {x: i32, y: i64}, 1)
+        - names of fn args -- #fieldnameof(fn(x: i32, y: i64) bool, 0)
+    - #fieldtypeof
+        - struct -- #fieldtypeof(struct {x: f32, y: i64}, 1)
+        - fn -- #fieldtypeof(fn(x: f32, y: i64) bool, 0)
+    - #rettypeof
+
+    - arbitrary printing
+        - e.g. `print("here is a value: ", 3, " and here is another one: ", {x: 13, y: &67}, ". That is all! :)");`
+        - will need varargs
+            - implementation -- just pack them all into a struct
 
     - better interpreter debugging
         - more accurate source information, stopping, etc.
@@ -23,16 +48,17 @@ TODO:
     -- switch
         -- on enum (tag)
         switch a {
-        case x: {
-            return 111;
-        }
-        case y: {
-            panic();
-        }
-        case default: {
+            x: {
+                return 111;
+            }
+            y: {
+                panic();
+            }
+            else: {
 
+            }
         }
-        }
+        -- on other things (??)
 
     - defer
 
@@ -53,31 +79,3 @@ TODO:
         - a := [10]i32{}; a|append(3); return a[1];
         - maybe just get rid of `[]` syntax... instead of giving all types a way to
             access to special syntax, we can just have less special syntax
-
-
-    ----------------------
-    ------ BUG 1 ---------
-    ----------------------
-    type TypeInfoS enum {
-        STRUCT: []ParamDataS,
-    }
-
-    type ParamDataS struct {
-        _type: *TypeInfoS
-    }
-
-    fn printParamsS(params : []ParamDataS) {
-        printTypeInfoS(params[0]._type);
-    }
-
-    fn printTypeInfoS(t: *TypeInfoS) {
-        printParamsS(t.STRUCT);
-    }
-
-    fn main() {
-        params: []ParamDataS;
-        printTypeInfoS(params[0]._type);
-    }
-    ----------------------
-    ----- END BUG 1 ------
-    ----------------------

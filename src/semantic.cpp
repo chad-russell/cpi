@@ -994,16 +994,14 @@ void resolveBinop(Semantic *semantic, Node *node) {
     }
 }
 
-Node *Semantic::deepCopy(Node *node, Scope *scope) {
-    // for now make sure we only copy fn decls
-    assert(node->type == NodeType::FN_DECL);
-
+Node *Semantic::deepCopy(Node *node) {
     auto copyingLexer = new Lexer(lexer, node);
 
     auto copyingParser = new Parser(copyingLexer);
+    copyingParser->isCopying = true;
     copyingParser->scopes.pop();
-    copyingParser->scopes.push(scope);
-    return copyingParser->parseFnDecl(true);
+    copyingParser->scopes.push(node->scope);
+    return copyingParser->parseScopedStmt();
 }
 
 void resolveFnCall(Semantic *semantic, Node *node) {
@@ -1014,7 +1012,7 @@ void resolveFnCall(Semantic *semantic, Node *node) {
     if (isPoly) {
         // make a new function
         // todo(chad): memoize this based on the ctParams
-        auto newResolvedFn = semantic->deepCopy(resolvedFn, resolvedFn->scope);
+        auto newResolvedFn = semantic->deepCopy(resolvedFn);
         assert(newResolvedFn->type == NodeType::FN_DECL);
         newResolvedFn->fnDeclData.cameFromPolymorph = true;
 
@@ -1604,7 +1602,54 @@ void resolveArrayLiteral(Semantic *semantic, Node *node) {
     node->typeInfo = node->resolved->typeInfo;
 }
 
+void resolveStaticFor(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->forData.target);
+
+    // if the target is not an array literal, error
+    // todo(chad): handle #for over structs, enums as well
+    if (node->forData.target->type != NodeType::ARRAY_LITERAL) {
+        semantic->reportError({node, node->forData.target}, Error{node->forData.target->region, "Can only #for over an array literal"});
+    }
+
+    int64_t staticIdx = 0;
+    for (auto staticElem : node->forData.target->arrayLiteralData.elements) {
+        // todo(chad): test scopes here
+
+        // new declaration for elem
+        auto elementDecl = new Node();
+        elementDecl->type = NodeType::DECL;
+        elementDecl->scope = node->scope;
+        elementDecl->region = node->forData.element_alias->region;
+        elementDecl->declData.lvalue = node->forData.element_alias;
+        elementDecl->declData.initialValue = staticElem;
+        semantic->addLocal(elementDecl);
+        semantic->resolveTypes(elementDecl);
+        node->scope->symbols.insert({node->forData.element_alias->symbolData.atomId, elementDecl});
+
+        // todo(chad): possibly new declaration for index
+
+        for (auto stmt : node->forData.stmts) {
+            // todo(chad): 'stmt' here is never going to get copied. However, it may still contain locals.
+            // So we still have to resolve the types here. We need to try to find a way around that, eventually :/
+            semantic->resolveTypes(stmt);
+
+            auto newStmt = semantic->deepCopy(stmt);
+
+            semantic->resolveTypes(newStmt);
+            node->forData.staticStmts.push_back(newStmt);
+        }
+
+        node->scope->symbols.erase(node->forData.element_alias->symbolData.atomId);
+        staticIdx += 1;
+    }
+}
+
 void resolveFor(Semantic *semantic, Node *node) {
+    if (node->forData.isStatic) {
+        resolveStaticFor(semantic, node);
+        return;
+    }
+
     semantic->resolveTypes(node->forData.target);
 
     if (!(node->forData.target->typeInfo->typeData.kind == NodeTypekind::STRUCT
@@ -1832,271 +1877,6 @@ Node *buildArrayLiteral(Scope *scope, vector<Node *> members, Node *elementType)
     return node;
 }
 
-Node *buildTypeInfoStructLiteral(Semantic *semantic, Scope *scope, Node *node) {
-//    NONE:             none,
-//    INT_LITERAL:      i64,
-//    I8:               none,
-//    I32:              none,
-//    I64:              none,
-//    FLOAT_LITERAL:    f64,
-//    BOOLEAN:          none,
-//    BOOLEAN_LITERAL:  bool,
-//    F32:              none,
-//    F64:              none,
-//    FN:               FnData,
-//    STRUCT:           StructData,
-//    POINTER:          PointerData,
-//    ENUM:             EnumData,
-//    ARRAY:            ArrayData,
-
-    if (node->typeInfoStructLiteral != nullptr) {
-        return node->typeInfoStructLiteral;
-    }
-
-    auto shadowDecl = new Node();
-    shadowDecl->scope = node->scope;
-    shadowDecl->type = NodeType::DECL;
-
-    ostringstream uniqueNameStr("");
-    uniqueNameStr << "unique__" << shadowDecl->id;
-
-    auto uniqueName = new Node();
-    uniqueName->scope = node->scope;
-    uniqueName->type = NodeType::SYMBOL;
-    uniqueName->symbolData.atomId = AtomTable::current->insertStr(uniqueNameStr.str());
-    shadowDecl->declData.lvalue = uniqueName;
-
-    auto typeinfoType = new Node();
-    typeinfoType->scope = node->scope;
-    typeinfoType->type = NodeType::SYMBOL;
-    typeinfoType->symbolData.atomId = AtomTable::current->insertStr("TypeInfo");
-    semantic->resolveTypes(typeinfoType);
-    shadowDecl->declData.type = typeinfoType;
-    semantic->resolveTypes(shadowDecl);
-    semantic->addLocal(shadowDecl);
-
-    // insert this new declaration into the scope
-    node->scope->symbols.insert({uniqueName->symbolData.atomId, shadowDecl});
-
-//    node->typeInfoStructLiteral = shadowDecl;
-    node->typeInfoStructLiteral = uniqueName;
-
-    auto returnStructNode = new Node();
-    returnStructNode->type = NodeType::STRUCT_LITERAL;
-
-    auto noneField = new Node();
-    noneField->type = NodeType::STRUCT_LITERAL;
-    noneField->typeInfo = new Node(NodeTypekind::NONE);
-
-    Node *valueField = noneField;
-    string fieldName;
-
-    assert(node->type == NodeType::TYPE);
-    switch (node->typeData.kind) {
-        case NodeTypekind::NONE: {
-            fieldName = "NONE";
-        } break;
-        case NodeTypekind::INT_LITERAL: {
-            auto lit = new Node();
-            lit->type = NodeType::INT_LITERAL;
-            lit->intLiteralData.value = node->typeData.intTypeData;
-            valueField = lit;
-
-            fieldName = "INT_LITERAL";
-        } break;
-        case NodeTypekind::I8: {
-            fieldName = "I8";
-        } break;
-        case NodeTypekind::I32: {
-            fieldName = "I32";
-        } break;
-        case NodeTypekind::I64: {
-            fieldName = "I64";
-        } break;
-        case NodeTypekind::FLOAT_LITERAL: {
-            auto lit = new Node();
-            lit->type = NodeType::FLOAT_LITERAL;
-            lit->floatLiteralData.value = node->typeData.floatTypeData;
-            valueField = lit;
-
-            fieldName = "FLOAT_LITERAL";
-        } break;
-        case NodeTypekind::BOOLEAN: {
-            fieldName = "BOOLEAN";
-        } break;
-        case NodeTypekind::BOOLEAN_LITERAL: {
-            auto lit = new Node();
-            lit->type = NodeType::BOOLEAN_LITERAL;
-            lit->boolLiteralData.value = node->typeData.boolTypeData;
-            valueField = lit;
-
-            fieldName = "BOOLEAN_LITERAL";
-        } break;
-        case NodeTypekind::F32: {
-            fieldName = "F32";
-        } break;
-        case NodeTypekind::F64: {
-            fieldName = "F64";
-        } break;
-        case NodeTypekind::FN: {
-            fieldName = "FN";
-
-            // params
-            vector<Node *> members = {};
-            for (auto m : node->typeData.fnTypeData.params) {
-                assert(m->type == NodeType::DECL_PARAM);
-
-                auto paramDataName = new Node();
-                paramDataName->scope = scope;
-                paramDataName->type = NodeType::STRING_LITERAL;
-                paramDataName->stringLiteralData.value = AtomTable::current->backwardAtoms[m->declParamData.name->symbolData.atomId];
-
-                auto paramDataType = buildTypeInfoStructLiteral(semantic, scope, m->typeInfo);
-                semantic->addLocal(paramDataType);
-
-                auto ptrToParamDataType = new Node();
-                ptrToParamDataType->scope = scope;
-                ptrToParamDataType->type = NodeType::ADDRESS_OF;
-                ptrToParamDataType->nodeData = paramDataType;
-
-                auto paramData = new Node();
-                paramData->scope = scope;
-                paramData->type = NodeType::STRUCT_LITERAL;
-                paramData->structLiteralData.params.push_back(wrapInValueParam(paramDataName, "name"));
-                paramData->structLiteralData.params.push_back(wrapInValueParam(ptrToParamDataType, "_type"));
-
-                members.push_back(paramData);
-            }
-
-            auto elementType = new Node(NodeTypekind::SYMBOL);
-            elementType->scope = scope;
-            elementType->symbolData.atomId = AtomTable::current->insertStr("ParamData");
-            auto paramDataArray = buildArrayLiteral(scope, members, elementType);
-
-            // return type
-            auto fnRetType = buildTypeInfoStructLiteral(semantic, scope, node->typeData.fnTypeData.returnType);
-            semantic->addLocal(fnRetType);
-
-            auto ptrToReturnType = new Node();
-            ptrToReturnType->scope = scope;
-            ptrToReturnType->type = NodeType::ADDRESS_OF;
-            ptrToReturnType->nodeData = fnRetType;
-
-            // literal
-            valueField = new Node();
-            valueField->scope = scope;
-            valueField->type = NodeType::STRUCT_LITERAL;
-            valueField->structLiteralData.params = {
-                    wrapInValueParam(paramDataArray, "params"),
-                    wrapInValueParam(ptrToReturnType, "returnType")
-            };
-        } break;
-        case NodeTypekind::STRUCT: {
-            if (node->typeData.structTypeData.isSecretlyArray) {
-                fieldName = "ARRAY";
-
-                auto elementType = buildTypeInfoStructLiteral(semantic, scope, node->typeData.structTypeData.secretArrayElementType);
-                semantic->addLocal(elementType);
-
-                auto ptrToElementType = new Node();
-                ptrToElementType->scope = scope;
-                ptrToElementType->type = NodeType::ADDRESS_OF;
-                ptrToElementType->nodeData = elementType;
-
-                valueField = ptrToElementType;
-            }
-            else {
-                if (node->typeData.structTypeData.isSecretlyEnum) {
-                    fieldName = "ENUM";
-                }
-                else {
-                    fieldName = "STRUCT";
-                }
-
-                // declare a struct first
-
-                vector<Node *> members = {};
-                for (auto m : node->typeData.structTypeData.params) {
-                    assert(m->type == NodeType::DECL_PARAM);
-
-                    auto paramDataName = new Node();
-                    paramDataName->scope = scope;
-                    paramDataName->type = NodeType::STRING_LITERAL;
-                    paramDataName->stringLiteralData.value = AtomTable::current->backwardAtoms[m->declParamData.name->symbolData.atomId];
-
-                    auto paramDataType = buildTypeInfoStructLiteral(semantic, scope, m->typeInfo);
-                    semantic->addLocal(paramDataType);
-
-                    auto ptrToParamDataType = new Node();
-                    ptrToParamDataType->scope = scope;
-                    ptrToParamDataType->type = NodeType::ADDRESS_OF;
-                    ptrToParamDataType->nodeData = paramDataType;
-
-                    auto paramData = new Node();
-                    paramData->scope = scope;
-                    paramData->type = NodeType::STRUCT_LITERAL;
-                    paramData->structLiteralData.params.push_back(wrapInValueParam(paramDataName, "name"));
-                    paramData->structLiteralData.params.push_back(wrapInValueParam(ptrToParamDataType, "_type"));
-
-                    members.push_back(paramData);
-                }
-
-                auto elementType = new Node(NodeTypekind::SYMBOL);
-                elementType->scope = scope;
-                elementType->symbolData.atomId = AtomTable::current->insertStr("ParamData");
-                auto paramDataArray = buildArrayLiteral(scope, members, elementType);
-
-                valueField = paramDataArray;
-            }
-        } break;
-        case NodeTypekind::SYMBOL: {
-            // todo(chad): include both the symbol (string) and the resolved in some kind of struct here
-            return buildTypeInfoStructLiteral(semantic, scope, resolve(node));
-        } break;
-        case NodeTypekind::POINTER: {
-            auto underlyingType = buildTypeInfoStructLiteral(semantic, scope, resolve(node->typeData.pointerTypeData.underlyingType));
-            semantic->addLocal(underlyingType);
-
-            auto ptrToParamDataType = new Node();
-            ptrToParamDataType->scope = scope;
-            ptrToParamDataType->type = NodeType::ADDRESS_OF;
-            ptrToParamDataType->nodeData = underlyingType;
-
-            valueField = ptrToParamDataType;
-
-            fieldName = "POINTER";
-        } break;
-        default: assert(false);
-    }
-
-    assert(valueField != nullptr);
-    returnStructNode->type = NodeType::STRUCT_LITERAL;
-    returnStructNode->structLiteralData.params.push_back(wrapInValueParam(valueField, fieldName));
-
-    auto ass = new Node();
-    ass->scope = node->scope;
-    ass->type = NodeType::ASSIGN;
-    ass->assignData.lhs = shadowDecl;
-    ass->assignData.rhs = returnStructNode;
-    semantic->resolveTypes(ass);
-
-    shadowDecl->postStmts.push_back(ass);
-
-    return uniqueName;
-}
-
-void resolveTypeinfo(Semantic *semantic, Node *node) {
-    auto heapifiedValue = new Node();
-    heapifiedValue->type = NodeType::HEAPIFY;
-    semantic->resolveTypes(node->nodeData);
-    heapifiedValue->nodeData = node->nodeData;
-    semantic->addLocal(node->nodeData);
-
-    node->resolved = buildTypeInfoStructLiteral(semantic, node->scope, node->nodeData->typeInfo);
-    semantic->resolveTypes(node->resolved);
-    node->typeInfo = node->resolved->typeInfo;
-}
-
 void resolvePuts(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->nodeData);
     auto resolvedType = resolve(node->nodeData->typeInfo);
@@ -2282,9 +2062,6 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::HEAPIFY: {
             resolveHeapify(this, node);
-        } break;
-        case NodeType::TYPEINFO: {
-            resolveTypeinfo(this, node);
         } break;
         case NodeType::PUTS: {
             resolvePuts(this, node);

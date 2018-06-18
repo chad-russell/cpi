@@ -898,8 +898,15 @@ void BytecodeGen::gen(Node *node) {
             // nothing to do here! wait until we actually need to store it somewhere
         } break;
         case NodeType::FOR: {
-            for (auto n : node->forData.rewritten) {
-                gen(n);
+            if (node->forData.isStatic) {
+                for (auto n : node->forData.staticStmts) {
+                    gen(n);
+                }
+            }
+            else {
+                for (auto n : node->forData.rewritten) {
+                    gen(n);
+                }
             }
         } break;
         case NodeType::TAGCHECK: {
@@ -936,9 +943,6 @@ void BytecodeGen::gen(Node *node) {
 
             append(node->bytecode, Instruction::RELCONSTI64);
             append(node->bytecode, toBytes32(node->localOffset));
-        } break;
-        case NodeType::TYPEINFO: {
-            gen(node->resolved);
         } break;
         case NodeType::PUTS: {
             gen(node->nodeData);

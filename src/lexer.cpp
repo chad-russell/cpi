@@ -173,7 +173,6 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "typeof", LexerTokenType::TYPEOF)) { return; }
     if (tryEatKeyword(&next, "sizeof", LexerTokenType::SIZEOF)) { return; }
     if (tryEatKeyword(&next, "heap", LexerTokenType::HEAP)) { return; }
-    if (tryEatKeyword(&next, "typeinfo", LexerTokenType::TYPEINFO)) { return; }
     if (tryEatKeyword(&next, "puts", LexerTokenType::PUTS)) { return; }
     if (tryEatKeyword(&next, "panic", LexerTokenType::PANIC)) { return; }
     if (tryEatKeyword(&next, "none", LexerTokenType::NONE)) { return; }
@@ -181,6 +180,7 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "free", LexerTokenType::FREE)) { return; }
     if (tryEatKeyword(&next, "tagcheck", LexerTokenType::TAGCHECK)) { return; }
     if (tryEatKeyword(&next, "for", LexerTokenType::FOR)) { return; }
+    if (tryEatKeyword(&next, "#for", LexerTokenType::STATIC_FOR)) { return; }
 
     // BACK_TICK
     if (srcInfo.source->at(loc.byteIndex) == '`') {

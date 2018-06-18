@@ -29,6 +29,7 @@ struct Parser {
     Node *mainFn = nullptr;
     stack<Scope *> scopes = {};
     Node *currentFnDecl = nullptr;
+    bool isCopying = false;
 
     explicit Parser(Lexer *lexer_);
 
@@ -46,7 +47,7 @@ struct Parser {
     Node *parseTopLevel();
     vector<Node *> parseDeclParams();
     vector<Node *> parseValueParams();
-    Node *parseFnDecl(bool polymorphCopy = false);
+    Node *parseFnDecl();
     Node *parseTypeDecl();
     Node *parseSymbol();
     Node *parseScopedStmt();
@@ -61,7 +62,6 @@ struct Parser {
     Node *parseRun();
     Node *parseTypeof();
     Node *parseSizeof();
-    Node *parseTypeInfo();
     Node *parsePuts();
     Node *parseHeapify();
     Node *parseMalloc();

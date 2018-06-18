@@ -67,7 +67,6 @@ enum class NodeType {
     ARRAY_LITERAL,
     FOR,
     HEAPIFY,
-    TYPEINFO,
 };
 
 enum class NodeTypekind {
@@ -158,8 +157,8 @@ enum class LexerTokenType : int32_t {
     PUTS,
     TAGCHECK,
     FOR,
+    STATIC_FOR,
     HEAP,
-    TYPEINFO,
 };
 
 struct SourceInfo {
@@ -384,6 +383,9 @@ struct ForData {
     vector<Node *> stmts;
 
     vector<Node *> rewritten;
+
+    bool isStatic = false;
+    vector<Node *> staticStmts;
 };
 
 class Scope {
@@ -440,7 +442,6 @@ public:
     // };
 
     Node *staticValue = nullptr;
-    Node *typeInfoStructLiteral = nullptr;
 
     bool isUsedInError = false;
     bool semantic = false;

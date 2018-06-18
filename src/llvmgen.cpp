@@ -1030,7 +1030,19 @@ void LlvmGen::gen(Node *node) {
                 vector<unsigned int> values = { (unsigned int) paramIndex };
                 node->llvmData = builder.CreateExtractValue(gepTarget, values);
 
-                if (node->isLocal) {
+                if (isSecretlyEnum && paramIndex == 1) {
+                    // bitcast gepTarget to the correct thing...
+                    llvm::Type *realType = resolve(foundParam->typeInfo)->typeData.kind == NodeTypekind::NONE
+                                           ? builder.getInt8Ty()
+                                           : typeFor(foundParam->typeInfo);
+
+                    auto dumbcast = builder.CreateAlloca(realType, nullptr, "dumbcast");
+                    builder.CreateStore((llvm::Value *) node->llvmData, builder.CreateBitCast(dumbcast, ((llvm::Value *) node->llvmData)->getType()->getPointerTo(0)));
+
+                    node->llvmLocal = dumbcast;
+                    node->llvmData = builder.CreateLoad(dumbcast);
+                }
+                else if (node->isLocal) {
                     store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
                 }
             }
@@ -1311,12 +1323,6 @@ void LlvmGen::gen(Node *node) {
             if (node->isLocal) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
-        } break;
-        case NodeType::TYPEINFO: {
-            assert(node->resolved);
-            gen(node->resolved);
-
-            node->llvmData = node->resolved->llvmData;
         } break;
         default: assert(false);
     }

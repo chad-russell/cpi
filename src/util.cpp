@@ -386,9 +386,6 @@ ostream &operator<<(ostream &os, Node *node) {
             }
             cout << ")";
         } break;
-        case NodeType::TYPEINFO: {
-            cout << resolve(node) << endl;
-        } break;
         case NodeType::TAGCHECK: {
             cout << "tagcheck(" << node->nodeData << ")";
         } break;

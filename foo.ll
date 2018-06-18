@@ -3,10 +3,10 @@ source_filename = "module"
 target datalayout = "e-m:o-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-apple-darwin17.6.0"
 
-%0 = type { i32 }
-%1 = type { i8, i8, i8, i8 }
-%2 = type { %3 }
-%3 = type { { i8*, i32 }, { i32, [20 x i8] }* }
+%0 = type { i8, i8, i8, i8, i8 }
+%1 = type { i8 }
+
+@printfFmtStr = private unnamed_addr constant [5 x i8] c"%.*s\00"
 
 declare {} @panic(i8*)
 
@@ -18,65 +18,106 @@ declare i8* @memset(i8*, i64, i64)
 
 declare {} @free(i8*)
 
-define i32 @main() {
+define {} @main() {
 entry:
-  %ll = alloca %0
-  %t = alloca { i32, [20 x i8] }
-  %unique__431 = alloca { i32, [20 x i8] }
-  %unique__543 = alloca { i32, [20 x i8] }
-  %unique__656 = alloca { i32, [20 x i8] }
-  %local796_ = alloca %1
-  %local809_ = alloca %1*
-  %local829_ = alloca %2
-  %local831_ = alloca %2*
-  %0 = bitcast %0* %ll to { i32 }*
-  store { i32 } zeroinitializer, { i32 }* %0
-  %1 = bitcast %1* %local796_ to { i8, i8, i8, i8 }*
-  store { i8, i8, i8, i8 } { i8 110, i8 101, i8 120, i8 116 }, { i8, i8, i8, i8 }* %1
-  %2 = load %1, %1* %local796_
-  store %1 %2, %1* %local796_
-  %3 = call i8* @malloc(i64 4)
-  %4 = bitcast %1** %local809_ to i8**
-  store i8* %3, i8** %4
-  %5 = load %1, %1* %local796_
-  %6 = bitcast i8* %3 to %1*
-  store %1 %5, %1* %6
-  %7 = load %1*, %1** %local809_
-  %8 = bitcast %1* %7 to i8*
-  %9 = insertvalue { i8*, i32 } zeroinitializer, i8* %8, 0
-  %10 = insertvalue { i8*, i32 } %9, i32 4, 1
-  %11 = bitcast { i32, [20 x i8] }* %unique__656 to <{ i32, {} }>*
-  store <{ i32, {} }> <{ i32 4, {} zeroinitializer }>, <{ i32, {} }>* %11
-  %12 = bitcast { i32, [20 x i8] }* %unique__656 to { i32, {}, i64, {}, {}, {}, float, {}, i1, {}, {}, { { i8*, i32 }, i8* }, { i8*, i32 }, i8*, { i8*, i32 }, i8* }*
-  store { i32, {}, i64, {}, {}, {}, float, {}, i1, {}, {}, { { i8*, i32 }, i8* }, { i8*, i32 }, i8*, { i8*, i32 }, i8* } zeroinitializer, { i32, {}, i64, {}, {}, {}, float, {}, i1, {}, {}, { { i8*, i32 }, i8* }, { i8*, i32 }, i8*, { i8*, i32 }, i8* }* %12
-  %13 = insertvalue { { i8*, i32 }, { i32, [20 x i8] }* } zeroinitializer, { i8*, i32 } %10, 0
-  %14 = insertvalue { { i8*, i32 }, { i32, [20 x i8] }* } %13, { i32, [20 x i8] }* %unique__656, 1
-  %15 = insertvalue { { { i8*, i32 }, { i32, [20 x i8] }* } } zeroinitializer, { { i8*, i32 }, { i32, [20 x i8] }* } %14, 0
-  %16 = bitcast %2* %local829_ to { { { i8*, i32 }, { i32, [20 x i8] }* } }*
-  store { { { i8*, i32 }, { i32, [20 x i8] }* } } %15, { { { i8*, i32 }, { i32, [20 x i8] }* } }* %16
-  %17 = load %2, %2* %local829_
-  store %2 %17, %2* %local829_
-  %18 = call i8* @malloc(i64 24)
-  %19 = bitcast %2** %local831_ to i8**
-  store i8* %18, i8** %19
-  %20 = load %2, %2* %local829_
-  %21 = bitcast i8* %18 to %2*
-  store %2 %20, %2* %21
-  %22 = load %2*, %2** %local831_
-  %23 = bitcast %2* %22 to %3*
-  %24 = insertvalue { %3*, i32 } zeroinitializer, %3* %23, 0
-  %25 = insertvalue { %3*, i32 } %24, i32 1, 1
-  %26 = insertvalue <{ i32, { %3*, i32 } }> <{ i32 12, { %3*, i32 } zeroinitializer }>, { %3*, i32 } %25, 1
-  %27 = bitcast { i32, [20 x i8] }* %unique__543 to <{ i32, { %3*, i32 } }>*
-  store <{ i32, { %3*, i32 } }> %26, <{ i32, { %3*, i32 } }>* %27
-  %28 = bitcast { i32, [20 x i8] }* %unique__543 to { i32, {}, i64, {}, {}, {}, float, {}, i1, {}, {}, { { i8*, i32 }, i8* }, { i8*, i32 }, i8*, { i8*, i32 }, i8* }*
-  store { i32, {}, i64, {}, {}, {}, float, {}, i1, {}, {}, { { i8*, i32 }, i8* }, { i8*, i32 }, i8*, { i8*, i32 }, i8* } zeroinitializer, { i32, {}, i64, {}, {}, {}, float, {}, i1, {}, {}, { { i8*, i32 }, i8* }, { i8*, i32 }, i8*, { i8*, i32 }, i8* }* %28
-  %29 = getelementptr { i32, [20 x i8] }, { i32, [20 x i8] }* %t, i32 0, i32 0
-  %30 = load i32, i32* %29
-  %realRet = alloca i32
-  store i32 %30, i32* %realRet
-  %31 = load i32, i32* %realRet
-  ret i32 %31
+  %a = alloca { i8*, i32 }
+  %local10_ = alloca i64
+  %local53_ = alloca %0
+  %local69_ = alloca %0*
+  %char = alloca i8
+  %foreach_index = alloca i32
+  %foreach_index1 = alloca { i8*, i32 }
+  %local103_ = alloca %1
+  %local107_ = alloca %1*
+  %local124_ = alloca i8*
+  %local126_ = alloca i8*
+  %local127_ = alloca i64
+  %local130_ = alloca i1
+  %local133_ = alloca i32
+  %local138_ = alloca i32
+  %local139_ = alloca i32
+  %local140_ = alloca i32
+  %local144_ = alloca i8*
+  %local146_ = alloca i8*
+  %local147_ = alloca i32
+  %local148_ = alloca i32
+  %local149_ = alloca i32
+  store i8 0, i8* %char
+  %0 = bitcast %0* %local53_ to { i8, i8, i8, i8, i8 }*
+  store { i8, i8, i8, i8, i8 } { i8 104, i8 101, i8 108, i8 108, i8 111 }, { i8, i8, i8, i8, i8 }* %0
+  %1 = load %0, %0* %local53_
+  store %0 %1, %0* %local53_
+  %2 = call i8* @malloc(i64 5)
+  %3 = bitcast %0** %local69_ to i8**
+  store i8* %2, i8** %3
+  %4 = load %0, %0* %local53_
+  %5 = bitcast i8* %2 to %0*
+  store %0 %4, %0* %5
+  %6 = load %0*, %0** %local69_
+  %7 = bitcast %0* %6 to i8*
+  %8 = insertvalue { i8*, i32 } zeroinitializer, i8* %7, 0
+  %9 = insertvalue { i8*, i32 } %8, i32 5, 1
+  store { i8*, i32 } %9, { i8*, i32 }* %foreach_index1
+  store i32 0, i32* %foreach_index
+  br label %cond
+
+cond:                                             ; preds = %then, %entry
+  %10 = getelementptr { i8*, i32 }, { i8*, i32 }* %foreach_index1, i32 0, i32 1
+  %11 = load i32, i32* %foreach_index
+  %12 = load i32, i32* %10
+  %13 = icmp slt i32 %11, %12
+  store i1 %13, i1* %local130_
+  %14 = load i1, i1* %local130_
+  br i1 %14, label %then, label %if_cont
+
+then:                                             ; preds = %cond
+  %15 = load { i8*, i32 }, { i8*, i32 }* %foreach_index1
+  %16 = extractvalue { i8*, i32 } %15, 0
+  %17 = load i32, i32* %foreach_index
+  %parith = getelementptr i8, i8* %16, i32 %17
+  store i8* %parith, i8** %local144_
+  %18 = load i8*, i8** %local144_
+  %19 = load i8, i8* %18
+  store i8 %19, i8* %char
+  %20 = bitcast %1* %local103_ to { i8 }*
+  store { i8 } { i8 46 }, { i8 }* %20
+  %21 = load %1, %1* %local103_
+  store %1 %21, %1* %local103_
+  %22 = call i8* @malloc(i64 1)
+  %23 = bitcast %1** %local107_ to i8**
+  store i8* %22, i8** %23
+  %24 = load %1, %1* %local103_
+  %25 = bitcast i8* %22 to %1*
+  store %1 %24, %1* %25
+  %26 = load %1*, %1** %local107_
+  %27 = bitcast %1* %26 to i8*
+  %28 = insertvalue { i8*, i32 } zeroinitializer, i8* %27, 0
+  %29 = insertvalue { i8*, i32 } %28, i32 1, 1
+  store { i8*, i32 } %29, { i8*, i32 }* %a
+  %30 = load { i8*, i32 }, { i8*, i32 }* %a
+  %31 = extractvalue { i8*, i32 } %30, 0
+  store i64 0, i64* %local10_
+  store i64 0, i64* %local10_
+  %32 = load i64, i64* %local10_
+  %parith2 = getelementptr i8, i8* %31, i64 %32
+  store i8* %parith2, i8** %local124_
+  %33 = load i8, i8* %char
+  %34 = load i8*, i8** %local124_
+  store i8 %33, i8* %34
+  %35 = load { i8*, i32 }, { i8*, i32 }* %a
+  %36 = extractvalue { i8*, i32 } %35, 0
+  %37 = load { i8*, i32 }, { i8*, i32 }* %a
+  %38 = extractvalue { i8*, i32 } %37, 1
+  %39 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([5 x i8], [5 x i8]* @printfFmtStr, i32 0, i32 0), i32 %38, i8* %36)
+  %40 = load i32, i32* %foreach_index
+  %41 = add i32 %40, 1
+  store i32 %41, i32* %local133_
+  %42 = load i32, i32* %local133_
+  store i32 %42, i32* %foreach_index
+  br label %cond
+
+if_cont:                                          ; preds = %cond
+  ret {} zeroinitializer
 }
 
 !llvm.module.flags = !{!0, !1}

@@ -1,112 +1,17 @@
-type ParamData struct {
-    name:  []i8,
-    _type: *TypeInfo
-}
-
-type FnData struct {
-    params:     []ParamData,
-    returnType: *TypeInfo
-}
-
-type TypeInfo enum {
-    NONE:             none,
-    INT_LITERAL:      i64,
-    I8:               none,
-    I32:              none,
-    I64:              none,
-    FLOAT_LITERAL:    f64,
-    BOOLEAN:          none,
-    BOOLEAN_LITERAL:  bool,
-    F32:              none,
-    F64:              none,
-    FN:               FnData,
-    STRUCT:           []ParamData,
-    POINTER:          *TypeInfo,
-    ENUM:             []ParamData,
-    ARRAY:            *TypeInfo,
-}
-
-type Any struct {
-    _type:  TypeInfo,
-    value:  *none
-}
-
-fn printParams(params: []ParamData) {
-    for param : params {
-        puts(param.name);
-        puts(": ");
-        printTypeInfo(param._type);
-        puts(", ");
-    }
-}
-
-fn printTypeInfo(hack: *TypeInfo) {
-    t := hack;
-
-    if tagcheck(t.STRUCT) {
-        puts("struct{");
-        printParams(t.STRUCT);
-        puts("}");
-    }
-    else if tagcheck(t.ENUM) {
-        puts("enum{");
-        printParams(t.ENUM);
-        puts("}");
-    }
-    else if tagcheck(t.ARRAY) {
-        puts("[]");
-        printTypeInfo(t.ARRAY);
-    }
-    else if tagcheck(t.NONE) {
-        puts("none");
-    }
-    else if tagcheck(t.INT_LITERAL) {
-        puts("int");
-    }
-    else if tagcheck(t.I8) {
-        puts("i8");
-    }
-    else if tagcheck(t.I32) {
-        puts("i32");
-    }
-    else if tagcheck(t.I64) {
-        puts("i64");
-    }
-    else if tagcheck(t.FLOAT_LITERAL) {
-        puts("float");
-    }
-    else if tagcheck(t.BOOLEAN) {
-        puts("boolean");
-    }
-    else if tagcheck(t.BOOLEAN_LITERAL) {
-        if t.BOOLEAN_LITERAL { puts("true"); }
-        else { puts("false"); }
-    }
-    else if tagcheck(t.F32) {
-        puts("f32");
-    }
-    else if tagcheck(t.F64) {
-        puts("f64");
-    }
-    else if tagcheck(t.FN) {
-        puts("fn(");
-        printParams(t.FN.params);
-        puts(") ");
-        printTypeInfo(t.FN.returnType);
-    }
-    else if tagcheck(t.POINTER) {
-        puts("*");
-        printTypeInfo(t.POINTER);
-    }
-}
-
-fn printType( T := typeof(t) )(t: T) {
-    printTypeInfo(&typeinfo(t));
-}
-
 fn main() {
-    t := typeinfo(ll);
-    return t.tag;
+    x := {x: 3, y: 4};
+    y := {x: 4, y: 5};
+    z := {x: 5, y: 6};
+
+    fn sumThingy(t: struct{x: i64, y: i64}) {
+        return t.x + t.y;
+    }
+
+    a := 0;
+    #for thingy: []{x, y, z} {
+        a = a + sumThingy(thingy);
+    }
+    return a;
 }
 
 fn println(s: []i8) {
