@@ -106,6 +106,7 @@ vector<Node *> Parser::parseDeclParams() {
 
         if (lexer->front.type == LexerTokenType::COLON) {
             popFront();
+
             param.type = parseType();
 
             if (lexer->front.type == LexerTokenType::EQ) {
@@ -502,6 +503,8 @@ Node *Parser::parseWhile() {
     while_->sourceMapStatement = true;
     while_->whileData.condition->sourceMapStatement = true;
 
+    scopes.push(new Scope(scopes.top()));
+
     expect(LexerTokenType::LCURLY, "{");
     while (lexer->front.type != LexerTokenType::RCURLY) {
         auto scopedStmt = parseScopedStmt();
@@ -512,6 +515,8 @@ Node *Parser::parseWhile() {
 
     while_->region.end = lexer->front.region.end;
     expect(LexerTokenType::RCURLY, "}");
+
+    scopes.pop();
 
     return while_;
 }
@@ -735,6 +740,10 @@ Node *Parser::parseType() {
         return parseTypeof();
     }
 
+    if (saved.type == LexerTokenType::RETTYPEOF) {
+        return parseRetTypeof();
+    }
+
     auto type = new Node(lexer->srcInfo, NodeType::TYPE, scopes.top());
     type->region = saved.region;
 
@@ -922,6 +931,17 @@ Node *Parser::parseTypeof() {
     return type;
 }
 
+Node *Parser::parseRetTypeof() {
+    auto type = new Node(lexer->srcInfo, NodeType::RETTYPEOF, scopes.top());
+    type->region.start = lexer->front.region.start;
+    popFront();
+    expect(LexerTokenType::LPAREN, "(");
+    type->nodeData = parseRvalue();
+    type->region.end = lexer->front.region.end;
+    expect(LexerTokenType::RPAREN, ")");
+    return type;
+}
+
 Node *Parser::parseHeapify() {
     auto h = new Node(lexer->srcInfo, NodeType::HEAPIFY, scopes.top());
     h->region.start = lexer->front.region.start;
@@ -948,6 +968,40 @@ Node *Parser::parseSizeof() {
     type->nodeData = parseType();
     type->region.end = lexer->front.region.end;
     expect(LexerTokenType::RPAREN, ")");
+    return type;
+}
+
+Node *Parser::parseIsKind() {
+    auto type = new Node(lexer->srcInfo, NodeType::ISKIND, scopes.top());
+    type->region.start = lexer->front.region.start;
+    popFront();
+    expect(LexerTokenType::LPAREN, "(");
+    type->isKindData.type = parseType();
+    expect(LexerTokenType::COMMA, ",");
+
+    if (lexer->front.type == LexerTokenType::I8
+        || lexer->front.type == LexerTokenType::I32
+        || lexer->front.type == LexerTokenType::I64
+        || lexer->front.type == LexerTokenType::F32
+        || lexer->front.type == LexerTokenType::BOOLEAN
+        || lexer->front.type == LexerTokenType::FN
+        || lexer->front.type == LexerTokenType::STRUCT
+        || lexer->front.type == LexerTokenType::ENUM
+        || lexer->front.type == LexerTokenType::NONE
+        || (lexer->front.type == LexerTokenType::LSQUARE && lexer->next.type == LexerTokenType::RSQUARE)
+        || lexer->front.type == LexerTokenType::MUL) {
+        type->isKindData.tokenType = lexer->front.type;
+        popFront();
+        if (lexer->front.type == LexerTokenType::RSQUARE) {
+            popFront();
+        }
+    }
+    else {
+        lexer->reportError(Error{type->region, "invalid kind symbol for #iskind"});
+    }
+
+    expect(LexerTokenType::RPAREN, ")");
+
     return type;
 }
 
@@ -1039,6 +1093,10 @@ Node *Parser::parseLvalueOrLiteral() {
 
     if (lexer->front.type == LexerTokenType::TAGCHECK) {
         return parseTagCheck();
+    }
+
+    if (lexer->front.type == LexerTokenType::ISKIND) {
+        return parseIsKind();
     }
 
     auto saved = lexer->front.region.start;

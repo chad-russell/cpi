@@ -1,40 +1,23 @@
 TODO:
+    - implement arbitrary printing
+
     - merge the concepts of declParam and valueParam. It's too confusing at this point and we are needing to switch between them too often
-
-    - #fieldtypeof
-        - struct -- #fieldtypeof(struct {x: f32, y: i64}, 1)
-        - fn -- #fieldtypeof(fn(x: f32, y: i64) bool, 0)
-    - #iskind
-        - i8, i32, i64, f32, f64, bool, fn, struct, enum, array, pointer
-        - #iskind(typeof(true), bool) -- evaluates to boolean literal true
-        - #iskind(typeof(false), fn)   -- evaluates to boolean literal false
-    - #rettypeof
-
-    - arbitrary printing
-        - e.g. `print("here is a value: ", 3, " and here is another one: ", {x: 13, y: &67}, ". That is all! :)");`
-        - will need varargs
-            - implementation -- just pack them all into a struct
 
     - better interpreter debugging
         - more accurate source information, stopping, etc.
         - get list of stack variables and print their values by name
         - implement option to have memory as a rope structure -- infinite undo/redo of program execution state
 
-    - libraries / namespaces / modules
-
-    - better type matching
-        - when are struct types matched nominally vs structurally?
-        - when are int/float types auto-converted/promoted?
-        - arrays, strings, etc.
-
     - pipe operator
+
+    - libraries / namespaces / modules
 
     - possibly bring back 'Type' as a way of asserting something must be a type
         - writing 'fn foo(t: Any)() { ... }' is a little weird considering the vast majority of the time we actually just want to accept a type here and not any random ast node
 
     -- switch
         -- on enum (tag)
-        switch a {
+        if a == {
             x: {
                 return 111;
             }
@@ -48,8 +31,6 @@ TODO:
         -- on other things (??)
 
     - defer
-
-    - signed vs unsigned ints
 
     - parse symbols in backticks
         - `0n3:s!mb()l` := 3;
@@ -66,3 +47,7 @@ TODO:
         - a := [10]i32{}; a|append(3); return a[1];
         - maybe just get rid of `[]` syntax... instead of giving all types a way to
             access to special syntax, we can just have less special syntax
+
+    - varargs
+        - e.g. `print("here is a value: ", 3, " and here is another one: ", {x: 13, y: &67}, ". That is all! :)");`
+        - implementation -- just pack them all into a struct

@@ -142,6 +142,9 @@ ostream &operator<<(ostream &os, NodeType type) {
         case NodeType::TYPEOF: {
             return os << "typeof";
         }
+        case NodeType::RETTYPEOF: {
+            return os << "rettypeof";
+        }
         case NodeType::SIZEOF: {
             return os << "sizeof";
         }
@@ -168,6 +171,9 @@ ostream &operator<<(ostream &os, NodeType type) {
         }
         case NodeType::ARRAY_LITERAL: {
             return os << "array literal";
+        }
+        case NodeType::ISKIND: {
+            return os << "#iskind";
         }
     }
 }

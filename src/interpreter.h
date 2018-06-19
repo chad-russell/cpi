@@ -363,11 +363,13 @@ void interpretMathDiv(Interpreter *interp) {
 
 template <typename T>
 void interpretMathMod(Interpreter *interp) {
-    auto a = interp->read<T>();
-    auto b = interp->read<T>();
-    auto result = a / b;
-    auto storeOffset = interp->consume<int32_t>();
-    interp->copyToStack(result, interp->bp + storeOffset);
+    assert(false && "todo(chad)");
+
+//    auto a = interp->read<T>();
+//    auto b = interp->read<T>();
+//    auto result = a % b;
+//    auto storeOffset = interp->consume<int32_t>();
+//    interp->copyToStack(result, interp->bp + storeOffset);
 }
 
 // bitwise binary operation

@@ -58,6 +58,7 @@ enum class NodeType {
     PANIC,
     RUN,
     TYPEOF,
+    RETTYPEOF,
     SIZEOF,
     FIELDSOF,
     ARRAY_INDEX,
@@ -68,6 +69,7 @@ enum class NodeType {
     ARRAY_LITERAL,
     FOR,
     HEAPIFY,
+    ISKIND,
 };
 
 enum class NodeTypekind {
@@ -150,6 +152,7 @@ enum class LexerTokenType : int32_t {
     RUN,
     EXPOSED_AST,
     TYPEOF,
+    RETTYPEOF,
     SIZEOF,
     FIELDSOF,
     PANIC,
@@ -161,6 +164,7 @@ enum class LexerTokenType : int32_t {
     FOR,
     STATIC_FOR,
     HEAP,
+    ISKIND,
 };
 
 struct SourceInfo {
@@ -390,6 +394,11 @@ struct ForData {
     vector<Node *> staticStmts;
 };
 
+struct IsKindData {
+    Node *type;
+    LexerTokenType tokenType;
+};
+
 class Scope {
 public:
     unordered_map<int64_t, Node *> symbols = {};
@@ -441,6 +450,7 @@ public:
     DerefData derefData;
     ArrayLiteralData arrayLiteralData;
     ForData forData;
+    IsKindData isKindData;
     // };
 
     Node *staticValue = nullptr;

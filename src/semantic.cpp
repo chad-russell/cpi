@@ -536,8 +536,11 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
 
         local->localOffset = semantic->currentFnDecl->stackSize;
 
-        semantic->currentFnDecl->stackSize += typeSize(local->typeInfo);
-        localIndex += 1;
+        // todo(chad): DANGEROUS!!! But I don't know of a better way to deal with the fact that we can have non-typechecked things because of static if, etc.
+        if (local->typeInfo != nullptr) {
+            semantic->currentFnDecl->stackSize += typeSize(local->typeInfo);
+            localIndex += 1;
+        }
     }
 
     auto paramOffset = -8;
@@ -577,7 +580,9 @@ void resolveArrayIndex(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->arrayIndexData.target);
     semantic->resolveTypes(node->arrayIndexData.indexValue);
 
-    switch (node->arrayIndexData.indexValue->typeInfo->typeData.kind) {
+    auto resolvedTargetTypeInfo = resolve(node->arrayIndexData.target->typeInfo);
+
+    switch (resolve(node->arrayIndexData.indexValue->typeInfo)->typeData.kind) {
         case NodeTypekind::INT_LITERAL:
         case NodeTypekind::I32:
         case NodeTypekind::I64:
@@ -589,7 +594,6 @@ void resolveArrayIndex(Semantic *semantic, Node *node) {
         }
     }
 
-    auto resolvedTargetTypeInfo = resolve(node->arrayIndexData.target->typeInfo);
     if (resolvedTargetTypeInfo->typeData.kind != NodeTypekind::STRUCT) {
         semantic->reportError({node}, Error{node->region, "cannot index a non-array"});
         return;
@@ -968,40 +972,43 @@ void resolveBinop(Semantic *semantic, Node *node) {
     node->binopData.lhsTemporary = makeTemporary(semantic, node->binopData.lhs);
     node->binopData.rhsTemporary = makeTemporary(semantic, node->binopData.rhs);
 
+    auto resolvedLhsType = resolve(node->binopData.lhs->typeInfo);
+    auto resolvedRhsType = resolve(node->binopData.rhs->typeInfo);
+
     if (node->binopData.lhs->type == NodeType::DOT) {
         auto newLocalStorage = new Node();
         newLocalStorage->type = NodeType::TYPE;
-        newLocalStorage->typeInfo = node->binopData.lhs->typeInfo;
+        newLocalStorage->typeInfo = resolvedLhsType;
 
         semantic->addLocal(newLocalStorage);
     }
     if (node->binopData.rhs->type == NodeType::DOT) {
         auto newLocalStorage = new Node();
         newLocalStorage->type = NodeType::TYPE;
-        newLocalStorage->typeInfo = node->binopData.rhs->typeInfo;
+        newLocalStorage->typeInfo = resolvedRhsType;
 
         semantic->addLocal(newLocalStorage);
     }
 
-    if (node->binopData.lhs->typeInfo->typeData.kind == NodeTypekind::POINTER
-        && (node->binopData.rhs->typeInfo->typeData.kind == NodeTypekind::INT_LITERAL
-            || node->binopData.rhs->typeInfo->typeData.kind == NodeTypekind::I32
-            || node->binopData.rhs->typeInfo->typeData.kind == NodeTypekind::I64)) {
-        node->typeInfo = node->binopData.lhs->typeInfo;
-        node->binopData.rhsScale = typeSize(node->binopData.lhs->typeInfo->typeData.pointerTypeData.underlyingType);
+    if (resolvedLhsType->typeData.kind == NodeTypekind::POINTER
+        && (resolvedRhsType->typeData.kind == NodeTypekind::INT_LITERAL
+            || resolvedRhsType->typeData.kind == NodeTypekind::I32
+            || resolvedRhsType->typeData.kind == NodeTypekind::I64)) {
+        node->typeInfo = resolvedLhsType;
+        node->binopData.rhsScale = typeSize(resolvedLhsType->typeData.pointerTypeData.underlyingType);
         return;
     }
 
-    if (node->binopData.rhs->typeInfo->typeData.kind == NodeTypekind::POINTER
-        && (node->binopData.lhs->typeInfo->typeData.kind == NodeTypekind::INT_LITERAL
-            || node->binopData.lhs->typeInfo->typeData.kind == NodeTypekind::I32
-            || node->binopData.lhs->typeInfo->typeData.kind == NodeTypekind::I64)) {
-        node->typeInfo = node->binopData.rhs->typeInfo;
-        node->binopData.rhsScale = typeSize(node->binopData.rhs->typeInfo->typeData.pointerTypeData.underlyingType);
+    if (resolvedRhsType->typeData.kind == NodeTypekind::POINTER
+        && (resolvedLhsType->typeData.kind == NodeTypekind::INT_LITERAL
+            || resolvedLhsType->typeData.kind == NodeTypekind::I32
+            || resolvedLhsType->typeData.kind == NodeTypekind::I64)) {
+        node->typeInfo = resolvedRhsType;
+        node->binopData.rhsScale = typeSize(resolvedRhsType->typeData.pointerTypeData.underlyingType);
         return;
     }
 
-    if (!typesMatch(node->binopData.lhs->typeInfo, node->binopData.rhs->typeInfo, semantic)) {
+    if (!typesMatch(resolvedLhsType, resolvedRhsType, semantic)) {
         semantic->reportError({node, node->binopData.lhs, node->binopData.rhs},
                               Error{node->region, "type mismatch - both sides of binary operation need to be the same type"});
     }
@@ -1010,7 +1017,7 @@ void resolveBinop(Semantic *semantic, Node *node) {
     if (isBooleanBinop(node->binopData.type)) {
         node->typeInfo = new Node(NodeTypekind::BOOLEAN);
     } else {
-        node->typeInfo = node->binopData.lhs->typeInfo;
+        node->typeInfo = resolvedLhsType;
     }
 }
 
@@ -1513,15 +1520,35 @@ void resolveStructLiteral(Semantic *semantic, Node *node) {
 void resolveIf(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->ifData.condition);
 
-    if (node->ifData.condition->typeInfo->typeData.kind != NodeTypekind::BOOLEAN && node->ifData.condition->typeInfo->typeData.kind != NodeTypekind::BOOLEAN_LITERAL) {
+    auto resolvedTypeInfo = resolve(node->ifData.condition->typeInfo);
+    auto resolvedKind = resolvedTypeInfo->typeData.kind;
+    if (resolvedKind != NodeTypekind::BOOLEAN && resolvedKind != NodeTypekind::BOOLEAN_LITERAL) {
         semantic->reportError({node, node->ifData.condition}, Error{node->ifData.condition->region, "Condition for 'if' must be a boolean!"});
     }
 
-    for (const auto& stmt : node->ifData.stmts) {
-        semantic->resolveTypes(stmt);
+    bool shouldResolveIfStmts = true;
+    bool shouldResolveElseStmts = true;
+    if (resolvedTypeInfo->typeData.kind == NodeTypekind::BOOLEAN_LITERAL) {
+        if (resolvedTypeInfo->typeData.boolTypeData) {
+            shouldResolveElseStmts = false;
+            node->ifData.elseStmts = {};
+        }
+        else {
+            shouldResolveIfStmts = false;
+            node->ifData.stmts = {};
+        }
     }
-    for (const auto& stmt : node->ifData.elseStmts) {
-        semantic->resolveTypes(stmt);
+
+    if (shouldResolveIfStmts) {
+        for (const auto& stmt : node->ifData.stmts) {
+            semantic->resolveTypes(stmt);
+        }
+    }
+
+    if (shouldResolveElseStmts) {
+        for (const auto& stmt : node->ifData.elseStmts) {
+            semantic->resolveTypes(stmt);
+        }
     }
 }
 
@@ -1643,15 +1670,17 @@ void resolveStaticFor(Semantic *semantic, Node *node) {
         resolvedTarget = resolve(resolvedTarget);
     }
 
+    auto resolvedTargetType = resolve(resolvedTarget->typeInfo);
+
     // if the target is not an array literal, error
     vector<Node *> staticElements;
     if (resolvedTarget->type == NodeType::ARRAY_LITERAL) {
         staticElements = resolvedTarget->arrayLiteralData.elements;
     }
-    else if (resolvedTarget->typeInfo->typeData.kind == NodeTypekind::STRUCT
-            && !resolvedTarget->typeInfo->typeData.structTypeData.isSecretlyArray
-            && !resolvedTarget->typeInfo->typeData.structTypeData.isSecretlyEnum) {
-        auto params = resolvedTarget->typeInfo->typeData.structTypeData.params;
+    else if (resolvedTargetType->typeData.kind == NodeTypekind::STRUCT
+            && !resolvedTargetType->typeData.structTypeData.isSecretlyArray
+            && !resolvedTargetType->typeData.structTypeData.isSecretlyEnum) {
+        auto params = resolvedTargetType->typeData.structTypeData.params;
 
         for (auto staticIdx = 0; staticIdx < params.size(); staticIdx += 1) {
             auto intLiteral = new Node();
@@ -1726,9 +1755,9 @@ void resolveFor(Semantic *semantic, Node *node) {
     }
 
     semantic->resolveTypes(node->forData.target);
+    auto resolvedTypeInfo = resolve(node->forData.target->typeInfo);
 
-    if (!(node->forData.target->typeInfo->typeData.kind == NodeTypekind::STRUCT
-          && node->forData.target->typeInfo->typeData.structTypeData.isSecretlyArray)) {
+    if (!(resolvedTypeInfo->typeData.kind == NodeTypekind::STRUCT && resolvedTypeInfo->typeData.structTypeData.isSecretlyArray)) {
         semantic->reportError({node, node->forData.target}, Error{
                 node->forData.target->region,
                 "'for' target must be an array"
@@ -1740,7 +1769,7 @@ void resolveFor(Semantic *semantic, Node *node) {
     elementDecl->type = NodeType::DECL;
     elementDecl->scope = node->scope;
     elementDecl->region = node->forData.element_alias->region;
-    elementDecl->declData.type = node->forData.target->typeInfo->typeData.structTypeData.secretArrayElementType;
+    elementDecl->declData.type = resolvedTypeInfo->typeData.structTypeData.secretArrayElementType;
     elementDecl->declData.lvalue = node->forData.element_alias;
     semantic->addLocal(elementDecl);
     semantic->resolveTypes(elementDecl);
@@ -1777,7 +1806,7 @@ void resolveFor(Semantic *semantic, Node *node) {
 
     // arrayDecl
     auto arrayDecl = new Node(node->region.srcInfo, NodeType::DECL, node->scope);
-    arrayDecl->declData.type = node->forData.target->typeInfo;
+    arrayDecl->declData.type = resolvedTypeInfo;
     arrayDecl->declData.initialValue = node->forData.target;
     semantic->addLocal(arrayDecl);
 
@@ -2023,6 +2052,80 @@ void resolveTypeof(Semantic *semantic, Node *node) {
     node->staticValue = node->nodeData->typeInfo;
 }
 
+void resolveRetTypeof(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->nodeData);
+
+    node->typeInfo = new Node(NodeTypekind::EXPOSED_AST);
+
+    assert(node->nodeData->typeInfo->typeData.kind == NodeTypekind::FN);
+
+    node->staticValue = node->nodeData->typeInfo->typeData.fnTypeData.returnType;
+}
+
+void resolveIsKind(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->isKindData.type);
+
+    auto resolvedType = resolve(node->isKindData.type);
+    assert(resolvedType->type == NodeType::TYPE);
+
+    auto matches = false;
+    switch (resolvedType->typeData.kind) {
+        case NodeTypekind::NONE: {
+            matches = node->isKindData.tokenType == LexerTokenType::NONE;
+        } break;
+        case NodeTypekind::I8: {
+            matches = node->isKindData.tokenType == LexerTokenType::I8;
+        } break;
+        case NodeTypekind::I32: {
+            matches = node->isKindData.tokenType == LexerTokenType::I32;
+        } break;
+        case NodeTypekind::INT_LITERAL:
+        case NodeTypekind::I64: {
+            matches = node->isKindData.tokenType == LexerTokenType::I64;
+        } break;
+        case NodeTypekind::F32: {
+            matches = node->isKindData.tokenType == LexerTokenType::F32;
+        } break;
+        case NodeTypekind::FLOAT_LITERAL:
+        case NodeTypekind::F64: {
+            matches = node->isKindData.tokenType == LexerTokenType::F64;
+        } break;
+        case NodeTypekind::FN: {
+            matches = node->isKindData.tokenType == LexerTokenType::FN;
+        } break;
+        case NodeTypekind::BOOLEAN:
+        case NodeTypekind::BOOLEAN_LITERAL: {
+            matches = node->isKindData.tokenType == LexerTokenType::BOOLEAN;
+        } break;
+        case NodeTypekind::STRUCT: {
+            if (resolvedType->typeData.structTypeData.isSecretlyArray) {
+                matches = node->isKindData.tokenType == LexerTokenType::LSQUARE;
+            }
+            else if (resolvedType->typeData.structTypeData.isSecretlyEnum) {
+                matches = node->isKindData.tokenType == LexerTokenType::ENUM;
+            }
+            else {
+                matches = node->isKindData.tokenType == LexerTokenType::STRUCT;
+            }
+        } break;
+        case NodeTypekind::POINTER: {
+            matches = node->isKindData.tokenType == LexerTokenType::MUL;
+        } break;
+        default: {}
+    }
+
+    auto resolved = new Node();
+    resolved->scope = node->scope;
+    resolved->type = NodeType::BOOLEAN_LITERAL;
+    resolved->boolLiteralData.value = matches;
+    semantic->resolveTypes(resolved);
+
+    node->resolved = resolved;
+    node->staticValue = resolved;
+
+    node->typeInfo = node->resolved->typeInfo;
+}
+
 void resolveSizeof(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->nodeData);
 
@@ -2156,6 +2259,12 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::TYPEOF: {
             resolveTypeof(this, node);
+        } break;
+        case NodeType::RETTYPEOF: {
+            resolveRetTypeof(this, node);
+        } break;
+        case NodeType::ISKIND: {
+            resolveIsKind(this, node);
         } break;
         case NodeType::SIZEOF: {
             resolveSizeof(this, node);

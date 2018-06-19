@@ -956,6 +956,10 @@ void BytecodeGen::gen(Node *node) {
         case NodeType::FIELDSOF: {
             gen(node->resolved);
         } break;
+        case NodeType::ISKIND: {
+            gen(node->resolved);
+            node->bytecode = node->resolved->bytecode;
+        } break;
         default:
             assert(false);
     }
