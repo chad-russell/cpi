@@ -953,6 +953,9 @@ void BytecodeGen::gen(Node *node) {
             append(instructions, Instruction::RELCONSTI32);
             append(instructions, toBytes32(node->nodeData->localOffset));
         } break;
+        case NodeType::FIELDSOF: {
+            gen(node->resolved);
+        } break;
         default:
             assert(false);
     }

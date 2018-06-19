@@ -605,7 +605,7 @@ Node *Parser::buildDots(stack<Node *> rvalues) {
 
         top->region = {lexer->srcInfo, top->arrayIndexData.target->region.start, top->region.end};
         return top;
-    } else if (top->type == NodeType::SYMBOL) {
+    } else if (top->type == NodeType::SYMBOL || top->type == NodeType::INT_LITERAL) {
         rvalues.pop();
 
         auto dot = new Node(lexer->srcInfo,
@@ -652,7 +652,15 @@ Node *Parser::parseLvalueHelper(Node *symbol, Location saved) {
     // ('.' lvalue_simple)*
     while (lexer->front.type == LexerTokenType::DOT) {
         expect(LexerTokenType::DOT, ".");
-        auto sym = parseSymbol();
+
+        Node *sym;
+        if (lexer->front.type == LexerTokenType::INT_LITERAL) {
+            sym = parseIntLiteral();
+        }
+        else {
+            sym = parseSymbol();
+        }
+
         rvalues.push(sym);
 
         maybePushArrayIndexOrFnCalls(this, rvalues);
@@ -943,6 +951,17 @@ Node *Parser::parseSizeof() {
     return type;
 }
 
+Node *Parser::parseFieldsof() {
+    auto type = new Node(lexer->srcInfo, NodeType::FIELDSOF, scopes.top());
+    type->region.start = lexer->front.region.start;
+    popFront();
+    expect(LexerTokenType::LPAREN, "(");
+    type->nodeData = parseType();
+    type->region.end = lexer->front.region.end;
+    expect(LexerTokenType::RPAREN, ")");
+    return type;
+}
+
 Node *Parser::parsePuts() {
     auto value = new Node(lexer->srcInfo, NodeType::PUTS, scopes.top());
     value->region.start = lexer->front.region.start;
@@ -1008,6 +1027,10 @@ Node *Parser::parseLvalueOrLiteral() {
 
     if (lexer->front.type == LexerTokenType::SIZEOF) {
         return parseSizeof();
+    }
+
+    if (lexer->front.type == LexerTokenType::FIELDSOF) {
+        return parseFieldsof();
     }
 
     if (lexer->front.type == LexerTokenType::MALLOC) {

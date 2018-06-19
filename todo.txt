@@ -1,26 +1,13 @@
 TODO:
     - merge the concepts of declParam and valueParam. It's too confusing at this point and we are needing to switch between them too often
 
-    - #for (static foreach)
-        - array literal
-            - #for it: []{1, 2, 3} { ... }
-        - struct
-            - #for it: {x: 18, y: "foobar"} { ... }
-        - example -- printing enums
-            - #for i, _: enumValue {
-                if t.tag == i {
-                    print(cast(#fieldtypeof(T, i)) t.data);
-                }
-            }
-    - #iskind
-        - `iskind(a, i32)`, `iskind(b, array)`, `iskind(c, struct)`, `iskind(d, fn)`, etc.
-    - #fieldcount
-    - #fieldnameof
-        - names of struct  -- #fieldnameof(struct {x: i32, y: i64}, 1)
-        - names of fn args -- #fieldnameof(fn(x: i32, y: i64) bool, 0)
     - #fieldtypeof
         - struct -- #fieldtypeof(struct {x: f32, y: i64}, 1)
         - fn -- #fieldtypeof(fn(x: f32, y: i64) bool, 0)
+    - #iskind
+        - i8, i32, i64, f32, f64, bool, fn, struct, enum, array, pointer
+        - #iskind(typeof(true), bool) -- evaluates to boolean literal true
+        - #iskind(typeof(false), fn)   -- evaluates to boolean literal false
     - #rettypeof
 
     - arbitrary printing

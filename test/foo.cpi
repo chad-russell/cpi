@@ -1,17 +1,21 @@
+fn getField2(i: i64, T := typeof(t))(t: T) {
+    return t[0];
+}
+
+fn getField(i: i64, T := typeof(t))(t: T) {
+    return getField2!(i)(t);
+}
+
 fn main() {
-    x := {x: 3, y: 4};
-    y := {x: 4, y: 5};
-    z := {x: 5, y: 6};
+    thing := {x: 14};
 
-    fn sumThingy(t: struct{x: i64, y: i64}) {
-        return t.x + t.y;
+    s := 0;
+    #for it, i: #fieldsof(typeof(thing)) {
+        x: typeof(getField!(i)(thing)) = thing[0];
+        s = s + x;
     }
 
-    a := 0;
-    #for thingy: []{x, y, z} {
-        a = a + sumThingy(thingy);
-    }
-    return a;
+    return s;
 }
 
 fn println(s: []i8) {

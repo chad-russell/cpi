@@ -474,12 +474,10 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
 
     // if the return type is just an int/float literal,
     // lock it down instead of leaving it open
-    if (data->returnType != nullptr
-        && data->returnType->typeData.kind == NodeTypekind::INT_LITERAL) {
+    if (data->returnType->typeData.kind == NodeTypekind::INT_LITERAL) {
         data->returnType->typeData.kind = NodeTypekind::I64;
     }
-    if (data->returnType != nullptr
-        && data->returnType ->typeData.kind == NodeTypekind::FLOAT_LITERAL) {
+    if (data->returnType ->typeData.kind == NodeTypekind::FLOAT_LITERAL) {
         data->returnType->typeData.kind = NodeTypekind::F32;
     }
 
@@ -515,10 +513,6 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
                  Error{ret->retData.value->region, "could not resolved type of return statement"});
              }
          }
-     }
-
-    for (auto stmt : data->body) {
-        semantic->resolveTypes(stmt);
     }
 
     // check to see everything worked out ok
@@ -529,6 +523,10 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
           << "'";
 
         semantic->reportError({node}, Error{node->region, s.str()});
+    }
+
+    for (auto stmt : data->body) {
+        semantic->resolveTypes(stmt);
     }
 
     auto localIndex = 0;
@@ -597,7 +595,28 @@ void resolveArrayIndex(Semantic *semantic, Node *node) {
         return;
     }
     if (!resolvedTargetTypeInfo->typeData.structTypeData.isSecretlyArray) {
-        semantic->reportError({node}, Error{node->region, "cannot index a non-array"});
+        auto resolvedIndexValue = resolve(node->arrayIndexData.indexValue);
+
+        // todo(chad): bounds checking
+        // todo(chad): assert it's an int literal
+
+        auto rewrittenDot = new Node();
+        rewrittenDot->scope = node->scope;
+        rewrittenDot->type = NodeType::DOT;
+        rewrittenDot->dotData.lhs = node->arrayIndexData.target;
+        rewrittenDot->dotData.rhs = resolvedIndexValue;
+        semantic->resolveTypes(rewrittenDot);
+
+        // @HACK - this value sometimes gets re-assigned even when it's an int_literal... sigh...
+        if (resolvedIndexValue->type == NodeType::INT_LITERAL && resolvedIndexValue->resolved != nullptr) {
+            resolvedIndexValue->resolved = nullptr;
+        }
+
+        node->resolved = rewrittenDot;
+        node->typeInfo = rewrittenDot->typeInfo;
+
+        assert(node->typeInfo != nullptr);
+
         return;
     }
 
@@ -705,6 +724,7 @@ void resolveSymbol(Semantic *semantic, Node *node) {
     assert(node->resolved->type == NodeType::DECL
            || node->resolved->type == NodeType::FN_DECL
            || node->resolved->type == NodeType::DECL_PARAM
+           || node->resolved->type == NodeType::INT_LITERAL
            || node->resolved->type == NodeType::TYPE);
 
     semantic->resolveTypes(node->resolved);
@@ -994,13 +1014,13 @@ void resolveBinop(Semantic *semantic, Node *node) {
     }
 }
 
-Node *Semantic::deepCopy(Node *node) {
+Node *Semantic::deepCopy(Node *node, Scope *scope) {
     auto copyingLexer = new Lexer(lexer, node);
 
     auto copyingParser = new Parser(copyingLexer);
     copyingParser->isCopying = true;
     copyingParser->scopes.pop();
-    copyingParser->scopes.push(node->scope);
+    copyingParser->scopes.push(scope);
     return copyingParser->parseScopedStmt();
 }
 
@@ -1012,7 +1032,7 @@ void resolveFnCall(Semantic *semantic, Node *node) {
     if (isPoly) {
         // make a new function
         // todo(chad): memoize this based on the ctParams
-        auto newResolvedFn = semantic->deepCopy(resolvedFn);
+        auto newResolvedFn = semantic->deepCopy(resolvedFn, resolvedFn->scope);
         assert(newResolvedFn->type == NodeType::FN_DECL);
         newResolvedFn->fnDeclData.cameFromPolymorph = true;
 
@@ -1306,6 +1326,10 @@ void resolveAddressOf(Semantic *semantic, Node *node) {
 }
 
 Node *findParam(Semantic *semantic, Node *node) {
+    if (node->dotData.resolved) {
+        return node->dotData.resolved;
+    }
+
     auto resolvedTypeInfo = resolve(node->dotData.lhs)->typeInfo;
     assert(resolvedTypeInfo != nullptr);
 
@@ -1318,8 +1342,15 @@ Node *findParam(Semantic *semantic, Node *node) {
     }
     auto structData = typeData->structTypeData;
 
+    assert(node->dotData.rhs->type == NodeType::SYMBOL
+//           || node->dotData.rhs->type == NodeType::DECL_PARAM
+           || node->dotData.rhs->type == NodeType::INT_LITERAL);
+
     Node *foundParam = nullptr;
-    if (structData.isLiteral) {
+    if (node->dotData.rhs->type == NodeType::INT_LITERAL) {
+        foundParam = structData.params[node->dotData.rhs->intLiteralData.value];
+    }
+    else if (structData.isLiteral) {
         auto debug2 = AtomTable::current->backwardAtoms[node->dotData.rhs->symbolData.atomId];
 
         for (auto param : structData.params) {
@@ -1345,7 +1376,6 @@ Node *findParam(Semantic *semantic, Node *node) {
     }
 
     node->dotData.resolved = foundParam;
-
     return foundParam;
 }
 
@@ -1605,14 +1635,47 @@ void resolveArrayLiteral(Semantic *semantic, Node *node) {
 void resolveStaticFor(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->forData.target);
 
+    auto resolvedTarget = node->forData.target;
+    if (resolvedTarget->type == NodeType::FIELDSOF) {
+        resolvedTarget = resolvedTarget->resolved;
+    }
+    else {
+        resolvedTarget = resolve(resolvedTarget);
+    }
+
     // if the target is not an array literal, error
-    // todo(chad): handle #for over structs, enums as well
-    if (node->forData.target->type != NodeType::ARRAY_LITERAL) {
-        semantic->reportError({node, node->forData.target}, Error{node->forData.target->region, "Can only #for over an array literal"});
+    vector<Node *> staticElements;
+    if (resolvedTarget->type == NodeType::ARRAY_LITERAL) {
+        staticElements = resolvedTarget->arrayLiteralData.elements;
+    }
+    else if (resolvedTarget->typeInfo->typeData.kind == NodeTypekind::STRUCT
+            && !resolvedTarget->typeInfo->typeData.structTypeData.isSecretlyArray
+            && !resolvedTarget->typeInfo->typeData.structTypeData.isSecretlyEnum) {
+        auto params = resolvedTarget->typeInfo->typeData.structTypeData.params;
+
+        for (auto staticIdx = 0; staticIdx < params.size(); staticIdx += 1) {
+            auto intLiteral = new Node();
+            intLiteral->type = NodeType::INT_LITERAL;
+            intLiteral->typeInfo = new Node(NodeTypekind::I64);
+            intLiteral->intLiteralData.value = staticIdx;
+
+            auto tagDot = new Node();
+            tagDot->scope = resolvedTarget->scope;
+            tagDot->type = NodeType::DOT;
+            tagDot->dotData.lhs = resolvedTarget;
+            tagDot->dotData.rhs = intLiteral;
+            semantic->resolveTypes(tagDot);
+
+            staticElements.push_back(tagDot);
+        }
+    }
+    else {
+        semantic->reportError({node, node->forData.target, resolvedTarget}, Error{node->forData.target->region, "Can only #for over an array literal or a struct"});
+        return;
     }
 
     int64_t staticIdx = 0;
-    for (auto staticElem : node->forData.target->arrayLiteralData.elements) {
+    for (auto staticElem : staticElements) {
         // todo(chad): test scopes here
 
         // new declaration for elem
@@ -1626,20 +1689,32 @@ void resolveStaticFor(Semantic *semantic, Node *node) {
         semantic->resolveTypes(elementDecl);
         node->scope->symbols.insert({node->forData.element_alias->symbolData.atomId, elementDecl});
 
-        // todo(chad): possibly new declaration for index
+        Node *indexLiteral = nullptr;
+        if (node->forData.iterator_alias != nullptr) {
+            indexLiteral = new Node();
+            indexLiteral->type = NodeType::INT_LITERAL;
+            indexLiteral->typeInfo = new Node(NodeTypekind::I64);
+            indexLiteral->intLiteralData.value = staticIdx;
+            node->scope->symbols.insert({node->forData.iterator_alias->symbolData.atomId, indexLiteral});
+        }
+
+        auto subScope = new Scope(node->scope);
 
         for (auto stmt : node->forData.stmts) {
             // todo(chad): 'stmt' here is never going to get copied. However, it may still contain locals.
             // So we still have to resolve the types here. We need to try to find a way around that, eventually :/
             semantic->resolveTypes(stmt);
 
-            auto newStmt = semantic->deepCopy(stmt);
+            auto newStmt = semantic->deepCopy(stmt, subScope);
 
             semantic->resolveTypes(newStmt);
             node->forData.staticStmts.push_back(newStmt);
         }
 
         node->scope->symbols.erase(node->forData.element_alias->symbolData.atomId);
+        if (node->forData.iterator_alias != nullptr) {
+            node->scope->symbols.erase(node->forData.iterator_alias->symbolData.atomId);
+        }
         staticIdx += 1;
     }
 }
@@ -1679,7 +1754,7 @@ void resolveFor(Semantic *semantic, Node *node) {
     zero->typeInfo = new Node(NodeTypekind::I32);
     zero->intLiteralData.value = 0;
 
-    // indexDecl: i32 = 0
+    // indexDecl: i64 = 0
     auto indexDecl = new Node();
     indexDecl->type = NodeType::DECL;
     indexDecl->scope = node->scope;
@@ -1954,6 +2029,67 @@ void resolveSizeof(Semantic *semantic, Node *node) {
     node->typeInfo = new Node(NodeTypekind::I64);
 }
 
+void resolveFieldsof(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->nodeData);
+    auto resolvedNodeData = resolve(node->nodeData);
+
+    auto canDo = true;
+    auto isEnum = false;
+    vector<Node *> params;
+    if (resolvedNodeData->typeData.kind == NodeTypekind::STRUCT) {
+        if (resolvedNodeData->typeData.structTypeData.isSecretlyArray) {
+            canDo = false;
+        }
+        isEnum = resolvedNodeData->typeData.structTypeData.isSecretlyEnum;
+
+        params = resolvedNodeData->typeData.structTypeData.params;
+    }
+    else if (resolvedNodeData->typeData.kind == NodeTypekind::FN) {
+        params = resolvedNodeData->typeData.fnTypeData.params;
+    }
+    else {
+        canDo = false;
+    }
+
+    if (!canDo) {
+        semantic->reportError({node}, Error{node->region, "Can only do #fieldsof on a struct/enum/fn type"});
+        return;
+    }
+
+    auto resolved = new Node();
+    resolved->type = NodeType::ARRAY_LITERAL;
+
+    for (auto param : params) {
+        assert(param->type == NodeType::DECL_PARAM);
+
+        if (param->declParamData.index == 0 && isEnum) {
+            // skip the 'tag' field
+            continue;
+        }
+
+        auto indexLit = new Node();
+        indexLit->scope = node->scope;
+        indexLit->type = NodeType::INT_LITERAL;
+        indexLit->intLiteralData.value = param->declParamData.index;
+
+        auto nameLit = new Node();
+        nameLit->scope = node->scope;
+        nameLit->type = NodeType::STRING_LITERAL;
+        nameLit->stringLiteralData.value = param->declParamData.name == nullptr ? "" : AtomTable::current->backwardAtoms[param->declParamData.name->symbolData.atomId];
+
+        auto fieldLit = new Node();
+        fieldLit->scope = node->scope;
+        fieldLit->type = NodeType::STRUCT_LITERAL;
+        fieldLit->structLiteralData.params = {wrapInValueParam(indexLit, "index"), wrapInValueParam(nameLit, "name")};
+
+        resolved->arrayLiteralData.elements.push_back(fieldLit);
+    }
+
+    semantic->resolveTypes(resolved);
+    node->resolved = resolved;
+    node->typeInfo = node->resolved->typeInfo;
+}
+
 void Semantic::resolveTypes(Node *node) {
     if (node == nullptr) { return; }
 
@@ -2023,6 +2159,9 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::SIZEOF: {
             resolveSizeof(this, node);
+        } break;
+        case NodeType::FIELDSOF: {
+            resolveFieldsof(this, node);
         } break;
         case NodeType::BOOLEAN_LITERAL: {
             resolveBooleanLiteral(this, node);

@@ -145,6 +145,9 @@ ostream &operator<<(ostream &os, NodeType type) {
         case NodeType::SIZEOF: {
             return os << "sizeof";
         }
+        case NodeType::FIELDSOF: {
+            return os << "fieldsof";
+        }
         case NodeType::ARRAY_INDEX: {
             return os << "array index";
         }
