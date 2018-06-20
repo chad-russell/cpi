@@ -73,6 +73,12 @@ fn print( T := typeof(t) )(t: T) {
     else if #iskind(T, i64) {
         printInt(t);
     }
+    else if #iskind(T, f32) {
+        print("<<some f32>>");
+    }
+    else if #iskind(T, f64) {
+        printInt("<<some f64>>");
+    }
     else if #iskind(T, bool) {
         if t {
             puts("true");
@@ -96,7 +102,7 @@ fn print( T := typeof(t) )(t: T) {
         }
     }
     else if #iskind(T, struct) {
-        fieldCount := cast(i64) #fieldsof(T).count;
+        fieldCount := #fieldsof(T).count;
 
         puts("{");
         #for it, i: #fieldsof(T) {
@@ -112,10 +118,10 @@ fn print( T := typeof(t) )(t: T) {
 
         puts("{");
         #for it, i: #fieldsof(T) {
-            if t.tag == cast(i32) i {
+            if t.tag == cast(i32) it.index {
                 print(it.name);
                 print(": ");
-                print(t[i]);
+                print(t[it.index]);
             }
         }
         puts("}");
@@ -144,9 +150,9 @@ fn assert(b: bool) {
 fn main() {
     type E enum {
         x: i32,
-        y: f32
+        y: bool
     }
-    e: E = { x: 12 };
+    e: E = { y: false };
 
     printMany({ 123, " and ", false, " ", []{1, 2, 3}, " -- ", {x: 3, y: &8767} , " ", e});
     puts("\n\n");

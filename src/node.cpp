@@ -182,7 +182,7 @@ Node *makeArrayType(Node *elementType) {
     auto ptrTy = new Node(NodeTypekind::POINTER);
     ptrTy->typeData.pointerTypeData.underlyingType = elementType;
 
-    auto countTy = new Node(NodeTypekind::I32);
+    auto countTy = new Node(NodeTypekind::I64);
 
     auto arrayType = new Node(NodeTypekind::STRUCT);
     arrayType->typeData.structTypeData.isSecretlyArray = true;

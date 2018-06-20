@@ -694,7 +694,7 @@ void resolveStringLiteral(Semantic *semantic, Node *node) {
     // countNode = 5
     auto countNode = new Node();
     countNode->type = NodeType::INT_LITERAL;
-    countNode->typeInfo = new Node(NodeTypekind::I32);
+    countNode->typeInfo = new Node(NodeTypekind::I64);
     countNode->intLiteralData.value = static_cast<int64_t>(node->stringLiteralData.value.size());
 
     // arrayLiteral = {&{'h', 'e', 'l', 'l', 'o'}, 5}
@@ -1383,6 +1383,14 @@ Node *findParam(Semantic *semantic, Node *node) {
     }
 
     node->dotData.resolved = foundParam;
+
+    if (foundParam != nullptr && resolve(node->dotData.lhs)->type == NodeType::STRUCT_LITERAL) {
+        assert(foundParam->type == NodeType::DECL_PARAM);
+        auto foundValue = resolve(node->dotData.lhs)->structLiteralData.params[foundParam->declParamData.index]->valueParamData.value;
+        node->resolved = foundValue;
+        node->dotData.resolved = foundValue;
+    }
+
     return foundParam;
 }
 
@@ -1455,6 +1463,13 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
         }
 
         auto foundParam = findParam(semantic, node);
+
+        if (node->resolved != nullptr) {
+            semantic->resolveTypes(node->resolved);
+            node->typeInfo = node->resolved->typeInfo;
+            return;
+        }
+
         semantic->resolveTypes(foundParam);
 
         if (foundParam == nullptr) {
@@ -1643,7 +1658,7 @@ void resolveArrayLiteral(Semantic *semantic, Node *node) {
 
     auto countNode = new Node(node->region.srcInfo, NodeType::INT_LITERAL, node->scope);
     countNode->intLiteralData.value = static_cast<int64_t>(elemsStruct->structLiteralData.params.size());
-    countNode->typeInfo = new Node(NodeTypekind::I32);
+    countNode->typeInfo = new Node(NodeTypekind::I64);
 
     node->arrayLiteralData.structLiteralRepresentation = new Node(node->region.srcInfo, NodeType::STRUCT_LITERAL, node->scope);
     node->arrayLiteralData.structLiteralRepresentation->structLiteralData.params.push_back(wrapInValueParam(castedHeapified, "data"));
@@ -1772,7 +1787,7 @@ void resolveFor(Semantic *semantic, Node *node) {
     // 0
     auto zero = new Node();
     zero->type = NodeType::INT_LITERAL;
-    zero->typeInfo = new Node(NodeTypekind::I32);
+    zero->typeInfo = new Node(NodeTypekind::I64);
     zero->intLiteralData.value = 0;
 
     // indexDecl: i64 = 0
@@ -1782,7 +1797,7 @@ void resolveFor(Semantic *semantic, Node *node) {
     if (node->forData.iterator_alias != nullptr) {
         indexDecl->region = node->forData.iterator_alias->region;
     }
-    indexDecl->declData.type = new Node(NodeTypekind::I32);
+    indexDecl->declData.type = new Node(NodeTypekind::I64);
     indexDecl->declData.lvalue = node->forData.iterator_alias;
     indexDecl->declData.initialValue = zero;
     semantic->addLocal(indexDecl);
@@ -1827,7 +1842,7 @@ void resolveFor(Semantic *semantic, Node *node) {
     // one
     auto one = new Node();
     one->type = NodeType::INT_LITERAL;
-    one->typeInfo = new Node(NodeTypekind::I32);
+    one->typeInfo = new Node(NodeTypekind::I64);
     one->intLiteralData.value = 1;
 
     // indexDecl + 1

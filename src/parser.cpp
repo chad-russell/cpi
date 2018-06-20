@@ -983,6 +983,7 @@ Node *Parser::parseIsKind() {
         || lexer->front.type == LexerTokenType::I32
         || lexer->front.type == LexerTokenType::I64
         || lexer->front.type == LexerTokenType::F32
+        || lexer->front.type == LexerTokenType::F64
         || lexer->front.type == LexerTokenType::BOOLEAN
         || lexer->front.type == LexerTokenType::FN
         || lexer->front.type == LexerTokenType::STRUCT

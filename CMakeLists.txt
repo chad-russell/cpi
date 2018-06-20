@@ -5,36 +5,37 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-include_directories(/usr/local/opt/llvm@5/include)
+include_directories(/usr/local/opt/llvm@6/include)
 
-set(CMAKE_CXX_FLAGS "-I/usr/local/Cellar/llvm/5.0.1/include -L/usr/local/Cellar/llvm/5.0.1/lib \
-    -lLLVMCore -lLLVMBinaryFormat -lLLVMSupport -lLLVMDemangle \
-    -lLLVMLTO -lLLVMPasses -lLLVMObjCARCOpts -lLLVMSymbolize -lLLVMDebugInfoPDB \
-    -lLLVMDebugInfoDWARF -lLLVMMIRParser -lLLVMCoverage -lLLVMTableGen -lLLVMDlltoolDriver \
-    -lLLVMOrcJIT -lLLVMXCoreDisassembler -lLLVMXCoreCodeGen -lLLVMXCoreDesc -lLLVMXCoreInfo \
-    -lLLVMXCoreAsmPrinter -lLLVMSystemZDisassembler -lLLVMSystemZCodeGen -lLLVMSystemZAsmParser \
-    -lLLVMSystemZDesc -lLLVMSystemZInfo -lLLVMSystemZAsmPrinter -lLLVMSparcDisassembler \
-    -lLLVMSparcCodeGen -lLLVMSparcAsmParser -lLLVMSparcDesc -lLLVMSparcInfo -lLLVMSparcAsmPrinter \
-    -lLLVMPowerPCDisassembler -lLLVMPowerPCCodeGen -lLLVMPowerPCAsmParser -lLLVMPowerPCDesc \
-    -lLLVMPowerPCInfo -lLLVMPowerPCAsmPrinter -lLLVMNVPTXCodeGen -lLLVMNVPTXDesc -lLLVMNVPTXInfo \
-    -lLLVMNVPTXAsmPrinter -lLLVMMSP430CodeGen -lLLVMMSP430Desc -lLLVMMSP430Info -lLLVMMSP430AsmPrinter \
-    -lLLVMMipsDisassembler -lLLVMMipsCodeGen -lLLVMMipsAsmParser -lLLVMMipsDesc -lLLVMMipsInfo \
-    -lLLVMMipsAsmPrinter -lLLVMLanaiDisassembler -lLLVMLanaiCodeGen -lLLVMLanaiAsmParser -lLLVMLanaiDesc \
-    -lLLVMLanaiAsmPrinter -lLLVMLanaiInfo -lLLVMHexagonDisassembler -lLLVMHexagonCodeGen \
-    -lLLVMHexagonAsmParser -lLLVMHexagonDesc -lLLVMHexagonInfo -lLLVMBPFDisassembler -lLLVMBPFCodeGen \
-    -lLLVMBPFDesc -lLLVMBPFInfo -lLLVMBPFAsmPrinter -lLLVMARMDisassembler -lLLVMARMCodeGen -lLLVMARMAsmParser \
-    -lLLVMARMDesc -lLLVMARMInfo -lLLVMARMAsmPrinter -lLLVMAMDGPUDisassembler -lLLVMAMDGPUCodeGen \
-    -lLLVMAMDGPUAsmParser -lLLVMAMDGPUDesc -lLLVMAMDGPUInfo -lLLVMAMDGPUAsmPrinter -lLLVMAMDGPUUtils \
-    -lLLVMAArch64Disassembler -lLLVMAArch64CodeGen -lLLVMAArch64AsmParser -lLLVMAArch64Desc -lLLVMAArch64Info \
-    -lLLVMAArch64AsmPrinter -lLLVMAArch64Utils -lLLVMObjectYAML -lLLVMLibDriver -lLLVMOption -lLLVMX86Disassembler \
-    -lLLVMX86AsmParser -lLLVMX86CodeGen -lLLVMGlobalISel -lLLVMSelectionDAG -lLLVMAsmPrinter -lLLVMDebugInfoCodeView \
-    -lLLVMDebugInfoMSF -lLLVMX86Desc -lLLVMMCDisassembler -lLLVMX86Info -lLLVMX86AsmPrinter -lLLVMX86Utils \
-    -lLLVMMCJIT -lLLVMLineEditor -lLLVMInterpreter -lLLVMExecutionEngine -lLLVMRuntimeDyld -lLLVMCodeGen \
-    -lLLVMTarget -lLLVMCoroutines -lLLVMipo -lLLVMInstrumentation -lLLVMVectorize -lLLVMScalarOpts \
-    -lLLVMLinker -lLLVMIRReader -lLLVMAsmParser -lLLVMInstCombine -lLLVMTransformUtils -lLLVMBitWriter \
-    -lLLVMAnalysis -lLLVMProfileData -lLLVMObject -lLLVMMCParser -lLLVMMC -lLLVMBitReader -lLLVMCore \
-    -lLLVMBinaryFormat -lLLVMSupport -lLLVMDemangle -lcurses -lz -lm \
-    -std=c++14")
+execute_process(
+        COMMAND
+        "/usr/local/opt/llvm@6/bin/llvm-config"
+        --cxxflags
+        OUTPUT_VARIABLE LLVM_CXXFLAGS
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+execute_process(
+        COMMAND
+        "/usr/local/opt/llvm@6/bin/llvm-config"
+        --ldflags
+        OUTPUT_VARIABLE LLVM_LDFLAGS
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+execute_process(
+        COMMAND
+        "/usr/local/opt/llvm@6/bin/llvm-config"
+        --system-libs
+        OUTPUT_VARIABLE LLVM_SYSTEMLIBS
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+execute_process(
+        COMMAND
+        "/usr/local/opt/llvm@6/bin/llvm-config"
+        --libs
+        OUTPUT_VARIABLE LLVM_LIBS
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+set(CMAKE_CXX_FLAGS "${LLVM_CXXFLAGS} ${LLVM_LDFLAGS} ${LLVM_SYSTEMLIBS} ${LLVM_LIBS}")
 
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
