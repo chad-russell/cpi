@@ -942,16 +942,6 @@ void BytecodeGen::gen(Node *node) {
             append(node->bytecode, Instruction::RELCONSTI64);
             append(node->bytecode, toBytes32(node->localOffset));
         } break;
-<<<<<<< Updated upstream
-=======
-        case NodeType::TYPEINFO: {
-            gen(node->resolved);
-
-            if (node->resolved->isLocal || node->resolved->isBytecodeLocal) {
-                storeValue(node->resolved, node->resolved->localOffset);
-            }
-        } break;
->>>>>>> Stashed changes
         case NodeType::PUTS: {
             gen(node->nodeData);
 
@@ -1102,7 +1092,7 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
                 tagValue->type = NodeType::INT_LITERAL;
                 // todo(chad): allow the user to specify the size of the tag (or maybe do it automatically?)
                 // todo(chad): maybe do this sooner - like in semantic back when we recognize this case?
-                tagValue->typeInfo = new Node(NodeTypekind::I32);
+                tagValue->typeInfo = new Node(NodeTypekind::I64);
                 tagValue->intLiteralData.value = tagIndex;
 
                 assert(value->type == NodeType::VALUE_PARAM);
@@ -1111,7 +1101,7 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
                 gen(value->valueParamData.value);
 
                 storeValue(tagValue, offset);
-                storeValue(value->valueParamData.value, offset + 4);
+                storeValue(value->valueParamData.value, offset + 8);
             }
             else {
                 auto sizeSoFar = 0;

@@ -1355,7 +1355,6 @@ void LlvmGen::gen(Node *node) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
         } break;
-<<<<<<< Updated upstream
         case NodeType::FIELDSOF: {
             assert(node->resolved);
             gen(node->resolved);
@@ -1364,11 +1363,6 @@ void LlvmGen::gen(Node *node) {
             if (node->isLocal) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
-=======
-        case NodeType::TYPEINFO: {
-            assert(node->resolved);
-            gen(node->resolved);
->>>>>>> Stashed changes
         } break;
         default: assert(false);
     }

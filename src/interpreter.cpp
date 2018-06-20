@@ -267,8 +267,17 @@ void interpretStore(Interpreter *interp) {
 
     memcpy(&interp->stack[storeOffset], &interp->stack[readOffset], static_cast<size_t>(size));
 
-//    auto debugValue = *((int64_t *) (&interp->stack[storeOffset]));
-//    cout << "stored " << debugValue << " to " << storeOffset << " (from " << readOffset << ")" << endl;
+//    if (size == 4) {
+//        auto debugValue = *((int32_t *) (&interp->stack[storeOffset]));
+//        cout << "stored " << debugValue << " to " << storeOffset << " (from " << readOffset << ")" << endl;
+//    }
+//    else if (size == 8) {
+//        auto debugValue = *((int64_t *) (&interp->stack[storeOffset]));
+//        cout << "stored " << debugValue << " to " << storeOffset << " (from " << readOffset << ")" << endl;
+//    }
+//    else {
+//        cout << "stored something";
+//    }
 }
 
 void interpretStoreConst(Interpreter *interp) {

@@ -125,7 +125,7 @@ fn main() {
     testUnion1();
     testBuffer();
     testDefault();
-    -- testAnySimple1();
+    testAnySimple1();
 
     return 0;
 }
@@ -151,16 +151,16 @@ fn testUnion1() {
     a.x = x;
 
     assert(a.x.f == 18);
-    -- assert(a.tag == 1);
+    assert(a.tag == 1);
 
     a.y = y;
-    -- assert(a.tag == 2);
+    assert(a.tag == 2);
 
     a.x.f = 13;
-    -- assert(a.tag == 1);
+    assert(a.tag == 1);
 
     a.y.b2 = 18;
-    -- assert(a.tag == 2);
+    assert(a.tag == 2);
 }
 
 fn testFor1() {
