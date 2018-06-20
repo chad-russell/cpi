@@ -905,7 +905,7 @@ Node *Parser::parseArrayLiteral() {
 }
 
 Node *Parser::parseRun() {
-    Node *node = new Node(lexer->srcInfo, NodeType::RUN, scopes.top());
+    auto node = new Node(lexer->srcInfo, NodeType::RUN, scopes.top());
     node->region.start = lexer->front.region.start;
     popFront();
 
@@ -1083,10 +1083,6 @@ Node *Parser::parseLvalueOrLiteral() {
         return parseSizeof();
     }
 
-    if (lexer->front.type == LexerTokenType::FIELDSOF) {
-        return parseFieldsof();
-    }
-
     if (lexer->front.type == LexerTokenType::MALLOC) {
         return parseMalloc();
     }
@@ -1154,6 +1150,8 @@ Node *Parser::parseLvalueOrLiteral() {
         popFront();
     } else if (lexer->front.type == LexerTokenType::LSQUARE) {
         symbol = parseArrayLiteral();
+    } else if (lexer->front.type == LexerTokenType::FIELDSOF) {
+        symbol = parseFieldsof();
     } else {
         symbol = parseSymbol();
     }

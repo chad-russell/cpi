@@ -182,27 +182,23 @@ void BytecodeGen::gen(Node *node) {
         } break;
         case NodeType::INT_LITERAL: {
             switch (node->typeInfo->typeData.kind) {
-                case NodeTypekind::I32: {
-                    append(node->bytecode, Instruction::CONSTI32);
-                    auto litData = static_cast<int32_t>(node->intLiteralData.value);
-                    append(node->bytecode, toBytes(litData));
-                }
-                    break;
                 case NodeTypekind::I8: {
                     append(node->bytecode, Instruction::CONSTI8);
                     auto litData = static_cast<int8_t>(node->intLiteralData.value);
                     append(node->bytecode, toBytes(litData));
-                }
-                    break;
+                } break;
+                case NodeTypekind::I32: {
+                    append(node->bytecode, Instruction::CONSTI32);
+                    auto litData = static_cast<int32_t>(node->intLiteralData.value);
+                    append(node->bytecode, toBytes(litData));
+                } break;
                 case NodeTypekind::INT_LITERAL:
                 case NodeTypekind::I64: {
                     append(node->bytecode, Instruction::CONSTI64);
                     auto litData = node->intLiteralData.value;
                     append(node->bytecode, toBytes(litData));
-                }
-                    break;
-                default:
-                    assert(false);
+                } break;
+                default: assert(false);
             }
         } break;
         case NodeType::SIZEOF: {
@@ -655,8 +651,8 @@ void BytecodeGen::gen(Node *node) {
             gen(node->nodeData);
 
             if (hasNoLocalByDefault(node->nodeData)) {
-                auto constOffset = node->nodeData->localOffset;
-                storeValue(node->nodeData, constOffset);
+                assert(node->nodeData->isLocal);
+                storeValue(node->nodeData, node->nodeData->localOffset);
             }
 
             append(node->bytecode, Instruction::RELCONSTI32);
@@ -678,7 +674,9 @@ void BytecodeGen::gen(Node *node) {
             auto offsetWords = foundParam->localOffset;
 
             gen(node->dotData.lhs);
+
             if (hasNoLocalByDefault(node->dotData.lhs)) {
+                assert(node->dotData.lhs->isLocal);
                 storeValue(node->dotData.lhs, node->dotData.lhs->localOffset);
             }
 

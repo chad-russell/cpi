@@ -433,7 +433,7 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
     }
 
     auto savedFnDecl = semantic->currentFnDecl;
-    semantic->currentFnDecl = data;
+    semantic->currentFnDecl = node;
 
     data->tableIndex = fnTableId;
     fnTableId += 1;
@@ -483,7 +483,7 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
 
     node->typeInfo->typeData.fnTypeData.returnType = data->returnType;
 
-    semantic->currentFnDecl->stackSize += typeSize(data->returnType);
+    semantic->currentFnDecl->fnDeclData.stackSize += typeSize(data->returnType);
 
     for (auto ret : data->returns) {
         semantic->resolveTypes(ret);
@@ -534,11 +534,11 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
         auto resolvedLocal = resolve(local);
         if (resolvedLocal != local && resolvedLocal->isLocal) { continue; }
 
-        local->localOffset = semantic->currentFnDecl->stackSize;
+        local->localOffset = semantic->currentFnDecl->fnDeclData.stackSize;
 
         // todo(chad): DANGEROUS!!! But I don't know of a better way to deal with the fact that we can have non-typechecked things because of static if, etc.
         if (local->typeInfo != nullptr) {
-            semantic->currentFnDecl->stackSize += typeSize(local->typeInfo);
+            semantic->currentFnDecl->fnDeclData.stackSize += typeSize(local->typeInfo);
             localIndex += 1;
         }
     }
@@ -602,7 +602,9 @@ void resolveArrayIndex(Semantic *semantic, Node *node) {
         auto resolvedIndexValue = resolve(node->arrayIndexData.indexValue);
 
         // todo(chad): bounds checking
-        // todo(chad): assert it's an int literal
+
+        auto oldTypeInfo = resolvedIndexValue->typeInfo;
+        auto oldResolved = resolvedIndexValue->resolved;
 
         auto rewrittenDot = new Node();
         rewrittenDot->scope = node->scope;
@@ -612,9 +614,8 @@ void resolveArrayIndex(Semantic *semantic, Node *node) {
         semantic->resolveTypes(rewrittenDot);
 
         // @HACK - this value sometimes gets re-assigned even when it's an int_literal... sigh...
-        if (resolvedIndexValue->type == NodeType::INT_LITERAL && resolvedIndexValue->resolved != nullptr) {
-            resolvedIndexValue->resolved = nullptr;
-        }
+        resolvedIndexValue->typeInfo = oldTypeInfo;
+        resolvedIndexValue->resolved = oldResolved;
 
         node->resolved = rewrittenDot;
         node->typeInfo = rewrittenDot->typeInfo;
@@ -725,11 +726,11 @@ void resolveSymbol(Semantic *semantic, Node *node) {
         return;
     }
 
-    assert(node->resolved->type == NodeType::DECL
-           || node->resolved->type == NodeType::FN_DECL
-           || node->resolved->type == NodeType::DECL_PARAM
-           || node->resolved->type == NodeType::INT_LITERAL
-           || node->resolved->type == NodeType::TYPE);
+//    assert(node->resolved->type == NodeType::DECL
+//           || node->resolved->type == NodeType::FN_DECL
+//           || node->resolved->type == NodeType::DECL_PARAM
+//           || node->resolved->type == NodeType::INT_LITERAL
+//           || node->resolved->type == NodeType::TYPE);
 
     semantic->resolveTypes(node->resolved);
     node->typeInfo = node->resolved->typeInfo;
@@ -1028,6 +1029,7 @@ Node *Semantic::deepCopy(Node *node, Scope *scope) {
     copyingParser->isCopying = true;
     copyingParser->scopes.pop();
     copyingParser->scopes.push(scope);
+    copyingParser->currentFnDecl = currentFnDecl;
     return copyingParser->parseScopedStmt();
 }
 
@@ -1349,9 +1351,7 @@ Node *findParam(Semantic *semantic, Node *node) {
     }
     auto structData = typeData->structTypeData;
 
-    assert(node->dotData.rhs->type == NodeType::SYMBOL
-//           || node->dotData.rhs->type == NodeType::DECL_PARAM
-           || node->dotData.rhs->type == NodeType::INT_LITERAL);
+    assert(node->dotData.rhs->type == NodeType::SYMBOL || node->dotData.rhs->type == NodeType::INT_LITERAL);
 
     Node *foundParam = nullptr;
     if (node->dotData.rhs->type == NodeType::INT_LITERAL) {
@@ -1688,14 +1688,14 @@ void resolveStaticFor(Semantic *semantic, Node *node) {
             intLiteral->typeInfo = new Node(NodeTypekind::I64);
             intLiteral->intLiteralData.value = staticIdx;
 
-            auto tagDot = new Node();
-            tagDot->scope = resolvedTarget->scope;
-            tagDot->type = NodeType::DOT;
-            tagDot->dotData.lhs = resolvedTarget;
-            tagDot->dotData.rhs = intLiteral;
-            semantic->resolveTypes(tagDot);
+            auto elemDot = new Node();
+            elemDot->scope = resolvedTarget->scope;
+            elemDot->type = NodeType::DOT;
+            elemDot->dotData.lhs = resolvedTarget;
+            elemDot->dotData.rhs = intLiteral;
+            semantic->resolveTypes(elemDot);
 
-            staticElements.push_back(tagDot);
+            staticElements.push_back(elemDot);
         }
     }
     else {
@@ -1708,15 +1708,7 @@ void resolveStaticFor(Semantic *semantic, Node *node) {
         // todo(chad): test scopes here
 
         // new declaration for elem
-        auto elementDecl = new Node();
-        elementDecl->type = NodeType::DECL;
-        elementDecl->scope = node->scope;
-        elementDecl->region = node->forData.element_alias->region;
-        elementDecl->declData.lvalue = node->forData.element_alias;
-        elementDecl->declData.initialValue = staticElem;
-        semantic->addLocal(elementDecl);
-        semantic->resolveTypes(elementDecl);
-        node->scope->symbols.insert({node->forData.element_alias->symbolData.atomId, elementDecl});
+        node->scope->symbols.insert({node->forData.element_alias->symbolData.atomId, staticElem});
 
         Node *indexLiteral = nullptr;
         if (node->forData.iterator_alias != nullptr) {
@@ -1891,8 +1883,11 @@ void resolveTagCheck(Semantic *semantic, Node *node) {
     if (node->tagCheck) { return; }
     node->tagCheck = true;
 
-    if (node->nodeData->type != NodeType::DOT) {
-        semantic->reportError({node, node->nodeData}, Error{
+    semantic->resolveTypes(node->nodeData);
+    auto resolvedNode = resolve(node->nodeData);
+
+    if (resolvedNode->type != NodeType::DOT) {
+        semantic->reportError({node, resolvedNode}, Error{
                 node->region,
                 "Expected dot for tagcheck"
         });
@@ -1901,7 +1896,7 @@ void resolveTagCheck(Semantic *semantic, Node *node) {
 
     semantic->resolveTypes(node->nodeData);
 
-    auto resolvedType = resolve(node->nodeData->dotData.lhs->typeInfo);
+    auto resolvedType = resolve(resolvedNode->dotData.lhs->typeInfo);
     while (resolvedType->typeData.kind == NodeTypekind::POINTER) {
         resolvedType = resolve(resolvedType->typeData.pointerTypeData.underlyingType);
     }
@@ -1914,18 +1909,18 @@ void resolveTagCheck(Semantic *semantic, Node *node) {
         });
     }
 
-    auto resolved = node->nodeData->dotData.resolved;
+    auto resolved = resolvedNode->dotData.resolved;
     assert(resolved->type == NodeType::DECL_PARAM);
 
     // eqeq
-    auto typeData = resolve(node->nodeData->dotData.lhs->typeInfo)->typeData;
+    auto typeData = resolve(resolvedNode->dotData.lhs->typeInfo)->typeData;
     while (typeData.kind == NodeTypekind::POINTER) {
         typeData = resolve(typeData.pointerTypeData.underlyingType)->typeData;
     }
 
     // the resolved parameter is the 0th parameter of the type data
     auto param0 = new Node();
-    param0->scope = node->nodeData->dotData.lhs->scope;
+    param0->scope = resolvedNode->dotData.lhs->scope;
     param0->type = NodeType::SYMBOL;
     param0->symbolData.atomId = AtomTable::current->insertStr("tag");
     param0->resolved = typeData.structTypeData.params[0];
@@ -1935,7 +1930,7 @@ void resolveTagCheck(Semantic *semantic, Node *node) {
     auto tagDot = new Node();
     tagDot->scope = node->scope;
     tagDot->type = NodeType::DOT;
-    tagDot->dotData.lhs = node->nodeData->dotData.lhs;
+    tagDot->dotData.lhs = resolvedNode->dotData.lhs;
     tagDot->dotData.rhs = param0;
     semantic->resolveTypes(tagDot);
 
@@ -2323,6 +2318,6 @@ void Semantic::addLocal(Node *local) {
     local->isLocal = true;
 
     if (currentFnDecl) {
-        currentFnDecl->locals.push_back(local);
+        currentFnDecl->fnDeclData.locals.push_back(local);
     }
 }

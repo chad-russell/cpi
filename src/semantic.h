@@ -7,7 +7,7 @@ class Semantic {
 public:
     bool encounteredErrors;
     bool lvalueAssignmentContext = false;
-    FnDeclData *currentFnDecl = nullptr;
+    Node *currentFnDecl = nullptr;
 
     Lexer *lexer;
 

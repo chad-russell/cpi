@@ -290,6 +290,7 @@ llvm::DIType *diTypeFor(LlvmGen *gen, Node *type) {
             return gen->dBuilder->createBasicType("i32", 32, llvm::dwarf::DW_ATE_signed);
         case NodeTypekind::I8:
             return gen->dBuilder->createBasicType("i8", 8, llvm::dwarf::DW_ATE_signed);
+        case NodeTypekind::BOOLEAN_LITERAL:
         case NodeTypekind::BOOLEAN:
             return gen->dBuilder->createBasicType("bool", 1, llvm::dwarf::DW_ATE_signed);
         case NodeTypekind::FLOAT_LITERAL:
@@ -484,6 +485,9 @@ void LlvmGen::gen(Node *node) {
                 auto resolvedLocal = resolve(local);
                 if (resolvedLocal != local && resolvedLocal->isLocal) { continue; }
 
+                // todo(chad): DANGEROUS!!! But I don't know of a better way to deal with the fact that we can have non-typechecked things because of static if, etc.
+                if (resolvedLocal->typeInfo == nullptr) { continue; }
+
                 Node *nodeTypeToAlloca = nullptr;
                 auto resolvedTypeInfo = resolve(resolvedLocal->typeInfo);
                 if (resolvedTypeInfo->type == NodeType::TYPE) {
@@ -535,6 +539,8 @@ void LlvmGen::gen(Node *node) {
 
                         resolvedLocal->llvmLocal = builder.CreateAlloca(typeToAlloca, nullptr, oss.str());
                     }
+
+                    local->llvmLocal = resolvedLocal->llvmLocal;
                 }
             }
 
@@ -544,7 +550,6 @@ void LlvmGen::gen(Node *node) {
                 gen(stmt);
             }
             if (!didTerminate) {
-//                builder.CreateRetVoid();
                 builder.CreateRet(llvm::ConstantStruct::get(llvm::StructType::get(context, {}), {}));
             }
 
@@ -651,9 +656,20 @@ void LlvmGen::gen(Node *node) {
             if (!node->fnCallData.hasRuntimeParams) { break; }
 
             vector<llvm::Value *> args;
+            auto argIdx = 0;
             for (auto param : node->fnCallData.params) {
                 gen(param);
-                args.push_back(rvalueFor(param->valueParamData.value));
+
+                auto passedParamType = rvalueFor(param->valueParamData.value)->getType();
+                auto declParamType = typeFor(resolve(resolve(node->fnCallData.fn)->typeInfo->typeData.fnTypeData.params[argIdx]->typeInfo));
+
+                // todo(chad): @Hack there doesn't seem to be another way to cast things...
+                auto realParam = builder.CreateAlloca(declParamType, nullptr, "realParam");
+                builder.CreateStore(rvalueFor(param->valueParamData.value), builder.CreateBitCast(realParam, passedParamType->getPointerTo(0)));
+
+                args.push_back(builder.CreateLoad(realParam));
+
+                argIdx += 1;
             }
 
             auto resolvedFn = resolve(node->fnCallData.fn);
@@ -826,6 +842,9 @@ void LlvmGen::gen(Node *node) {
                             case LexerTokenType::LT: {
                                 value = builder.CreateICmpSLT(lhsValue, rhsValue);
                             } break;
+                            case LexerTokenType::GT: {
+                                value = builder.CreateICmpSGT(lhsValue, rhsValue);
+                            } break;
                             case LexerTokenType::GE: {
                                 value = builder.CreateICmpSGE(lhsValue, rhsValue);
                             } break;
@@ -958,13 +977,10 @@ void LlvmGen::gen(Node *node) {
             auto foundParam = node->dotData.resolved;
 
             uint32_t paramIndex;
-            int64_t tag = 0;
             if (foundParam->type == NodeType::DECL_PARAM) {
                 paramIndex = static_cast<uint32_t>(foundParam->declParamData.index);
-                tag = foundParam->declParamData.name->symbolData.atomId;
             } else if (foundParam->type == NodeType::VALUE_PARAM) {
                 paramIndex = static_cast<uint32_t>(foundParam->valueParamData.index);
-                tag = foundParam->declParamData.name->symbolData.atomId;
             } else {
                 assert(false);
             }
@@ -978,6 +994,14 @@ void LlvmGen::gen(Node *node) {
             auto isSecretlyEnum = false;
             if (resolvedTypeInfo->typeData.structTypeData.isSecretlyEnum) {
                 isSecretlyEnum = true;
+
+                int64_t tag = 0;
+                if (foundParam->type == NodeType::DECL_PARAM) {
+                    tag = foundParam->declParamData.name->symbolData.atomId;
+                } else if (foundParam->type == NodeType::VALUE_PARAM) {
+                    tag = foundParam->declParamData.name->symbolData.atomId;
+                }
+
                 paramIndex = tag == tagAtom ? 0 : 1;
             }
 
@@ -1187,6 +1211,10 @@ void LlvmGen::gen(Node *node) {
 
             node->llvmData = node->arrayLiteralData.structLiteralRepresentation->llvmData;
             node->llvmLocal = node->arrayLiteralData.structLiteralRepresentation->llvmLocal;
+
+            if (node->isLocal) {
+                store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
+            }
         } break;
         case NodeType::CAST: {
             gen(node->castData.value);
@@ -1204,32 +1232,31 @@ void LlvmGen::gen(Node *node) {
             }
             else if ((fromType->typeData.kind == NodeTypekind::INT_LITERAL || fromType->typeData.kind == NodeTypekind::F32)
                      && toType->typeData.kind == NodeTypekind::F64) {
-                node->llvmData = builder.CreateFPCast(static_cast<llvm::Value *>(node->castData.value->llvmData), builder.getDoubleTy());
+                node->llvmData = builder.CreateFPCast(rvalueFor(node->castData.value), builder.getDoubleTy());
             }
             else if ((fromType->typeData.kind == NodeTypekind::INT_LITERAL || fromType->typeData.kind == NodeTypekind::F64)
                      && toType->typeData.kind == NodeTypekind::F32) {
                 // todo(chad): warn about losing information here
-                node->llvmData = builder.CreateFPCast(static_cast<llvm::Value *>(node->castData.value->llvmData), builder.getFloatTy());
+                node->llvmData = builder.CreateFPCast(rvalueFor(node->castData.value), builder.getFloatTy());
             }
             else if ((fromType->typeData.kind == NodeTypekind::INT_LITERAL || fromType->typeData.kind == NodeTypekind::I32)
                      && toType->typeData.kind == NodeTypekind::I64) {
-                node->llvmData = builder.CreateIntCast(static_cast<llvm::Value *>(node->castData.value->llvmData), builder.getInt64Ty(), true);
+                node->llvmData = builder.CreateIntCast(rvalueFor(node->castData.value), builder.getInt64Ty(), true);
             }
             else if ((fromType->typeData.kind == NodeTypekind::INT_LITERAL || fromType->typeData.kind == NodeTypekind::I32)
                      && toType->typeData.kind == NodeTypekind::I32) {
                 // todo(chad): warn about losing information here
-                node->llvmData = builder.CreateIntCast(static_cast<llvm::Value *>(node->castData.value->llvmData), builder.getInt32Ty(), true);
+                node->llvmData = builder.CreateIntCast(rvalueFor(node->castData.value), builder.getInt32Ty(), true);
+            }
+            else if (fromType->typeData.kind == NodeTypekind::POINTER && toType->typeData.kind == NodeTypekind::I64) {
+                // ptr to int
+                node->llvmData = builder.CreatePtrToInt(rvalueFor(node->castData.value), typeFor(node->castData.type));
             }
             else {
                 node->llvmData = (llvm::Value *) node->castData.value->llvmData;
                 if (node->llvmData && resolve(node->castData.type)->typeData.kind == NodeTypekind::POINTER) {
                     node->llvmData = builder.CreateBitCast(rvalueFor(node->castData.value), typeFor(node->castData.type));
                 }
-
-//                node->llvmLocal = (llvm::Value *) node->castData.value->llvmLocal;
-//                if (node->llvmLocal && resolve(node->castData.type)->typeData.kind == NodeTypekind::POINTER) {
-//                    node->llvmLocal = builder.CreateBitCast((llvm::Value *) node->llvmLocal, typeFor(node->castData.type)->getPointerTo(0));
-//                }
 
                 if (node->llvmLocal) {
                     store(rvalueFor(node->castData.value), (llvm::Value *) node->llvmLocal);
@@ -1285,8 +1312,15 @@ void LlvmGen::gen(Node *node) {
             node->llvmData = llvm::ConstantInt::get(builder.getInt64Ty(), sizeInBytes);
         } break;
         case NodeType::FOR: {
-            for (auto n : node->forData.rewritten) {
-                gen(n);
+            if (node->forData.isStatic) {
+                for (auto n : node->forData.staticStmts) {
+                    gen(n);
+                }
+            }
+            else {
+                for (auto n : node->forData.rewritten) {
+                    gen(n);
+                }
             }
         } break;
         case NodeType::HEAPIFY: {
@@ -1315,7 +1349,17 @@ void LlvmGen::gen(Node *node) {
             auto formatStr = builder.CreateGlobalStringPtr("%.*s", "printfFmtStr");
             builder.CreateCall(printfFunc, { formatStr, count, firstChar });
         } break;
+        case NodeType::ISKIND:
         case NodeType::TAGCHECK: {
+            assert(node->resolved);
+            gen(node->resolved);
+
+            node->llvmData = node->resolved->llvmData;
+            if (node->isLocal) {
+                store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
+            }
+        } break;
+        case NodeType::FIELDSOF: {
             assert(node->resolved);
             gen(node->resolved);
 

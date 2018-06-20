@@ -49,5 +49,6 @@ TODO:
             access to special syntax, we can just have less special syntax
 
     - varargs
+        - fn print(args: ...) { }
         - e.g. `print("here is a value: ", 3, " and here is another one: ", {x: 13, y: &67}, ". That is all! :)");`
         - implementation -- just pack them all into a struct
