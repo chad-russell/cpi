@@ -125,7 +125,7 @@ fn main() {
     testUnion1();
     testBuffer();
     testDefault();
-    testAnySimple1();
+    -- testAnySimple1();
 
     return 0;
 }
@@ -151,16 +151,16 @@ fn testUnion1() {
     a.x = x;
 
     assert(a.x.f == 18);
-    assert(a.tag == 1);
+    -- assert(a.tag == 1);
 
     a.y = y;
-    assert(a.tag == 2);
+    -- assert(a.tag == 2);
 
     a.x.f = 13;
-    assert(a.tag == 1);
+    -- assert(a.tag == 1);
 
     a.y.b2 = 18;
-    assert(a.tag == 2);
+    -- assert(a.tag == 2);
 }
 
 fn testFor1() {
@@ -194,7 +194,7 @@ fn testFor3() {
 }
 
 fn testFor4() {
-    isum : i32 = 0;
+    isum := 0;
     for e, i: []{1, 1, 1, 1999, 1} {
         isum = isum + i;
     }
@@ -316,9 +316,7 @@ fn testArray5() {
 }
 
 fn assert(b: bool) {
-    if (b == false) {
-        panic();
-    }
+    if (b == false) { panic(); }
 }
 
 fn apply_static(f: Ast)(t: i32) {
@@ -855,4 +853,162 @@ fn testAnySimple1() {
 
     assert(a._type.STRUCT.params[0]._type.tag == 3);
     assert(a._type.STRUCT.params[0].name[3] == "duck"[3]);
+}
+
+fn putchar(c: i8) {
+    s := ".";
+    s[0] = c;
+    puts(s);
+}
+
+fn mod( T := typeof(x) )(x: T, y: T) {
+    return x - (x / y) * y;
+}
+
+fn printInt( T := typeof(t) )(t: T) {
+    base := 10;
+    table := []{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"};
+
+    b: []i8;
+    b.data = cast(*i8) malloc(20 * sizeof(i8));
+
+    n := t;
+    idx : i32 = 0;
+
+    while n > base {
+        m := mod(n, base);
+        n = n / base;
+        b[idx] = table[m][0];
+        idx = idx + 1;
+    }
+
+    m := mod(n, base);
+    n = n / base;
+    b[idx] = table[m][0];
+
+    while idx >= 0 {
+        putchar(b[idx]);
+        idx = idx - 1;
+    }
+}
+
+fn printHex( T := typeof(t) )(t: T) {
+    base := 16;
+    table := []{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"};
+
+    b: []i8;
+    b.data = cast(*i8) malloc(20 * sizeof(i8));
+
+    n := t;
+    idx : i32 = 0;
+
+    while n > base {
+        m := mod(n, base);
+        n = n / base;
+        b[idx] = table[m][0];
+        idx = idx + 1;
+    }
+
+    m := mod(n, base);
+    n = n / base;
+    b[idx] = table[m][0];
+
+    puts("0x");
+    while idx >= 0 {
+        putchar(b[idx]);
+        idx = idx - 1;
+    }
+}
+
+fn print( T := typeof(t) )(t: T) {
+    if #iskind(T, i8) {
+        printInt(t);
+    }
+    else if #iskind(T, i32) {
+        printInt(t);
+    }
+    else if #iskind(T, i64) {
+        printInt(t);
+    }
+    else if #iskind(T, f32) {
+        print("<<some f32>>");
+    }
+    else if #iskind(T, f64) {
+        printInt("<<some f64>>");
+    }
+    else if #iskind(T, bool) {
+        if t {
+            puts("true");
+        }
+        else {
+            puts("false");
+        }
+    }
+    else if #iskind(T, []) {
+        -- could be a string, or something else
+        if #iskind(typeof(t[0]), i8) {
+            puts(t);
+        }
+        else {
+            puts("[]{");
+            for it, i: t {
+                print(it);
+                if i < t.count - 1 { puts(", "); }
+            }
+            puts("}");
+        }
+    }
+    else if #iskind(T, struct) {
+        fieldCount := #fieldsof(T).count;
+
+        puts("{");
+        #for it, i: #fieldsof(T) {
+            print(it.name);
+            print(": ");
+            print(t[i]);
+            if i < fieldCount - 1 { puts(", "); }
+        }
+        puts("}");
+    }
+    else if #iskind(T, enum) {
+        fieldCount2 := cast(i64) #fieldsof(T).count;
+
+        puts("{");
+        #for it, i: #fieldsof(T) {
+            if t.tag == it.index {
+                print(it.name);
+                print(": ");
+                print(t[it.index]);
+            }
+        }
+        puts("}");
+    }
+    else if #iskind(T, *) {
+        puts("*(");
+        printHex(cast(i64) t);
+        puts(")");
+    }
+}
+
+fn printMany( T := typeof(t) )(t: T) {
+    #for it: t {
+        print(it);
+    }
+}
+
+fn printWithSeparator( sep: []i8, T := typeof(t) )(t: T) {
+    fieldCount := #fieldsof(T).count;
+
+    #for it, i: t {
+        print(it);
+        if i < fieldCount - 1 { print(sep); }
+    }
+}
+
+fn printWithSpaces( T := typeof(t) )(t: T) {
+    printWithSeparator!(" ")(t);
+}
+
+fn println(s: []i8) {
+    puts(s); puts("\n");
 }

@@ -253,7 +253,7 @@ ostream &operator<<(ostream &os, TypeData td) {
 }
 
 ostream &operator<<(ostream &os, Node *node) {
-    if (node->printed) { return os; }
+    if (node->printed && node->type != NodeType::SYMBOL) { return os; }
 
     node->printed = true;
 
@@ -329,13 +329,13 @@ ostream &operator<<(ostream &os, Node *node) {
             cout << "nil";
         } break;
         case NodeType::ARRAY_LITERAL: {
-//            cout << "[]" << node->arrayLiteralData.elementType << "{";
-//            for (auto e : node->arrayLiteralData.elements) {
-//                cout << e << ", ";
-//            }
-//            cout << "}";
+            cout << "[]" << node->arrayLiteralData.elementType << "{";
+            for (auto e : node->arrayLiteralData.elements) {
+                cout << e << ", ";
+            }
+            cout << "}";
 
-             cout << node->arrayLiteralData.structLiteralRepresentation;
+//             cout << node->arrayLiteralData.structLiteralRepresentation;
         } break;
         case NodeType::RET: {
             cout << "return " << node->retData.value << ";" << endl;

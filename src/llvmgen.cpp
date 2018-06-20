@@ -205,7 +205,7 @@ llvm::Type *LlvmGen::typeFor(Node *node) {
             if (node->typeData.structTypeData.isSecretlyArray) {
                 vector<llvm::Type *> elementTypes;
                 elementTypes.push_back(typeFor(node->typeData.structTypeData.secretArrayElementType)->getPointerTo(0));
-                elementTypes.push_back(builder.getInt32Ty());
+                elementTypes.push_back(builder.getInt64Ty());
 
                 return llvm::StructType::get(context, elementTypes);
             }
@@ -214,7 +214,7 @@ llvm::Type *LlvmGen::typeFor(Node *node) {
                 vector<llvm::Type *> elementTypes;
 
                 // tag
-                elementTypes.push_back(builder.getInt32Ty());
+                elementTypes.push_back(builder.getInt64Ty());
 
                 // value size
                 uint64_t dataSizeInBytes = 0;
@@ -332,7 +332,7 @@ llvm::DIType *diTypeFor(LlvmGen *gen, Node *type) {
                     string name;
 
                     if (i == 0) {
-                        basicType = gen->dBuilder->createBasicType("i32", 32, llvm::dwarf::DW_ATE_signed);
+                        basicType = gen->dBuilder->createBasicType("i64", 64, llvm::dwarf::DW_ATE_signed);
                         name = "tag";
                     }
                     else {
@@ -618,10 +618,6 @@ void LlvmGen::gen(Node *node) {
 
             if (data.initialValue == nullptr) {
                 assert(node->llvmLocal);
-
-//                auto zeroArrayType = llvm::ArrayType::get(builder.getInt8Ty(), 20);
-//                auto st = llvm::StructType::get(builder.getInt32Ty(), zeroArrayType);
-//                store(llvm::ConstantStruct::get(st), (llvm::Value *) node->llvmLocal);
 
                 // memset the local to zero
                 auto sizeInBytes = module->getDataLayout().getTypeSizeInBits(typeFor(data.type)) / 8;
@@ -1145,11 +1141,11 @@ void LlvmGen::gen(Node *node) {
                 auto paramValue = rvalueFor(value->valueParamData.value);
 
                 auto structType = llvm::StructType::get(builder.getContext(),
-                                                        { builder.getInt32Ty(), paramValue->getType() },
+                                                        { builder.getInt64Ty(), paramValue->getType() },
                                                         true);
                 auto blankSlate = (llvm::Value *) llvm::ConstantStruct::get(structType);
 
-                blankSlate = builder.CreateInsertValue(blankSlate, builder.getInt32(static_cast<uint32_t>(tagIndex)), 0);
+                blankSlate = builder.CreateInsertValue(blankSlate, builder.getInt64(tagIndex), 0);
 
                 auto blankSlateIdxType = structType->getTypeAtIndex(1);
                 auto castedValue = builder.CreateBitCast(paramValue, blankSlateIdxType);
@@ -1359,6 +1355,7 @@ void LlvmGen::gen(Node *node) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
         } break;
+<<<<<<< Updated upstream
         case NodeType::FIELDSOF: {
             assert(node->resolved);
             gen(node->resolved);
@@ -1367,6 +1364,11 @@ void LlvmGen::gen(Node *node) {
             if (node->isLocal) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
+=======
+        case NodeType::TYPEINFO: {
+            assert(node->resolved);
+            gen(node->resolved);
+>>>>>>> Stashed changes
         } break;
         default: assert(false);
     }

@@ -942,6 +942,16 @@ void BytecodeGen::gen(Node *node) {
             append(node->bytecode, Instruction::RELCONSTI64);
             append(node->bytecode, toBytes32(node->localOffset));
         } break;
+<<<<<<< Updated upstream
+=======
+        case NodeType::TYPEINFO: {
+            gen(node->resolved);
+
+            if (node->resolved->isLocal || node->resolved->isBytecodeLocal) {
+                storeValue(node->resolved, node->resolved->localOffset);
+            }
+        } break;
+>>>>>>> Stashed changes
         case NodeType::PUTS: {
             gen(node->nodeData);
 

@@ -1,142 +1,135 @@
-fn putchar(c: i8) {
-    s := ".";
-    s[0] = c;
-    puts(s);
+<<<<<<< Updated upstream
+fn main() {
+    e: enum{x: i64};
+    e.x = 13;
+    return e.x;
+}
+=======
+type ParamData struct {
+    name:  []i8,
+    _type: *TypeInfo
 }
 
-fn mod( T := typeof(x) )(x: T, y: T) {
-    return x - (x / y) * y;
+type FnData struct {
+    params:     []ParamData,
+    returnType: *TypeInfo
 }
 
-fn printInt( T := typeof(t) )(t: T) {
-    base := 10;
-    table := []{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"};
-
-    b: []i8;
-    b.data = cast(*i8) malloc(20 * sizeof(i8));
-
-    n := t;
-    idx : i32 = 0;
-
-    while n > base {
-        m := mod(n, base);
-        n = n / base;
-        b[idx] = table[m][0];
-        idx = idx + 1;
-    }
-
-    m := mod(n, base);
-    n = n / base;
-    b[idx] = table[m][0];
-
-    while idx >= 0 {
-        putchar(b[idx]);
-        idx = idx - 1;
-    }
+type TypeInfo enum {
+    NONE:             none,
+    INT_LITERAL:      i64,
+    I8:               none,
+    I32:              none,
+    I64:              none,
+    FLOAT_LITERAL:    f64,
+    BOOLEAN:          none,
+    BOOLEAN_LITERAL:  bool,
+    F32:              none,
+    F64:              none,
+    FN:               FnData,
+    STRUCT:           []ParamData,
+    POINTER:          *TypeInfo,
+    ENUM:             []ParamData,
+    ARRAY:            *TypeInfo,
 }
 
-fn printHex( T := typeof(t) )(t: T) {
-    base := 16;
-    table := []{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"};
+type Any struct {
+    _type:  TypeInfo,
+    value:  *none
+}
 
-    b: []i8;
-    b.data = cast(*i8) malloc(20 * sizeof(i8));
-
-    n := t;
-    idx : i32 = 0;
-
-    while n > base {
-        m := mod(n, base);
-        n = n / base;
-        b[idx] = table[m][0];
-        idx = idx + 1;
-    }
-
-    m := mod(n, base);
-    n = n / base;
-    b[idx] = table[m][0];
-
-    puts("0x");
-    while idx >= 0 {
-        putchar(b[idx]);
-        idx = idx - 1;
+fn printParams(params: []ParamData) {
+    for param : params {
+        puts(param.name);
+        puts(": ");
+        printTypeInfo(param._type);
+        puts(", ");
     }
 }
 
-fn print( T := typeof(t) )(t: T) {
-    if #iskind(T, i8) {
-        printInt(t);
-    }
-    else if #iskind(T, i32) {
-        printInt(t);
-    }
-    else if #iskind(T, i64) {
-        printInt(t);
-    }
-    else if #iskind(T, f32) {
-        print("<<some f32>>");
-    }
-    else if #iskind(T, f64) {
-        printInt("<<some f64>>");
-    }
-    else if #iskind(T, bool) {
-        if t {
-            puts("true");
-        }
-        else {
-            puts("false");
-        }
-    }
-    else if #iskind(T, []) {
-        -- could be a string, or something else
-        if #iskind(typeof(t[0]), i8) {
-            puts(t);
-        }
-        else {
-            puts("[]{");
-            for it, i: t {
-                print(it);
-                if i < t.count - 1 { puts(", "); }
-            }
-            puts("}");
-        }
-    }
-    else if #iskind(T, struct) {
-        fieldCount := #fieldsof(T).count;
-
-        puts("{");
-        #for it, i: #fieldsof(T) {
-            print(it.name);
-            print(": ");
-            print(t[i]);
-            if i < fieldCount - 1 { puts(", "); }
-        }
+fn printTypeInfo(t: *TypeInfo) {
+    if tagcheck(t.STRUCT) {
+        puts("struct{");
+        printParams(t.STRUCT);
         puts("}");
     }
-    else if #iskind(T, enum) {
-        fieldCount2 := cast(i64) #fieldsof(T).count;
-
-        puts("{");
-        #for it, i: #fieldsof(T) {
-            if t.tag == cast(i32) it.index {
-                print(it.name);
-                print(": ");
-                print(t[it.index]);
-            }
-        }
+    else if tagcheck(t.ENUM) {
+        puts("enum{");
+        printParams(t.ENUM);
         puts("}");
     }
-    else if #iskind(T, *) {
-        puts("*(");
-        printHex(cast(i64) t);
-        puts(")");
+    else if tagcheck(t.ARRAY) {
+        puts("[]");
+        printTypeInfo(t.ARRAY);
+    }
+    else if tagcheck(t.NONE) {
+        puts("none");
+    }
+    else if tagcheck(t.INT_LITERAL) {
+        puts("int");
+    }
+    else if tagcheck(t.I8) {
+        puts("i8");
+    }
+    else if tagcheck(t.I32) {
+        puts("i32");
+    }
+    else if tagcheck(t.I64) {
+        puts("i64");
+    }
+    else if tagcheck(t.FLOAT_LITERAL) {
+        puts("float");
+    }
+    else if tagcheck(t.BOOLEAN) {
+        puts("boolean");
+    }
+    else if tagcheck(t.BOOLEAN_LITERAL) {
+        if t.BOOLEAN_LITERAL { puts("true"); }
+        else { puts("false"); }
+    }
+    else if tagcheck(t.F32) {
+        puts("f32");
+    }
+    else if tagcheck(t.F64) {
+        puts("f64");
+    }
+    else if tagcheck(t.FN) {
+        puts("fn(");
+        printParams(t.FN.params);
+        puts(") ");
+        printTypeInfo(t.FN.returnType);
+    }
+    else if tagcheck(t.POINTER) {
+        puts("*");
+        printTypeInfo(t.POINTER);
     }
 }
 
-fn printMany( T := typeof(t) )(t: T) {
-    #for it: t {
-        print(it);
-    }
+fn printType( T := typeof(t) )(t: T) {
+    printTypeInfo(&typeinfo(t));
+}
+
+type linkedList struct {
+    next: none
+}
+
+fn saved() {
+    ll: linkedList;
+    printType(ll);
+}
+
+fn main() {
+    t: TypeInfo;
+    t = {
+        STRUCT: []ParamData{
+            {name: "next", _type: &u}
+        }
+    };
+
+    u: TypeInfo;
+    u = { POINTER: &t };
+
+    printTypeInfo(&t);
 }
 
 fn println(s: []i8) {
@@ -146,15 +139,4 @@ fn println(s: []i8) {
 fn assert(b: bool) {
     if b == false { panic(); }
 }
-
-fn main() {
-    type E enum {
-        x: i32,
-        y: bool
-    }
-    e: E = { y: false };
-
-    printMany({ 123, " and ", false, " ", []{1, 2, 3}, " -- ", {x: 3, y: &8767} , " ", e});
-    puts("\n\n");
-}
-
+>>>>>>> Stashed changes

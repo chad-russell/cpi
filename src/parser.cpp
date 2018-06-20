@@ -818,7 +818,7 @@ Node *Parser::parseType() {
             tagParam->declParamData.index = 0;
 
             // todo(chad): allow the user to specify the width of the tag
-            tagParam->declParamData.type = new Node(NodeTypekind::I32);
+            tagParam->declParamData.type = new Node(NodeTypekind::I64);
             tagParam->declParamData.name = tagSymbol;
 
             type->typeData.structTypeData.params.push_back(tagParam);
@@ -1306,6 +1306,10 @@ Node *Parser::parseStringLiteral() {
                 } break;
                 case '0': {
                     s << '\0';
+                } break;
+                case '"': {
+                    s << '"';
+                    i = i + 1;
                 } break;
                 default: {
                     reportError("unexpected escape sequence");

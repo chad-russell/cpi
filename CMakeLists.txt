@@ -7,30 +7,32 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include_directories(/usr/local/opt/llvm@6/include)
 
+set(LLVM_CONFIG_PATH "/usr/local/opt/llvm@6/bin/llvm-config")
+
 execute_process(
         COMMAND
-        "/usr/local/opt/llvm@6/bin/llvm-config"
+        ${LLVM_CONFIG_PATH}
         --cxxflags
         OUTPUT_VARIABLE LLVM_CXXFLAGS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 execute_process(
         COMMAND
-        "/usr/local/opt/llvm@6/bin/llvm-config"
+        ${LLVM_CONFIG_PATH}
         --ldflags
         OUTPUT_VARIABLE LLVM_LDFLAGS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 execute_process(
         COMMAND
-        "/usr/local/opt/llvm@6/bin/llvm-config"
+        ${LLVM_CONFIG_PATH}
         --system-libs
         OUTPUT_VARIABLE LLVM_SYSTEMLIBS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 execute_process(
         COMMAND
-        "/usr/local/opt/llvm@6/bin/llvm-config"
+        ${LLVM_CONFIG_PATH}
         --libs
         OUTPUT_VARIABLE LLVM_LIBS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
