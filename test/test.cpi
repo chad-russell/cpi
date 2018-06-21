@@ -127,10 +127,18 @@ fn main() {
     testDefault();
     testAnySimple1();
 
+    testPrinting();
+
     return 0;
 }
 
 fn saved() {
+}
+
+fn testPrinting() {
+    e: enum {x: i32, y: bool} = { y: false };
+    printWithSpaces({ 123, "string", false, []{1, 2, 3}, {x: 3, y: &8767} , e});
+    puts("\n\n");
 }
 
 fn testUnion1() {
@@ -1001,12 +1009,14 @@ fn printWithSeparator( sep: []i8, T := typeof(t) )(t: T) {
 
     #for it, i: t {
         print(it);
-        if i < fieldCount - 1 { print(sep); }
+        -- if i < fieldCount - 1 {
+            print(sep);
+        -- }
     }
 }
 
 fn printWithSpaces( T := typeof(t) )(t: T) {
-    printWithSeparator!(" ")(t);
+    printWithSeparator!(", ")(t);
 }
 
 fn println(s: []i8) {

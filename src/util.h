@@ -234,14 +234,15 @@ struct DeclParamData {
     Node *initialValue = nullptr;
 
     Node *polyLink = nullptr;
-    int64_t index;
+
+    int64_t index = 0;
 };
 
 struct ValueParamData {
     Node *name = nullptr;
     Node *value = nullptr;
 
-    int32_t index;
+    int32_t index = 0;
 };
 
 struct ModuleData {

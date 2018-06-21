@@ -970,6 +970,13 @@ void LlvmGen::gen(Node *node) {
             }
         } break;
         case NodeType::DOT: {
+            if (node->resolved != nullptr) {
+                gen(node->resolved);
+
+                node->llvmData = node->resolved->llvmData;
+                break;
+            }
+
             auto foundParam = node->dotData.resolved;
 
             uint32_t paramIndex;

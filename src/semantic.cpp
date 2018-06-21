@@ -1037,16 +1037,17 @@ void resolveFnCall(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->fnCallData.fn);
     auto resolvedFn = resolve(node->fnCallData.fn);
     auto isPoly = resolvedFn->type == NodeType::FN_DECL && !resolvedFn->fnDeclData.ctParams.empty();
+    Node *polyResolvedFn = nullptr;
 
     if (isPoly) {
         // make a new function
         // todo(chad): memoize this based on the ctParams
-        auto newResolvedFn = semantic->deepCopy(resolvedFn, resolvedFn->scope);
-        assert(newResolvedFn->type == NodeType::FN_DECL);
-        newResolvedFn->fnDeclData.cameFromPolymorph = true;
+        polyResolvedFn = semantic->deepCopy(resolvedFn, resolvedFn->scope);
+        assert(polyResolvedFn->type == NodeType::FN_DECL);
+        polyResolvedFn->fnDeclData.cameFromPolymorph = true;
 
-        node->fnCallData.fn->resolved = newResolvedFn;
-        resolvedFn = newResolvedFn;
+        node->fnCallData.fn->resolved = polyResolvedFn;
+        resolvedFn = polyResolvedFn;
     }
 
     // assign runtime params
@@ -1087,13 +1088,10 @@ void resolveFnCall(Semantic *semantic, Node *node) {
 
             if (ctParam->type == NodeType::VALUE_PARAM) {
                 auto ctValue = ctParam->valueParamData.value;
-                semantic->resolveTypes(ctValue);
                 ctDeclParams[i]->staticValue = resolve(ctValue);
             } else {
                 ctDeclParams[i]->staticValue = resolve(ctParam);
             }
-
-            semantic->resolveTypes(ctParam);
         }
     }
 
@@ -1129,6 +1127,10 @@ void resolveFnCall(Semantic *semantic, Node *node) {
         auto ctDeclParams = resolvedFn->fnDeclData.ctParams;
         auto ctGivenParams = node->fnCallData.ctParams;
 
+        // put ourselves in the context of the newly resolved fn in order to do the decl params
+        auto savedCurrentFnDecl = semantic->currentFnDecl;
+        semantic->currentFnDecl = polyResolvedFn;
+
         for (unsigned long i = 0; i < ctGivenParams.size(); i++) {
             auto declParam = ctDeclParams[i];
             auto givenParam = ctGivenParams[i];
@@ -1148,9 +1150,9 @@ void resolveFnCall(Semantic *semantic, Node *node) {
                     semantic->reportError({node, declParam, givenParam}, Error{node->region, "static type mismatch!"});
                 }
             }
-
-            semantic->resolveTypes(givenParam);
         }
+
+        semantic->currentFnDecl = savedCurrentFnDecl;
     }
 
     semantic->resolveTypes(resolvedFn);
@@ -1570,7 +1572,7 @@ void resolveIf(Semantic *semantic, Node *node) {
 void resolveWhile(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->whileData.condition);
 
-    if (node->whileData.condition->typeInfo->typeData.kind != NodeTypekind::BOOLEAN && node->ifData.condition->typeInfo->typeData.kind != NodeTypekind::BOOLEAN_LITERAL) {
+    if (node->whileData.condition->typeInfo->typeData.kind != NodeTypekind::BOOLEAN && node->whileData.condition->typeInfo->typeData.kind != NodeTypekind::BOOLEAN_LITERAL) {
         semantic->reportError({node, node->whileData.condition}, Error{node->whileData.condition->region, "Condition for 'while' must be a boolean!"});
     }
 
