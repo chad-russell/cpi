@@ -27,7 +27,7 @@ struct Parser {
     Lexer *lexer = nullptr;
     LexerToken last;
     Node *mainFn = nullptr;
-    stack<Scope *> scopes = {};
+    stack<Scope *> scopes;
     Node *currentFnDecl = nullptr;
     bool isCopying = false;
 

@@ -15,7 +15,7 @@ public:
     SourceMap sourceMap = {};
     int64_t currentFnStackSize;
 
-    queue<Node *> toProcess = {};
+    queue<Node *> toProcess;
     bool processFnDecls = false;
 
     bool isMainFn;

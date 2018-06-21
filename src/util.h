@@ -402,8 +402,8 @@ struct IsKindData {
 
 class Scope {
 public:
-    unordered_map<int64_t, Node *> symbols = {};
-    Scope *parent = {};
+    unordered_map<int64_t, Node *> symbols;
+    Scope *parent = nullptr;
 
     Scope(Scope *parent);
 
@@ -622,8 +622,9 @@ struct SourceMap {
 class AtomTable {
 public:
     static AtomTable *current;
-    unordered_map<string, int64_t> atoms = {};
-    vector<string> backwardAtoms = {};
+    unordered_map<string, int64_t> atoms;
+    std::vector<string> atoms2;
+    vector<string> backwardAtoms;
 
     int64_t insert(Region &r);
     int64_t insertStr(string s);

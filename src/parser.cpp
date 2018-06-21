@@ -7,7 +7,6 @@ Parser::Parser(Lexer *lexer_) {
     lexer = lexer_;
     last = lexer->front;
 
-    scopes = {};
     scopes.push(new Scope(nullptr));
 }
 

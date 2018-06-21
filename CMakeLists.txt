@@ -1,13 +1,18 @@
-cmake_minimum_required(VERSION 3.7)
+cmake_minimum_required(VERSION 3.5.1)
 project(cpi)
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# MAC OS
 include_directories(/usr/local/opt/llvm@6/include)
-
 set(LLVM_CONFIG_PATH "/usr/local/opt/llvm@6/bin/llvm-config")
+
+# WINDOWS
+#include_directories(/usr/include/llvm-5.0)
+#include_directories(/usr/include/llvm-c-5.0)
+#set(LLVM_CONFIG_PATH "/usr/bin/llvm-config-5.0")
 
 execute_process(
         COMMAND
@@ -42,8 +47,8 @@ set(CMAKE_CXX_FLAGS "${LLVM_CXXFLAGS} ${LLVM_LDFLAGS} ${LLVM_SYSTEMLIBS} ${LLVM_
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-#set(CMAKE_BUILD_TYPE Debug)
-set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_BUILD_TYPE Debug)
+#set(CMAKE_BUILD_TYPE Release)
 
 set(SOURCE_FILES
         src/assembler.cpp
