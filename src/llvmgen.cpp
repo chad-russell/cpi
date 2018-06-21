@@ -141,9 +141,9 @@ void LlvmGen::finalize() {
     }
 
     // DO_OPTIMIZE
-//    for (auto fn : allFns) {
-//        TheFPM->run(*fn);
-//    }
+    for (auto fn : allFns) {
+        TheFPM->run(*fn);
+    }
     verifyModule(*module, &llvm::errs());
 }
 

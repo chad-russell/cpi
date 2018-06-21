@@ -276,7 +276,7 @@ int main(int argc, char **argv) {
 //            cout << "executed " << interp->stepCount << " instructions" << endl;
         }
 
-        cout << "ANSWER: ";
+        cout << "RETURN VALUE: ";
 
         // todo(chad): look at the return type of the 'main' fn and determine which of these to print!!
         auto mainReturnType = resolve(resolve(parser->mainFn)->fnDeclData.returnType);

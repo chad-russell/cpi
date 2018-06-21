@@ -1,13 +1,4 @@
 fn main() {
-    printWithSeparator!(" ")();
+    puts("hello, world!\n");
+    return 0;
 }
-
-fn printWithSeparator( sep: []i8 )() {
-    if true {
-        a := sep;
-    }
-    if true {
-        a := sep;
-    }
-}
-
