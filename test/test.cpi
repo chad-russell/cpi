@@ -1009,9 +1009,9 @@ fn printWithSeparator( sep: []i8, T := typeof(t) )(t: T) {
 
     #for it, i: t {
         print(it);
-        -- if i < fieldCount - 1 {
+        if i < fieldCount - 1 {
             print(sep);
-        -- }
+        }
     }
 }
 

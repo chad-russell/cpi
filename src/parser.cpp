@@ -460,6 +460,8 @@ Node *Parser::parseIf() {
     if_->sourceMapStatement = true;
     if_->ifData.condition->sourceMapStatement = true;
 
+    scopes.push(new Scope(scopes.top()));
+
     expect(LexerTokenType::LCURLY, "{");
     while (lexer->front.type != LexerTokenType::RCURLY) {
         auto scopedStmt = parseScopedStmt();
@@ -471,6 +473,8 @@ Node *Parser::parseIf() {
     if_->region.end = lexer->front.region.end;
     expect(LexerTokenType::RCURLY, "}");
 
+    scopes.pop();
+
     if (lexer->front.type == LexerTokenType::ELSE) {
         popFront();
 
@@ -481,9 +485,13 @@ Node *Parser::parseIf() {
 
         expect(LexerTokenType::LCURLY, "{");
 
+        scopes.push(new Scope(scopes.top()));
+
         while (lexer->front.type != LexerTokenType::RCURLY) {
             if_->ifData.elseStmts.push_back(parseScopedStmt());
         }
+
+        scopes.pop();
 
         if_->region.end = lexer->front.region.start;
         expect(LexerTokenType::RCURLY, "}");

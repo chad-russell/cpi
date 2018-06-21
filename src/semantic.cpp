@@ -1679,7 +1679,10 @@ void resolveStaticFor(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->forData.target);
 
     auto resolvedTarget = node->forData.target;
-    if (resolvedTarget->type == NodeType::FIELDSOF) {
+    if (resolvedTarget->type == NodeType::ARRAY_LITERAL) {
+        // todo(chad): we need to move away from using 'resolved' for array literals...
+    }
+    else if (resolvedTarget->type == NodeType::FIELDSOF) {
         resolvedTarget = resolvedTarget->resolved;
     }
     else {
@@ -1738,10 +1741,6 @@ void resolveStaticFor(Semantic *semantic, Node *node) {
         auto subScope = new Scope(node->scope);
 
         for (auto stmt : node->forData.stmts) {
-            // todo(chad): 'stmt' here is never going to get copied. However, it may still contain locals.
-            // So we still have to resolve the types here. We need to try to find a way around that, eventually :/
-            semantic->resolveTypes(stmt);
-
             auto newStmt = semantic->deepCopy(stmt, subScope);
 
             semantic->resolveTypes(newStmt);

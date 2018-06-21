@@ -544,6 +544,16 @@ void LlvmGen::gen(Node *node) {
                 }
             }
 
+            // gen all ctParams
+            for (auto ctParam : node->fnDeclData.ctParams) {
+                auto resolvedCtParam = resolve(ctParam);
+
+                // this shouldn't get us into trouble... right?
+                if (resolvedCtParam->type != NodeType::FN_DECL) {
+                    gen(resolvedCtParam);
+                }
+            }
+
             auto didTerminate = false;
             for (const auto& stmt : node->fnDeclData.body) {
                 if (stmt->type == NodeType::RET) { didTerminate = true; }
