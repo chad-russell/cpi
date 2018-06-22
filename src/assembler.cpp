@@ -8,18 +8,16 @@
 
 using namespace std;
 
-unordered_map<string, TokenType> AssemblyLexer::nameToTokenType = {};
-unordered_map<string, Instruction> AssemblyLexer::nameToInstruction = {};
+hash_t<string, TokenType> *AssemblyLexer::nameToTokenType = hash_t_init<string, TokenType>(200);
+hash_t<string, Instruction> *AssemblyLexer::nameToInstruction = hash_t_init<string, Instruction>(200);
 
 void AssemblyLexer::populateMaps() {
     for (unsigned char i = 0; i < AssemblyLexer::tokenTypeStrings.size(); i++) {
-        nameToTokenType.insert({AssemblyLexer::tokenTypeStrings[i],
-                                static_cast<TokenType>(i)});
+        hash_t_insert(nameToTokenType, AssemblyLexer::tokenTypeStrings[i], static_cast<TokenType>(i));
     }
 
     for (unsigned char i = 0; i < AssemblyLexer::instructionStrings.size(); i++) {
-        nameToInstruction.insert({AssemblyLexer::instructionStrings[i],
-                                  static_cast<Instruction>(i)});
+        hash_t_insert(nameToInstruction, AssemblyLexer::instructionStrings[i], static_cast<Instruction>(i));
     }
 }
 
@@ -180,7 +178,7 @@ void AssemblyLexer::popFront() {
 
     // try parsing all the tokens
     for (const auto &memberName : tokenTypeStrings) {
-        auto member = nameToTokenType.at(memberName);
+        auto member = *hash_t_get(nameToTokenType, memberName);
 
         if (startsWith(sourceMap.sourceInfo.source, loc.byteIndex, memberName)) {
             auto startIndex = loc.byteIndex;
@@ -191,7 +189,7 @@ void AssemblyLexer::popFront() {
                 eat();
             }
 
-            auto newInst = nameToInstruction.at(sourceMap.sourceInfo.source->substr(startIndex, memberName.length()));
+            auto newInst = *hash_t_get(nameToInstruction, sourceMap.sourceInfo.source->substr(startIndex, memberName.length()));
             popFrontFinalize(newNext, {static_cast<unsigned char>(newInst)});
 
             return;

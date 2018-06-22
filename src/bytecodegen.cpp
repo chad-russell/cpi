@@ -75,10 +75,10 @@ void BytecodeGen::binopHelper(string instructionStr, Node *node, int32_t scale) 
 
     instructionStr.append(toAppend);
 
-    auto inst = AssemblyLexer::nameToInstruction[instructionStr];
+    auto inst = *hash_t_get(AssemblyLexer::nameToInstruction, instructionStr);
     append(instructions, inst);
 
-    auto bytecodeInst = AssemblyLexer::nameToInstruction[bytecodeStr];
+    auto bytecodeInst = *hash_t_get(AssemblyLexer::nameToInstruction, bytecodeStr);
     append(node->bytecode, bytecodeInst);
 
     append(instructions, bytecodeInst);
@@ -576,7 +576,7 @@ void BytecodeGen::gen(Node *node) {
             auto resolvedFn = resolve(node->fnCallData.fn);
             if (resolvedFn->type == NodeType::FN_DECL) {
                 append(instructions, Instruction::CALL);
-                fixups.insert({instructions.size(), resolvedFn});
+                hash_t_insert(fixups, (int64_t) instructions.size(), resolvedFn);
                 append(instructions, toBytes32(999));
             } else if (resolvedFn->type == NodeType::DECL) {
                 append(instructions, Instruction::CALLI);
@@ -973,12 +973,23 @@ void BytecodeGen::gen(Node *node) {
 
 void BytecodeGen::fixup() {
     // fixup statically known function instruction offsets
-    for (auto fixup : fixups) {
-        auto node = fixup.second;
-        assert(node->type == NodeType::FN_DECL);
+    for (auto i = 0; i < fixups->bucket_count; i++) {
+        auto bucket = fixups->buckets[i];
+        if (bucket != nullptr) {
+            auto node = bucket->value;
+            assert(node->type == NodeType::FN_DECL);
+            auto instOffset = static_cast<int32_t>(node->fnDeclData.instOffset);
+            memcpy(&instructions[bucket->key], &instOffset, sizeof(int32_t));
 
-        auto instOffset = static_cast<int32_t>(node->fnDeclData.instOffset);
-        memcpy(&instructions[fixup.first], &instOffset, sizeof(int32_t));
+            while (bucket->next != nullptr) {
+                bucket = bucket->next;
+
+                node = bucket->value;
+                assert(node->type == NodeType::FN_DECL);
+                instOffset = static_cast<int32_t>(node->fnDeclData.instOffset);
+                memcpy(&instructions[bucket->key], &instOffset, sizeof(int32_t));
+            }
+        }
     }
 }
 
@@ -1145,4 +1156,5 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
 
 BytecodeGen::BytecodeGen() {
     fnTable = hash_t_init<uint32_t, uint64_t>(100);
+    fixups = hash_t_init<int64_t, Node *>(500);
 }

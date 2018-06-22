@@ -142,10 +142,10 @@ public:
     SourceMap sourceMap = {};
 
     const static vector<string> tokenTypeStrings;
-    static unordered_map<string, TokenType> nameToTokenType;
+    static hash_t<string, TokenType> *nameToTokenType;
 
     const static vector<string> instructionStrings;
-    static unordered_map<string, Instruction> nameToInstruction;
+    static hash_t<string, Instruction> *nameToInstruction;
 
     AssemblyLexer(string fileName);
     static void populateMaps();
