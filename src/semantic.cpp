@@ -89,19 +89,19 @@ int maybeMatchUnionToStructLiteral(Node *desired, Node *actual, Semantic *semant
             other = desired;
         }
 
-        if (other->typeData.structTypeData.params.size() != 1) {
+        if (other->typeData.structTypeData.params.length != 1) {
             return 0;
         }
 
-        assert(other->typeData.structTypeData.params[0]->type == NodeType::DECL_PARAM);
+        assert(vector_at(other->typeData.structTypeData.params, 0)->type == NodeType::DECL_PARAM);
 
         // if it doesn't have a name it obviously can't be a match
-        if (other->typeData.structTypeData.params[0]->paramData.name == nullptr) {
+        if (vector_at(other->typeData.structTypeData.params, 0)->paramData.name == nullptr) {
             return 0;
         }
 
-        assert(other->typeData.structTypeData.params[0]->paramData.name->type == NodeType::SYMBOL);
-        auto otherAtomId = other->typeData.structTypeData.params[0]->paramData.name->symbolData.atomId;
+        assert(vector_at(other->typeData.structTypeData.params, 0)->paramData.name->type == NodeType::SYMBOL);
+        auto otherAtomId = vector_at(other->typeData.structTypeData.params, 0)->paramData.name->symbolData.atomId;
 
         auto debugAtom = AtomTable::current->backwardAtoms[otherAtomId];
 
@@ -112,12 +112,12 @@ int maybeMatchUnionToStructLiteral(Node *desired, Node *actual, Semantic *semant
             auto pAtomId = p->paramData.name->symbolData.atomId;
 
             if (pAtomId == otherAtomId) {
-                if (!typesMatch(p->paramData.type, other->typeData.structTypeData.params[0]->paramData.type, semantic)) {
+                if (!typesMatch(p->paramData.type, vector_at(other->typeData.structTypeData.params, 0)->paramData.type, semantic)) {
                     return 1;
                 }
 
                 other->typeData.structTypeData.coercedType = unionToMatchAgainst;
-                other->typeData.structTypeData.params[0]->paramData.index = paramIndex;
+                vector_at(other->typeData.structTypeData.params, 0)->paramData.index = paramIndex;
                 other->typeData.structTypeData.enumCoerced = true;
 
                 return 2;
@@ -221,13 +221,13 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
     }
 
     if (actual->typeData.kind == NodeTypekind::NONE) {
-        if (desired->typeData.kind == NodeTypekind::STRUCT && desired->typeData.structTypeData.params.empty()) {
+        if (desired->typeData.kind == NodeTypekind::STRUCT && desired->typeData.structTypeData.params.length == 0) {
             return true;
         }
     }
 
     if (desired->typeData.kind == NodeTypekind::NONE) {
-        if (actual->typeData.kind == NodeTypekind::STRUCT && actual->typeData.structTypeData.params.empty()) {
+        if (actual->typeData.kind == NodeTypekind::STRUCT && actual->typeData.structTypeData.params.length == 0) {
             return true;
         }
     }
@@ -253,7 +253,7 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
             return true;
         }
 
-        if (desired->typeData.structTypeData.params.size() != actual->typeData.structTypeData.params.size()) {
+        if (desired->typeData.structTypeData.params.length != actual->typeData.structTypeData.params.length) {
             return false;
         }
 
@@ -268,9 +268,9 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
             }
         }
 
-        for (unsigned long i = 0; i < desired->typeData.structTypeData.params.size(); i++) {
-            auto desiredParamI = desired->typeData.structTypeData.params[i];
-            auto actualParamI = actual->typeData.structTypeData.params[i];
+        for (unsigned long i = 0; i < desired->typeData.structTypeData.params.length; i++) {
+            auto desiredParamI = vector_at(desired->typeData.structTypeData.params, i);
+            auto actualParamI = vector_at(actual->typeData.structTypeData.params, i);
 
             Node *newT1 = resolve(desiredParamI->typeInfo);
             Node *newT2 = resolve(actualParamI->typeInfo);
@@ -369,7 +369,7 @@ Node *defaultValueFor(Semantic *semantic, Node *type) {
                 }
 
                 semantic->resolveTypes(vp);
-                def->structLiteralData.params.push_back(vp);
+                vector_append(def->structLiteralData.params, vp);
             }
 
             def->typeInfo = type;
@@ -432,7 +432,7 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
         index += 1;
     }
 
-    if (!data->ctParams.empty() && !data->cameFromPolymorph) {
+    if (!data->ctParams.length == 0 && !data->cameFromPolymorph) {
         return;
     }
 
@@ -471,9 +471,9 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
     semantic->resolveTypes(data->returnType);
 
     node->typeInfo = new Node(NodeTypekind::FN);
-    node->typeInfo->typeData.fnTypeData.params = {};
+    node->typeInfo->typeData.fnTypeData.params = vector_init<Node *>(10);
     for (auto param : data->params) {
-        node->typeInfo->typeData.fnTypeData.params.push_back(param);
+        vector_append(node->typeInfo->typeData.fnTypeData.params, param);
     }
 
     // if the return type is just an int/float literal,
@@ -685,7 +685,7 @@ void resolveStringLiteral(Semantic *semantic, Node *node) {
         charNode->typeInfo = new Node(NodeTypekind::I8);
         charNode->intLiteralData.value = static_cast<int64_t>(c);
 
-        charArrayLiteral->structLiteralData.params.push_back(wrapInValueParam(charNode, ""));
+        vector_append(charArrayLiteral->structLiteralData.params, wrapInValueParam(charNode, ""));
     }
 
     // heapifiedCharArrayLiteral = &{'h', 'e', 'l', 'l', 'o'}
@@ -702,8 +702,8 @@ void resolveStringLiteral(Semantic *semantic, Node *node) {
     countNode->intLiteralData.value = static_cast<int64_t>(node->stringLiteralData.value.size());
 
     // arrayLiteral = {&{'h', 'e', 'l', 'l', 'o'}, 5}
-    arrayLiteral->structLiteralData.params.push_back(wrapInValueParam(heapifiedCharArrayLiteral, "data"));
-    arrayLiteral->structLiteralData.params.push_back(wrapInValueParam(countNode, "count"));
+    vector_append(arrayLiteral->structLiteralData.params, wrapInValueParam(heapifiedCharArrayLiteral, "data"));
+    vector_append(arrayLiteral->structLiteralData.params, wrapInValueParam(countNode, "count"));
 
     semantic->resolveTypes(arrayLiteral);
 
@@ -740,16 +740,13 @@ void resolveSymbol(Semantic *semantic, Node *node) {
     node->typeInfo = node->resolved->typeInfo;
 }
 
-bool assignParams(Semantic *semantic,
-                  Node *errorReportTarget,
-                  const vector<Node *> &declParams,
-                  vector<Node *> &givenParams) {
-    vector<bool> openParams = {};
-    vector<Node *> newParams = {};
+bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<Node *> &declParams, vector_t<Node *> &givenParams) {
+    vector_t<bool> openParams = {};
+    vector_t<Node *> newParams = {};
 
-    for (unsigned long i = 0; i < declParams.size(); i++) {
-        openParams.push_back(true);
-        newParams.push_back(nullptr);
+    for (unsigned long i = 0; i < declParams.length; i++) {
+        vector_append(openParams, true);
+        vector_append(newParams, (Node *) nullptr);
     }
 
     auto encounteredError = false;
@@ -761,21 +758,15 @@ bool assignParams(Semantic *semantic,
         if (valueAndNameNotNull || declAndNameNotNull) {
             // look up that name in the declaration
             auto found = false;
-            for (unsigned long j = 0; j < declParams.size(); j++) {
-                auto declParam = declParams[j];
+            for (unsigned long j = 0; j < declParams.length; j++) {
+                auto declParam = vector_at(declParams, j);
                 assert(declParam->type == NodeType::DECL_PARAM);
 
-                int64_t passedParamAtomId;
-                if (passedParam->type == NodeType::VALUE_PARAM) {
-                    passedParamAtomId = passedParam->paramData.name->symbolData.atomId;
-                }
-                else {
-                    passedParamAtomId = passedParam->paramData.name->symbolData.atomId;
-                }
+                int64_t passedParamAtomId = passedParam->paramData.name->symbolData.atomId;
 
                 if (declParam->paramData.name->symbolData.atomId == passedParamAtomId) {
                     found = true;
-                    auto openParam = openParams.at(j);
+                    auto openParam = vector_at(openParams, j);
                     if (!openParam) {
                         encounteredError = true;
                         semantic->reportError({errorReportTarget},
@@ -784,8 +775,8 @@ bool assignParams(Semantic *semantic,
 
                     if (typesMatch(declParam->typeInfo, passedParam->typeInfo, semantic)) {
                         passedParam->typeInfo = declParam->paramData.type;
-                        newParams[j] = passedParam;
-                        openParams[j] = false;
+                        vector_set_at(newParams, j, passedParam);
+                        vector_set_at(openParams, j, false);
                     }
                     else {
                         encounteredError = true;
@@ -800,13 +791,13 @@ bool assignParams(Semantic *semantic,
         else {
             // put it in next open slot
             unsigned long j = 0;
-            while (j < newParams.size() && !(openParams[j])) { j += 1; }
-            if (j >= newParams.size()) {
+            while (j < newParams.length && !(vector_at(openParams, j))) { j += 1; }
+            if (j >= newParams.length) {
                 encounteredError = true;
                 semantic->reportError({errorReportTarget}, Error{errorReportTarget->region, "too many parameters passed!"});
             }
             else {
-                auto declParam = declParams[j];
+                auto declParam = vector_at(declParams, j);
 
                 if (declParam->type == NodeType::DECL_PARAM) {
                     passedParam->typeInfo = declParam->paramData.type;
@@ -818,33 +809,33 @@ bool assignParams(Semantic *semantic,
                     assert(false);
                 }
 
-                newParams[j] = passedParam;
-                openParams[j] = false;
+                vector_set_at(newParams, j, passedParam);
+                vector_set_at(openParams, j, false);
             }
         }
     }
 
-    for (unsigned long i = 0; i < newParams.size(); i++) {
-        auto declParam = declParams[i];
+    for (unsigned long i = 0; i < newParams.length; i++) {
+        auto declParam = vector_at(declParams, i);
 
         // if the decl parameter is unassigned but there is a default value, then fill in that param with the default
-        bool openParamsI = openParams[i];
+        bool openParamsI = vector_at(openParams, i);
         if (declParam->paramData.value != nullptr && openParamsI) {
-            openParams[i] = false;
+            vector_set_at(openParams, i, false);
             declParam->paramData.value->typeInfo = declParam->paramData.type;
-            newParams[i] = wrapInValueParam(declParam->paramData.value, declParam->paramData.name);
+            vector_set_at(newParams, i, wrapInValueParam(declParam->paramData.value, declParam->paramData.name));
 
-            semantic->resolveTypes(newParams[i]);
+            semantic->resolveTypes(vector_at(newParams, i));
         }
     }
 
-    for (unsigned long i = 0; i < declParams.size(); i++) {
-        auto openParamsI = openParams[i];
-        if (openParamsI || newParams[i] == nullptr) {
+    for (unsigned long i = 0; i < declParams.length; i++) {
+        auto openParamsI = vector_at(openParams, i);
+        if (openParamsI || vector_at(newParams, i) == nullptr) {
             encounteredError = true;
 
             ostringstream s("");
-            s << "unassigned parameter: " << AtomTable::current->backwardAtoms[declParams[i]->paramData.name->symbolData.atomId];
+            s << "unassigned parameter: " << AtomTable::current->backwardAtoms[vector_at(declParams, i)->paramData.name->symbolData.atomId];
             auto sstr = s.str();
             semantic->reportError({errorReportTarget}, Error{errorReportTarget->region, sstr});
         }
@@ -1027,7 +1018,7 @@ Node *Semantic::deepCopy(Node *node, Scope *scope) {
 void resolveFnCall(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->fnCallData.fn);
     auto resolvedFn = resolve(node->fnCallData.fn);
-    auto isPoly = resolvedFn->type == NodeType::FN_DECL && !resolvedFn->fnDeclData.ctParams.empty();
+    auto isPoly = resolvedFn->type == NodeType::FN_DECL && !resolvedFn->fnDeclData.ctParams.length == 0;
     Node *polyResolvedFn = nullptr;
 
     if (isPoly) {
@@ -1043,7 +1034,7 @@ void resolveFnCall(Semantic *semantic, Node *node) {
 
     // assign runtime params
     if (node->fnCallData.hasRuntimeParams) {
-        vector<Node *> declParams;
+        vector_t<Node *> declParams;
 
         if (isPoly) {
             assert(resolvedFn->type == NodeType::FN_DECL);
@@ -1062,8 +1053,8 @@ void resolveFnCall(Semantic *semantic, Node *node) {
 
         if (isPoly) {
             // 'link' each decl param to its runtime param
-            for (unsigned long p = 0; p < declParams.size(); p++) {
-                declParams[p]->paramData.polyLink = node->fnCallData.params[p];
+            for (unsigned long p = 0; p < declParams.length; p++) {
+                vector_at(declParams, p)->paramData.polyLink = vector_at(node->fnCallData.params, p);
             }
         }
     }
@@ -1078,21 +1069,21 @@ void resolveFnCall(Semantic *semantic, Node *node) {
         }
 
         // Make sure the ctDeclParams resolve to their compile-time values
-        for (unsigned long i = 0; i < ctGivenParams.size(); i++) {
-            const auto& ctParam = ctGivenParams[i];
+        for (unsigned long i = 0; i < ctGivenParams.length; i++) {
+            const auto& ctParam = vector_at(ctGivenParams, i);
 
             if (ctParam->type == NodeType::VALUE_PARAM) {
                 auto ctValue = ctParam->paramData.value;
-                ctDeclParams[i]->staticValue = resolve(ctValue);
+                vector_at(ctDeclParams, i)->staticValue = resolve(ctValue);
             } else {
-                ctDeclParams[i]->staticValue = resolve(ctParam);
+                vector_at(ctDeclParams, i)->staticValue = resolve(ctParam);
             }
         }
     }
 
     // un-assign runtime params
     if (node->fnCallData.hasRuntimeParams) {
-        vector<Node *> declParams;
+        vector_t<Node *> declParams;
 
         if (isPoly) {
             assert(resolvedFn->type == NodeType::FN_DECL);
@@ -1100,14 +1091,13 @@ void resolveFnCall(Semantic *semantic, Node *node) {
         } else {
             auto resolvedFnType = resolve(resolvedFn->typeInfo)->typeData;
             assert(resolvedFnType.kind == NodeTypekind::FN);
-
             declParams = resolvedFnType.fnTypeData.params;
         }
 
         if (isPoly) {
             // un-link
-            for (unsigned long p = 0; p < declParams.size(); p++) {
-                declParams[p]->paramData.polyLink = nullptr;
+            for (unsigned long p = 0; p < declParams.length; p++) {
+                vector_at(declParams, p)->paramData.polyLink = nullptr;
             }
 
             // @Hack!!!
@@ -1126,9 +1116,9 @@ void resolveFnCall(Semantic *semantic, Node *node) {
         auto savedCurrentFnDecl = semantic->currentFnDecl;
         semantic->currentFnDecl = polyResolvedFn;
 
-        for (unsigned long i = 0; i < ctGivenParams.size(); i++) {
-            auto declParam = ctDeclParams[i];
-            auto givenParam = ctGivenParams[i];
+        for (unsigned long i = 0; i < ctGivenParams.length; i++) {
+            auto declParam = vector_at(ctDeclParams, i);
+            auto givenParam = vector_at(ctGivenParams, i);
 
             semantic->resolveTypes(declParam);
             semantic->resolveTypes(givenParam);
@@ -1159,9 +1149,9 @@ void resolveFnCall(Semantic *semantic, Node *node) {
         auto declParams = resolvedFnType.fnTypeData.params;
         auto givenParams = node->fnCallData.params;
 
-        for (unsigned long i = 0; i < givenParams.size(); i++) {
-            auto declParam = declParams[i];
-            auto givenParam = givenParams[i];
+        for (unsigned long i = 0; i < givenParams.length; i++) {
+            auto declParam = vector_at(declParams, i);
+            auto givenParam = vector_at(givenParams, i);
             semantic->resolveTypes(givenParam);
             if (!typesMatch(declParam->typeInfo, givenParam->typeInfo, semantic)) {
                 semantic->reportError({node, declParam, givenParam}, Error{node->region, "type mismatch!"});
@@ -1210,9 +1200,9 @@ void possiblyResolveAssignToUnion(Semantic *semantic, Node *originalAssignment, 
         param0->scope = node->dotData.lhs->scope;
         param0->type = NodeType::SYMBOL;
         param0->symbolData.atomId = AtomTable::current->insertStr("tag");
-        param0->resolved = typeData.structTypeData.params[0];
-        assert(typeData.structTypeData.params[0]->type == NodeType::DECL_PARAM);
-        param0->typeInfo = typeData.structTypeData.params[0]->paramData.type;
+        param0->resolved = vector_at(typeData.structTypeData.params, 0);
+        assert(vector_at(typeData.structTypeData.params, 0)->type == NodeType::DECL_PARAM);
+        param0->typeInfo = vector_at(typeData.structTypeData.params, 0)->paramData.type;
 
         auto tagDot = new Node();
         tagDot->scope = originalAssignment->scope;
@@ -1345,7 +1335,7 @@ Node *findParam(Semantic *semantic, Node *node) {
 
     Node *foundParam = nullptr;
     if (node->dotData.rhs->type == NodeType::INT_LITERAL) {
-        foundParam = structData.params[node->dotData.rhs->intLiteralData.value];
+        foundParam = vector_at(structData.params, node->dotData.rhs->intLiteralData.value);
     }
     else if (structData.isLiteral) {
         auto debug2 = AtomTable::current->backwardAtoms[node->dotData.rhs->symbolData.atomId];
@@ -1376,7 +1366,7 @@ Node *findParam(Semantic *semantic, Node *node) {
 
     if (foundParam != nullptr && resolve(node->dotData.lhs)->type == NodeType::STRUCT_LITERAL) {
         assert(foundParam->type == NodeType::DECL_PARAM);
-        auto foundValue = resolve(node->dotData.lhs)->structLiteralData.params[foundParam->paramData.index]->paramData.value;
+        auto foundValue = vector_at(resolve(node->dotData.lhs)->structLiteralData.params, foundParam->paramData.index)->paramData.value;
         node->resolved = foundValue;
         node->dotData.resolved = foundValue;
     }
@@ -1513,7 +1503,7 @@ void resolveStructLiteral(Semantic *semantic, Node *node) {
         semantic->resolveTypes(param);
 
         auto wrapped = wrapInDeclParam(param->typeInfo, param->paramData.name, paramIndex);
-        node->typeInfo->typeData.structTypeData.params.push_back(wrapped);
+        vector_append(node->typeInfo->typeData.structTypeData.params, wrapped);
 
         param->typeInfo = param->paramData.value->typeInfo;
 
@@ -1622,7 +1612,7 @@ void resolveArrayLiteral(Semantic *semantic, Node *node) {
     // create struct literal representation
     auto elemsStruct = new Node(node->region.srcInfo, NodeType::STRUCT_LITERAL, node->scope);
     for (auto elem : node->arrayLiteralData.elements) {
-        elemsStruct->structLiteralData.params.push_back(wrapInValueParam(elem, ""));
+        vector_append(elemsStruct->structLiteralData.params, wrapInValueParam(elem, ""));
     }
 
     auto heapified = new Node(node->region.srcInfo, NodeType::HEAPIFY, node->scope);
@@ -1647,12 +1637,12 @@ void resolveArrayLiteral(Semantic *semantic, Node *node) {
     castedHeapified->castData.value = heapified;
 
     auto countNode = new Node(node->region.srcInfo, NodeType::INT_LITERAL, node->scope);
-    countNode->intLiteralData.value = static_cast<int64_t>(elemsStruct->structLiteralData.params.size());
+    countNode->intLiteralData.value = static_cast<int64_t>(elemsStruct->structLiteralData.params.length);
     countNode->typeInfo = new Node(NodeTypekind::I64);
 
     node->arrayLiteralData.structLiteralRepresentation = new Node(node->region.srcInfo, NodeType::STRUCT_LITERAL, node->scope);
-    node->arrayLiteralData.structLiteralRepresentation->structLiteralData.params.push_back(wrapInValueParam(castedHeapified, "data"));
-    node->arrayLiteralData.structLiteralRepresentation->structLiteralData.params.push_back(wrapInValueParam(countNode, "count"));
+    vector_append(node->arrayLiteralData.structLiteralRepresentation->structLiteralData.params, wrapInValueParam(castedHeapified, "data"));
+    vector_append(node->arrayLiteralData.structLiteralRepresentation->structLiteralData.params, wrapInValueParam(countNode, "count"));
 
     node->resolved = node->arrayLiteralData.structLiteralRepresentation;
 
@@ -1689,7 +1679,7 @@ void resolveStaticFor(Semantic *semantic, Node *node) {
             && !resolvedTargetType->typeData.structTypeData.isSecretlyEnum) {
         auto params = resolvedTargetType->typeData.structTypeData.params;
 
-        for (unsigned long staticIdx = 0; staticIdx < params.size(); staticIdx += 1) {
+        for (unsigned long staticIdx = 0; staticIdx < params.length; staticIdx += 1) {
             auto intLiteral = new Node();
             intLiteral->type = NodeType::INT_LITERAL;
             intLiteral->typeInfo = new Node(NodeTypekind::I64);
@@ -1715,7 +1705,7 @@ void resolveStaticFor(Semantic *semantic, Node *node) {
         // todo(chad): test scopes here
 
         // new declaration for elem
-        hash_t_insert(node->scope->symbols, node->forData.element_alias->symbolData.atomId, staticElem);
+        hash_insert(node->scope->symbols, node->forData.element_alias->symbolData.atomId, staticElem);
 
         Node *indexLiteral = nullptr;
         if (node->forData.iterator_alias != nullptr) {
@@ -1723,7 +1713,7 @@ void resolveStaticFor(Semantic *semantic, Node *node) {
             indexLiteral->type = NodeType::INT_LITERAL;
             indexLiteral->typeInfo = new Node(NodeTypekind::I64);
             indexLiteral->intLiteralData.value = staticIdx;
-            hash_t_insert(node->scope->symbols, node->forData.iterator_alias->symbolData.atomId, indexLiteral);
+            hash_insert(node->scope->symbols, node->forData.iterator_alias->symbolData.atomId, indexLiteral);
         }
 
         auto subScope = new Scope(node->scope);
@@ -1735,9 +1725,9 @@ void resolveStaticFor(Semantic *semantic, Node *node) {
             node->forData.staticStmts.push_back(newStmt);
         }
 
-        hash_t_erase(node->scope->symbols, node->forData.element_alias->symbolData.atomId);
+        hash_erase(node->scope->symbols, node->forData.element_alias->symbolData.atomId);
         if (node->forData.iterator_alias != nullptr) {
-            hash_t_erase(node->scope->symbols, node->forData.iterator_alias->symbolData.atomId);
+            hash_erase(node->scope->symbols, node->forData.iterator_alias->symbolData.atomId);
         }
         staticIdx += 1;
     }
@@ -1770,7 +1760,7 @@ void resolveFor(Semantic *semantic, Node *node) {
     semantic->resolveTypes(elementDecl);
 
     // insert this new declaration into the scope of the 'for' statement
-    hash_t_insert(node->scope->symbols, node->forData.element_alias->symbolData.atomId, elementDecl);
+    hash_insert(node->scope->symbols, node->forData.element_alias->symbolData.atomId, elementDecl);
 
     // 0
     auto zero = new Node();
@@ -1794,7 +1784,7 @@ void resolveFor(Semantic *semantic, Node *node) {
     auto index = indexDecl;
     if (node->forData.iterator_alias != nullptr) {
         node->forData.iterator_alias->resolved = indexDecl;
-        hash_t_insert(node->scope->symbols, node->forData.iterator_alias->symbolData.atomId, indexDecl);
+        hash_insert(node->scope->symbols, node->forData.iterator_alias->symbolData.atomId, indexDecl);
 
         index = node->forData.iterator_alias;
     }
@@ -1926,9 +1916,9 @@ void resolveTagCheck(Semantic *semantic, Node *node) {
     param0->scope = resolvedNode->dotData.lhs->scope;
     param0->type = NodeType::SYMBOL;
     param0->symbolData.atomId = AtomTable::current->insertStr("tag");
-    param0->resolved = typeData.structTypeData.params[0];
-    assert(typeData.structTypeData.params[0]->type == NodeType::DECL_PARAM);
-    param0->typeInfo = typeData.structTypeData.params[0]->paramData.type;
+    param0->resolved = vector_at(typeData.structTypeData.params, 0);
+    assert(vector_at(typeData.structTypeData.params, 0)->type == NodeType::DECL_PARAM);
+    param0->typeInfo = vector_at(typeData.structTypeData.params, 0)->paramData.type;
 
     auto tagDot = new Node();
     tagDot->scope = node->scope;
@@ -2136,7 +2126,7 @@ void resolveFieldsof(Semantic *semantic, Node *node) {
 
     auto canDo = true;
     auto isEnum = false;
-    vector<Node *> params;
+    vector_t<Node *> params;
     if (resolvedNodeData->typeData.kind == NodeTypekind::STRUCT) {
         if (resolvedNodeData->typeData.structTypeData.isSecretlyArray) {
             canDo = false;
@@ -2181,7 +2171,9 @@ void resolveFieldsof(Semantic *semantic, Node *node) {
         auto fieldLit = new Node();
         fieldLit->scope = node->scope;
         fieldLit->type = NodeType::STRUCT_LITERAL;
-        fieldLit->structLiteralData.params = {wrapInValueParam(indexLit, "index"), wrapInValueParam(nameLit, "name")};
+        fieldLit->structLiteralData.params = vector_init<Node *>(2);
+        vector_append(fieldLit->structLiteralData.params, wrapInValueParam(indexLit, "index"));
+        vector_append(fieldLit->structLiteralData.params, wrapInValueParam(nameLit, "name"));
 
         resolved->arrayLiteralData.elements.push_back(fieldLit);
     }

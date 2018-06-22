@@ -321,7 +321,7 @@ llvm::DIType *diTypeFor(LlvmGen *gen, Node *type) {
             unsigned int idx = 0;
 
             auto isUnion = type->typeData.structTypeData.isSecretlyEnum;
-            auto paramCount = type->typeData.structTypeData.params.size();
+            auto paramCount = type->typeData.structTypeData.params.length;
             if (isUnion) {
                 paramCount = 2;
             }
@@ -357,12 +357,12 @@ llvm::DIType *diTypeFor(LlvmGen *gen, Node *type) {
                     auto offsetInBits = structLayout->getElementOffsetInBits(idx);
 
                     elements.push_back(gen->dBuilder->createMemberType(gen->diCu, name, diFile,
-                                                                       static_cast<unsigned int>(type->typeData.structTypeData.params[0]->region.start.line),
+                                                                       static_cast<unsigned int>(vector_at(type->typeData.structTypeData.params, 0)->region.start.line),
                                                                        sizeInBits, alignInBits, offsetInBits,
                                                                        llvm::DINode::FlagZero, basicType));
                 }
                 else {
-                    auto param = type->typeData.structTypeData.params[i];
+                    auto param = vector_at(type->typeData.structTypeData.params, i);
 
                     auto basicType = diTypeFor(gen, param->typeInfo);
 
@@ -667,7 +667,7 @@ void LlvmGen::gen(Node *node) {
                 gen(param);
 
                 auto passedParamType = rvalueFor(param->paramData.value)->getType();
-                auto declParamType = typeFor(resolve(resolve(node->fnCallData.fn)->typeInfo->typeData.fnTypeData.params[argIdx]->typeInfo));
+                auto declParamType = typeFor(resolve(vector_at(resolve(node->fnCallData.fn)->typeInfo->typeData.fnTypeData.params, argIdx)->typeInfo));
 
                 // todo(chad): @Hack there doesn't seem to be another way to cast things...
                 auto realParam = builder.CreateAlloca(declParamType, nullptr, "realParam");
@@ -870,7 +870,7 @@ void LlvmGen::gen(Node *node) {
             }
         } break;
         case NodeType::DECL_PARAM: {
-            auto resolvedParam = currentFnDecl->fnDeclData.params[node->paramData.index];
+            auto resolvedParam = vector_at(currentFnDecl->fnDeclData.params, node->paramData.index);
             auto fn = static_cast<llvm::Function *>(currentFnDecl->llvmData);
             node->llvmData = &fn->arg_begin()[resolvedParam->paramData.index];
 
@@ -1137,10 +1137,10 @@ void LlvmGen::gen(Node *node) {
         case NodeType::STRUCT_LITERAL: {
             if (node->typeInfo->typeData.structTypeData.coercedType != nullptr && node->typeInfo->typeData.structTypeData.coercedType->typeData.structTypeData.isSecretlyEnum) {
                 // we need to store the tag and the value.
-                auto tagIndex = node->typeInfo->typeData.structTypeData.params[0]->paramData.index;
+                auto tagIndex = vector_at(node->typeInfo->typeData.structTypeData.params, 0)->paramData.index;
 
-                assert(node->structLiteralData.params.size() == 1);
-                auto value = node->structLiteralData.params[0];
+                assert(node->structLiteralData.params.length == 1);
+                auto value = vector_at(node->structLiteralData.params, 0);
                 assert(value->type == NodeType::VALUE_PARAM);
 
                 gen(value->paramData.value);

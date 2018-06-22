@@ -13,11 +13,11 @@ hash_t<string, Instruction> *AssemblyLexer::nameToInstruction = hash_t_init<stri
 
 void AssemblyLexer::populateMaps() {
     for (unsigned char i = 0; i < AssemblyLexer::tokenTypeStrings.size(); i++) {
-        hash_t_insert(nameToTokenType, AssemblyLexer::tokenTypeStrings[i], static_cast<TokenType>(i));
+        hash_insert(nameToTokenType, AssemblyLexer::tokenTypeStrings[i], static_cast<TokenType>(i));
     }
 
     for (unsigned char i = 0; i < AssemblyLexer::instructionStrings.size(); i++) {
-        hash_t_insert(nameToInstruction, AssemblyLexer::instructionStrings[i], static_cast<Instruction>(i));
+        hash_insert(nameToInstruction, AssemblyLexer::instructionStrings[i], static_cast<Instruction>(i));
     }
 }
 
@@ -32,7 +32,7 @@ void AssemblyLexer::readFnTable() {
         uint32_t fnIndex, instIndex;
         iss >> fnIndex;
         iss >> instIndex;
-        hash_t_insert(fnTable, fnIndex, (uint64_t) instIndex);
+        hash_insert(fnTable, fnIndex, (uint64_t) instIndex);
     }
 
     sourceMap.sourceInfo.source = new string(
@@ -51,10 +51,11 @@ AssemblyLexer::AssemblyLexer(string fileName)  {
     fileBytes.assign((istreambuf_iterator<char>(t)),
                 istreambuf_iterator<char>());
 
-    auto lines = new vector<unsigned long>();
-    lines->push_back(0);
+    auto lines = vector_init<unsigned long>(1);
+    vector_append(lines, (unsigned long) 0);
 
     sourceMap.sourceInfo = {new string(fileName), new string(fileBytes), lines};
+
     lastLoc = {0, 0, 0};
     loc = {0, 0, 0};
 
@@ -178,7 +179,7 @@ void AssemblyLexer::popFront() {
 
     // try parsing all the tokens
     for (const auto &memberName : tokenTypeStrings) {
-        auto member = *hash_t_get(nameToTokenType, memberName);
+        auto member = *hash_get(nameToTokenType, memberName);
 
         if (startsWith(sourceMap.sourceInfo.source, loc.byteIndex, memberName)) {
             auto startIndex = loc.byteIndex;
@@ -189,7 +190,8 @@ void AssemblyLexer::popFront() {
                 eat();
             }
 
-            auto newInst = *hash_t_get(nameToInstruction, sourceMap.sourceInfo.source->substr(startIndex, memberName.length()));
+            auto newInst = *hash_get(nameToInstruction,
+                                     sourceMap.sourceInfo.source->substr(startIndex, memberName.length()));
             popFrontFinalize(newNext, {static_cast<unsigned char>(newInst)});
 
             return;
@@ -305,7 +307,7 @@ void AssemblyLexer::eat() {
         loc.line += 1;
         loc.col = 1;
 
-        sourceMap.sourceInfo.lines->push_back(loc.byteIndex + 1);
+        vector_append(sourceMap.sourceInfo.lines, loc.byteIndex + 1);
     }
     else {
         loc.col += 1;

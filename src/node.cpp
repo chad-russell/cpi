@@ -43,7 +43,7 @@ Scope::Scope(Scope *parent_) {
 }
 
 Node *Scope::find(int64_t atomId) {
-    auto found = hash_t_get(symbols, atomId);
+    auto found = hash_get(symbols, atomId);
     if (found != nullptr) {
         return *found;
     }
@@ -191,7 +191,9 @@ Node *makeArrayType(Node *elementType) {
 
     arrayType->typeData.structTypeData.secretArrayElementType = elementType;
 
-    arrayType->typeData.structTypeData.params = {wrapInDeclParam(ptrTy, "data", 0), wrapInDeclParam(countTy, "count", 1)};
+    arrayType->typeData.structTypeData.params = vector_init<Node *>(2);
+    vector_append(arrayType->typeData.structTypeData.params, wrapInDeclParam(ptrTy, "data", 0));
+    vector_append(arrayType->typeData.structTypeData.params, wrapInDeclParam(countTy, "count", 1));
 
     return arrayType;
 }

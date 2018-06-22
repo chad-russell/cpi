@@ -75,10 +75,10 @@ void BytecodeGen::binopHelper(string instructionStr, Node *node, int32_t scale) 
 
     instructionStr.append(toAppend);
 
-    auto inst = *hash_t_get(AssemblyLexer::nameToInstruction, instructionStr);
+    auto inst = *hash_get(AssemblyLexer::nameToInstruction, instructionStr);
     append(instructions, inst);
 
-    auto bytecodeInst = *hash_t_get(AssemblyLexer::nameToInstruction, bytecodeStr);
+    auto bytecodeInst = *hash_get(AssemblyLexer::nameToInstruction, bytecodeStr);
     append(node->bytecode, bytecodeInst);
 
     append(instructions, bytecodeInst);
@@ -140,7 +140,7 @@ void BytecodeGen::gen(Node *node) {
 
             node->fnDeclData.instOffset = instructions.size();
 
-            hash_t_insert(fnTable, node->fnDeclData.tableIndex, node->fnDeclData.instOffset);
+            hash_insert(fnTable, node->fnDeclData.tableIndex, node->fnDeclData.instOffset);
 
             auto stackSize = static_cast<int32_t>(node->fnDeclData.stackSize);
             append(instructions, Instruction::BUMPSP);
@@ -546,10 +546,10 @@ void BytecodeGen::gen(Node *node) {
         case NodeType::FN_CALL: {
             if (!node->fnCallData.hasRuntimeParams) { break; }
 
-            auto paramCount = node->fnCallData.params.size();
+            auto paramCount = node->fnCallData.params.length;
             int32_t totalParamsSize = 0;
             for (auto i = 0; i < paramCount; i++) {
-                auto paramValue = node->fnCallData.params[i]->paramData.value;
+                auto paramValue = vector_at(node->fnCallData.params, i)->paramData.value;
                 resolve(paramValue);
                 totalParamsSize += typeSize(paramValue->typeInfo);
             }
@@ -558,12 +558,12 @@ void BytecodeGen::gen(Node *node) {
                 // push the params (in reverse order!)
                 auto paramAccum = 0;
                 for (auto i = static_cast<int32_t>(paramCount - 1); i >= 0; i--) {
-                    auto paramValue = node->fnCallData.params[i]->paramData.value;
+                    auto paramValue = vector_at(node->fnCallData.params, i)->paramData.value;
                     gen(paramValue);
                 }
 
                 for (auto i = static_cast<int32_t>(paramCount - 1); i >= 0; i--) {
-                    auto paramValue = node->fnCallData.params[i]->paramData.value;
+                    auto paramValue = vector_at(node->fnCallData.params, i)->paramData.value;
                     auto paramSize = typeSize(paramValue->typeInfo);
                     storeValue(resolve(paramValue), static_cast<int32_t>(currentFnStackSize + paramAccum));
                     paramAccum += paramSize;
@@ -576,7 +576,7 @@ void BytecodeGen::gen(Node *node) {
             auto resolvedFn = resolve(node->fnCallData.fn);
             if (resolvedFn->type == NodeType::FN_DECL) {
                 append(instructions, Instruction::CALL);
-                hash_t_insert(fixups, (int64_t) instructions.size(), resolvedFn);
+                hash_insert(fixups, (int64_t) instructions.size(), resolvedFn);
                 append(instructions, toBytes32(999));
             } else if (resolvedFn->type == NodeType::DECL) {
                 append(instructions, Instruction::CALLI);
@@ -1096,8 +1096,8 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
             if (node->typeInfo->typeData.structTypeData.coercedType != nullptr
                 && node->typeInfo->typeData.structTypeData.coercedType->typeData.structTypeData.isSecretlyEnum) {
                 // we need to store the tag and the value.
-                auto tagIndex = node->typeInfo->typeData.structTypeData.params[0]->paramData.index;
-                auto value = node->structLiteralData.params[0];
+                auto tagIndex = vector_at(node->typeInfo->typeData.structTypeData.params, 0)->paramData.index;
+                auto value = vector_at(node->structLiteralData.params, 0);
 
                 auto tagValue = new Node();
                 tagValue->type = NodeType::INT_LITERAL;

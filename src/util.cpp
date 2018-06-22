@@ -91,7 +91,7 @@ ostream &operator<<(ostream &os, HighlightedRegion region) {
     auto startLine = region.region.start.line;
     if (startLine > 0) { startLine -= 1; }
 
-    auto startSrc = region.region.srcInfo.lines->at(startLine);
+    auto startSrc = vector_at(region.region.srcInfo.lines, (int64_t) startLine);
     for (auto i = startSrc; i < region.region.srcInfo.source->length() && region.region.srcInfo.source->at(i) != '\n'; i++) {
         Colored<string> colored;
         if (i == region.region.start.byteIndex) {
@@ -432,13 +432,13 @@ AtomTable::AtomTable() {
 }
 
 int64_t AtomTable::insertStr(string s) {
-    auto found = hash_t_get(atoms, s);
+    auto found = hash_get(atoms, s);
     if (found != nullptr) {
         return *found;
     }
 
     auto tableIndex = (int64_t) AtomTable::current->backwardAtoms.size();
-    hash_t_insert(atoms, s, tableIndex);
+    hash_insert(atoms, s, tableIndex);
     backwardAtoms.push_back(s);
     return tableIndex;
 }
@@ -446,13 +446,13 @@ int64_t AtomTable::insertStr(string s) {
 int64_t AtomTable::insert(Region &r) {
     auto sourceStr = r.srcInfo.source->substr(r.start.byteIndex, r.end.byteIndex - r.start.byteIndex);
 
-    auto found = hash_t_get(atoms, sourceStr);
+    auto found = hash_get(atoms, sourceStr);
     if (found != nullptr) {
         return *found;
     }
 
     auto tableIndex = (int64_t) AtomTable::current->backwardAtoms.size();
-    hash_t_insert(atoms, sourceStr, tableIndex);
+    hash_insert(atoms, sourceStr, tableIndex);
     backwardAtoms.push_back(sourceStr);
     return tableIndex;
 }

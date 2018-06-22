@@ -178,7 +178,7 @@ void interpretPuts(Interpreter *interp) {
 // calli
 void interpretCalli(Interpreter *interp) {
     auto fnTableIndex = interp->read<int32_t>();
-    auto callIndex = *hash_t_get(interp->fnTable, (uint32_t) fnTableIndex);
+    auto callIndex = *hash_get(interp->fnTable, (uint32_t) fnTableIndex);
     interp->callIndex((int32_t) callIndex);
 }
 

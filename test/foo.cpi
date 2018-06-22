@@ -1,4 +1,8 @@
 fn main() {
-    puts("hello, world!\n");
+    id(3);
     return 0;
+}
+
+fn id(i: i32) {
+    return i;
 }

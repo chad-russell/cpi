@@ -12,7 +12,7 @@
 #include "semantic.h"
 #include "bytecodegen.h"
 #include "llvmgen.h"
-#include "hash.h"
+#include "container.h"
 
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/Optional.h"
@@ -89,9 +89,6 @@ InputType inputTypeFromExtension(const string &fileName) {
 }
 
 int main(int argc, char **argv) {
-    string foo = "foo";
-    string bar = "bar";
-
     nodeId = 0;
     debugFlag = 0;
 
@@ -242,7 +239,7 @@ int main(int argc, char **argv) {
             auto instIndex = bytesTo<uint32_t>(bytes, offset);
             offset += sizeof(uint32_t);
 
-            hash_t_insert(fnTable, fnIndex, (uint64_t) instIndex);
+            hash_insert(fnTable, fnIndex, (uint64_t) instIndex);
         }
 
         instructions = vector<unsigned char>(bytes.size() - offset);

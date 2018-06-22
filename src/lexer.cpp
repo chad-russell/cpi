@@ -49,8 +49,8 @@ Lexer::Lexer(string fileName) {
     fileBytes.assign((istreambuf_iterator<char>(t)),
                 istreambuf_iterator<char>());
 
-    auto lines = new vector<unsigned long>();
-    lines->push_back(0);
+    auto lines = vector_init<unsigned long>(1);
+    vector_append(lines, (unsigned long) 0);
 
     srcInfo = {new string(fileName), new string(fileBytes), lines};
 
@@ -322,7 +322,7 @@ void Lexer::eat() {
         loc.col = 1;
 
         unsigned long byteIndex = loc.byteIndex + 1;
-        srcInfo.lines->push_back(byteIndex);
+        vector_append(srcInfo.lines, byteIndex);
     } else {
         loc.col += 1;
     }

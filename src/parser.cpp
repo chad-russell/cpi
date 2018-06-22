@@ -46,14 +46,14 @@ void Parser::expectSemicolon() {
 void Parser::scopeInsert(int64_t atomId, Node *node) {
     auto _scope = scopes.top();
 
-    auto found = hash_t_get(_scope->symbols, atomId);
+    auto found = hash_get(_scope->symbols, atomId);
     if (found != nullptr) {
         ostringstream s("");
         s << "redeclaration of symbol '" << AtomTable::current->backwardAtoms[atomId] << "'";
         reportError(s.str());
     }
 
-    hash_t_insert(_scope->symbols, atomId, node);
+    hash_insert(_scope->symbols, atomId, node);
 }
 
 void Parser::parseRoot() {
@@ -89,8 +89,8 @@ Node *Parser::parseTopLevel() {
         exit(1);
 }
 
-vector<Node *> Parser::parseDeclParams() {
-    vector<Node *> params;
+vector_t<Node *> Parser::parseDeclParams() {
+    auto params = vector_init<Node *>(10);
 
     while (!lexer->isEmpty() && lexer->front.type != LexerTokenType::RPAREN && lexer->front.type != LexerTokenType::RCURLY) {
         ParamData param{};
@@ -136,14 +136,14 @@ vector<Node *> Parser::parseDeclParams() {
             node->region.end = name->region.end;
         }
 
-        params.push_back(node);
+        vector_append(params, node);
     }
 
     return params;
 }
 
-vector<Node *> Parser::parseValueParams() {
-    vector<Node *> params;
+vector_t<Node *> Parser::parseValueParams() {
+    vector_t<Node *> params = vector_init<Node *>(10);
 
     while (!lexer->isEmpty() && lexer->front.type != LexerTokenType::RPAREN && lexer->front.type != LexerTokenType::RCURLY) {
         ParamData param{};
@@ -170,7 +170,7 @@ vector<Node *> Parser::parseValueParams() {
         node->paramData = param;
 
         node->region = {lexer->srcInfo, name ? name->region.start : param.value->region.start, param.value->region.end};
-        params.push_back(node);
+        vector_append(params, node);
     }
 
     return params;
@@ -828,11 +828,11 @@ Node *Parser::parseType() {
             tagParam->paramData.type = new Node(NodeTypekind::I64);
             tagParam->paramData.name = tagSymbol;
 
-            type->typeData.structTypeData.params.push_back(tagParam);
+            vector_append(type->typeData.structTypeData.params, tagParam);
             auto declaredParams = parseDeclParams();
             for (auto dp : declaredParams) {
                 dp->paramData.index += 1;
-                type->typeData.structTypeData.params.push_back(dp);
+                vector_append(type->typeData.structTypeData.params, dp);
             }
 
             expect(LexerTokenType::RCURLY, "}");

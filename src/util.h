@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <memory.h>
 
-#include "hash.h"
+#include "container.h"
 
 using namespace std;
 
@@ -173,7 +173,7 @@ struct SourceInfo {
     string *fileName = nullptr;
     string *source = nullptr;
 
-    vector<unsigned long> *lines;
+    vector_t<unsigned long> lines = vector_init<unsigned long>(100);
 };
 
 struct Location {
@@ -189,13 +189,13 @@ struct Region {
 };
 
 struct FnTypeData {
-    vector<Node *> params = {};
+    vector_t<Node *> params = vector_init<Node *>(10);
     Node *returnType = nullptr;
 };
 
 struct StructTypeData {
     bool isLiteral = false;
-    vector<Node *> params = {};
+    vector_t<Node *> params = vector_init<Node *>(10);
 
     bool isSecretlyArray = false;
     Node *secretArrayElementType = nullptr;
@@ -251,8 +251,8 @@ struct ImportData {
 
 struct FnDeclData {
     Node *name = nullptr;
-    vector<Node *> ctParams = {};
-    vector<Node *> params = {};
+    vector_t<Node *> ctParams = vector_init<Node *>(10);
+    vector_t<Node *> params = vector_init<Node *>(10);
     Node * returnType = nullptr;
     vector<Node *> body = {};
     vector<Node *> locals = {};
@@ -294,8 +294,8 @@ struct BoolLiteralData {
 
 struct FnCallData {
     Node *fn = nullptr;
-    vector<Node *> ctParams = {};
-    vector<Node *> params = {};
+    vector_t<Node *> ctParams = vector_init<Node *>(10);
+    vector_t<Node *> params = vector_init<Node *>(10);
 
     bool hasRuntimeParams = true;
 };
@@ -327,7 +327,7 @@ struct BinopData {
 };
 
 struct StructLiteralData {
-    vector<Node *> params = {};
+    vector_t<Node *> params = vector_init<Node *>(10);
 };
 
 struct StringLiteralData {

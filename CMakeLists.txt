@@ -17,8 +17,8 @@ set(LLVM_CONFIG_PATH "/usr/local/opt/llvm@6/bin/llvm-config")
 execute_process(
         COMMAND
         ${LLVM_CONFIG_PATH}
-        --cxxflags
-        OUTPUT_VARIABLE LLVM_CXXFLAGS
+        --includedir
+        OUTPUT_VARIABLE LLVM_INCLUDEDIR
         OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 execute_process(
@@ -42,13 +42,13 @@ execute_process(
         OUTPUT_VARIABLE LLVM_LIBS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-set(CMAKE_CXX_FLAGS "${LLVM_CXXFLAGS} ${LLVM_LDFLAGS} ${LLVM_SYSTEMLIBS} ${LLVM_LIBS}")
+set(CMAKE_CXX_FLAGS "-I${LLVM_INCLUDEDIR} ${LLVM_LDFLAGS} ${LLVM_SYSTEMLIBS} ${LLVM_LIBS}")
 
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-#set(CMAKE_BUILD_TYPE Debug)
-set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_BUILD_TYPE Debug)
+#set(CMAKE_BUILD_TYPE Release)
 
 set(SOURCE_FILES
         src/assembler.cpp
@@ -69,7 +69,6 @@ set(SOURCE_FILES
         src/util.cpp
         src/util.h
         src/llvmgen.cpp
-        src/hash.cpp
-        src/hash.h)
+        src/container.h)
 
 add_executable(cpi ${SOURCE_FILES})

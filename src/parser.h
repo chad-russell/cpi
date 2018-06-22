@@ -45,8 +45,8 @@ struct Parser {
 
     void parseRoot();
     Node *parseTopLevel();
-    vector<Node *> parseDeclParams();
-    vector<Node *> parseValueParams();
+    vector_t<Node *> parseDeclParams();
+    vector_t<Node *> parseValueParams();
     Node *parseFnDecl();
     Node *parseTypeDecl();
     Node *parseSymbol();

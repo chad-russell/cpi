@@ -19,5 +19,5 @@ public:
 
 bool assignParams(Semantic *semantic,
                   Node *errorReportTarget,
-                  const vector<Node *> &declParams,
-                  vector<Node *> &givenParams);
+                  const vector_t<Node *> &declParams,
+                  vector_t<Node *> &givenParams);

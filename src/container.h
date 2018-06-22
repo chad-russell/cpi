@@ -1,14 +1,17 @@
 //
-// Created by Chad Russell on 6/21/18.
+// Created by Chad Russell on 6/22/18.
 //
 
-#ifndef CPI_HASH_H
-#define CPI_HASH_H
+#ifndef CPI_CONTAINER_H
+#define CPI_CONTAINER_H
 
 #include <string>
 
 using namespace std;
 
+// ==========================
+//          HASH
+// ==========================
 template<typename Key, typename Value>
 struct bucket_t {
     Key key;
@@ -33,7 +36,7 @@ struct hash_t<Key, Value> *hash_t_init(int32_t bc) {
 }
 
 template<typename Key, typename Value>
-void hash_t_insert(struct hash_t<Key, Value> *ht, Key key, Value value) {
+void hash_insert(struct hash_t<Key, Value> *ht, Key key, Value value) {
     hash<Key> hasher;
     auto hash = hasher(key) % ht->bucket_count;
 
@@ -71,7 +74,7 @@ void hash_t_insert(struct hash_t<Key, Value> *ht, Key key, Value value) {
 }
 
 template<typename Key, typename Value>
-void hash_t_erase(hash_t<Key, Value> *ht, Key key) {
+void hash_erase(hash_t<Key, Value> *ht, Key key) {
     hash<Key> hasher;
     auto hash = hasher(key) % ht->bucket_count;
 
@@ -98,7 +101,7 @@ void hash_t_erase(hash_t<Key, Value> *ht, Key key) {
 }
 
 template<typename Key, typename Value>
-Value *hash_t_get(struct hash_t<Key, Value> *ht, Key key) {
+Value *hash_get(struct hash_t<Key, Value> *ht, Key key) {
     hash<Key> hasher;
     auto hash = hasher(key) % ht->bucket_count;
 
@@ -119,4 +122,76 @@ Value *hash_t_get(struct hash_t<Key, Value> *ht, Key key) {
     return nullptr;
 }
 
-#endif //CPI_HASH_H
+
+// ==========================
+//          VECTOR
+// ==========================
+template<typename T>
+struct vector_t {
+    unsigned long length;
+    unsigned long capacity;
+
+    T *items;
+};
+
+// to debug:
+// (T(*)[128]) v->items
+
+template<typename T>
+vector_t<T> vector_init(unsigned long initial_capacity) {
+    vector_t<T> vec;
+    vec.length = 0;
+    vec.capacity = initial_capacity;
+    vec.items = (T *) calloc((size_t) initial_capacity, sizeof(T));
+    return vec;
+}
+
+template<typename T>
+void vector_grow(vector_t<T> &vector) {
+    unsigned long new_capacity = vector.capacity * 2;
+
+    auto new_items = (T *) calloc((size_t) new_capacity, sizeof(T));
+    auto old_items = vector.items;
+
+    memcpy(new_items, vector.items, vector.capacity * sizeof(T));
+
+    vector.capacity = new_capacity;
+    vector.items = new_items;
+
+    free(old_items);
+}
+
+template<typename T>
+void vector_append(vector_t<T> &vector, T item) {
+    if (vector.length == vector.capacity) {
+        vector_grow(vector);
+    }
+
+    memcpy(vector.items + vector.length, &item, sizeof(T));
+    vector.length = vector.length + 1;
+}
+
+template<typename T>
+T vector_at(vector_t<T> vector, unsigned long index) {
+    assert(index >= 0 && index < vector.length);
+
+    return vector.items[index];
+}
+
+template<typename T>
+void vector_set_at(vector_t<T> vector, unsigned long index, T item) {
+    memcpy(vector.items + index, &item, sizeof(T));
+}
+
+template<typename T>
+auto begin(vector_t<T> &v) {
+    return &v.items[0];
+}
+
+template<typename T>
+auto end(vector_t<T> &v) {
+    // todo(chad): is this dangerous???
+    return &v.items[v.length];
+}
+
+#endif //CPI_CONTAINER_H
