@@ -189,27 +189,24 @@ struct Region {
 };
 
 struct FnTypeData {
-    vector_t<Node *> params = vector_init<Node *>(10);
-    Node *returnType = nullptr;
+    vector_t<Node *> params;
+    Node *returnType;
 };
 
 struct StructTypeData {
-    bool isLiteral = false;
-    vector_t<Node *> params = vector_init<Node *>(10);
+    bool isLiteral;
+    vector_t<Node *> params;
 
-    bool isSecretlyArray = false;
-    Node *secretArrayElementType = nullptr;
+    bool isSecretlyArray;
+    Node *secretArrayElementType;
 
-    bool isSecretlyEnum = false;
+    bool isSecretlyEnum;
 
-    // todo(chad): this should maybe just be rolled up into 'resolved'?
-    Node *coercedType = nullptr;
-
-    bool enumCoerced = false;
+    Node *coercedType;
 };
 
 struct PointerTypeData {
-    Node *underlyingType = nullptr;
+    Node *underlyingType;
 };
 
 struct SymbolTypeData {
@@ -219,15 +216,25 @@ struct SymbolTypeData {
 struct TypeData {
     NodeTypekind kind;
 
-//     union {
-    FnTypeData fnTypeData;
-    StructTypeData structTypeData;
-    PointerTypeData pointerTypeData;
-    SymbolTypeData symbolTypeData;
-    double floatTypeData;
-    int64_t intTypeData;
-    bool boolTypeData;
-//     };
+//    union {
+        FnTypeData fnTypeData;
+        StructTypeData structTypeData;
+        PointerTypeData pointerTypeData;
+        SymbolTypeData symbolTypeData;
+        double floatTypeData;
+        int64_t intTypeData;
+        bool boolTypeData;
+//    };
+};
+
+struct TDF {
+    union {
+        FnTypeData fnTypeData;
+        StructTypeData structTypeData;
+        PointerTypeData pointerTypeData;
+        SymbolTypeData symbolTypeData;
+        bool boolTypeData;
+    };
 };
 
 struct ParamData {

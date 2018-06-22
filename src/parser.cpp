@@ -783,7 +783,7 @@ Node *Parser::parseType() {
         } break;
         case LexerTokenType::FN: {
             popFront();
-            type->typeData.kind = NodeTypekind::FN;
+            initFnTypeData(type);
             expect(LexerTokenType::LPAREN, "(");
             type->typeData.fnTypeData.params = parseDeclParams();
             expect(LexerTokenType::RPAREN, ")");
@@ -799,7 +799,7 @@ Node *Parser::parseType() {
 
             expect(LexerTokenType::LCURLY, "{");
 
-            type->typeData.kind = NodeTypekind::STRUCT;
+            initStructTypeData(type);
             type->typeData.structTypeData.params = parseDeclParams();
 
             expect(LexerTokenType::RCURLY, "}");
@@ -811,7 +811,7 @@ Node *Parser::parseType() {
 
             expect(LexerTokenType::LCURLY, "{");
 
-            type->typeData.kind = NodeTypekind::STRUCT;
+            initStructTypeData(type);
             type->typeData.structTypeData.isSecretlyEnum = true;
 
             auto tagSymbol = new Node();

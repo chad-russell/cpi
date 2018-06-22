@@ -118,7 +118,6 @@ int maybeMatchUnionToStructLiteral(Node *desired, Node *actual, Semantic *semant
 
                 other->typeData.structTypeData.coercedType = unionToMatchAgainst;
                 vector_at(other->typeData.structTypeData.params, 0)->paramData.index = paramIndex;
-                other->typeData.structTypeData.enumCoerced = true;
 
                 return 2;
             }
@@ -471,6 +470,7 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
     semantic->resolveTypes(data->returnType);
 
     node->typeInfo = new Node(NodeTypekind::FN);
+    initFnTypeData(node->typeInfo);
     node->typeInfo->typeData.fnTypeData.params = vector_init<Node *>(10);
     for (auto param : data->params) {
         vector_append(node->typeInfo->typeData.fnTypeData.params, param);
@@ -1496,6 +1496,7 @@ void resolvePanic(Semantic *semantic, Node *node) {
 
 void resolveStructLiteral(Semantic *semantic, Node *node) {
     node->typeInfo = new Node(NodeTypekind::STRUCT);
+    initStructTypeData(node->typeInfo);
     node->typeInfo->typeData.structTypeData.isLiteral = true;
 
     auto paramIndex = 0;

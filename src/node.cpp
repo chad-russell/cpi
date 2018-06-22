@@ -20,6 +20,24 @@ Node::Node() {
     nodeId += 1;
 }
 
+void initStructTypeData(Node *node) {
+    node->typeData.kind = NodeTypekind::STRUCT;
+
+    node->typeData.structTypeData.isLiteral = false;
+    node->typeData.structTypeData.params = vector_init<Node *>(10);
+    node->typeData.structTypeData.isSecretlyArray = false;
+    node->typeData.structTypeData.secretArrayElementType = nullptr;
+    node->typeData.structTypeData.isSecretlyEnum = false;
+    node->typeData.structTypeData.coercedType = nullptr;
+}
+
+void initFnTypeData(Node *node) {
+    node->typeData.kind = NodeTypekind::FN;
+
+    node->typeData.fnTypeData.returnType = nullptr;
+    node->typeData.fnTypeData.params = vector_init<Node *>(10);
+}
+
 Node *resolve(Node *n) {
     if (n == nullptr) { return nullptr; }
 
@@ -187,6 +205,7 @@ Node *makeArrayType(Node *elementType) {
     auto countTy = new Node(NodeTypekind::I64);
 
     auto arrayType = new Node(NodeTypekind::STRUCT);
+    initStructTypeData(arrayType);
     arrayType->typeData.structTypeData.isSecretlyArray = true;
 
     arrayType->typeData.structTypeData.secretArrayElementType = elementType;
