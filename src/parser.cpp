@@ -463,7 +463,7 @@ Node *Parser::parseIf() {
     while (lexer->front.type != LexerTokenType::RCURLY) {
         auto scopedStmt = parseScopedStmt();
         if (scopedStmt != nullptr) {
-            if_->ifData.stmts.push_back(scopedStmt);
+            vector_append(if_->ifData.stmts, scopedStmt);
         }
     }
 
@@ -476,7 +476,7 @@ Node *Parser::parseIf() {
         popFront();
 
         if (lexer->front.type == LexerTokenType::IF) {
-            if_->ifData.elseStmts.push_back(parseIf());
+            vector_append(if_->ifData.elseStmts, parseIf());
             return if_;
         }
 
@@ -485,7 +485,7 @@ Node *Parser::parseIf() {
         scopes.push(new Scope(scopes.top()));
 
         while (lexer->front.type != LexerTokenType::RCURLY) {
-            if_->ifData.elseStmts.push_back(parseScopedStmt());
+            vector_append(if_->ifData.elseStmts, parseScopedStmt());
         }
 
         scopes.pop();
@@ -514,7 +514,7 @@ Node *Parser::parseWhile() {
     while (lexer->front.type != LexerTokenType::RCURLY) {
         auto scopedStmt = parseScopedStmt();
         if (scopedStmt) {
-            while_->whileData.stmts.push_back(scopedStmt);
+            vector_append(while_->whileData.stmts, scopedStmt);
         }
     }
 
@@ -557,7 +557,7 @@ Node *Parser::parseFor() {
     while (lexer->front.type != LexerTokenType::RCURLY) {
         auto scopedStmt = parseScopedStmt();
         if (scopedStmt) {
-            for_->forData.stmts.push_back(scopedStmt);
+            vector_append(for_->forData.stmts, scopedStmt);
         }
     }
 
@@ -896,13 +896,13 @@ Node *Parser::parseArrayLiteral() {
     expect(LexerTokenType::LCURLY, "{");
     if (lexer->front.type != LexerTokenType::RCURLY) {
         auto elem = parseRvalue();
-        lit->arrayLiteralData.elements.push_back(elem);
+        vector_append(lit->arrayLiteralData.elements, elem);
     }
     while (lexer->front.type != LexerTokenType::RCURLY) {
         expect(LexerTokenType::COMMA, ",");
 
         auto elem = parseRvalue();
-        lit->arrayLiteralData.elements.push_back(elem);
+        vector_append(lit->arrayLiteralData.elements, elem);
     }
     expect(LexerTokenType::RCURLY, "}");
 

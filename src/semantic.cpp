@@ -741,8 +741,8 @@ void resolveSymbol(Semantic *semantic, Node *node) {
 }
 
 bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<Node *> &declParams, vector_t<Node *> &givenParams) {
-    vector_t<bool> openParams = {};
-    vector_t<Node *> newParams = {};
+    vector_t<bool> openParams = vector_init<bool>(declParams.length + 1);
+    vector_t<Node *> newParams = vector_init<Node *>(declParams.length + 1);
 
     for (unsigned long i = 0; i < declParams.length; i++) {
         vector_append(openParams, true);
@@ -1034,7 +1034,7 @@ void resolveFnCall(Semantic *semantic, Node *node) {
 
     // assign runtime params
     if (node->fnCallData.hasRuntimeParams) {
-        vector_t<Node *> declParams;
+        vector_t<Node *> declParams = vector_init<Node *>(10);
 
         if (isPoly) {
             assert(resolvedFn->type == NodeType::FN_DECL);
@@ -1083,7 +1083,7 @@ void resolveFnCall(Semantic *semantic, Node *node) {
 
     // un-assign runtime params
     if (node->fnCallData.hasRuntimeParams) {
-        vector_t<Node *> declParams;
+        vector_t<Node *> declParams = vector_init<Node *>(10);
 
         if (isPoly) {
             assert(resolvedFn->type == NodeType::FN_DECL);
@@ -1230,7 +1230,7 @@ void possiblyResolveAssignToUnion(Semantic *semantic, Node *originalAssignment, 
         secretAss->assignData.lhs = tagDot;
         secretAss->assignData.rhs = constParamIndex;
 
-        originalAssignment->postStmts.push_back(secretAss);
+        vector_append(originalAssignment->postStmts, secretAss);
 
         semantic->resolveTypes(secretAss);
     }
@@ -1408,9 +1408,9 @@ void createTagCheck(Semantic *semantic, Node *node) {
     ifCheck->scope = node->scope;
     ifCheck->type = NodeType::IF;
     ifCheck->ifData.condition = eqFalse;
-    ifCheck->ifData.stmts.push_back(panicStmt);
+    vector_append(ifCheck->ifData.stmts, panicStmt);
 
-    node->preStmts.push_back(ifCheck);
+    vector_append(node->preStmts, ifCheck);
 }
 
 void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
@@ -1587,14 +1587,14 @@ void resolveArrayLiteral(Semantic *semantic, Node *node) {
     }
 
     if (node->arrayLiteralData.elementType == nullptr) {
-        if (node->arrayLiteralData.elements.empty()) {
+        if (node->arrayLiteralData.elements.length == 0) {
             semantic->reportError({node}, Error{
                     node->region,
                     "No type given for array literal and no elements from which to infer it"
             });
             return;
         }
-        node->arrayLiteralData.elementType = node->arrayLiteralData.elements[0]->typeInfo;
+        node->arrayLiteralData.elementType = vector_at(node->arrayLiteralData.elements, 0)->typeInfo;
     }
 
     semantic->resolveTypes(node->arrayLiteralData.elementType);
@@ -1624,9 +1624,9 @@ void resolveArrayLiteral(Semantic *semantic, Node *node) {
     if (node->arrayLiteralData.elementType != nullptr) {
         typeOfElem = node->arrayLiteralData.elementType;
     }
-    else if (!node->arrayLiteralData.elements.empty()) {
+    else if (!node->arrayLiteralData.elements.length == 0) {
         typeOfElem = new Node(node->region.srcInfo, NodeType::TYPEOF, node->scope);
-        typeOfElem->nodeData = node->arrayLiteralData.elements[0];
+        typeOfElem->nodeData = vector_at(node->arrayLiteralData.elements, 0);
     }
 
     auto pointerToTypeOfElem = new Node(NodeTypekind::POINTER);
@@ -1670,7 +1670,7 @@ void resolveStaticFor(Semantic *semantic, Node *node) {
     auto resolvedTargetType = resolve(resolvedTarget->typeInfo);
 
     // if the target is not an array literal, error
-    vector<Node *> staticElements;
+    vector_t<Node *> staticElements = vector_init<Node *>(10);
     if (resolvedTarget->type == NodeType::ARRAY_LITERAL) {
         staticElements = resolvedTarget->arrayLiteralData.elements;
     }
@@ -1692,7 +1692,7 @@ void resolveStaticFor(Semantic *semantic, Node *node) {
             elemDot->dotData.rhs = intLiteral;
             semantic->resolveTypes(elemDot);
 
-            staticElements.push_back(elemDot);
+            vector_append(staticElements, elemDot);
         }
     }
     else {
@@ -1722,7 +1722,7 @@ void resolveStaticFor(Semantic *semantic, Node *node) {
             auto newStmt = semantic->deepCopy(stmt, subScope);
 
             semantic->resolveTypes(newStmt);
-            node->forData.staticStmts.push_back(newStmt);
+            vector_append(node->forData.staticStmts, newStmt);
         }
 
         hash_erase(node->scope->symbols, node->forData.element_alias->symbolData.atomId);
@@ -1852,20 +1852,20 @@ void resolveFor(Semantic *semantic, Node *node) {
     while_->whileData.condition = whileConditionBinop;
 
     // e := array[index]
-    while_->whileData.stmts.push_back(elementAssign);
+    vector_append(while_->whileData.stmts, elementAssign);
 
     // stmts
     for (auto stmt : node->forData.stmts) {
-        while_->whileData.stmts.push_back(stmt);
+        vector_append(while_->whileData.stmts, stmt);
     }
 
     // increment
-    while_->whileData.stmts.push_back(incr);
+    vector_append(while_->whileData.stmts, incr);
 
-    node->forData.rewritten.push_back(elementDecl);
-    node->forData.rewritten.push_back(arrayDecl);
-    node->forData.rewritten.push_back(index);
-    node->forData.rewritten.push_back(while_);
+    vector_append(node->forData.rewritten, elementDecl);
+    vector_append(node->forData.rewritten, arrayDecl);
+    vector_append(node->forData.rewritten, index);
+    vector_append(node->forData.rewritten, while_);
 
     for (auto stmt : node->forData.rewritten) {
         semantic->resolveTypes(stmt);
@@ -1956,17 +1956,6 @@ void resolveHeapify(Semantic *semantic, Node *node) {
     auto pointerTypeInfo = new Node(NodeTypekind::POINTER);
     pointerTypeInfo->typeData.pointerTypeData.underlyingType = node->nodeData->typeInfo;
     node->typeInfo = pointerTypeInfo;
-}
-
-Node *buildArrayLiteral(Scope *scope, vector<Node *> members, Node *elementType) {
-    auto node = new Node();
-    node->scope = scope;
-    node->type = NodeType::ARRAY_LITERAL;
-
-    node->arrayLiteralData.elementType = elementType;
-    node->arrayLiteralData.elements = std::move(members);
-
-    return node;
 }
 
 void resolvePuts(Semantic *semantic, Node *node) {
@@ -2126,7 +2115,7 @@ void resolveFieldsof(Semantic *semantic, Node *node) {
 
     auto canDo = true;
     auto isEnum = false;
-    vector_t<Node *> params;
+    vector_t<Node *> params = vector_init<Node *>(10);
     if (resolvedNodeData->typeData.kind == NodeTypekind::STRUCT) {
         if (resolvedNodeData->typeData.structTypeData.isSecretlyArray) {
             canDo = false;
@@ -2175,7 +2164,7 @@ void resolveFieldsof(Semantic *semantic, Node *node) {
         vector_append(fieldLit->structLiteralData.params, wrapInValueParam(indexLit, "index"));
         vector_append(fieldLit->structLiteralData.params, wrapInValueParam(nameLit, "name"));
 
-        resolved->arrayLiteralData.elements.push_back(fieldLit);
+        vector_append(resolved->arrayLiteralData.elements, fieldLit);
     }
 
     semantic->resolveTypes(resolved);

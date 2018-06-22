@@ -324,13 +324,13 @@ struct StringLiteralData {
 
 struct IfData {
     Node *condition = nullptr;
-    vector<Node *> stmts = {};
-    vector<Node *> elseStmts = {};
+    vector_t<Node *> stmts = vector_init<Node *>(10);
+    vector_t<Node *> elseStmts = vector_init<Node *>(10);
 };
 
 struct WhileData {
     Node *condition = nullptr;
-    vector<Node *> stmts = {};
+    vector_t<Node *> stmts = vector_init<Node *>(10);
 };
 
 struct CastData {
@@ -355,7 +355,7 @@ struct DerefData {
 
 struct ArrayLiteralData {
     Node *elementType = nullptr;
-    vector<Node *> elements;
+    vector_t<Node *> elements = vector_init<Node *>(10);
 
     Node *structLiteralRepresentation;
 };
@@ -365,12 +365,12 @@ struct ForData {
     Node *iterator_alias = nullptr;
     Node *target = nullptr;
 
-    vector<Node *> stmts;
+    vector_t<Node *> stmts = vector_init<Node *>(10);;
 
-    vector<Node *> rewritten;
+    vector_t<Node *> rewritten = vector_init<Node *>(10);;
 
     bool isStatic = false;
-    vector<Node *> staticStmts;
+    vector_t<Node *> staticStmts = vector_init<Node *>(10);;
 };
 
 struct IsKindData {
@@ -398,8 +398,8 @@ public:
     Node *resolved = nullptr;
     NodeType type;
 
-    vector<Node *> preStmts;
-    vector<Node *> postStmts;
+    vector_t<Node *> preStmts = vector_init<Node *>(10);;
+    vector_t<Node *> postStmts = vector_init<Node *>(10);;
 
     // union {
     Node *nodeData;

@@ -805,7 +805,7 @@ void BytecodeGen::gen(Node *node) {
             }
 
             unsigned long skipElseBranchOverwrite = 0;
-            auto hasElse = !node->ifData.elseStmts.empty();
+            auto hasElse = !node->ifData.elseStmts.length == 0;
             if (hasElse) {
                 append(instructions, Instruction::JUMP);
 
