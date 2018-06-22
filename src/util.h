@@ -240,26 +240,14 @@ struct ParamData {
     int64_t index = 0;
 };
 
-struct ModuleData {
-    Node *name = nullptr;
-    vector<Node *> decls = {};
-};
-
-struct ImportData {
-    Node *target = nullptr;
-};
-
 struct FnDeclData {
     Node *name = nullptr;
     vector_t<Node *> ctParams = vector_init<Node *>(10);
     vector_t<Node *> params = vector_init<Node *>(10);
     Node * returnType = nullptr;
-    vector<Node *> body = {};
-    vector<Node *> locals = {};
-    vector<Node *> returns = {};
-
-    Scope *paramScope = nullptr;
-    Scope *bodyScope = nullptr;
+    vector_t<Node *> body = vector_init<Node *>(10);
+    vector_t<Node *> locals = vector_init<Node *>(10);
+    vector_t<Node *> returns = vector_init<Node *>(10);
 
     int32_t stackSize = 0;
     uint64_t instOffset;
@@ -415,7 +403,6 @@ public:
 
     // union {
     Node *nodeData;
-    ModuleData moduleData;
     FnDeclData fnDeclData;
     DeclData declData;
     AssignData assignData;
@@ -432,7 +419,6 @@ public:
     StringLiteralData stringLiteralData;
     IfData ifData;
     WhileData whileData;
-    ImportData importData;
     CastData castData;
     RetData retData;
     SymbolData symbolData;

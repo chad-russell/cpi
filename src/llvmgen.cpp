@@ -422,7 +422,7 @@ void LlvmGen::gen(Node *node) {
 
     switch (node->type) {
         case NodeType::FN_DECL: {
-            auto declOnly = node->fnDeclData.body.empty();
+            auto declOnly = node->fnDeclData.body.length == 0;
 
             // debug info
             auto fnName = node->fnDeclData.name ? AtomTable::current->backwardAtoms[node->fnDeclData.name->symbolData.atomId] : "anon";

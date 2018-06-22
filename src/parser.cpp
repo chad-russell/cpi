@@ -205,7 +205,6 @@ Node *Parser::parseFnDecl() {
     }
 
     scopes.push(new Scope(scopes.top()));
-    decl->fnDeclData.paramScope = scopes.top();
 
     // params
     expect(LexerTokenType::LPAREN, "(");
@@ -252,12 +251,11 @@ Node *Parser::parseFnDecl() {
     expect(LexerTokenType::LCURLY, "{");
 
     scopes.push(new Scope(scopes.top()));
-    decl->fnDeclData.bodyScope = scopes.top();
 
     while (!lexer->isEmpty() && lexer->front.type != LexerTokenType::RCURLY) {
         auto scopedStmt = parseScopedStmt();
         if (scopedStmt != nullptr) {
-            decl->fnDeclData.body.push_back(scopedStmt);
+            vector_append(decl->fnDeclData.body, scopedStmt);
         }
     }
     auto end = expect(LexerTokenType::RCURLY, "}");
@@ -580,7 +578,7 @@ Node *Parser::parseRet() {
     ret->region = {lexer->srcInfo, saved, ret->retData.value->region.end};
 
     if (currentFnDecl) {
-        currentFnDecl->fnDeclData.returns.push_back(ret);
+        vector_append(currentFnDecl->fnDeclData.returns, ret);
     }
 
     expectSemicolon();
@@ -1390,7 +1388,7 @@ void Parser::addLocal(Node *local) {
     local->isLocal = true;
 
     if (currentFnDecl) {
-        currentFnDecl->fnDeclData.locals.push_back(local);
+        vector_append(currentFnDecl->fnDeclData.locals, local);
     }
 }
 

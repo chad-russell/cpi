@@ -450,19 +450,19 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
         semantic->resolveTypes(param);
     }
 
-    if (data->body.empty()) {
+    if (data->body.length == 0) {
         if (data->returnType == nullptr) {
             data->returnType = new Node(NodeTypekind::NONE);
         }
     }
-    else if (data->returnType != nullptr && data->returns.empty()) {
+    else if (data->returnType != nullptr && data->returns.length == 0) {
         semantic->reportError({node}, Error{node->region, "fn has a return type, but there are no return statements!"});
     }
-    else if (data->returns.empty()) {
+    else if (data->returns.length == 0) {
         data->returnType = new Node(NodeTypekind::NONE);
     }
     else if (data->returnType == nullptr) {
-        auto firstReturn = data->returns[0];
+        auto firstReturn = vector_at(data->returns, 0);
         semantic->resolveTypes(firstReturn);
         data->returnType = firstReturn->typeInfo;
     }
@@ -2313,6 +2313,6 @@ void Semantic::addLocal(Node *local) {
     local->isLocal = true;
 
     if (currentFnDecl) {
-        currentFnDecl->fnDeclData.locals.push_back(local);
+        vector_append(currentFnDecl->fnDeclData.locals, local);
     }
 }
