@@ -1393,6 +1393,7 @@ void createTagCheck(Semantic *semantic, Node *node) {
     auto eqFalse = new Node();
     eqFalse->scope = node->scope;
     eqFalse->type = NodeType::BINOP;
+    initBinopData(eqFalse);
     eqFalse->binopData.type = LexerTokenType::EQ_EQ;
     eqFalse->binopData.lhs = tagCheck;
     eqFalse->binopData.rhs = falseConst;
@@ -1816,6 +1817,7 @@ void resolveFor(Semantic *semantic, Node *node) {
 
     auto whileConditionBinop = new Node();
     whileConditionBinop->type = NodeType::BINOP;
+    initBinopData(whileConditionBinop);
     whileConditionBinop->binopData.type = LexerTokenType::LT;
     whileConditionBinop->binopData.lhs = index;
     whileConditionBinop->binopData.rhs = arrayDotCount;
@@ -1830,6 +1832,7 @@ void resolveFor(Semantic *semantic, Node *node) {
     // indexDecl + 1
     auto incrementIndexBinop = new Node(node->region.srcInfo, NodeType::BINOP, node->scope);
     incrementIndexBinop->type = NodeType::BINOP;
+    initBinopData(incrementIndexBinop);
     incrementIndexBinop->binopData.type = LexerTokenType::ADD;
     incrementIndexBinop->binopData.lhs = index;
     incrementIndexBinop->binopData.rhs = one;
@@ -1942,6 +1945,7 @@ void resolveTagCheck(Semantic *semantic, Node *node) {
     auto eqeq = new Node();
     eqeq->scope = node->scope;
     eqeq->type = NodeType::BINOP;
+    initBinopData(eqeq);
     eqeq->binopData.type = LexerTokenType::EQ_EQ;
     eqeq->binopData.lhs = tagDot;
     eqeq->binopData.rhs = constParamIndex;

@@ -277,11 +277,11 @@ struct BoolLiteralData {
 };
 
 struct FnCallData {
-    Node *fn = nullptr;
-    vector_t<Node *> ctParams = vector_init<Node *>(10);
-    vector_t<Node *> params = vector_init<Node *>(10);
+    Node *fn;
+    vector_t<Node *> ctParams;
+    vector_t<Node *> params;
 
-    bool hasRuntimeParams = true;
+    bool hasRuntimeParams;
 };
 
 struct ArrayIndexData {

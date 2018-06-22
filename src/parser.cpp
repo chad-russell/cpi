@@ -597,8 +597,6 @@ Node *Parser::buildDots(stack<Node *> rvalues) {
         rvalues.pop();
 
         // create a new node (but reuse memory from top)
-        top->type = NodeType::FN_CALL;
-
         top->fnCallData.fn = buildDots(rvalues);
 
         top->region = {lexer->srcInfo, top->fnCallData.fn->region.start, top->region.end};

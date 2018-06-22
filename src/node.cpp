@@ -23,6 +23,15 @@ Node::Node(SourceInfo srcInfo, NodeType type_, Scope *scope_) : Node() {
         case NodeType::ASSIGN: {
             initAssignData(this);
         } break;
+        case NodeType::FN_CALL: {
+            initFnCallData(this);
+        } break;
+        case NodeType::BINOP: {
+            initBinopData(this);
+        } break;
+        case NodeType::DOT: {
+            initDotData(this);
+        }
         default: {}
     }
 }
@@ -35,6 +44,29 @@ Node::Node(NodeTypekind typekind) : Node() {
 Node::Node() {
     id = nodeId;
     nodeId += 1;
+}
+
+void initDotData(Node *node) {
+    node->dotData.lhs = nullptr;
+    node->dotData.rhs = nullptr;
+    node->dotData.resolved = nullptr;
+    node->dotData.autoDerefStorage = nullptr;
+    node->dotData.pointerIsRelative = false;
+}
+
+void initBinopData(Node *node) {
+    node->binopData.lhs = nullptr;
+    node->binopData.rhs = nullptr;
+    node->binopData.rhsScale = 1;
+    node->binopData.lhsTemporary = nullptr;
+    node->binopData.rhsTemporary = nullptr;
+}
+
+void initFnCallData(Node *node) {
+    node->fnCallData.fn = nullptr;
+    node->fnCallData.ctParams = vector_init<Node *>(10);
+    node->fnCallData.params = vector_init<Node *>(10);
+    node->fnCallData.hasRuntimeParams = true;
 }
 
 void initAssignData(Node *node) {
