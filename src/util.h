@@ -228,21 +228,14 @@ struct TypeData {
 //     };
 };
 
-struct DeclParamData {
+struct ParamData {
     Node *name = nullptr;
     Node *type = nullptr;
-    Node *initialValue = nullptr;
+    Node *value = nullptr;
 
     Node *polyLink = nullptr;
 
     int64_t index = 0;
-};
-
-struct ValueParamData {
-    Node *name = nullptr;
-    Node *value = nullptr;
-
-    int32_t index = 0;
 };
 
 struct ModuleData {
@@ -329,11 +322,6 @@ struct BinopData {
 
     Node *lhsTemporary;
     Node *rhsTemporary;
-};
-
-struct PipeData {
-    Node *lhs = nullptr;
-    Node *rhs = nullptr;
 };
 
 struct StructLiteralData {
@@ -436,9 +424,7 @@ public:
     ArrayIndexData arrayIndexData;
     DotData dotData;
     BinopData binopData;
-    PipeData pipeData;
-    DeclParamData declParamData;
-    ValueParamData valueParamData;
+    ParamData paramData;
     TypeData typeData;
     StructLiteralData structLiteralData;
     StringLiteralData stringLiteralData;

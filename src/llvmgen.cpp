@@ -303,7 +303,7 @@ llvm::DIType *diTypeFor(LlvmGen *gen, Node *type) {
             diTypes.push_back(diTypeFor(gen, resolved->typeData.fnTypeData.returnType));
             for (auto pt : resolved->typeData.fnTypeData.params) {
                 assert(pt->type == NodeType::DECL_PARAM);
-                diTypes.push_back(diTypeFor(gen, pt->declParamData.type));
+                diTypes.push_back(diTypeFor(gen, pt->paramData.type));
             }
             return gen->dBuilder->createSubroutineType(gen->dBuilder->getOrCreateTypeArray(diTypes));
         }
@@ -367,11 +367,11 @@ llvm::DIType *diTypeFor(LlvmGen *gen, Node *type) {
                     auto basicType = diTypeFor(gen, param->typeInfo);
 
                     string name;
-                    if (param->type == NodeType::VALUE_PARAM && param->valueParamData.name != nullptr) {
-                        name = AtomTable::current->backwardAtoms[param->valueParamData.name->symbolData.atomId];
+                    if (param->type == NodeType::VALUE_PARAM && param->paramData.name != nullptr) {
+                        name = AtomTable::current->backwardAtoms[param->paramData.name->symbolData.atomId];
                     }
-                    else if (param->type == NodeType::DECL_PARAM && param->declParamData.name != nullptr) {
-                        name = AtomTable::current->backwardAtoms[param->declParamData.name->symbolData.atomId];
+                    else if (param->type == NodeType::DECL_PARAM && param->paramData.name != nullptr) {
+                        name = AtomTable::current->backwardAtoms[param->paramData.name->symbolData.atomId];
                     }
                     auto sizeInBits = basicType->getSizeInBits();
                     auto alignInBits = basicType->getAlignInBits();
@@ -447,7 +447,7 @@ void LlvmGen::gen(Node *node) {
             std::vector<llvm::Type*> paramTypes = {};
             for (const auto& param : node->fnDeclData.params) {
                 assert(param->type == NodeType::DECL_PARAM);
-                paramTypes.push_back(typeFor(param->declParamData.type));
+                paramTypes.push_back(typeFor(param->paramData.type));
             }
 
             auto returnType = typeFor(node->fnDeclData.returnType);
@@ -666,12 +666,12 @@ void LlvmGen::gen(Node *node) {
             for (auto param : node->fnCallData.params) {
                 gen(param);
 
-                auto passedParamType = rvalueFor(param->valueParamData.value)->getType();
+                auto passedParamType = rvalueFor(param->paramData.value)->getType();
                 auto declParamType = typeFor(resolve(resolve(node->fnCallData.fn)->typeInfo->typeData.fnTypeData.params[argIdx]->typeInfo));
 
                 // todo(chad): @Hack there doesn't seem to be another way to cast things...
                 auto realParam = builder.CreateAlloca(declParamType, nullptr, "realParam");
-                builder.CreateStore(rvalueFor(param->valueParamData.value), builder.CreateBitCast(realParam, passedParamType->getPointerTo(0)));
+                builder.CreateStore(rvalueFor(param->paramData.value), builder.CreateBitCast(realParam, passedParamType->getPointerTo(0)));
 
                 args.push_back(builder.CreateLoad(realParam));
 
@@ -689,11 +689,11 @@ void LlvmGen::gen(Node *node) {
             }
         } break;
         case NodeType::VALUE_PARAM: {
-            gen(node->valueParamData.value);
+            gen(node->paramData.value);
 
-            node->llvmLocal = node->valueParamData.value->llvmLocal;
-            node->llvmData = node->valueParamData.value->llvmData;
-            node->isLocal = node->valueParamData.value->isLocal;
+            node->llvmLocal = node->paramData.value->llvmLocal;
+            node->llvmData = node->paramData.value->llvmData;
+            node->isLocal = node->paramData.value->isLocal;
         } break;
         case NodeType::BINOP: {
             emitDebugLocation(this, node);
@@ -870,9 +870,9 @@ void LlvmGen::gen(Node *node) {
             }
         } break;
         case NodeType::DECL_PARAM: {
-            auto resolvedParam = currentFnDecl->fnDeclData.params[node->declParamData.index];
+            auto resolvedParam = currentFnDecl->fnDeclData.params[node->paramData.index];
             auto fn = static_cast<llvm::Function *>(currentFnDecl->llvmData);
-            node->llvmData = &fn->arg_begin()[resolvedParam->declParamData.index];
+            node->llvmData = &fn->arg_begin()[resolvedParam->paramData.index];
 
             if (node->isLocal) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
@@ -943,7 +943,7 @@ void LlvmGen::gen(Node *node) {
                 storeIfNeeded(resolvedRhs);
 
                 auto foundParam = resolvedDecl->dotData.resolved;
-                auto paramIndex = (uint64_t) foundParam->declParamData.index;
+                auto paramIndex = (uint64_t) foundParam->paramData.index;
 
                 if (resolve(resolvedDecl->dotData.lhs->typeInfo)->typeData.structTypeData.isSecretlyEnum && paramIndex != 0) {
                     paramIndex = 1;
@@ -989,14 +989,8 @@ void LlvmGen::gen(Node *node) {
 
             auto foundParam = node->dotData.resolved;
 
-            uint32_t paramIndex;
-            if (foundParam->type == NodeType::DECL_PARAM) {
-                paramIndex = static_cast<uint32_t>(foundParam->declParamData.index);
-            } else if (foundParam->type == NodeType::VALUE_PARAM) {
-                paramIndex = static_cast<uint32_t>(foundParam->valueParamData.index);
-            } else {
-                assert(false);
-            }
+            assert(foundParam->type == NodeType::DECL_PARAM || foundParam->type == NodeType::VALUE_PARAM);
+            uint32_t paramIndex = static_cast<uint32_t>(foundParam->paramData.index);
 
             auto tagAtom = AtomTable::current->insertStr("tag");
             auto resolvedTypeInfo = resolve(node->dotData.lhs->typeInfo);
@@ -1008,12 +1002,7 @@ void LlvmGen::gen(Node *node) {
             if (resolvedTypeInfo->typeData.structTypeData.isSecretlyEnum) {
                 isSecretlyEnum = true;
 
-                int64_t tag = 0;
-                if (foundParam->type == NodeType::DECL_PARAM) {
-                    tag = foundParam->declParamData.name->symbolData.atomId;
-                } else if (foundParam->type == NodeType::VALUE_PARAM) {
-                    tag = foundParam->declParamData.name->symbolData.atomId;
-                }
+                int64_t tag = foundParam->paramData.name->symbolData.atomId;
 
                 paramIndex = tag == tagAtom ? 0 : 1;
             }
@@ -1148,14 +1137,14 @@ void LlvmGen::gen(Node *node) {
         case NodeType::STRUCT_LITERAL: {
             if (node->typeInfo->typeData.structTypeData.coercedType != nullptr && node->typeInfo->typeData.structTypeData.coercedType->typeData.structTypeData.isSecretlyEnum) {
                 // we need to store the tag and the value.
-                auto tagIndex = node->typeInfo->typeData.structTypeData.params[0]->declParamData.index;
+                auto tagIndex = node->typeInfo->typeData.structTypeData.params[0]->paramData.index;
 
                 assert(node->structLiteralData.params.size() == 1);
                 auto value = node->structLiteralData.params[0];
                 assert(value->type == NodeType::VALUE_PARAM);
 
-                gen(value->valueParamData.value);
-                auto paramValue = rvalueFor(value->valueParamData.value);
+                gen(value->paramData.value);
+                auto paramValue = rvalueFor(value->paramData.value);
 
                 auto structType = llvm::StructType::get(builder.getContext(),
                                                         { builder.getInt64Ty(), paramValue->getType() },
@@ -1182,8 +1171,8 @@ void LlvmGen::gen(Node *node) {
                 for (auto param : node->structLiteralData.params) {
                     gen(param);
 
-                    auto valueToInsert = rvalueFor(param->valueParamData.value);
-                    auto computedType = typeFor(param->valueParamData.value->typeInfo);
+                    auto valueToInsert = rvalueFor(param->paramData.value);
+                    auto computedType = typeFor(param->paramData.value->typeInfo);
                     assert(valueToInsert);
 
                     if (node->typeInfo->typeData.structTypeData.isSecretlyArray && idx == 0) {

@@ -1,8 +1,4 @@
 TODO:
-    - implement arbitrary printing
-
-    - merge the concepts of declParam and valueParam. It's too confusing at this point and we are needing to switch between them too often
-
     - better interpreter debugging
         - more accurate source information, stopping, etc.
         - get list of stack variables and print their values by name

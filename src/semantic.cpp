@@ -43,7 +43,7 @@ int32_t typeSize(Node *type) {
 
             for (auto param : resolved->typeData.structTypeData.params) {
                 // if it's a union and we're not assigning to the 'tag' part, then the offset is the size of the tag
-                if (resolved->typeData.structTypeData.isSecretlyEnum && param->declParamData.index > 0) {
+                if (resolved->typeData.structTypeData.isSecretlyEnum && param->paramData.index > 0) {
                     param->localOffset = tagSizeInBytes;
                 }
                 else {
@@ -51,7 +51,7 @@ int32_t typeSize(Node *type) {
                 }
                 assert(param->type == NodeType::DECL_PARAM);
 
-                auto size = typeSize(param->declParamData.type);
+                auto size = typeSize(param->paramData.type);
                 total += size;
 
                 if (size > largest) {
@@ -95,28 +95,28 @@ int maybeMatchUnionToStructLiteral(Node *desired, Node *actual, Semantic *semant
         assert(other->typeData.structTypeData.params[0]->type == NodeType::DECL_PARAM);
 
         // if it doesn't have a name it obviously can't be a match
-        if (other->typeData.structTypeData.params[0]->declParamData.name == nullptr) {
+        if (other->typeData.structTypeData.params[0]->paramData.name == nullptr) {
             return 0;
         }
 
-        assert(other->typeData.structTypeData.params[0]->declParamData.name->type == NodeType::SYMBOL);
-        auto otherAtomId = other->typeData.structTypeData.params[0]->declParamData.name->symbolData.atomId;
+        assert(other->typeData.structTypeData.params[0]->paramData.name->type == NodeType::SYMBOL);
+        auto otherAtomId = other->typeData.structTypeData.params[0]->paramData.name->symbolData.atomId;
 
         auto debugAtom = AtomTable::current->backwardAtoms[otherAtomId];
 
         auto paramIndex = 0;
         for (auto p : unionToMatchAgainst->typeData.structTypeData.params) {
             assert(p->type == NodeType::DECL_PARAM);
-            assert(p->declParamData.name->type == NodeType::SYMBOL);
-            auto pAtomId = p->declParamData.name->symbolData.atomId;
+            assert(p->paramData.name->type == NodeType::SYMBOL);
+            auto pAtomId = p->paramData.name->symbolData.atomId;
 
             if (pAtomId == otherAtomId) {
-                if (!typesMatch(p->declParamData.type, other->typeData.structTypeData.params[0]->declParamData.type, semantic)) {
+                if (!typesMatch(p->paramData.type, other->typeData.structTypeData.params[0]->paramData.type, semantic)) {
                     return 1;
                 }
 
                 other->typeData.structTypeData.coercedType = unionToMatchAgainst;
-                other->typeData.structTypeData.params[0]->declParamData.index = paramIndex;
+                other->typeData.structTypeData.params[0]->paramData.index = paramIndex;
                 other->typeData.structTypeData.enumCoerced = true;
 
                 return 2;
@@ -359,12 +359,12 @@ Node *defaultValueFor(Semantic *semantic, Node *type) {
             def->type = NodeType::STRUCT_LITERAL;
 
             for (auto param : type->typeData.structTypeData.params) {
-                auto vp = param->declParamData.initialValue;
+                auto vp = param->paramData.value;
                 if (vp == nullptr) {
-                    vp = wrapInValueParam(defaultValueFor(semantic, param->typeInfo), param->declParamData.name->symbolData.atomId);
+                    vp = wrapInValueParam(defaultValueFor(semantic, param->typeInfo), param->paramData.name->symbolData.atomId);
                 }
                 else {
-                    vp = wrapInValueParam(vp, param->declParamData.name->symbolData.atomId);
+                    vp = wrapInValueParam(vp, param->paramData.name->symbolData.atomId);
                 }
 
                 semantic->resolveTypes(vp);
@@ -424,7 +424,7 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
 
     auto index = 0;
     for (auto param : node->fnDeclData.params) {
-        param->declParamData.index = index;
+        param->paramData.index = index;
         index += 1;
     }
 
@@ -751,8 +751,8 @@ bool assignParams(Semantic *semantic,
     auto encounteredError = false;
 
     for (auto passedParam : givenParams) {
-        auto valueAndNameNotNull = passedParam->type == NodeType::VALUE_PARAM && passedParam->valueParamData.name != nullptr;
-        auto declAndNameNotNull = passedParam->type == NodeType::DECL_PARAM && passedParam->declParamData.name != nullptr;
+        auto valueAndNameNotNull = passedParam->type == NodeType::VALUE_PARAM && passedParam->paramData.name != nullptr;
+        auto declAndNameNotNull = passedParam->type == NodeType::DECL_PARAM && passedParam->paramData.name != nullptr;
 
         if (valueAndNameNotNull || declAndNameNotNull) {
             // look up that name in the declaration
@@ -763,13 +763,13 @@ bool assignParams(Semantic *semantic,
 
                 int64_t passedParamAtomId;
                 if (passedParam->type == NodeType::VALUE_PARAM) {
-                    passedParamAtomId = passedParam->valueParamData.name->symbolData.atomId;
+                    passedParamAtomId = passedParam->paramData.name->symbolData.atomId;
                 }
                 else {
-                    passedParamAtomId = passedParam->declParamData.name->symbolData.atomId;
+                    passedParamAtomId = passedParam->paramData.name->symbolData.atomId;
                 }
 
-                if (declParam->declParamData.name->symbolData.atomId == passedParamAtomId) {
+                if (declParam->paramData.name->symbolData.atomId == passedParamAtomId) {
                     found = true;
                     auto openParam = openParams.at(j);
                     if (!openParam) {
@@ -779,7 +779,7 @@ bool assignParams(Semantic *semantic,
                     }
 
                     if (typesMatch(declParam->typeInfo, passedParam->typeInfo, semantic)) {
-                        passedParam->typeInfo = declParam->declParamData.type;
+                        passedParam->typeInfo = declParam->paramData.type;
                         newParams[j] = passedParam;
                         openParams[j] = false;
                     }
@@ -805,23 +805,11 @@ bool assignParams(Semantic *semantic,
                 auto declParam = declParams[j];
 
                 if (declParam->type == NodeType::DECL_PARAM) {
-                    passedParam->typeInfo = declParam->declParamData.type;
-
-                    if (passedParam->type == NodeType::VALUE_PARAM) {
-                        passedParam->valueParamData.name = declParam->declParamData.name;
-                    }
-                    else if (passedParam->type == NodeType::DECL_PARAM) {
-                        passedParam->declParamData.name = declParam->declParamData.name;
-                    }
+                    passedParam->typeInfo = declParam->paramData.type;
+                    passedParam->paramData.name = declParam->paramData.name;
                 } else if (declParam->type == NodeType::VALUE_PARAM) {
-                    passedParam->typeInfo = declParam->valueParamData.value->typeInfo;
-
-                    if (passedParam->type == NodeType::VALUE_PARAM) {
-                        passedParam->valueParamData.name = declParam->valueParamData.name;
-                    }
-                    else if (passedParam->type == NodeType::DECL_PARAM) {
-                        passedParam->declParamData.name = declParam->valueParamData.name;
-                    }
+                    passedParam->typeInfo = declParam->paramData.value->typeInfo;
+                    passedParam->paramData.name = declParam->paramData.name;
                 } else {
                     assert(false);
                 }
@@ -837,10 +825,10 @@ bool assignParams(Semantic *semantic,
 
         // if the decl parameter is unassigned but there is a default value, then fill in that param with the default
         bool openParamsI = openParams[i];
-        if (declParam->declParamData.initialValue != nullptr && openParamsI) {
+        if (declParam->paramData.value != nullptr && openParamsI) {
             openParams[i] = false;
-            declParam->declParamData.initialValue->typeInfo = declParam->declParamData.type;
-            newParams[i] = wrapInValueParam(declParam->declParamData.initialValue, declParam->declParamData.name);
+            declParam->paramData.value->typeInfo = declParam->paramData.type;
+            newParams[i] = wrapInValueParam(declParam->paramData.value, declParam->paramData.name);
 
             semantic->resolveTypes(newParams[i]);
         }
@@ -852,7 +840,7 @@ bool assignParams(Semantic *semantic,
             encounteredError = true;
 
             ostringstream s("");
-            s << "unassigned parameter: " << AtomTable::current->backwardAtoms[declParams[i]->declParamData.name->symbolData.atomId];
+            s << "unassigned parameter: " << AtomTable::current->backwardAtoms[declParams[i]->paramData.name->symbolData.atomId];
             auto sstr = s.str();
             semantic->reportError({errorReportTarget}, Error{errorReportTarget->region, sstr});
         }
@@ -930,11 +918,11 @@ void resolveType(Semantic *semantic, Node *node) {
 
             for (auto param : node->typeData.structTypeData.params) {
                 param->localOffset = total;
-                param->declParamData.index = localIndex;
+                param->paramData.index = localIndex;
 
                 semantic->resolveTypes(param);
 
-                total += typeSize(param->declParamData.type);
+                total += typeSize(param->paramData.type);
                 localIndex += 1;
             }
         } break;
@@ -1070,7 +1058,7 @@ void resolveFnCall(Semantic *semantic, Node *node) {
         if (isPoly) {
             // 'link' each decl param to its runtime param
             for (auto p = 0; p < declParams.size(); p++) {
-                declParams[p]->declParamData.polyLink = node->fnCallData.params[p];
+                declParams[p]->paramData.polyLink = node->fnCallData.params[p];
             }
         }
     }
@@ -1087,7 +1075,7 @@ void resolveFnCall(Semantic *semantic, Node *node) {
             const auto& ctParam = ctGivenParams[i];
 
             if (ctParam->type == NodeType::VALUE_PARAM) {
-                auto ctValue = ctParam->valueParamData.value;
+                auto ctValue = ctParam->paramData.value;
                 ctDeclParams[i]->staticValue = resolve(ctValue);
             } else {
                 ctDeclParams[i]->staticValue = resolve(ctParam);
@@ -1112,7 +1100,7 @@ void resolveFnCall(Semantic *semantic, Node *node) {
         if (isPoly) {
             // un-link
             for (auto p = 0; p < declParams.size(); p++) {
-                declParams[p]->declParamData.polyLink = nullptr;
+                declParams[p]->paramData.polyLink = nullptr;
             }
 
             // @Hack!!!
@@ -1144,7 +1132,7 @@ void resolveFnCall(Semantic *semantic, Node *node) {
                 givenParam->typeInfo->staticValue = givenParam;
             }
             else {
-                if (!typesMatch(declParam->typeInfo, givenParam->valueParamData.value->typeInfo, semantic)) {
+                if (!typesMatch(declParam->typeInfo, givenParam->paramData.value->typeInfo, semantic)) {
                     // todo if match exposed to real type then set resolved on exposed to real and pass match
                     // unless already set then error?
                     semantic->reportError({node, declParam, givenParam}, Error{node->region, "static type mismatch!"});
@@ -1217,7 +1205,7 @@ void possiblyResolveAssignToUnion(Semantic *semantic, Node *originalAssignment, 
         param0->symbolData.atomId = AtomTable::current->insertStr("tag");
         param0->resolved = typeData.structTypeData.params[0];
         assert(typeData.structTypeData.params[0]->type == NodeType::DECL_PARAM);
-        param0->typeInfo = typeData.structTypeData.params[0]->declParamData.type;
+        param0->typeInfo = typeData.structTypeData.params[0]->paramData.type;
 
         auto tagDot = new Node();
         tagDot->scope = originalAssignment->scope;
@@ -1226,15 +1214,8 @@ void possiblyResolveAssignToUnion(Semantic *semantic, Node *originalAssignment, 
         tagDot->dotData.rhs = param0;
         semantic->resolveTypes(tagDot);
 
-        uint64_t paramIndex;
+        uint64_t paramIndex = (uint64_t) foundParam->paramData.index;
         auto foundParam = secondmostLhs->dotData.resolved;
-        if (foundParam->type == NodeType::DECL_PARAM) {
-            paramIndex = (uint64_t) foundParam->declParamData.index;
-        } else if (foundParam->type == NodeType::VALUE_PARAM) {
-            paramIndex = (uint64_t) foundParam->valueParamData.index;
-        } else {
-            assert(false);
-        }
 
         // assign to 0th parameter the value of paramIndex
         auto constParamIndex = new Node();
@@ -1286,31 +1267,31 @@ void resolveAssign(Semantic *semantic, Node *node) {
 }
 
 void resolveDeclParam(Semantic *semantic, Node *node) {
-    assert(!(node->declParamData.type == nullptr && node->declParamData.initialValue == nullptr));
-    semantic->resolveTypes(node->declParamData.initialValue);
+    assert(!(node->paramData.type == nullptr && node->paramData.value == nullptr));
+    semantic->resolveTypes(node->paramData.value);
 
-    if (node->declParamData.type == nullptr) {
-        node->declParamData.type = node->declParamData.initialValue->typeInfo;
+    if (node->paramData.type == nullptr) {
+        node->paramData.type = node->paramData.value->typeInfo;
     }
 
-    semantic->resolveTypes(node->declParamData.type);
-    if (node->declParamData.polyLink != nullptr) {
-        semantic->resolveTypes(node->declParamData.polyLink);
-        node->typeInfo = node->declParamData.polyLink->typeInfo;
+    semantic->resolveTypes(node->paramData.type);
+    if (node->paramData.polyLink != nullptr) {
+        semantic->resolveTypes(node->paramData.polyLink);
+        node->typeInfo = node->paramData.polyLink->typeInfo;
     } else {
-        node->typeInfo = node->declParamData.type;
+        node->typeInfo = node->paramData.type;
     }
 
-    if (node->declParamData.type != nullptr && node->declParamData.initialValue != nullptr) {
-        if (!typesMatch(node->declParamData.type, node->declParamData.initialValue->typeInfo, semantic)) {
+    if (node->paramData.type != nullptr && node->paramData.value != nullptr) {
+        if (!typesMatch(node->paramData.type, node->paramData.value->typeInfo, semantic)) {
             semantic->reportError({node}, Error{node->region, "Type mismatch decl param"});
         }
     }
 }
 
 void resolveValueParam(Semantic *semantic, Node *node) {
-    semantic->resolveTypes(node->valueParamData.value);
-    node->typeInfo = node->valueParamData.value->typeInfo;
+    semantic->resolveTypes(node->paramData.value);
+    node->typeInfo = node->paramData.value->typeInfo;
 }
 
 void resolveDeref(Semantic *semantic, Node *node) {
@@ -1363,10 +1344,10 @@ Node *findParam(Semantic *semantic, Node *node) {
         auto debug2 = AtomTable::current->backwardAtoms[node->dotData.rhs->symbolData.atomId];
 
         for (auto param : structData.params) {
-            if (param->declParamData.name != nullptr) {
-                auto debug1 = AtomTable::current->backwardAtoms[param->declParamData.name->symbolData.atomId];
+            if (param->paramData.name != nullptr) {
+                auto debug1 = AtomTable::current->backwardAtoms[param->paramData.name->symbolData.atomId];
 
-                if (param->declParamData.name->symbolData.atomId == node->dotData.rhs->symbolData.atomId) {
+                if (param->paramData.name->symbolData.atomId == node->dotData.rhs->symbolData.atomId) {
                     foundParam = param;
                     break;
                 }
@@ -1374,10 +1355,10 @@ Node *findParam(Semantic *semantic, Node *node) {
         }
     } else {
         for (auto param : structData.params) {
-            auto f1 = AtomTable::current->backwardAtoms[param->declParamData.name->symbolData.atomId];
+            auto f1 = AtomTable::current->backwardAtoms[param->paramData.name->symbolData.atomId];
             auto f2 = AtomTable::current->backwardAtoms[node->dotData.rhs->symbolData.atomId];
 
-            if (param->declParamData.name->symbolData.atomId == node->dotData.rhs->symbolData.atomId) {
+            if (param->paramData.name->symbolData.atomId == node->dotData.rhs->symbolData.atomId) {
                 foundParam = param;
                 break;
             }
@@ -1388,7 +1369,7 @@ Node *findParam(Semantic *semantic, Node *node) {
 
     if (foundParam != nullptr && resolve(node->dotData.lhs)->type == NodeType::STRUCT_LITERAL) {
         assert(foundParam->type == NodeType::DECL_PARAM);
-        auto foundValue = resolve(node->dotData.lhs)->structLiteralData.params[foundParam->declParamData.index]->valueParamData.value;
+        auto foundValue = resolve(node->dotData.lhs)->structLiteralData.params[foundParam->paramData.index]->paramData.value;
         node->resolved = foundValue;
         node->dotData.resolved = foundValue;
     }
@@ -1524,12 +1505,12 @@ void resolveStructLiteral(Semantic *semantic, Node *node) {
     for (auto param : node->structLiteralData.params) {
         semantic->resolveTypes(param);
 
-        auto wrapped = wrapInDeclParam(param->typeInfo, param->valueParamData.name, paramIndex);
+        auto wrapped = wrapInDeclParam(param->typeInfo, param->paramData.name, paramIndex);
         node->typeInfo->typeData.structTypeData.params.push_back(wrapped);
 
-        param->typeInfo = param->valueParamData.value->typeInfo;
+        param->typeInfo = param->paramData.value->typeInfo;
 
-        param->valueParamData.index = paramIndex;
+        param->paramData.index = paramIndex;
         paramIndex += 1;
     }
 }
@@ -1940,7 +1921,7 @@ void resolveTagCheck(Semantic *semantic, Node *node) {
     param0->symbolData.atomId = AtomTable::current->insertStr("tag");
     param0->resolved = typeData.structTypeData.params[0];
     assert(typeData.structTypeData.params[0]->type == NodeType::DECL_PARAM);
-    param0->typeInfo = typeData.structTypeData.params[0]->declParamData.type;
+    param0->typeInfo = typeData.structTypeData.params[0]->paramData.type;
 
     auto tagDot = new Node();
     tagDot->scope = node->scope;
@@ -1949,7 +1930,7 @@ void resolveTagCheck(Semantic *semantic, Node *node) {
     tagDot->dotData.rhs = param0;
     semantic->resolveTypes(tagDot);
 
-    auto paramIndex = resolved->declParamData.index;
+    auto paramIndex = resolved->paramData.index;
 
     // assign to 0th parameter the value of paramIndex
     auto constParamIndex = new Node();
@@ -2175,7 +2156,7 @@ void resolveFieldsof(Semantic *semantic, Node *node) {
     for (auto param : params) {
         assert(param->type == NodeType::DECL_PARAM);
 
-        if (param->declParamData.index == 0 && isEnum) {
+        if (param->paramData.index == 0 && isEnum) {
             // skip the 'tag' field
             continue;
         }
@@ -2183,12 +2164,12 @@ void resolveFieldsof(Semantic *semantic, Node *node) {
         auto indexLit = new Node();
         indexLit->scope = node->scope;
         indexLit->type = NodeType::INT_LITERAL;
-        indexLit->intLiteralData.value = param->declParamData.index;
+        indexLit->intLiteralData.value = param->paramData.index;
 
         auto nameLit = new Node();
         nameLit->scope = node->scope;
         nameLit->type = NodeType::STRING_LITERAL;
-        nameLit->stringLiteralData.value = param->declParamData.name == nullptr ? "" : AtomTable::current->backwardAtoms[param->declParamData.name->symbolData.atomId];
+        nameLit->stringLiteralData.value = param->paramData.name == nullptr ? "" : AtomTable::current->backwardAtoms[param->paramData.name->symbolData.atomId];
 
         auto fieldLit = new Node();
         fieldLit->scope = node->scope;

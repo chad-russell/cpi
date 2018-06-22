@@ -219,7 +219,7 @@ ostream &operator<<(ostream &os, TypeData td) {
             os << "fn (";
             for (auto param : td.fnTypeData.params) {
                 assert(param->type == NodeType::DECL_PARAM);
-                os << param->declParamData.type->typeData << ", ";
+                os << param->paramData.type->typeData << ", ";
             }
             os << ")";
             os << td.fnTypeData.returnType->typeData;
@@ -230,8 +230,8 @@ ostream &operator<<(ostream &os, TypeData td) {
 
             // todo(chad): @Incomplete -- handle array/union types here too
             for (auto param : td.structTypeData.params) {
-                if (param->declParamData.type) {
-                    os << param->declParamData.type->typeData << ", ";
+                if (param->paramData.type) {
+                    os << param->paramData.type->typeData << ", ";
                 }
                 else {
                     os << "<<unresolved>>" << ", ";
@@ -309,11 +309,11 @@ ostream &operator<<(ostream &os, Node *node) {
             cout << " }";
         } break;
         case NodeType::VALUE_PARAM: {
-            if (node->valueParamData.name != nullptr) {
-                cout << node->valueParamData.name << " : " << node->valueParamData.value;
+            if (node->paramData.name != nullptr) {
+                cout << node->paramData.name << " : " << node->paramData.value;
             }
             else {
-                cout << node->valueParamData.value;
+                cout << node->paramData.value;
             }
         } break;
         case NodeType::INT_LITERAL: {
@@ -367,12 +367,12 @@ ostream &operator<<(ostream &os, Node *node) {
             cout << "panic()" << endl;
         } break;
         case NodeType::DECL_PARAM: {
-            cout << node->declParamData.name;
-            if (node->declParamData.type != nullptr) {
-                cout << " : " << resolve(node->declParamData.type);
+            cout << node->paramData.name;
+            if (node->paramData.type != nullptr) {
+                cout << " : " << resolve(node->paramData.type);
             }
-            if (node->declParamData.initialValue != nullptr) {
-                cout << " = " << node->declParamData.initialValue;
+            if (node->paramData.value != nullptr) {
+                cout << " = " << node->paramData.value;
             }
         } break;
         case NodeType::ARRAY_INDEX: {

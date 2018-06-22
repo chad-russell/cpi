@@ -93,7 +93,7 @@ vector<Node *> Parser::parseDeclParams() {
     vector<Node *> params;
 
     while (!lexer->isEmpty() && lexer->front.type != LexerTokenType::RPAREN && lexer->front.type != LexerTokenType::RCURLY) {
-        DeclParamData param{};
+        ParamData param{};
 
         // lvalue
         auto name = parseSymbol();
@@ -110,12 +110,12 @@ vector<Node *> Parser::parseDeclParams() {
 
             if (lexer->front.type == LexerTokenType::EQ) {
                 popFront();
-                param.initialValue = parseRvalue();
+                param.value = parseRvalue();
             }
         }
         else {
             expect(LexerTokenType::COLON_EQ, ":=");
-            param.initialValue = parseRvalue();
+            param.value = parseRvalue();
         }
 
         // comma (if not RPAREN or RCURLY)
@@ -125,11 +125,11 @@ vector<Node *> Parser::parseDeclParams() {
 
         auto node = new Node(lexer->srcInfo, NodeType::DECL_PARAM, scopes.top());
 
-        node->declParamData = param;
+        node->paramData = param;
 
         node->region.start = name->region.start;
-        if (param.initialValue != nullptr) {
-            node->region.end = param.initialValue->region.end;
+        if (param.value != nullptr) {
+            node->region.end = param.value->region.end;
         } else if (param.type != nullptr) {
             node->region.end = param.type->region.end;
         } else {
@@ -146,7 +146,7 @@ vector<Node *> Parser::parseValueParams() {
     vector<Node *> params;
 
     while (!lexer->isEmpty() && lexer->front.type != LexerTokenType::RPAREN && lexer->front.type != LexerTokenType::RCURLY) {
-        ValueParamData param{};
+        ParamData param{};
 
         Node *name = nullptr;
 
@@ -167,7 +167,7 @@ vector<Node *> Parser::parseValueParams() {
 
         auto node = new Node(lexer->srcInfo, NodeType::VALUE_PARAM, scopes.top());
 
-        node->valueParamData = param;
+        node->paramData = param;
 
         node->region = {lexer->srcInfo, name ? name->region.start : param.value->region.start, param.value->region.end};
         params.push_back(node);
@@ -242,10 +242,10 @@ Node *Parser::parseFnDecl() {
 
     // put params in scope
     for (auto param : decl->fnDeclData.ctParams) {
-        scopeInsert(param->declParamData.name->symbolData.atomId, param);
+        scopeInsert(param->paramData.name->symbolData.atomId, param);
     }
     for (auto param : decl->fnDeclData.params) {
-        scopeInsert(param->declParamData.name->symbolData.atomId, param);
+        scopeInsert(param->paramData.name->symbolData.atomId, param);
     }
 
     // body
@@ -822,16 +822,16 @@ Node *Parser::parseType() {
             tagSymbol->symbolData.atomId = AtomTable::current->insertStr("tag");
 
             auto tagParam = new Node(lexer->srcInfo, NodeType::DECL_PARAM, scopes.top());
-            tagParam->declParamData.index = 0;
+            tagParam->paramData.index = 0;
 
             // todo(chad): allow the user to specify the width of the tag
-            tagParam->declParamData.type = new Node(NodeTypekind::I64);
-            tagParam->declParamData.name = tagSymbol;
+            tagParam->paramData.type = new Node(NodeTypekind::I64);
+            tagParam->paramData.name = tagSymbol;
 
             type->typeData.structTypeData.params.push_back(tagParam);
             auto declaredParams = parseDeclParams();
             for (auto dp : declaredParams) {
-                dp->declParamData.index += 1;
+                dp->paramData.index += 1;
                 type->typeData.structTypeData.params.push_back(dp);
             }
 

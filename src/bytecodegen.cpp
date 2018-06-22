@@ -549,7 +549,7 @@ void BytecodeGen::gen(Node *node) {
             auto paramCount = node->fnCallData.params.size();
             int32_t totalParamsSize = 0;
             for (auto i = 0; i < paramCount; i++) {
-                auto paramValue = node->fnCallData.params[i]->valueParamData.value;
+                auto paramValue = node->fnCallData.params[i]->paramData.value;
                 resolve(paramValue);
                 totalParamsSize += typeSize(paramValue->typeInfo);
             }
@@ -558,12 +558,12 @@ void BytecodeGen::gen(Node *node) {
                 // push the params (in reverse order!)
                 auto paramAccum = 0;
                 for (auto i = static_cast<int32_t>(paramCount - 1); i >= 0; i--) {
-                    auto paramValue = node->fnCallData.params[i]->valueParamData.value;
+                    auto paramValue = node->fnCallData.params[i]->paramData.value;
                     gen(paramValue);
                 }
 
                 for (auto i = static_cast<int32_t>(paramCount - 1); i >= 0; i--) {
-                    auto paramValue = node->fnCallData.params[i]->valueParamData.value;
+                    auto paramValue = node->fnCallData.params[i]->paramData.value;
                     auto paramSize = typeSize(paramValue->typeInfo);
                     storeValue(resolve(paramValue), static_cast<int32_t>(currentFnStackSize + paramAccum));
                     paramAccum += paramSize;
@@ -1085,7 +1085,7 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
             if (node->typeInfo->typeData.structTypeData.coercedType != nullptr
                 && node->typeInfo->typeData.structTypeData.coercedType->typeData.structTypeData.isSecretlyEnum) {
                 // we need to store the tag and the value.
-                auto tagIndex = node->typeInfo->typeData.structTypeData.params[0]->declParamData.index;
+                auto tagIndex = node->typeInfo->typeData.structTypeData.params[0]->paramData.index;
                 auto value = node->structLiteralData.params[0];
 
                 auto tagValue = new Node();
@@ -1098,18 +1098,18 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
                 assert(value->type == NodeType::VALUE_PARAM);
 
                 gen(tagValue);
-                gen(value->valueParamData.value);
+                gen(value->paramData.value);
 
                 storeValue(tagValue, offset);
-                storeValue(value->valueParamData.value, offset + 8);
+                storeValue(value->paramData.value, offset + 8);
             }
             else {
                 auto sizeSoFar = 0;
                 for (const auto &param : node->structLiteralData.params) {
-                    gen(param->valueParamData.value);
+                    gen(param->paramData.value);
 
-                    storeValue(param->valueParamData.value, offset + sizeSoFar);
-                    sizeSoFar += typeSize(param->valueParamData.value->typeInfo);
+                    storeValue(param->paramData.value, offset + sizeSoFar);
+                    sizeSoFar += typeSize(param->paramData.value->typeInfo);
                 }
             }
         } break;

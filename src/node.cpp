@@ -197,15 +197,15 @@ Node *makeArrayType(Node *elementType) {
 Node *wrapInValueParam(Node *value, Node *name) {
     auto valueParam = new Node();
     valueParam->type = NodeType::VALUE_PARAM;
-    valueParam->valueParamData.value = value;
-    valueParam->valueParamData.name = name;
+    valueParam->paramData.value = value;
+    valueParam->paramData.name = name;
     return valueParam;
 }
 
 Node *wrapInValueParam(Node *value, int64_t atomId) {
     auto valueParam = new Node();
     valueParam->type = NodeType::VALUE_PARAM;
-    valueParam->valueParamData.value = value;
+    valueParam->paramData.value = value;
 
     auto nameNode = new Node();
     nameNode->type = NodeType::SYMBOL;
@@ -213,7 +213,7 @@ Node *wrapInValueParam(Node *value, int64_t atomId) {
     nameNode->region = value->region;
     nameNode->symbolData.atomId = atomId;
 
-    valueParam->valueParamData.name = nameNode;
+    valueParam->paramData.name = nameNode;
 
     return valueParam;
 }
@@ -221,7 +221,7 @@ Node *wrapInValueParam(Node *value, int64_t atomId) {
 Node *wrapInValueParam(Node *value, string name) {
     auto valueParam = new Node();
     valueParam->type = NodeType::VALUE_PARAM;
-    valueParam->valueParamData.value = value;
+    valueParam->paramData.value = value;
 
     if (!name.empty()) {
         auto nameNode = new Node();
@@ -230,7 +230,7 @@ Node *wrapInValueParam(Node *value, string name) {
         nameNode->region = value->region;
 
         nameNode->symbolData.atomId = AtomTable::current->insertStr(name);
-        valueParam->valueParamData.name = nameNode;
+        valueParam->paramData.name = nameNode;
     }
 
     return valueParam;
@@ -251,9 +251,9 @@ Node *wrapInDeclParam(Node *type, string name, int index) {
 Node *wrapInDeclParam(Node *type, Node *name, int index) {
     auto param = new Node();
     param->type = NodeType::DECL_PARAM;
-    param->declParamData.type = type;
-    param->declParamData.index = index;
-    param->declParamData.name = name;
+    param->paramData.type = type;
+    param->paramData.index = index;
+    param->paramData.name = name;
     param->typeInfo = type;
 
     return param;
