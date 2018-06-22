@@ -19,6 +19,7 @@ Node *wrapInValueParam(Node *value, int64_t atomId);
 Node *wrapInDeclParam(Node *value, string name, int index);
 Node *wrapInDeclParam(Node *value, Node *name, int index);
 
+void initFnDeclData(Node *node);
 void initStructTypeData(Node *node);
 void initFnTypeData(Node *node);
 

@@ -216,23 +216,13 @@ struct SymbolTypeData {
 struct TypeData {
     NodeTypekind kind;
 
-//    union {
+    union {
         FnTypeData fnTypeData;
         StructTypeData structTypeData;
         PointerTypeData pointerTypeData;
         SymbolTypeData symbolTypeData;
         double floatTypeData;
         int64_t intTypeData;
-        bool boolTypeData;
-//    };
-};
-
-struct TDF {
-    union {
-        FnTypeData fnTypeData;
-        StructTypeData structTypeData;
-        PointerTypeData pointerTypeData;
-        SymbolTypeData symbolTypeData;
         bool boolTypeData;
     };
 };
@@ -248,19 +238,19 @@ struct ParamData {
 };
 
 struct FnDeclData {
-    Node *name = nullptr;
-    vector_t<Node *> ctParams = vector_init<Node *>(10);
-    vector_t<Node *> params = vector_init<Node *>(10);
-    Node * returnType = nullptr;
-    vector_t<Node *> body = vector_init<Node *>(10);
-    vector_t<Node *> locals = vector_init<Node *>(10);
-    vector_t<Node *> returns = vector_init<Node *>(10);
+    Node *name;
+    vector_t<Node *> ctParams;
+    vector_t<Node *> params;
+    Node * returnType;
+    vector_t<Node *> body;
+    vector_t<Node *> locals;
+    vector_t<Node *> returns;
 
-    int32_t stackSize = 0;
+    int32_t stackSize;
     uint64_t instOffset;
     bool isLiteral;
     uint32_t tableIndex;
-    bool cameFromPolymorph = false;
+    bool cameFromPolymorph;
 };
 
 struct DeclData {
@@ -393,6 +383,33 @@ public:
     explicit Scope(Scope *parent);
 
     Node *find(int64_t atomId);
+};
+
+union TDF {
+    Node *nodeData;
+    FnDeclData fnDeclData;
+//    DeclData declData;
+//    AssignData assignData;
+//    IntLiteralData intLiteralData;
+//    FloatLiteralData floatLiteralData;
+//    BoolLiteralData boolLiteralData;
+//    FnCallData fnCallData;
+//    ArrayIndexData arrayIndexData;
+//    DotData dotData;
+//    BinopData binopData;
+//    ParamData paramData;
+//    TypeData typeData;
+//    StructLiteralData structLiteralData;
+//    StringLiteralData stringLiteralData;
+//    IfData ifData;
+//    WhileData whileData;
+//    CastData castData;
+//    RetData retData;
+//    SymbolData symbolData;
+//    DerefData derefData;
+//    ArrayLiteralData arrayLiteralData;
+//    ForData forData;
+//    IsKindData isKindData;
 };
 
 class Node {

@@ -8,6 +8,13 @@ Node::Node(SourceInfo srcInfo, NodeType type_, Scope *scope_) : Node() {
     typeInfo = nullptr;
     resolved = nullptr;
     region.srcInfo = srcInfo;
+
+    switch (type_) {
+        case NodeType::FN_DECL: {
+            initFnDeclData(this);
+        } break;
+        default: {}
+    }
 }
 
 Node::Node(NodeTypekind typekind) : Node() {
@@ -18,6 +25,21 @@ Node::Node(NodeTypekind typekind) : Node() {
 Node::Node() {
     id = nodeId;
     nodeId += 1;
+}
+
+void initFnDeclData(Node *node) {
+    node->fnDeclData.name = nullptr;
+    node->fnDeclData.ctParams = vector_init<Node *>(10);
+    node->fnDeclData.params = vector_init<Node *>(10);
+    node->fnDeclData.returnType = nullptr;
+    node->fnDeclData.body = vector_init<Node *>(10);
+    node->fnDeclData.locals = vector_init<Node *>(10);
+    node->fnDeclData.returns = vector_init<Node *>(10);
+    node->fnDeclData.stackSize = 0;
+    node->fnDeclData.instOffset = 0;
+    node->fnDeclData.cameFromPolymorph = false;
+    node->fnDeclData.isLiteral = false;
+    node->fnDeclData.tableIndex = 0;
 }
 
 void initStructTypeData(Node *node) {
