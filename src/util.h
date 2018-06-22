@@ -228,13 +228,13 @@ struct TypeData {
 };
 
 struct ParamData {
-    Node *name = nullptr;
-    Node *type = nullptr;
-    Node *value = nullptr;
+    Node *name;
+    Node *type;
+    Node *value;
 
-    Node *polyLink = nullptr;
+    Node *polyLink;
 
-    int64_t index = 0;
+    int64_t index;
 };
 
 struct FnDeclData {
@@ -254,15 +254,14 @@ struct FnDeclData {
 };
 
 struct DeclData {
-    Node *lvalue = nullptr;
-    Node *type = nullptr;
-
-    Node *initialValue = nullptr;
+    Node *lvalue;
+    Node *type;
+    Node *initialValue;
 };
 
 struct AssignData {
-    Node *lhs = nullptr;
-    Node *rhs = nullptr;
+    Node *lhs;
+    Node *rhs;
 };
 
 struct IntLiteralData {

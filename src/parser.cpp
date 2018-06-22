@@ -93,11 +93,12 @@ vector_t<Node *> Parser::parseDeclParams() {
     auto params = vector_init<Node *>(10);
 
     while (!lexer->isEmpty() && lexer->front.type != LexerTokenType::RPAREN && lexer->front.type != LexerTokenType::RCURLY) {
-        ParamData param{};
+        auto node = new Node(lexer->srcInfo, NodeType::DECL_PARAM, scopes.top());
+        initParamData(node);
 
         // lvalue
         auto name = parseSymbol();
-        param.name = name;
+        node->paramData.name = name;
 
         if (lexer->front.type != LexerTokenType::COLON && lexer->front.type != LexerTokenType::COLON_EQ) {
             reportError("expected ':' or ':='");
@@ -106,16 +107,16 @@ vector_t<Node *> Parser::parseDeclParams() {
         if (lexer->front.type == LexerTokenType::COLON) {
             popFront();
 
-            param.type = parseType();
+            node->paramData.type = parseType();
 
             if (lexer->front.type == LexerTokenType::EQ) {
                 popFront();
-                param.value = parseRvalue();
+                node->paramData.value = parseRvalue();
             }
         }
         else {
             expect(LexerTokenType::COLON_EQ, ":=");
-            param.value = parseRvalue();
+            node->paramData.value = parseRvalue();
         }
 
         // comma (if not RPAREN or RCURLY)
@@ -123,15 +124,11 @@ vector_t<Node *> Parser::parseDeclParams() {
             expect(LexerTokenType::COMMA, ",");
         }
 
-        auto node = new Node(lexer->srcInfo, NodeType::DECL_PARAM, scopes.top());
-
-        node->paramData = param;
-
         node->region.start = name->region.start;
-        if (param.value != nullptr) {
-            node->region.end = param.value->region.end;
-        } else if (param.type != nullptr) {
-            node->region.end = param.type->region.end;
+        if (node->paramData.value != nullptr) {
+            node->region.end = node->paramData.value->region.end;
+        } else if (node->paramData.type != nullptr) {
+            node->region.end = node->paramData.type->region.end;
         } else {
             node->region.end = name->region.end;
         }

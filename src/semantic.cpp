@@ -1227,6 +1227,7 @@ void possiblyResolveAssignToUnion(Semantic *semantic, Node *originalAssignment, 
         auto secretAss = new Node();
         secretAss->scope = originalAssignment->scope;
         secretAss->type = NodeType::ASSIGN;
+        initAssignData(secretAss);
         secretAss->assignData.lhs = tagDot;
         secretAss->assignData.rhs = constParamIndex;
 
@@ -1753,6 +1754,7 @@ void resolveFor(Semantic *semantic, Node *node) {
     // create a new declaration with the alias as the lvalue, and the array type as the type
     auto elementDecl = new Node();
     elementDecl->type = NodeType::DECL;
+    initDeclData(elementDecl);
     elementDecl->scope = node->scope;
     elementDecl->region = node->forData.element_alias->region;
     elementDecl->declData.type = resolvedTypeInfo->typeData.structTypeData.secretArrayElementType;
@@ -1772,6 +1774,7 @@ void resolveFor(Semantic *semantic, Node *node) {
     // indexDecl: i64 = 0
     auto indexDecl = new Node();
     indexDecl->type = NodeType::DECL;
+    initDeclData(elementDecl);
     indexDecl->scope = node->scope;
     if (node->forData.iterator_alias != nullptr) {
         indexDecl->region = node->forData.iterator_alias->region;

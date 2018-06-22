@@ -13,6 +13,16 @@ Node::Node(SourceInfo srcInfo, NodeType type_, Scope *scope_) : Node() {
         case NodeType::FN_DECL: {
             initFnDeclData(this);
         } break;
+        case NodeType::DECL_PARAM:
+        case NodeType::VALUE_PARAM: {
+            initParamData(this);
+        } break;
+        case NodeType::DECL: {
+            initDeclData(this);
+        } break;
+        case NodeType::ASSIGN: {
+            initAssignData(this);
+        } break;
         default: {}
     }
 }
@@ -25,6 +35,25 @@ Node::Node(NodeTypekind typekind) : Node() {
 Node::Node() {
     id = nodeId;
     nodeId += 1;
+}
+
+void initAssignData(Node *node) {
+    node->assignData.lhs = nullptr;
+    node->assignData.rhs = nullptr;
+}
+
+void initDeclData(Node *node) {
+    node->declData.lvalue = nullptr;
+    node->declData.type = nullptr;
+    node->declData.initialValue = nullptr;
+}
+
+void initParamData(Node *node) {
+    node->paramData.name = nullptr;
+    node->paramData.type = nullptr;
+    node->paramData.value = nullptr;
+    node->paramData.polyLink = nullptr;
+    node->paramData.index = 0;
 }
 
 void initFnDeclData(Node *node) {
@@ -296,6 +325,7 @@ Node *wrapInDeclParam(Node *type, string name, int index) {
 Node *wrapInDeclParam(Node *type, Node *name, int index) {
     auto param = new Node();
     param->type = NodeType::DECL_PARAM;
+    initParamData(param);
     param->paramData.type = type;
     param->paramData.index = index;
     param->paramData.name = name;
