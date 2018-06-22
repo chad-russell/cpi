@@ -264,6 +264,7 @@ struct AssignData {
     Node *rhs;
 };
 
+// todo(chad): inline these
 struct IntLiteralData {
     int64_t value;
 };
@@ -315,7 +316,7 @@ struct StructLiteralData {
 };
 
 struct StringLiteralData {
-    string value;
+    string *value;
 };
 
 struct IfData {
@@ -330,15 +331,15 @@ struct WhileData {
 };
 
 struct CastData {
-    Node *type = nullptr;
-    Node *value = nullptr;
+    Node *type;
+    Node *value;
 
     // @Hack??
-    bool isCastFromArrayToDataPtr = false;
+    bool isCastFromArrayToDataPtr;
 };
 
 struct RetData {
-    Node *value = nullptr;
+    Node *value;
 };
 
 struct SymbolData {
@@ -346,27 +347,25 @@ struct SymbolData {
 };
 
 struct DerefData {
-    Node *target = nullptr;
+    Node *target;
 };
 
 struct ArrayLiteralData {
-    Node *elementType = nullptr;
-    vector_t<Node *> elements = vector_init<Node *>(10);
-
+    Node *elementType;
+    vector_t<Node *> elements;
     Node *structLiteralRepresentation;
 };
 
 struct ForData {
-    Node *element_alias = nullptr;
-    Node *iterator_alias = nullptr;
-    Node *target = nullptr;
+    Node *element_alias;
+    Node *iterator_alias;
+    Node *target;
 
-    vector_t<Node *> stmts = vector_init<Node *>(10);;
+    vector_t<Node *> stmts;
+    vector_t<Node *> rewritten;
 
-    vector_t<Node *> rewritten = vector_init<Node *>(10);;
-
-    bool isStatic = false;
-    vector_t<Node *> staticStmts = vector_init<Node *>(10);;
+    bool isStatic;
+    vector_t<Node *> staticStmts;;
 };
 
 struct IsKindData {
@@ -384,33 +383,6 @@ public:
     Node *find(int64_t atomId);
 };
 
-union TDF {
-    Node *nodeData;
-    FnDeclData fnDeclData;
-//    DeclData declData;
-//    AssignData assignData;
-//    IntLiteralData intLiteralData;
-//    FloatLiteralData floatLiteralData;
-//    BoolLiteralData boolLiteralData;
-//    FnCallData fnCallData;
-//    ArrayIndexData arrayIndexData;
-//    DotData dotData;
-//    BinopData binopData;
-//    ParamData paramData;
-//    TypeData typeData;
-//    StructLiteralData structLiteralData;
-//    StringLiteralData stringLiteralData;
-//    IfData ifData;
-//    WhileData whileData;
-//    CastData castData;
-//    RetData retData;
-//    SymbolData symbolData;
-//    DerefData derefData;
-//    ArrayLiteralData arrayLiteralData;
-//    ForData forData;
-//    IsKindData isKindData;
-};
-
 class Node {
 public:
     unsigned long id;
@@ -424,32 +396,32 @@ public:
     vector_t<Node *> preStmts = vector_init<Node *>(10);;
     vector_t<Node *> postStmts = vector_init<Node *>(10);;
 
-    // union {
-    Node *nodeData;
-    FnDeclData fnDeclData;
-    DeclData declData;
-    AssignData assignData;
-    IntLiteralData intLiteralData;
-    FloatLiteralData floatLiteralData;
-    BoolLiteralData boolLiteralData;
-    FnCallData fnCallData;
-    ArrayIndexData arrayIndexData;
-    DotData dotData;
-    BinopData binopData;
-    ParamData paramData;
-    TypeData typeData;
-    StructLiteralData structLiteralData;
-    StringLiteralData stringLiteralData;
-    IfData ifData;
-    WhileData whileData;
-    CastData castData;
-    RetData retData;
-    SymbolData symbolData;
-    DerefData derefData;
-    ArrayLiteralData arrayLiteralData;
-    ForData forData;
-    IsKindData isKindData;
-    // };
+    union {
+        Node *nodeData;
+        FnDeclData fnDeclData;
+        DeclData declData;
+        AssignData assignData;
+        IntLiteralData intLiteralData;
+        FloatLiteralData floatLiteralData;
+        BoolLiteralData boolLiteralData;
+        FnCallData fnCallData;
+        ArrayIndexData arrayIndexData;
+        DotData dotData;
+        BinopData binopData;
+        ParamData paramData;
+        TypeData typeData;
+        StructLiteralData structLiteralData;
+        StringLiteralData stringLiteralData;
+        IfData ifData;
+        WhileData whileData;
+        CastData castData;
+        RetData retData;
+        SymbolData symbolData;
+        DerefData derefData;
+        ArrayLiteralData arrayLiteralData;
+        ForData forData;
+        IsKindData isKindData;
+    };
 
     Node *staticValue = nullptr;
 

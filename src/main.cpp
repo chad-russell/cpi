@@ -89,8 +89,6 @@ InputType inputTypeFromExtension(const string &fileName) {
 }
 
 int main(int argc, char **argv) {
-    TDF tdf;
-
     nodeId = 0;
     debugFlag = 0;
 

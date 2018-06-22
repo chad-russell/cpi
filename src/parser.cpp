@@ -1321,7 +1321,7 @@ Node *Parser::parseStringLiteral() {
             s << node->region.srcInfo.source->at(i);
         }
     }
-    node->stringLiteralData.value = s.str();
+    node->stringLiteralData.value = new string(s.str());
 
     return node;
 }

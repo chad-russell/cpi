@@ -638,6 +638,7 @@ void resolveArrayIndex(Semantic *semantic, Node *node) {
 
     auto aCasted = new Node();
     aCasted->type = NodeType::CAST;
+    initCastData(aCasted);
     aCasted->castData.isCastFromArrayToDataPtr = true;
     aCasted->castData.type = new Node(NodeTypekind::POINTER);
     aCasted->castData.type->typeData.pointerTypeData.underlyingType = node->typeInfo;
@@ -683,7 +684,7 @@ void resolveStringLiteral(Semantic *semantic, Node *node) {
     charArrayLiteral->type = NodeType::STRUCT_LITERAL;
     initStructLiteralData(charArrayLiteral);
 
-    for (auto c : node->stringLiteralData.value) {
+    for (auto c : *node->stringLiteralData.value) {
         auto charNode = new Node();
         charNode->type = NodeType::INT_LITERAL;
         charNode->typeInfo = new Node(NodeTypekind::I8);
@@ -703,7 +704,7 @@ void resolveStringLiteral(Semantic *semantic, Node *node) {
     auto countNode = new Node();
     countNode->type = NodeType::INT_LITERAL;
     countNode->typeInfo = new Node(NodeTypekind::I64);
-    countNode->intLiteralData.value = static_cast<int64_t>(node->stringLiteralData.value.size());
+    countNode->intLiteralData.value = static_cast<int64_t>(node->stringLiteralData.value->size());
 
     // arrayLiteral = {&{'h', 'e', 'l', 'l', 'o'}, 5}
     vector_append(arrayLiteral->structLiteralData.params, wrapInValueParam(heapifiedCharArrayLiteral, "data"));
@@ -2155,6 +2156,7 @@ void resolveFieldsof(Semantic *semantic, Node *node) {
 
     auto resolved = new Node();
     resolved->type = NodeType::ARRAY_LITERAL;
+    initArrayLiteralData(resolved);
 
     for (auto param : params) {
         assert(param->type == NodeType::DECL_PARAM);
@@ -2172,7 +2174,8 @@ void resolveFieldsof(Semantic *semantic, Node *node) {
         auto nameLit = new Node();
         nameLit->scope = node->scope;
         nameLit->type = NodeType::STRING_LITERAL;
-        nameLit->stringLiteralData.value = param->paramData.name == nullptr ? "" : AtomTable::current->backwardAtoms[param->paramData.name->symbolData.atomId];
+        nameLit->stringLiteralData.value = new string(
+                param->paramData.name == nullptr ? "" : AtomTable::current->backwardAtoms[param->paramData.name->symbolData.atomId]);
 
         auto fieldLit = new Node();
         fieldLit->scope = node->scope;

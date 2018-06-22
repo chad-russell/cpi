@@ -41,6 +41,15 @@ Node::Node(SourceInfo srcInfo, NodeType type_, Scope *scope_) : Node() {
         case NodeType::WHILE: {
             initWhileData(this);
         } break;
+        case NodeType::CAST: {
+            initCastData(this);
+        } break;
+        case NodeType::ARRAY_LITERAL: {
+            initArrayLiteralData(this);
+        } break;
+        case NodeType::FOR: {
+            initForData(this);
+        } break;
         default: {}
     }
 }
@@ -53,6 +62,28 @@ Node::Node(NodeTypekind typekind) : Node() {
 Node::Node() {
     id = nodeId;
     nodeId += 1;
+}
+
+void initForData(Node *node) {
+    node->forData.element_alias = nullptr;
+    node->forData.iterator_alias = nullptr;
+    node->forData.target = nullptr;
+    node->forData.stmts = vector_init<Node *>(10);
+    node->forData.rewritten = vector_init<Node *>(10);
+    node->forData.isStatic = false;
+    node->forData.staticStmts = vector_init<Node *>(10);
+}
+
+void initArrayLiteralData(Node *node) {
+    node->arrayLiteralData.elementType = nullptr;
+    node->arrayLiteralData.elements = vector_init<Node *>(10);
+    node->arrayLiteralData.structLiteralRepresentation = nullptr;
+}
+
+void initCastData(Node *node) {
+    node->castData.type = nullptr;
+    node->castData.value = nullptr;
+    node->castData.isCastFromArrayToDataPtr = false;
 }
 
 void initWhileData(Node *node) {
