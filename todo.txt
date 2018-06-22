@@ -1,4 +1,6 @@
 TODO:
+    - get rid of c++ std containers!!
+
     - better interpreter debugging
         - more accurate source information, stopping, etc.
         - get list of stack variables and print their values by name

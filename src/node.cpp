@@ -38,12 +38,14 @@ Node *resolve(Node *n) {
 
 Scope::Scope(Scope *parent_) {
     parent = parent_;
+
+    symbols = hash_t_init<int64_t, Node *>(100);
 }
 
 Node *Scope::find(int64_t atomId) {
-    auto found = symbols.find(atomId);
-    if (found != symbols.end()) {
-        return found->second;
+    auto found = hash_t_get(symbols, atomId);
+    if (found != nullptr) {
+        return *found;
     }
 
     if (parent != nullptr) {

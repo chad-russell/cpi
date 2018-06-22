@@ -10,7 +10,7 @@
 class BytecodeGen {
 public:
     vector<unsigned char> instructions = {};
-    unordered_map<uint32_t, uint32_t> fnTable = {};
+    hash_t<uint32_t, uint64_t> *fnTable;
 
     SourceMap sourceMap = {};
     int64_t currentFnStackSize;
@@ -30,6 +30,8 @@ public:
     void fixup();
 
     void storeValue(Node *node, int32_t offset);
+
+    BytecodeGen();
 };
 
 bool hasNoLocalByDefault(Node *node);

@@ -140,7 +140,7 @@ void BytecodeGen::gen(Node *node) {
 
             node->fnDeclData.instOffset = instructions.size();
 
-            fnTable.insert({node->fnDeclData.tableIndex, node->fnDeclData.instOffset});
+            hash_t_insert(fnTable, node->fnDeclData.tableIndex, node->fnDeclData.instOffset);
 
             auto stackSize = static_cast<int32_t>(node->fnDeclData.stackSize);
             append(instructions, Instruction::BUMPSP);
@@ -1141,4 +1141,8 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
         default:
             assert(false);
     }
+}
+
+BytecodeGen::BytecodeGen() {
+    fnTable = hash_t_init<uint32_t, uint64_t>(100);
 }

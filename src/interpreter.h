@@ -5,13 +5,6 @@
 
 #include "assembler.h"
 
-template<typename T>
-class Optional {
-public:
-    bool isPresent;
-    T value;
-};
-
 class Interpreter;
 
 template <typename T>
@@ -75,14 +68,14 @@ void interpretPuts(Interpreter *interp);
 class Interpreter {
 public:
     vector<unsigned char> instructions = {};
-    unordered_map<uint32_t, uint32_t> fnTable = {};
+    hash_t<uint32_t, uint64_t> *fnTable;
 
     vector<unsigned char> stack = {};
     int32_t stackSize = 1024;
 
     uint64_t stepCount = 0;
 
-    int32_t pc = 0;
+    uint32_t pc = 0;
     int32_t sp = 0;
     int32_t bp = 0;
 
@@ -111,6 +104,8 @@ public:
         for (auto i = 0; i < stackSize; i++) {
             stack.push_back(0);
         }
+
+        this->fnTable = hash_t_init<uint32_t, uint64_t>(100);
 
         table = {
             interpretMathAdd<int8_t>,
@@ -290,6 +285,7 @@ public:
       }
 
       assert(false && "unrecognized inst for read<T>");
+      return {};
   }
 
   auto readBits8() {

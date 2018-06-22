@@ -34,7 +34,7 @@ void AssemblyLexer::readFnTable() {
         uint32_t fnIndex, instIndex;
         iss >> fnIndex;
         iss >> instIndex;
-        fnTable.insert({fnIndex, instIndex});
+        hash_t_insert(fnTable, fnIndex, (uint64_t) instIndex);
     }
 
     sourceMap.sourceInfo.source = new string(
@@ -432,13 +432,26 @@ const vector<string> AssemblyLexer::instructionStrings = {
 string MnemonicPrinter::debugString() {
     instructionString = "";
 
-    instructionString.append(to_string(fnTable.size()));
+    instructionString.append(to_string(fnTable->size));
     instructionString.append(" ");
-    for (auto t : fnTable) {
-        instructionString.append(to_string(t.first));
-        instructionString.append(" ");
-        instructionString.append(to_string(t.second));
-        instructionString.append(" ");
+
+    for (auto i = 0; i < fnTable->bucket_count; i++) {
+        auto bucket = fnTable->buckets[i];
+        if (bucket != nullptr) {
+            instructionString.append(to_string(bucket->key));
+            instructionString.append(" ");
+            instructionString.append(to_string(bucket->value));
+            instructionString.append(" ");
+
+            while (bucket->next != nullptr) {
+                bucket = bucket->next;
+
+                instructionString.append(to_string(bucket->key));
+                instructionString.append(" ");
+                instructionString.append(to_string(bucket->value));
+                instructionString.append(" ");
+            }
+        }
     }
     instructionString.append("\n");
 

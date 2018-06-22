@@ -427,31 +427,33 @@ AtomTable *AtomTable::current = nullptr;
 
 AtomTable::AtomTable() {
     current = this;
+
+    atoms = hash_t_init<string, int64_t>(1000);
 }
 
 int64_t AtomTable::insertStr(string s) {
-    auto found = atoms.find(s);
-    if (found != atoms.end()) {
-        return found->second;
+    auto found = hash_t_get(atoms, s);
+    if (found != nullptr) {
+        return *found;
     }
 
     auto tableIndex = (int64_t) AtomTable::current->backwardAtoms.size();
-    AtomTable::current->atoms.insert({s, tableIndex});
-    AtomTable::current->backwardAtoms.push_back(s);
+    hash_t_insert(atoms, s, tableIndex);
+    backwardAtoms.push_back(s);
     return tableIndex;
 }
 
 int64_t AtomTable::insert(Region &r) {
     auto sourceStr = r.srcInfo.source->substr(r.start.byteIndex, r.end.byteIndex - r.start.byteIndex);
 
-    auto found = atoms.find(sourceStr);
-    if (found != atoms.end()) {
-        return found->second;
+    auto found = hash_t_get(atoms, sourceStr);
+    if (found != nullptr) {
+        return *found;
     }
 
     auto tableIndex = (int64_t) AtomTable::current->backwardAtoms.size();
-    AtomTable::current->atoms.insert({sourceStr, tableIndex});
-    AtomTable::current->backwardAtoms.push_back(sourceStr);
+    hash_t_insert(atoms, sourceStr, tableIndex);
+    backwardAtoms.push_back(sourceStr);
     return tableIndex;
 }
 

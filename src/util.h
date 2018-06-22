@@ -8,6 +8,8 @@
 #include <unordered_map>
 #include <memory.h>
 
+#include "hash.h"
+
 using namespace std;
 
 extern unsigned long nodeId;
@@ -260,9 +262,9 @@ struct FnDeclData {
     Scope *bodyScope = nullptr;
 
     int32_t stackSize = 0;
-    unsigned long instOffset;
+    uint64_t instOffset;
     bool isLiteral;
-    unsigned long tableIndex;
+    uint32_t tableIndex;
     bool cameFromPolymorph = false;
 };
 
@@ -390,10 +392,10 @@ struct IsKindData {
 
 class Scope {
 public:
-    unordered_map<int64_t, Node *> symbols;
+    hash_t<int64_t, Node *> *symbols;
     Scope *parent = nullptr;
 
-    Scope(Scope *parent);
+    explicit Scope(Scope *parent);
 
     Node *find(int64_t atomId);
 };
@@ -467,6 +469,13 @@ public:
     Node();
     explicit Node(NodeTypekind typekind);
     Node(SourceInfo srcInfo, NodeType type_, Scope *scope_);
+};
+
+template<typename T>
+class Optional {
+public:
+    bool isPresent;
+    T value;
 };
 
 template<typename T> 
@@ -581,11 +590,11 @@ ostream &operator<<(ostream &os, TypeData td);
 
 template<typename T>
 ostream &operator<<(ostream &os, Colored<T> colored) {
-    os << "\e[" << (colored.bold ? "1" : "0");
+    os << "\x1B[" << (colored.bold ? "1" : "0");
     for (auto color : colored.colors) {
         os << ";" << color;
     }
-    return os << "m" << colored.value << "\e[0m";
+    return os << "m" << colored.value << "\x1B[0m";
 }
 
 struct SourceMapStatement {
@@ -608,8 +617,7 @@ struct SourceMap {
 class AtomTable {
 public:
     static AtomTable *current;
-    unordered_map<string, int64_t> atoms;
-    std::vector<string> atoms2;
+    hash_t<string, int64_t> *atoms;
     vector<string> backwardAtoms;
 
     int64_t insert(Region &r);

@@ -47,8 +47,8 @@ set(CMAKE_CXX_FLAGS "${LLVM_CXXFLAGS} ${LLVM_LDFLAGS} ${LLVM_SYSTEMLIBS} ${LLVM_
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-set(CMAKE_BUILD_TYPE Debug)
-#set(CMAKE_BUILD_TYPE Release)
+#set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
 
 set(SOURCE_FILES
         src/assembler.cpp
@@ -67,6 +67,9 @@ set(SOURCE_FILES
         src/semantic.cpp
         src/semantic.h
         src/util.cpp
-        src/util.h src/llvmgen.cpp)
+        src/util.h
+        src/llvmgen.cpp
+        src/hash.cpp
+        src/hash.h)
 
 add_executable(cpi ${SOURCE_FILES})

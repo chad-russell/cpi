@@ -354,7 +354,7 @@ bool Lexer::prefix(string pre) {
         return 0;
     }
 
-    for (int32_t i = 0; i < pre.length(); i++) {
+    for (unsigned long i = 0; i < pre.length(); i++) {
         if (srcInfo.source->at(loc.byteIndex + i) != pre[i]) {
             return 0;
         }

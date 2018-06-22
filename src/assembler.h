@@ -134,7 +134,7 @@ public:
     Location loc = {};
 
     vector<unsigned char> instructions = {};
-    unordered_map<uint32_t, uint32_t> fnTable = {};
+    hash_t<uint32_t, uint64_t> *fnTable;
 
     Location savedLoc = {};
     unsigned long lastInstStart;
@@ -165,7 +165,7 @@ private:
 class MnemonicPrinter {
 public:
     const vector<unsigned char> &instructions;
-    unordered_map<uint32_t, uint32_t> fnTable = {};
+    hash_t<uint32_t, uint64_t> *fnTable;
 
     uint32_t pc = 0;
     string instructionString = "";

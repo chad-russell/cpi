@@ -12,6 +12,7 @@
 #include "semantic.h"
 #include "bytecodegen.h"
 #include "llvmgen.h"
+#include "hash.h"
 
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/Optional.h"
@@ -34,8 +35,6 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
-#include "llvm/Transforms/Scalar.h"
-#include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 
 using namespace std;
@@ -84,10 +83,15 @@ InputType inputTypeFromExtension(const string &fileName) {
     if (endsWith(const_cast<string *>(&fileName), ".cbc")) { return InputType::CBC; }
 
     printHelp();
+
     assert(false);
+    return {};
 }
 
 int main(int argc, char **argv) {
+    string foo = "foo";
+    string bar = "bar";
+
     nodeId = 0;
     debugFlag = 0;
 
@@ -145,7 +149,7 @@ int main(int argc, char **argv) {
     Semantic *semantic;
 
     vector<unsigned char> instructions;
-    unordered_map<uint32_t, uint32_t> fnTable;
+    hash_t<uint32_t, uint64_t> *fnTable = nullptr;
 
     Parser *parser = nullptr;
 
@@ -231,14 +235,14 @@ int main(int argc, char **argv) {
         auto offset = 0;
         auto count = bytesTo<uint32_t>(bytes, 0);
         offset += sizeof(uint32_t);
-        for (auto i = 0; i < count; i++) {
+        for (uint32_t i = 0; i < count; i++) {
             auto fnIndex = bytesTo<uint32_t>(bytes, offset);
             offset += sizeof(uint32_t);
 
             auto instIndex = bytesTo<uint32_t>(bytes, offset);
             offset += sizeof(uint32_t);
 
-            fnTable.insert({fnIndex, instIndex});
+            hash_t_insert(fnTable, fnIndex, (uint64_t) instIndex);
         }
 
         instructions = vector<unsigned char>(bytes.size() - offset);
@@ -322,9 +326,18 @@ int main(int argc, char **argv) {
             // .cbc
 
             // fn table
-            out << toBytes(static_cast<uint32_t>(fnTable.size()));
-            for (auto t : fnTable) {
-                out << toBytes(t.first) << toBytes(t.second);
+            out << toBytes(static_cast<uint32_t>(fnTable->size));
+            for (auto i = 0; i < fnTable->bucket_count; i++) {
+                auto bucket = fnTable->buckets[i];
+                if (bucket != nullptr) {
+                    out << toBytes(bucket->key) << toBytes(bucket->value);
+
+                    while (bucket->next != nullptr) {
+                        bucket = bucket->next;
+
+                        out << toBytes(bucket->key) << toBytes(bucket->value);
+                    }
+                }
             }
 
             // instructions

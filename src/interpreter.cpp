@@ -8,19 +8,10 @@ using namespace std;
 
 void printStmt(Interpreter *interp, int32_t pcStmtStart, bool withLineInfo = false) {
     for (auto stmt : interp->sourceMap.statements) {
-        if (stmt.instIndex == pcStmtStart) {
-            // get byte corresponding to start
-            auto startByte = stmt.startByte;
-
-            // get byte corresponding to end
-            auto endByte = stmt.endByte;
-
+        if (stmt.instIndex == (unsigned long) pcStmtStart) {
             if (withLineInfo) {
                 cout << "[" << stmt.startLine << "] ";
             }
-
-            // todo(chad): this is a normal 'const char *' now
-//            cout << interp->sourceMap.sourceInfo.source.substr(startByte, endByte - startByte) << endl;
         }
     }
 }
@@ -32,13 +23,13 @@ void printCurrentStmt(Interpreter *interp, bool withLineInfo = false) {
 void Interpreter::interpret() {
     auto mp = new MnemonicPrinter(this->instructions);
 
-    while (pc < instructions.size() && !terminated) {
+    while ((unsigned long) pc < instructions.size() && !terminated) {
 
         bool shouldStop = false;
         if (debugFlag) {
             auto stmtStop = false;
             for (auto&& s : sourceMap.statements) {
-                if (s.instIndex == pc) { stmtStop = true; }
+                if (s.instIndex == (unsigned long) pc) { stmtStop = true; }
             }
 
             if (stmtStop) {
@@ -83,7 +74,7 @@ void Interpreter::interpret() {
 
                     // find the statement which is on this line
                     for (auto stmt : sourceMap.statements) {
-                        if (stmt.startLine == bNum) {
+                        if (stmt.startLine == (unsigned long) bNum) {
                             breakpoints.push_back(stmt.instIndex);
                         }
                     }
@@ -91,7 +82,7 @@ void Interpreter::interpret() {
                     breakpoints = {};
                 } else if (line == "location") {
                     for (auto stmt : sourceMap.statements) {
-                        if (stmt.instIndex == pc) {
+                        if (stmt.instIndex == (unsigned long) pc) {
                             cout << stmt.startLine << endl;
                         }
                     }
@@ -99,11 +90,11 @@ void Interpreter::interpret() {
                     printCurrentStmt(this);
                 } else if (line == "asm") {
                     // print all insts between this stmt and the next one
-                    auto firstIndex = (uint32_t) pc;
-                    auto lastIndex = (uint32_t) pc;
+                    auto firstIndex = pc;
+                    auto lastIndex = pc;
                     for (auto statement : sourceMap.statements) {
                         auto stmt = statement;
-                        if (stmt.instIndex == pc) {
+                        if (stmt.instIndex == (unsigned long) pc) {
                             lastIndex = (int32_t) statement.instEndIndex;
                             break;
                         }
@@ -187,8 +178,8 @@ void interpretPuts(Interpreter *interp) {
 // calli
 void interpretCalli(Interpreter *interp) {
     auto fnTableIndex = interp->read<int32_t>();
-    auto callIndex = interp->fnTable[fnTableIndex];
-    interp->callIndex(callIndex);
+    auto callIndex = *hash_t_get(interp->fnTable, (uint32_t) fnTableIndex);
+    interp->callIndex((int32_t) callIndex);
 }
 
 // call

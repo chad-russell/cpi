@@ -46,14 +46,14 @@ void Parser::expectSemicolon() {
 void Parser::scopeInsert(int64_t atomId, Node *node) {
     auto _scope = scopes.top();
 
-    auto found = _scope->symbols.find(atomId);
-    if (found != _scope->symbols.end()) {
+    auto found = hash_t_get(_scope->symbols, atomId);
+    if (found != nullptr) {
         ostringstream s("");
         s << "redeclaration of symbol '" << AtomTable::current->backwardAtoms[atomId] << "'";
         reportError(s.str());
     }
 
-    _scope->symbols.insert({atomId, node});
+    hash_t_insert(_scope->symbols, atomId, node);
 }
 
 void Parser::parseRoot() {

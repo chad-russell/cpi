@@ -68,9 +68,10 @@ int32_t typeSize(Node *type) {
         case NodeTypekind::EXPOSED_AST: {
             return typeSize(resolved->staticValue);
         }
-        default:
-            assert(false);
     }
+
+    assert(false);
+    return 0;
 }
 
 bool typesMatch(Node *desired, Node *actual, Semantic *semantic);
@@ -267,7 +268,7 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
             }
         }
 
-        for (auto i = 0; i < desired->typeData.structTypeData.params.size(); i++) {
+        for (unsigned long i = 0; i < desired->typeData.structTypeData.params.size(); i++) {
             auto desiredParamI = desired->typeData.structTypeData.params[i];
             auto actualParamI = actual->typeData.structTypeData.params[i];
 
@@ -387,6 +388,9 @@ Node *defaultValueFor(Semantic *semantic, Node *type) {
         default:
             assert(false);
     }
+
+    assert(false);
+    return nullptr;
 }
 
 void Semantic::reportError(vector<Node *> nodes, Error error) {
@@ -743,7 +747,7 @@ bool assignParams(Semantic *semantic,
     vector<bool> openParams = {};
     vector<Node *> newParams = {};
 
-    for (auto i = 0; i < declParams.size(); i++) {
+    for (unsigned long i = 0; i < declParams.size(); i++) {
         openParams.push_back(true);
         newParams.push_back(nullptr);
     }
@@ -834,7 +838,7 @@ bool assignParams(Semantic *semantic,
         }
     }
 
-    for (auto i = 0; i < declParams.size(); i++) {
+    for (unsigned long i = 0; i < declParams.size(); i++) {
         auto openParamsI = openParams[i];
         if (openParamsI || newParams[i] == nullptr) {
             encounteredError = true;
@@ -943,7 +947,6 @@ void resolveType(Semantic *semantic, Node *node) {
         case NodeTypekind::POINTER: {
             semantic->resolveTypes(node->typeData.pointerTypeData.underlyingType);
         } break;
-        default: assert(false);
     }
 }
 
@@ -1053,11 +1056,13 @@ void resolveFnCall(Semantic *semantic, Node *node) {
         }
 
         auto encounteredError = assignParams(semantic, node, declParams, node->fnCallData.params);
-        assert(!encounteredError);
+        if (encounteredError) {
+            assert(false);
+        }
 
         if (isPoly) {
             // 'link' each decl param to its runtime param
-            for (auto p = 0; p < declParams.size(); p++) {
+            for (unsigned long p = 0; p < declParams.size(); p++) {
                 declParams[p]->paramData.polyLink = node->fnCallData.params[p];
             }
         }
@@ -1068,10 +1073,12 @@ void resolveFnCall(Semantic *semantic, Node *node) {
         auto ctDeclParams = resolvedFn->fnDeclData.ctParams;
         auto ctGivenParams = node->fnCallData.ctParams;
         auto encounteredError = assignParams(semantic, node, ctDeclParams, ctGivenParams);
-        assert(!encounteredError);
+        if (encounteredError) {
+            assert(false);
+        }
 
         // Make sure the ctDeclParams resolve to their compile-time values
-        for (auto i = 0; i < ctGivenParams.size(); i++) {
+        for (unsigned long i = 0; i < ctGivenParams.size(); i++) {
             const auto& ctParam = ctGivenParams[i];
 
             if (ctParam->type == NodeType::VALUE_PARAM) {
@@ -1099,7 +1106,7 @@ void resolveFnCall(Semantic *semantic, Node *node) {
 
         if (isPoly) {
             // un-link
-            for (auto p = 0; p < declParams.size(); p++) {
+            for (unsigned long p = 0; p < declParams.size(); p++) {
                 declParams[p]->paramData.polyLink = nullptr;
             }
 
@@ -1214,8 +1221,8 @@ void possiblyResolveAssignToUnion(Semantic *semantic, Node *originalAssignment, 
         tagDot->dotData.rhs = param0;
         semantic->resolveTypes(tagDot);
 
-        uint64_t paramIndex = (uint64_t) foundParam->paramData.index;
         auto foundParam = secondmostLhs->dotData.resolved;
+        uint64_t paramIndex = (uint64_t) foundParam->paramData.index;
 
         // assign to 0th parameter the value of paramIndex
         auto constParamIndex = new Node();
@@ -1682,11 +1689,11 @@ void resolveStaticFor(Semantic *semantic, Node *node) {
             && !resolvedTargetType->typeData.structTypeData.isSecretlyEnum) {
         auto params = resolvedTargetType->typeData.structTypeData.params;
 
-        for (auto staticIdx = 0; staticIdx < params.size(); staticIdx += 1) {
+        for (unsigned long staticIdx = 0; staticIdx < params.size(); staticIdx += 1) {
             auto intLiteral = new Node();
             intLiteral->type = NodeType::INT_LITERAL;
             intLiteral->typeInfo = new Node(NodeTypekind::I64);
-            intLiteral->intLiteralData.value = staticIdx;
+            intLiteral->intLiteralData.value = (int64_t) staticIdx;
 
             auto elemDot = new Node();
             elemDot->scope = resolvedTarget->scope;
@@ -1708,7 +1715,7 @@ void resolveStaticFor(Semantic *semantic, Node *node) {
         // todo(chad): test scopes here
 
         // new declaration for elem
-        node->scope->symbols.insert({node->forData.element_alias->symbolData.atomId, staticElem});
+        hash_t_insert(node->scope->symbols, node->forData.element_alias->symbolData.atomId, staticElem);
 
         Node *indexLiteral = nullptr;
         if (node->forData.iterator_alias != nullptr) {
@@ -1716,7 +1723,7 @@ void resolveStaticFor(Semantic *semantic, Node *node) {
             indexLiteral->type = NodeType::INT_LITERAL;
             indexLiteral->typeInfo = new Node(NodeTypekind::I64);
             indexLiteral->intLiteralData.value = staticIdx;
-            node->scope->symbols.insert({node->forData.iterator_alias->symbolData.atomId, indexLiteral});
+            hash_t_insert(node->scope->symbols, node->forData.iterator_alias->symbolData.atomId, indexLiteral);
         }
 
         auto subScope = new Scope(node->scope);
@@ -1728,9 +1735,9 @@ void resolveStaticFor(Semantic *semantic, Node *node) {
             node->forData.staticStmts.push_back(newStmt);
         }
 
-        node->scope->symbols.erase(node->forData.element_alias->symbolData.atomId);
+        hash_t_erase(node->scope->symbols, node->forData.element_alias->symbolData.atomId);
         if (node->forData.iterator_alias != nullptr) {
-            node->scope->symbols.erase(node->forData.iterator_alias->symbolData.atomId);
+            hash_t_erase(node->scope->symbols, node->forData.iterator_alias->symbolData.atomId);
         }
         staticIdx += 1;
     }
@@ -1763,7 +1770,7 @@ void resolveFor(Semantic *semantic, Node *node) {
     semantic->resolveTypes(elementDecl);
 
     // insert this new declaration into the scope of the 'for' statement
-    node->scope->symbols.insert({node->forData.element_alias->symbolData.atomId, elementDecl});
+    hash_t_insert(node->scope->symbols, node->forData.element_alias->symbolData.atomId, elementDecl);
 
     // 0
     auto zero = new Node();
@@ -1787,7 +1794,7 @@ void resolveFor(Semantic *semantic, Node *node) {
     auto index = indexDecl;
     if (node->forData.iterator_alias != nullptr) {
         node->forData.iterator_alias->resolved = indexDecl;
-        node->scope->symbols.insert({node->forData.iterator_alias->symbolData.atomId, indexDecl});
+        hash_t_insert(node->scope->symbols, node->forData.iterator_alias->symbolData.atomId, indexDecl);
 
         index = node->forData.iterator_alias;
     }
@@ -1995,7 +2002,7 @@ void resolveRun(Semantic *semantic, Node *node) {
     auto ctSemantic = make_unique<Semantic>();
     ctSemantic->resolveTypes(ctFn);
 
-    auto gen = make_unique<BytecodeGen>();
+    auto gen = new BytecodeGen();
     gen->isMainFn = true;
     gen->sourceMap.sourceInfo = node->region.srcInfo;
     gen->processFnDecls = true;
