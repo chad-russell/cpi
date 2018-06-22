@@ -290,28 +290,28 @@ struct ArrayIndexData {
 };
 
 struct DotData {
-    Node *lhs = nullptr;
-    Node *rhs = nullptr;
-    Node *resolved = nullptr;
+    Node *lhs;
+    Node *rhs;
+    Node *resolved;
 
-    Node *autoDerefStorage = nullptr;
-    bool pointerIsRelative = false;
+    Node *autoDerefStorage;
+    bool pointerIsRelative;
 };
 
 struct BinopData {
     LexerTokenType type;
 
-    Node *lhs = nullptr;
-    Node *rhs = nullptr;
+    Node *lhs;
+    Node *rhs;
 
-    int rhsScale = 1;
+    int rhsScale;
 
     Node *lhsTemporary;
     Node *rhsTemporary;
 };
 
 struct StructLiteralData {
-    vector_t<Node *> params = vector_init<Node *>(10);
+    vector_t<Node *> params;
 };
 
 struct StringLiteralData {
@@ -319,14 +319,14 @@ struct StringLiteralData {
 };
 
 struct IfData {
-    Node *condition = nullptr;
-    vector_t<Node *> stmts = vector_init<Node *>(10);
-    vector_t<Node *> elseStmts = vector_init<Node *>(10);
+    Node *condition;
+    vector_t<Node *> stmts;
+    vector_t<Node *> elseStmts;
 };
 
 struct WhileData {
-    Node *condition = nullptr;
-    vector_t<Node *> stmts = vector_init<Node *>(10);
+    Node *condition;
+    vector_t<Node *> stmts;
 };
 
 struct CastData {

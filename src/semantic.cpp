@@ -357,6 +357,7 @@ Node *defaultValueFor(Semantic *semantic, Node *type) {
         case NodeTypekind::STRUCT: {
             auto def = new Node();
             def->type = NodeType::STRUCT_LITERAL;
+            initStructLiteralData(def);
 
             for (auto param : type->typeData.structTypeData.params) {
                 auto vp = param->paramData.value;
@@ -381,6 +382,7 @@ Node *defaultValueFor(Semantic *semantic, Node *type) {
         case NodeTypekind::NONE: {
             auto def = new Node();
             def->type = NodeType::STRUCT_LITERAL;
+            initStructLiteralData(def);
             def->typeInfo = type;
             return def;
         }
@@ -613,6 +615,7 @@ void resolveArrayIndex(Semantic *semantic, Node *node) {
         auto rewrittenDot = new Node();
         rewrittenDot->scope = node->scope;
         rewrittenDot->type = NodeType::DOT;
+        initDotData(rewrittenDot);
         rewrittenDot->dotData.lhs = node->arrayIndexData.target;
         rewrittenDot->dotData.rhs = resolvedIndexValue;
         semantic->resolveTypes(rewrittenDot);
@@ -678,6 +681,7 @@ void resolveStringLiteral(Semantic *semantic, Node *node) {
     // charArrayLiteral = {'h', 'e', 'l', 'l', 'o'}
     auto charArrayLiteral = new Node();
     charArrayLiteral->type = NodeType::STRUCT_LITERAL;
+    initStructLiteralData(charArrayLiteral);
 
     for (auto c : node->stringLiteralData.value) {
         auto charNode = new Node();
@@ -1207,6 +1211,7 @@ void possiblyResolveAssignToUnion(Semantic *semantic, Node *originalAssignment, 
         auto tagDot = new Node();
         tagDot->scope = originalAssignment->scope;
         tagDot->type = NodeType::DOT;
+        initDotData(tagDot);
         tagDot->dotData.lhs = mostLhs;
         tagDot->dotData.rhs = param0;
         semantic->resolveTypes(tagDot);
@@ -1409,6 +1414,7 @@ void createTagCheck(Semantic *semantic, Node *node) {
     auto ifCheck = new Node();
     ifCheck->scope = node->scope;
     ifCheck->type = NodeType::IF;
+    initIfData(ifCheck);
     ifCheck->ifData.condition = eqFalse;
     vector_append(ifCheck->ifData.stmts, panicStmt);
 
@@ -1691,6 +1697,7 @@ void resolveStaticFor(Semantic *semantic, Node *node) {
             auto elemDot = new Node();
             elemDot->scope = resolvedTarget->scope;
             elemDot->type = NodeType::DOT;
+            initDotData(elemDot);
             elemDot->dotData.lhs = resolvedTarget;
             elemDot->dotData.rhs = intLiteral;
             semantic->resolveTypes(elemDot);
@@ -1812,6 +1819,7 @@ void resolveFor(Semantic *semantic, Node *node) {
     auto arrayDotCount = new Node();
     arrayDotCount->scope = node->scope;
     arrayDotCount->type = NodeType::DOT;
+    initDotData(arrayDotCount);
     arrayDotCount->dotData.lhs = arrayDecl;
     arrayDotCount->dotData.rhs = countSymbol;
 
@@ -1930,6 +1938,7 @@ void resolveTagCheck(Semantic *semantic, Node *node) {
     auto tagDot = new Node();
     tagDot->scope = node->scope;
     tagDot->type = NodeType::DOT;
+    initDotData(tagDot);
     tagDot->dotData.lhs = resolvedNode->dotData.lhs;
     tagDot->dotData.rhs = param0;
     semantic->resolveTypes(tagDot);
@@ -2168,6 +2177,7 @@ void resolveFieldsof(Semantic *semantic, Node *node) {
         auto fieldLit = new Node();
         fieldLit->scope = node->scope;
         fieldLit->type = NodeType::STRUCT_LITERAL;
+        initStructLiteralData(fieldLit);
         fieldLit->structLiteralData.params = vector_init<Node *>(2);
         vector_append(fieldLit->structLiteralData.params, wrapInValueParam(indexLit, "index"));
         vector_append(fieldLit->structLiteralData.params, wrapInValueParam(nameLit, "name"));

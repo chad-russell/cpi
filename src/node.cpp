@@ -31,7 +31,16 @@ Node::Node(SourceInfo srcInfo, NodeType type_, Scope *scope_) : Node() {
         } break;
         case NodeType::DOT: {
             initDotData(this);
-        }
+        } break;
+        case NodeType::STRUCT_LITERAL: {
+            initStructLiteralData(this);
+        } break;
+        case NodeType::IF: {
+            initIfData(this);
+        } break;
+        case NodeType::WHILE: {
+            initWhileData(this);
+        } break;
         default: {}
     }
 }
@@ -44,6 +53,21 @@ Node::Node(NodeTypekind typekind) : Node() {
 Node::Node() {
     id = nodeId;
     nodeId += 1;
+}
+
+void initWhileData(Node *node) {
+    node->whileData.condition = nullptr;
+    node->whileData.stmts = vector_init<Node *>(10);
+}
+
+void initIfData(Node *node) {
+    node->ifData.condition = nullptr;
+    node->ifData.stmts = vector_init<Node *>(10);
+    node->ifData.elseStmts = vector_init<Node *>(10);
+}
+
+void initStructLiteralData(Node *node) {
+  node->structLiteralData.params = vector_init<Node *>(10);
 }
 
 void initDotData(Node *node) {
