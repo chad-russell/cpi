@@ -59,9 +59,11 @@ Node::Node(NodeTypekind typekind) : Node() {
     typeData.kind = typekind;
 }
 
-Node::Node() {
+Node::Node(Region r) {
     id = nodeId;
     nodeId += 1;
+
+    this->region = r;
 }
 
 void initForData(Node *node) {
@@ -356,7 +358,7 @@ Node *makeArrayType(Node *elementType) {
 }
 
 Node *wrapInValueParam(Node *value, Node *name) {
-    auto valueParam = new Node();
+    auto valueParam = new Node(value->region);
     valueParam->type = NodeType::VALUE_PARAM;
     valueParam->paramData.value = value;
     valueParam->paramData.name = name;
@@ -364,11 +366,11 @@ Node *wrapInValueParam(Node *value, Node *name) {
 }
 
 Node *wrapInValueParam(Node *value, int64_t atomId) {
-    auto valueParam = new Node();
+    auto valueParam = new Node(value->region);
     valueParam->type = NodeType::VALUE_PARAM;
     valueParam->paramData.value = value;
 
-    auto nameNode = new Node();
+    auto nameNode = new Node(value->region);
     nameNode->type = NodeType::SYMBOL;
     nameNode->scope = value->scope;
     nameNode->region = value->region;
@@ -380,12 +382,12 @@ Node *wrapInValueParam(Node *value, int64_t atomId) {
 }
 
 Node *wrapInValueParam(Node *value, string name) {
-    auto valueParam = new Node();
+    auto valueParam = new Node(value->region);
     valueParam->type = NodeType::VALUE_PARAM;
     valueParam->paramData.value = value;
 
     if (!name.empty()) {
-        auto nameNode = new Node();
+        auto nameNode = new Node(value->region);
         nameNode->type = NodeType::SYMBOL;
         nameNode->scope = value->scope;
         nameNode->region = value->region;

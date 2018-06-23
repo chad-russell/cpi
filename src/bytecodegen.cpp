@@ -1099,7 +1099,7 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
                 auto tagIndex = vector_at(node->typeInfo->typeData.structTypeData.params, 0)->paramData.index;
                 auto value = vector_at(node->structLiteralData.params, 0);
 
-                auto tagValue = new Node();
+                auto tagValue = new Node(node->region);
                 tagValue->type = NodeType::INT_LITERAL;
                 // todo(chad): allow the user to specify the size of the tag (or maybe do it automatically?)
                 // todo(chad): maybe do this sooner - like in semantic back when we recognize this case?

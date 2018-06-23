@@ -447,7 +447,7 @@ public:
     void *llvmLocal = nullptr;
     void *llvmData = nullptr;
 
-    Node();
+    Node(Region r = {});
     explicit Node(NodeTypekind typekind);
     Node(SourceInfo srcInfo, NodeType type_, Scope *scope_);
 };

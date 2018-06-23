@@ -9,9 +9,13 @@ using namespace std;
 void printStmt(Interpreter *interp, int32_t pcStmtStart, bool withLineInfo = false) {
     for (auto stmt : interp->sourceMap.statements) {
         if (stmt.instIndex == (unsigned long) pcStmtStart) {
+            cout << interp->sourceMap.sourceInfo.source->substr(stmt.startByte, stmt.endByte - stmt.startByte);
+
             if (withLineInfo) {
                 cout << "[" << stmt.startLine << "] ";
             }
+
+            cout << endl;
         }
     }
 }

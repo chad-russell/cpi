@@ -831,6 +831,7 @@ Node *Parser::parseType() {
             expect(LexerTokenType::RCURLY, "}");
 
             type->region.end = lexer->lastLoc;
+            tagParam->region = type->region;
         } break;
         case LexerTokenType::MUL: {
             popFront();
@@ -1118,6 +1119,9 @@ Node *Parser::parseLvalueOrLiteral() {
             symbol = new Node();
             symbol->type = NodeType::UNARY_NEG;
             symbol->nodeData = target;
+
+            symbol->region.start = saved;
+            symbol->region.end = target->region.end;
         }
     } else if (lexer->front.type == LexerTokenType::INT_LITERAL) {
         symbol = parseIntLiteral();

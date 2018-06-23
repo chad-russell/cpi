@@ -6,13 +6,13 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # MAC OS
-#include_directories(/usr/local/opt/llvm@6/include)
-#set(LLVM_CONFIG_PATH "/usr/local/opt/llvm@6/bin/llvm-config")
+include_directories(/usr/local/opt/llvm@6/include)
+set(LLVM_CONFIG_PATH "/usr/local/opt/llvm@6/bin/llvm-config")
 
 # WINDOWS
-include_directories(/usr/include/llvm-5.0)
-include_directories(/usr/include/llvm-c-5.0)
-set(LLVM_CONFIG_PATH "/usr/bin/llvm-config-5.0")
+#include_directories(/usr/include/llvm-5.0)
+#include_directories(/usr/include/llvm-c-5.0)
+#set(LLVM_CONFIG_PATH "/usr/bin/llvm-config-5.0")
 
 execute_process(
         COMMAND

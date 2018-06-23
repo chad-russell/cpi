@@ -624,7 +624,7 @@ void resolveArrayIndex(Semantic *semantic, Node *node) {
         auto oldTypeInfo = resolvedIndexValue->typeInfo;
         auto oldResolved = resolvedIndexValue->resolved;
 
-        auto rewrittenDot = new Node();
+        auto rewrittenDot = new Node(node->region);
         rewrittenDot->scope = node->scope;
         rewrittenDot->type = NodeType::DOT;
         initDotData(rewrittenDot);
@@ -648,7 +648,7 @@ void resolveArrayIndex(Semantic *semantic, Node *node) {
 
     // a[i] <==> ^((cast(*i32) a) + i), for example (if typeof(a) is []i32)
 
-    auto aCasted = new Node();
+    auto aCasted = new Node(node->region);
     aCasted->type = NodeType::CAST;
     initCastData(aCasted);
     aCasted->castData.isCastFromArrayToDataPtr = true;
@@ -692,12 +692,12 @@ void resolveStringLiteral(Semantic *semantic, Node *node) {
     arrayLiteral->region = node->region;
 
     // charArrayLiteral = {'h', 'e', 'l', 'l', 'o'}
-    auto charArrayLiteral = new Node();
+    auto charArrayLiteral = new Node(node->region);
     charArrayLiteral->type = NodeType::STRUCT_LITERAL;
     initStructLiteralData(charArrayLiteral);
 
     for (auto c : *node->stringLiteralData.value) {
-        auto charNode = new Node();
+        auto charNode = new Node(node->region);
         charNode->type = NodeType::INT_LITERAL;
         charNode->typeInfo = new Node(NodeTypekind::I8);
         charNode->intLiteralData.value = static_cast<int64_t>(c);
@@ -706,14 +706,14 @@ void resolveStringLiteral(Semantic *semantic, Node *node) {
     }
 
     // heapifiedCharArrayLiteral = &{'h', 'e', 'l', 'l', 'o'}
-    auto heapifiedCharArrayLiteral = new Node();
+    auto heapifiedCharArrayLiteral = new Node(node->region);
     heapifiedCharArrayLiteral->type = NodeType::HEAPIFY;
     heapifiedCharArrayLiteral->nodeData = charArrayLiteral;
 
     semantic->addLocal(heapifiedCharArrayLiteral->nodeData);
 
     // countNode = 5
-    auto countNode = new Node();
+    auto countNode = new Node(node->region);
     countNode->type = NodeType::INT_LITERAL;
     countNode->typeInfo = new Node(NodeTypekind::I64);
     countNode->intLiteralData.value = static_cast<int64_t>(node->stringLiteralData.value->size());
@@ -959,7 +959,7 @@ void resolveType(Semantic *semantic, Node *node) {
 }
 
 Node *makeTemporary(Semantic *semantic, Node *n) {
-    auto node = new Node();
+    auto node = new Node(n->region);
     node->typeInfo = n->typeInfo;
     semantic->addLocal(node);
     return node;
@@ -976,14 +976,14 @@ void resolveBinop(Semantic *semantic, Node *node) {
     auto resolvedRhsType = resolve(node->binopData.rhs->typeInfo);
 
     if (node->binopData.lhs->type == NodeType::DOT) {
-        auto newLocalStorage = new Node();
+        auto newLocalStorage = new Node(node->region);
         newLocalStorage->type = NodeType::TYPE;
         newLocalStorage->typeInfo = resolvedLhsType;
 
         semantic->addLocal(newLocalStorage);
     }
     if (node->binopData.rhs->type == NodeType::DOT) {
-        auto newLocalStorage = new Node();
+        auto newLocalStorage = new Node(node->region);
         newLocalStorage->type = NodeType::TYPE;
         newLocalStorage->typeInfo = resolvedRhsType;
 

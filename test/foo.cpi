@@ -1,8 +1,7 @@
 fn main() {
-    id(3);
-    return 0;
+    return []{1, 2, 3}[foo()];
 }
 
-fn id(i: i32) {
-    return i;
+fn foo() {
+    return 1;
 }

@@ -1,10 +1,12 @@
 TODO:
-    - get rid of c++ std containers!!
-
     - better interpreter debugging
         - more accurate source information, stopping, etc.
         - get list of stack variables and print their values by name
         - implement option to have memory as a rope structure -- infinite undo/redo of program execution state
+
+    - support binop in constant-folding
+
+    - arguments in #run
 
     - pipe operator
 
