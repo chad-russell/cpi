@@ -1476,6 +1476,7 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
     semantic->resolveTypes(node->dotData.lhs);
     if (resolve(node->dotData.lhs->typeInfo)->typeData.kind == NodeTypekind::POINTER) {
         auto local = new Node(NodeTypekind::POINTER);
+        local->typeData.pointerTypeData.underlyingType = nullptr;
         local->typeInfo = local;
         semantic->addLocal(local);
 
@@ -1783,7 +1784,7 @@ void resolveFor(Semantic *semantic, Node *node) {
     // indexDecl: i64 = 0
     auto indexDecl = new Node();
     indexDecl->type = NodeType::DECL;
-    initDeclData(elementDecl);
+    initDeclData(indexDecl);
     indexDecl->scope = node->scope;
     if (node->forData.iterator_alias != nullptr) {
         indexDecl->region = node->forData.iterator_alias->region;
