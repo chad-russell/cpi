@@ -368,10 +368,10 @@ llvm::DIType *diTypeFor(LlvmGen *gen, Node *type) {
 
                     string name;
                     if (param->type == NodeType::VALUE_PARAM && param->paramData.name != nullptr) {
-                        name = AtomTable::current->backwardAtoms[param->paramData.name->symbolData.atomId];
+                        name = atomTable->backwardAtoms[param->paramData.name->symbolData.atomId];
                     }
                     else if (param->type == NodeType::DECL_PARAM && param->paramData.name != nullptr) {
-                        name = AtomTable::current->backwardAtoms[param->paramData.name->symbolData.atomId];
+                        name = atomTable->backwardAtoms[param->paramData.name->symbolData.atomId];
                     }
                     auto sizeInBits = basicType->getSizeInBits();
                     auto alignInBits = basicType->getAlignInBits();
@@ -425,7 +425,7 @@ void LlvmGen::gen(Node *node) {
             auto declOnly = node->fnDeclData.body.length == 0;
 
             // debug info
-            auto fnName = node->fnDeclData.name ? AtomTable::current->backwardAtoms[node->fnDeclData.name->symbolData.atomId] : "anon";
+            auto fnName = node->fnDeclData.name ? atomTable->backwardAtoms[node->fnDeclData.name->symbolData.atomId] : "anon";
 
             auto savedScope = currentScope;
             auto savedScopeName = currentScopeName;
@@ -515,7 +515,7 @@ void LlvmGen::gen(Node *node) {
                             assert(resolvedLocal->declData.lvalue->type == NodeType::SYMBOL);
                             auto atomId = resolvedLocal->declData.lvalue->symbolData.atomId;
 
-                            auto localName = AtomTable::current->backwardAtoms[atomId];
+                            auto localName = atomTable->backwardAtoms[atomId];
                             resolvedLocal->llvmLocal = builder.CreateAlloca(typeToAlloca, nullptr, localName);
 
                             if (DBUILDER) {
@@ -992,7 +992,7 @@ void LlvmGen::gen(Node *node) {
             assert(foundParam->type == NodeType::DECL_PARAM || foundParam->type == NodeType::VALUE_PARAM);
             uint32_t paramIndex = static_cast<uint32_t>(foundParam->paramData.index);
 
-            auto tagAtom = AtomTable::current->insertStr("tag");
+            auto tagAtom = atomTable->insertStr("tag");
             auto resolvedTypeInfo = resolve(node->dotData.lhs->typeInfo);
             while (resolvedTypeInfo->typeData.kind == NodeTypekind::POINTER) {
                 resolvedTypeInfo = resolve(resolvedTypeInfo->typeData.pointerTypeData.underlyingType);

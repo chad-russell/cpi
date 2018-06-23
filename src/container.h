@@ -27,7 +27,7 @@ struct hash_t {
 };
 
 template<typename Key, typename Value>
-struct hash_t<Key, Value> *hash_t_init(int32_t bc) {
+struct hash_t<Key, Value> *hash_init(int32_t bc) {
     auto ht = (hash_t<Key, Value> *) calloc(1, sizeof(struct hash_t<Key, Value>));
     ht->bucket_count = bc;
     ht->size = 0;

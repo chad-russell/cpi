@@ -8,8 +8,8 @@
 
 using namespace std;
 
-hash_t<string, TokenType> *AssemblyLexer::nameToTokenType = hash_t_init<string, TokenType>(200);
-hash_t<string, Instruction> *AssemblyLexer::nameToInstruction = hash_t_init<string, Instruction>(200);
+hash_t<string, TokenType> *AssemblyLexer::nameToTokenType = hash_init<string, TokenType>(200);
+hash_t<string, Instruction> *AssemblyLexer::nameToInstruction = hash_init<string, Instruction>(200);
 
 void AssemblyLexer::populateMaps() {
     for (unsigned char i = 0; i < AssemblyLexer::tokenTypeStrings.size(); i++) {

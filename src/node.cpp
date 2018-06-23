@@ -195,7 +195,7 @@ Node *resolve(Node *n) {
 Scope::Scope(Scope *parent_) {
     parent = parent_;
 
-    symbols = hash_t_init<int64_t, Node *>(100);
+    symbols = hash_init<int64_t, Node *>(100);
 }
 
 Node *Scope::find(int64_t atomId) {
@@ -390,7 +390,7 @@ Node *wrapInValueParam(Node *value, string name) {
         nameNode->scope = value->scope;
         nameNode->region = value->region;
 
-        nameNode->symbolData.atomId = AtomTable::current->insertStr(name);
+        nameNode->symbolData.atomId = atomTable->insertStr(name);
         valueParam->paramData.name = nameNode;
     }
 
@@ -403,7 +403,7 @@ Node *wrapInDeclParam(Node *type, string name, int index) {
         nameNode = new Node();
         nameNode->type = NodeType::SYMBOL;
 
-        nameNode->symbolData.atomId = AtomTable::current->insertStr(name);
+        nameNode->symbolData.atomId = atomTable->insertStr(name);
     }
 
     return wrapInDeclParam(type, nameNode, index);

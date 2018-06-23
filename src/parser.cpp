@@ -49,7 +49,7 @@ void Parser::scopeInsert(int64_t atomId, Node *node) {
     auto found = hash_get(_scope->symbols, atomId);
     if (found != nullptr) {
         ostringstream s("");
-        s << "redeclaration of symbol '" << AtomTable::current->backwardAtoms[atomId] << "'";
+        s << "redeclaration of symbol '" << atomTable->backwardAtoms[atomId] << "'";
         reportError(s.str());
     }
 
@@ -285,7 +285,7 @@ Node *Parser::parseSymbol() {
     LexerToken front = expect(LexerTokenType::SYMBOL, "identifier");
     auto sym = new Node(lexer->srcInfo, NodeType::SYMBOL, scopes.top());
     sym->region = front.region;
-    sym->symbolData.atomId = AtomTable::current->insert(sym->region);
+    sym->symbolData.atomId = atomTable->insert(sym->region);
     return sym;
 }
 
@@ -812,7 +812,7 @@ Node *Parser::parseType() {
             auto tagSymbol = new Node();
             tagSymbol->type = NodeType::SYMBOL;
 
-            tagSymbol->symbolData.atomId = AtomTable::current->insertStr("tag");
+            tagSymbol->symbolData.atomId = atomTable->insertStr("tag");
 
             auto tagParam = new Node(lexer->srcInfo, NodeType::DECL_PARAM, scopes.top());
             tagParam->paramData.index = 0;

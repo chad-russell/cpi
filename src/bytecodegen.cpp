@@ -1155,6 +1155,6 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
 }
 
 BytecodeGen::BytecodeGen() {
-    fnTable = hash_t_init<uint32_t, uint64_t>(100);
-    fixups = hash_t_init<int64_t, Node *>(500);
+    fnTable = hash_init<uint32_t, uint64_t>(100);
+    fixups = hash_init<int64_t, Node *>(500);
 }

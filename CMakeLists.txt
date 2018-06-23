@@ -6,18 +6,18 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # MAC OS
-include_directories(/usr/local/opt/llvm@6/include)
-set(LLVM_CONFIG_PATH "/usr/local/opt/llvm@6/bin/llvm-config")
+#include_directories(/usr/local/opt/llvm@6/include)
+#set(LLVM_CONFIG_PATH "/usr/local/opt/llvm@6/bin/llvm-config")
 
 # WINDOWS
-#include_directories(/usr/include/llvm-5.0)
-#include_directories(/usr/include/llvm-c-5.0)
-#set(LLVM_CONFIG_PATH "/usr/bin/llvm-config-5.0")
+include_directories(/usr/include/llvm-5.0)
+include_directories(/usr/include/llvm-c-5.0)
+set(LLVM_CONFIG_PATH "/usr/bin/llvm-config-5.0")
 
 execute_process(
         COMMAND
         ${LLVM_CONFIG_PATH}
-        --includedir
+        --cxxflags
         OUTPUT_VARIABLE LLVM_INCLUDEDIR
         OUTPUT_STRIP_TRAILING_WHITESPACE)
 
@@ -42,7 +42,7 @@ execute_process(
         OUTPUT_VARIABLE LLVM_LIBS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-set(CMAKE_CXX_FLAGS "-I${LLVM_INCLUDEDIR} ${LLVM_LDFLAGS} ${LLVM_SYSTEMLIBS} ${LLVM_LIBS}")
+set(CMAKE_CXX_FLAGS "${LLVM_INCLUDEDIR} ${LLVM_LDFLAGS} ${LLVM_SYSTEMLIBS} ${LLVM_LIBS}")
 
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")

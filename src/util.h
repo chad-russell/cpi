@@ -393,8 +393,8 @@ public:
     Node *resolved = nullptr;
     NodeType type;
 
-    vector_t<Node *> preStmts = vector_init<Node *>(10);;
-    vector_t<Node *> postStmts = vector_init<Node *>(10);;
+    vector_t<Node *> preStmts = vector_init<Node *>(10);
+    vector_t<Node *> postStmts = vector_init<Node *>(10);
 
     union {
         Node *nodeData;
@@ -597,15 +597,14 @@ struct SourceMap {
 /////////////
 class AtomTable {
 public:
-    static AtomTable *current;
     hash_t<string, int64_t> *atoms;
     vector<string> backwardAtoms;
 
     int64_t insert(Region &r);
     int64_t insertStr(string s);
-
-    AtomTable();
 };
+
+extern AtomTable *atomTable;
 
 Node *resolve(Node *n);
 

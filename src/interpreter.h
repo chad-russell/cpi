@@ -105,7 +105,7 @@ public:
             stack.push_back(0);
         }
 
-        this->fnTable = hash_t_init<uint32_t, uint64_t>(100);
+        this->fnTable = hash_init<uint32_t, uint64_t>(100);
 
         table = {
             interpretMathAdd<int8_t>,

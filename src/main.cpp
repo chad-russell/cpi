@@ -43,6 +43,7 @@ using namespace llvm;
 unsigned long nodeId;
 unsigned long fnTableId;
 int debugFlag;
+AtomTable *atomTable;
 
 static int printAsmFlag = 0;
 static int printAstFlag = 0;
@@ -92,7 +93,9 @@ int main(int argc, char **argv) {
     nodeId = 0;
     debugFlag = 0;
 
-    AtomTable();
+    atomTable = new AtomTable();
+    atomTable->atoms = hash_init<string, int64_t>(1000);
+
     AssemblyLexer::populateMaps();
 
     // ./cpi [-o outputFile] [--print-asm] [--debug] inputFile

@@ -77,14 +77,26 @@ int32_t typeSize(Node *type) {
 bool typesMatch(Node *desired, Node *actual, Semantic *semantic);
 
 int maybeMatchUnionToStructLiteral(Node *desired, Node *actual, Semantic *semantic) {
-    if ((actual->typeData.structTypeData.isSecretlyEnum && !desired->typeData.structTypeData.isSecretlyEnum)
-        || (desired->typeData.structTypeData.isSecretlyEnum && !actual->typeData.structTypeData.isSecretlyEnum)) {
+    auto actualTypeData = resolve(actual)->typeData;
+    if (actualTypeData.kind != NodeTypekind::STRUCT) {
+        return 0;
+    }
+    auto actualStructData = actualTypeData.structTypeData;
+
+    auto desiredTypeData = resolve(desired)->typeData;
+    if (desiredTypeData.kind != NodeTypekind::STRUCT) {
+        return 0;
+    }
+    auto desiredStructData = desiredTypeData.structTypeData;
+
+    if ((actualStructData.isSecretlyEnum && !desiredStructData.isSecretlyEnum)
+        || (desiredStructData.isSecretlyEnum && !actualStructData.isSecretlyEnum)) {
         // if the other one is a struct literal, then we just need to match that there is only one param,
         // and that it matches something in the other one
 
         Node *unionToMatchAgainst = desired;
         Node *other = actual;
-        if (actual->typeData.structTypeData.isSecretlyEnum) {
+        if (actualStructData.isSecretlyEnum) {
             unionToMatchAgainst = actual;
             other = desired;
         }
@@ -103,7 +115,7 @@ int maybeMatchUnionToStructLiteral(Node *desired, Node *actual, Semantic *semant
         assert(vector_at(other->typeData.structTypeData.params, 0)->paramData.name->type == NodeType::SYMBOL);
         auto otherAtomId = vector_at(other->typeData.structTypeData.params, 0)->paramData.name->symbolData.atomId;
 
-        auto debugAtom = AtomTable::current->backwardAtoms[otherAtomId];
+        auto debugAtom = atomTable->backwardAtoms[otherAtomId];
 
         auto paramIndex = 0;
         for (auto p : unionToMatchAgainst->typeData.structTypeData.params) {
@@ -525,7 +537,7 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
     if (data->returnType == nullptr) {
         ostringstream s("");
         s << "could not resolve return type for fn '"
-          << AtomTable::current->backwardAtoms[data->name->symbolData.atomId]
+          << atomTable->backwardAtoms[data->name->symbolData.atomId]
           << "'";
 
         semantic->reportError({node}, Error{node->region, s.str()});
@@ -730,7 +742,7 @@ void resolveSymbol(Semantic *semantic, Node *node) {
 
     if (node->resolved == nullptr) {
         ostringstream s("");
-        s << "undeclared identifier " << AtomTable::current->backwardAtoms[node->symbolData.atomId];
+        s << "undeclared identifier " << atomTable->backwardAtoms[node->symbolData.atomId];
         semantic->reportError({node}, Error{node->region, s.str()});
         return;
     }
@@ -840,7 +852,7 @@ bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<No
             encounteredError = true;
 
             ostringstream s("");
-            s << "unassigned parameter: " << AtomTable::current->backwardAtoms[vector_at(declParams, i)->paramData.name->symbolData.atomId];
+            s << "unassigned parameter: " << atomTable->backwardAtoms[vector_at(declParams, i)->paramData.name->symbolData.atomId];
             auto sstr = s.str();
             semantic->reportError({errorReportTarget}, Error{errorReportTarget->region, sstr});
         }
@@ -931,7 +943,7 @@ void resolveType(Semantic *semantic, Node *node) {
 
             if (node->resolved == nullptr) {
                 ostringstream s("");
-                s << "undeclared identifier " << AtomTable::current->backwardAtoms[node->typeData.symbolTypeData.atomId];
+                s << "undeclared identifier " << atomTable->backwardAtoms[node->typeData.symbolTypeData.atomId];
                 semantic->reportError({node}, Error{node->region, s.str()});
                 return;
             }
@@ -1187,7 +1199,7 @@ void possiblyResolveAssignToUnion(Semantic *semantic, Node *originalAssignment, 
 
     // don't set the tag when assigning to the tag parameter
     if (assigningToUnion) {
-        assigningToUnion = node->dotData.rhs->symbolData.atomId != AtomTable::current->insertStr("tag");
+        assigningToUnion = node->dotData.rhs->symbolData.atomId != atomTable->insertStr("tag");
     }
 
     if (assigningToUnion) {
@@ -1204,7 +1216,7 @@ void possiblyResolveAssignToUnion(Semantic *semantic, Node *originalAssignment, 
         auto param0 = new Node();
         param0->scope = node->dotData.lhs->scope;
         param0->type = NodeType::SYMBOL;
-        param0->symbolData.atomId = AtomTable::current->insertStr("tag");
+        param0->symbolData.atomId = atomTable->insertStr("tag");
         param0->resolved = vector_at(typeData.structTypeData.params, 0);
         assert(vector_at(typeData.structTypeData.params, 0)->type == NodeType::DECL_PARAM);
         param0->typeInfo = vector_at(typeData.structTypeData.params, 0)->paramData.type;
@@ -1345,11 +1357,11 @@ Node *findParam(Semantic *semantic, Node *node) {
         foundParam = vector_at(structData.params, node->dotData.rhs->intLiteralData.value);
     }
     else if (structData.isLiteral) {
-        auto debug2 = AtomTable::current->backwardAtoms[node->dotData.rhs->symbolData.atomId];
+        auto debug2 = atomTable->backwardAtoms[node->dotData.rhs->symbolData.atomId];
 
         for (auto param : structData.params) {
             if (param->paramData.name != nullptr) {
-                auto debug1 = AtomTable::current->backwardAtoms[param->paramData.name->symbolData.atomId];
+                auto debug1 = atomTable->backwardAtoms[param->paramData.name->symbolData.atomId];
 
                 if (param->paramData.name->symbolData.atomId == node->dotData.rhs->symbolData.atomId) {
                     foundParam = param;
@@ -1359,8 +1371,8 @@ Node *findParam(Semantic *semantic, Node *node) {
         }
     } else {
         for (auto param : structData.params) {
-            auto f1 = AtomTable::current->backwardAtoms[param->paramData.name->symbolData.atomId];
-            auto f2 = AtomTable::current->backwardAtoms[node->dotData.rhs->symbolData.atomId];
+            auto f1 = atomTable->backwardAtoms[param->paramData.name->symbolData.atomId];
+            auto f2 = atomTable->backwardAtoms[node->dotData.rhs->symbolData.atomId];
 
             if (param->paramData.name->symbolData.atomId == node->dotData.rhs->symbolData.atomId) {
                 foundParam = param;
@@ -1487,7 +1499,7 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
         auto isUnionAccess = resolvedLhsTypeInfo->typeData.structTypeData.isSecretlyEnum;
 
         // todo(chad): keep the atomId for "tag" handy so we don't have to look it up all the time...
-        auto isTagAccess = node->dotData.rhs->symbolData.atomId == AtomTable::current->insertStr("tag");
+        auto isTagAccess = node->dotData.rhs->symbolData.atomId == atomTable->insertStr("tag");
 
         if (isUnionAccess && !isTagAccess) {
             createTagCheck(semantic, node);
@@ -1816,7 +1828,7 @@ void resolveFor(Semantic *semantic, Node *node) {
     auto countSymbol = new Node();
     countSymbol->scope = node->forData.target->scope;
     countSymbol->type = NodeType::SYMBOL;
-    countSymbol->symbolData.atomId = AtomTable::current->insertStr("count");
+    countSymbol->symbolData.atomId = atomTable->insertStr("count");
 
     auto arrayDotCount = new Node();
     arrayDotCount->scope = node->scope;
@@ -1932,7 +1944,7 @@ void resolveTagCheck(Semantic *semantic, Node *node) {
     auto param0 = new Node();
     param0->scope = resolvedNode->dotData.lhs->scope;
     param0->type = NodeType::SYMBOL;
-    param0->symbolData.atomId = AtomTable::current->insertStr("tag");
+    param0->symbolData.atomId = atomTable->insertStr("tag");
     param0->resolved = vector_at(typeData.structTypeData.params, 0);
     assert(vector_at(typeData.structTypeData.params, 0)->type == NodeType::DECL_PARAM);
     param0->typeInfo = vector_at(typeData.structTypeData.params, 0)->paramData.type;
@@ -2176,7 +2188,7 @@ void resolveFieldsof(Semantic *semantic, Node *node) {
         nameLit->scope = node->scope;
         nameLit->type = NodeType::STRING_LITERAL;
         nameLit->stringLiteralData.value = new string(
-                param->paramData.name == nullptr ? "" : AtomTable::current->backwardAtoms[param->paramData.name->symbolData.atomId]);
+                param->paramData.name == nullptr ? "" : atomTable->backwardAtoms[param->paramData.name->symbolData.atomId]);
 
         auto fieldLit = new Node();
         fieldLit->scope = node->scope;

@@ -241,7 +241,7 @@ ostream &operator<<(ostream &os, TypeData td) {
             os << "}";
         } break;
         case NodeTypekind::SYMBOL: {
-            os << AtomTable::current->backwardAtoms[td.symbolTypeData.atomId];
+            os << atomTable->backwardAtoms[td.symbolTypeData.atomId];
         } break;
         case NodeTypekind::POINTER: {
             os << "*";
@@ -282,7 +282,7 @@ ostream &operator<<(ostream &os, Node *node) {
             cout << "}" << endl;
         } break;
         case NodeType::SYMBOL:{
-            auto sym = AtomTable::current->backwardAtoms[node->symbolData.atomId];
+            auto sym = atomTable->backwardAtoms[node->symbolData.atomId];
             cout << sym;
         } break;
         case NodeType::DECL: {
@@ -423,21 +423,13 @@ ostream &operator<<(ostream &os, Node *node) {
 /////////////
 //  ATOMS  //
 /////////////
-AtomTable *AtomTable::current = nullptr;
-
-AtomTable::AtomTable() {
-    current = this;
-
-    atoms = hash_t_init<string, int64_t>(1000);
-}
-
 int64_t AtomTable::insertStr(string s) {
     auto found = hash_get(atoms, s);
     if (found != nullptr) {
         return *found;
     }
 
-    auto tableIndex = (int64_t) AtomTable::current->backwardAtoms.size();
+    auto tableIndex = (int64_t) backwardAtoms.size();
     hash_insert(atoms, s, tableIndex);
     backwardAtoms.push_back(s);
     return tableIndex;
@@ -451,7 +443,7 @@ int64_t AtomTable::insert(Region &r) {
         return *found;
     }
 
-    auto tableIndex = (int64_t) AtomTable::current->backwardAtoms.size();
+    auto tableIndex = (int64_t) backwardAtoms.size();
     hash_insert(atoms, sourceStr, tableIndex);
     backwardAtoms.push_back(sourceStr);
     return tableIndex;
