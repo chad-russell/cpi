@@ -450,6 +450,7 @@ Node *Parser::parseIf() {
     auto if_ = new Node(lexer->srcInfo, NodeType::IF, scopes.top());
     if_->region.start = saved;
     if_->ifData.condition = parseRvalue();
+    if_->ifData.condition->sourceMapStatement = true;
 
     if_->sourceMapStatement = true;
     if_->ifData.condition->sourceMapStatement = true;
@@ -487,7 +488,7 @@ Node *Parser::parseIf() {
 
         scopes.pop();
 
-        if_->region.end = lexer->front.region.start;
+        if_->region.end = lexer->front.region.end;
         expect(LexerTokenType::RCURLY, "}");
     }
 
