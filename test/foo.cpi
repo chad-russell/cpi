@@ -1,7 +1,11 @@
 fn main() {
-    return []{1, 2, 3}[foo()];
-}
-
-fn foo() {
-    return 1;
+    if false {
+        return 3;
+    }
+    else if false {
+        return 4;
+    }
+    else {
+        return 5;
+    }
 }
