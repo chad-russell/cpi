@@ -79,15 +79,12 @@ public:
     int32_t sp = 0;
     int32_t bp = 0;
 
-    int32_t lastStmtPc;
-
     typedef void (*interpFuncType)(Interpreter *);
     vector<interpFuncType> table;
 
     bool terminated = false;
 
     SourceMap sourceMap;
-    unsigned long currentSourceMapStmtIndex = 0;
     vector<unsigned long> breakpoints = {};
     bool continuing = false;
 

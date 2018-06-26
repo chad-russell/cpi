@@ -632,7 +632,7 @@ void LlvmGen::gen(Node *node) {
                 // memset the local to zero
                 auto sizeInBytes = module->getDataLayout().getTypeSizeInBits(typeFor(data.type)) / 8;
                 auto castedLocal = builder.CreateBitCast((llvm::Value *) node->llvmLocal, builder.getInt8PtrTy(0));
-                auto memsetCall = builder.CreateCall(memsetFunc, { castedLocal, builder.getInt64(0), builder.getInt64(sizeInBytes) });
+//                auto memsetCall = builder.CreateCall(memsetFunc, { castedLocal, builder.getInt64(0), builder.getInt64(sizeInBytes) });
             }
             else {
                 gen(data.initialValue);

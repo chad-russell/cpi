@@ -1,4 +1,5 @@
 #include "interpreter.h"
+#include "node.h"
 
 #include <iostream>
 #include <string.h>
@@ -24,6 +25,113 @@ void printCurrentStmt(Interpreter *interp, bool withLineInfo = false) {
     printStmt(interp, interp->pc, withLineInfo);
 }
 
+void debugPrintVar(Interpreter *interp, TypeData td, int32_t offset) {
+    switch (td.kind) {
+        case NodeTypekind::NONE: {
+            cout << "{}";
+        };
+        case NodeTypekind::INT_LITERAL: {
+            cout << td.intTypeData;
+        } break;
+        case NodeTypekind::I8: {
+            cout << interp->readFromStack<char>(offset);
+        } break;
+        case NodeTypekind::I32: {
+            cout << interp->readFromStack<int32_t>(offset);
+        } break;
+        case NodeTypekind::I64: {
+            cout << interp->readFromStack<int64_t>(offset);
+        } break;
+        case NodeTypekind::FLOAT_LITERAL: {
+            cout << td.floatTypeData;
+        } break;
+        case NodeTypekind::BOOLEAN_LITERAL: {
+            cout << td.boolTypeData;
+        } break;
+        case NodeTypekind::BOOLEAN: {
+            cout << (interp->readFromStack<int32_t>(offset) == 1 ? "true" : "false");
+        } break;
+        case NodeTypekind::F32: {
+            cout << interp->readFromStack<float>(offset);
+        } break;
+        case NodeTypekind::F64: {
+            cout << interp->readFromStack<double>(offset);
+        } break;
+        case NodeTypekind::POINTER: {
+            cout << interp->readFromStack<int32_t>(offset);
+        } break;
+        case NodeTypekind::FN: {
+            cout << interp->readFromStack<int32_t>(offset) << " (todo(chad): look up the fn name)";
+        } break;
+        case NodeTypekind::STRUCT: {
+            if (td.structTypeData.isSecretlyEnum) {
+                cout << "todo(chad): enums";
+            }
+            else if (td.structTypeData.isSecretlyArray) {
+                cout << "todo(chad): arrays";
+            }
+            else {
+                // plain old struct
+                cout << "{";
+                auto sizeSoFar = 0;
+                auto idx = 0;
+
+                for (const auto &param : td.structTypeData.params) {
+                    debugPrintVar(interp, param->typeInfo->typeData, offset + sizeSoFar);
+                    if (idx < td.structTypeData.params.length - 1) {
+                        cout << ", ";
+                    }
+
+                    sizeSoFar += typeSize(param->typeInfo);
+                    idx += 1;
+                }
+                cout << "}";
+            }
+        } break;
+        default: {
+            cout << "unsupported typekind " << td.kind << endl;
+        } break;
+    }
+}
+
+void debugPrintVar(Interpreter *interp, Node *n) {
+    if (!n->isLocal || n->isBytecodeLocal) {
+        cout << "no info";
+        return;
+    }
+
+    auto resolvedTypeinfo = resolve(resolve(n)->typeInfo);
+    debugPrintVar(interp, resolvedTypeinfo->typeData, n->localOffset);
+}
+
+void printCurrentVars(Interpreter *interp) {
+    for (auto stmt : interp->sourceMap.statements) {
+        if (stmt.instIndex == (unsigned long) interp->pc) {
+            auto node = stmt.node;
+            if (node == nullptr) {
+                cout << "ERROR: no debug info";
+                return;
+            }
+
+            for (auto i = 0; i < node->scope->symbols->bucket_count; i++) {
+                auto bucket = node->scope->symbols->buckets[i];
+                if (bucket != nullptr) {
+                    cout << atomTable->backwardAtoms[bucket->key] << ": ";
+                    debugPrintVar(interp, bucket->value);
+                    cout << endl;
+
+                    while (bucket->next != nullptr) {
+                        bucket = bucket->next;
+                        cout << atomTable->backwardAtoms[bucket->key] << ": ";
+                        debugPrintVar(interp, bucket->value);
+                        cout << endl;
+                    }
+                }
+            }
+        }
+    }
+}
+
 void Interpreter::interpret() {
     auto mp = new MnemonicPrinter(this->instructions);
 
@@ -37,7 +145,6 @@ void Interpreter::interpret() {
             }
 
             if (stmtStop) {
-                lastStmtPc = pc;
             }
 
             auto breakStopIf = find(breakpoints.begin(), breakpoints.end(), pc);
@@ -105,6 +212,8 @@ void Interpreter::interpret() {
                     }
 
                     cout << mp->debugString(firstIndex, lastIndex);
+                } else if (line == "vars") {
+                    printCurrentVars(this);
                 } else if (line == "step") {
                     shouldStop = false;
                     break;

@@ -285,7 +285,9 @@ void AssemblyLexer::popFrontFinalize(Token newNext, vector<unsigned char> newIns
 
                 savedLoc.line,
                 savedLoc.byteIndex,
-                newNext.region.end.byteIndex
+                newNext.region.end.byteIndex,
+
+                nullptr
         });
 
         // ignore whitespace

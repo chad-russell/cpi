@@ -29,49 +29,49 @@ class Node;
 class Scope;
 
 enum class NodeType {
-    FN_DECL,
-    SYMBOL,
-    DECL,
-    ASSIGN,
-    BINOP,
-    PIPE,
-    DOT,
-    FN_CALL,
-    INT_LITERAL,
-    FLOAT_LITERAL,
-    STRING_LITERAL,
-    NIL_LITERAL,
-    BOOLEAN_LITERAL,
-    BOOLEAN,
-    UNARY_NEG,
-    RET,
-    IF,
-    WHILE,
-    DECL_PARAM,
-    VALUE_PARAM,
-    TYPE,
-    DEREF,
-    ADDRESS_OF,
-    STRUCT_LITERAL,
-    UNARY_NOT,
-    MODULE,
-    IMPORT,
-    CAST,
-    PANIC,
-    RUN,
-    TYPEOF,
-    RETTYPEOF,
-    SIZEOF,
-    FIELDSOF,
-    ARRAY_INDEX,
-    MALLOC,
-    FREE,
-    PUTS,
-    TAGCHECK,
-    ARRAY_LITERAL,
-    FOR,
-    HEAPIFY,
-    ISKIND,
+    FN_DECL = 0,
+    SYMBOL = 1,
+    DECL = 2,
+    ASSIGN = 3,
+    BINOP = 4,
+    PIPE = 5,
+    DOT = 6,
+    FN_CALL = 7,
+    INT_LITERAL = 8,
+    FLOAT_LITERAL = 9,
+    STRING_LITERAL = 10,
+    NIL_LITERAL = 11,
+    BOOLEAN_LITERAL = 12,
+    BOOLEAN = 13,
+    UNARY_NEG = 14,
+    RET = 15,
+    IF = 16,
+    WHILE = 17,
+    DECL_PARAM = 18,
+    VALUE_PARAM = 19,
+    TYPE = 20,
+    DEREF = 21,
+    ADDRESS_OF = 22,
+    STRUCT_LITERAL = 23,
+    UNARY_NOT = 24,
+    MODULE = 25,
+    IMPORT = 26,
+    CAST = 27,
+    PANIC = 28,
+    RUN = 29,
+    TYPEOF = 30,
+    RETTYPEOF = 31,
+    SIZEOF = 32,
+    FIELDSOF = 33,
+    ARRAY_INDEX = 34,
+    MALLOC = 35,
+    FREE = 36,
+    PUTS = 37,
+    TAGCHECK = 38,
+    ARRAY_LITERAL = 39,
+    FOR = 40,
+    HEAPIFY = 41,
+    ISKIND = 42
 };
 
 enum class NodeTypekind {
@@ -365,7 +365,7 @@ struct ForData {
     vector_t<Node *> rewritten;
 
     bool isStatic;
-    vector_t<Node *> staticStmts;;
+    vector_t<Node *> staticStmts;
 };
 
 struct IsKindData {
@@ -585,6 +585,8 @@ struct SourceMapStatement {
     unsigned long startLine;
     unsigned long startByte;
     unsigned long endByte;
+
+    Node *node;
 };
 
 struct SourceMap {

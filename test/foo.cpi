@@ -1,11 +1,11 @@
 fn main() {
-    if false {
-        return 3;
-    }
-    else if false {
-        return 4;
-    }
-    else {
-        return 5;
-    }
+    a := {
+        x: 3,
+        y: fn() {
+            return 18;
+        }()
+    };
+    a.x = 75;
+
+    return a;
 }

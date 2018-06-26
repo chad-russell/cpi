@@ -130,7 +130,9 @@ void BytecodeGen::gen(Node *node) {
 
                 node->region.start.line,
                 node->region.start.byteIndex,
-                node->region.end.byteIndex
+                node->region.end.byteIndex,
+
+                node
         });
     }
 
