@@ -1,12 +1,18 @@
 TODO:
     - better interpreter debugging
-        - more accurate source information, stopping, etc.
-        - get list of stack variables and print their values by name
+        - expansion for:
+            - arrays
+            - enums
+            - pointers
+        - better 'step over' feature
+        - include column info
+        - evaluate
+        - conditional breakpoints
         - implement option to have memory as a rope structure -- infinite undo/redo of program execution state
-
-    - support binop in constant-folding
+            - use this for step/continue backwards in vscode
 
     - arguments in #run
+        - must be constant-ized first
 
     - pipe operator
 

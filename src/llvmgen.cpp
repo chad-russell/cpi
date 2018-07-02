@@ -221,7 +221,7 @@ llvm::Type *LlvmGen::typeFor(Node *node) {
                 for (auto param : node->typeData.structTypeData.params) {
                     if (resolve(param->typeInfo)->typeData.kind != NodeTypekind::NONE) {
                         // todo(chad): this might not always be accurate -- should write a routine to consult with llvm...
-                        auto potentiallyLarger = typeSize(param->typeInfo);
+                        auto potentiallyLarger = (uint64_t) typeSize(param->typeInfo);
                         if (potentiallyLarger > dataSizeInBytes) {
                             dataSizeInBytes = static_cast<uint64_t>(potentiallyLarger);
                         }
@@ -260,6 +260,8 @@ llvm::Type *LlvmGen::typeFor(Node *node) {
         }
         default: assert(false);
     }
+
+    return nullptr;
 }
 
 llvm::Value *LlvmGen::rvalueFor(Node *node) {
@@ -326,7 +328,7 @@ llvm::DIType *diTypeFor(LlvmGen *gen, Node *type) {
                 paramCount = 2;
             }
 
-            for (auto i = 0; i < paramCount; i++) {
+            for (unsigned long i = 0; i < paramCount; i++) {
                 if (isUnion) {
                     llvm::DIType *basicType;
                     string name;
@@ -402,6 +404,8 @@ llvm::DIType *diTypeFor(LlvmGen *gen, Node *type) {
         default:
             assert(false);
     }
+
+    return nullptr;
 }
 
 void LlvmGen::gen(Node *node) {
@@ -628,11 +632,6 @@ void LlvmGen::gen(Node *node) {
 
             if (data.initialValue == nullptr) {
                 assert(node->llvmLocal);
-
-                // memset the local to zero
-                auto sizeInBytes = module->getDataLayout().getTypeSizeInBits(typeFor(data.type)) / 8;
-                auto castedLocal = builder.CreateBitCast((llvm::Value *) node->llvmLocal, builder.getInt8PtrTy(0));
-//                auto memsetCall = builder.CreateCall(memsetFunc, { castedLocal, builder.getInt64(0), builder.getInt64(sizeInBytes) });
             }
             else {
                 gen(data.initialValue);
@@ -1192,7 +1191,6 @@ void LlvmGen::gen(Node *node) {
 
                 idx = 0;
                 for (auto value : values) {
-                    auto valueType = value->getType();
                     auto blankSlateIdxType = structType->getTypeAtIndex(idx);
 
                     auto castedValue = builder.CreateBitCast(value, blankSlateIdxType);

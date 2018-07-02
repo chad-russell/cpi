@@ -1021,6 +1021,7 @@ Node *Parser::parseFieldsof() {
 
 Node *Parser::parsePuts() {
     auto value = new Node(lexer->srcInfo, NodeType::PUTS, scopes.top());
+    value->sourceMapStatement = true;
     value->region.start = lexer->front.region.start;
     popFront();
     expect(LexerTokenType::LPAREN, "(");
@@ -1407,6 +1408,7 @@ Node *Parser::parseArrayIndex() {
 
 Node *Parser::parseFnCall() {
     auto call = new Node(lexer->srcInfo, NodeType::FN_CALL, scopes.top());
+    call->sourceMapStatement = true;
 
     if (lexer->front.type == LexerTokenType::NOT) {
         expect(LexerTokenType::NOT, "!");

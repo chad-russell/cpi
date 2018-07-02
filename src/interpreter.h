@@ -2,6 +2,7 @@
 #define INTERPRETER_H
 
 #include <vector>
+#include <stack>
 
 #include "assembler.h"
 
@@ -54,7 +55,7 @@ void interpretCmpLte(Interpreter *interp);
 void interpretCalli(Interpreter *interp);
 void interpretCall(Interpreter *interp);
 void interpretBumpSP(Interpreter *interp);
-void interpretRet(Interpreter *interp);
+void interpretReturn(Interpreter *interp);
 void interpretJumpIf(Interpreter *interp);
 void interpretJump(Interpreter *interp);
 void interpretStore(Interpreter *interp);
@@ -78,6 +79,11 @@ public:
     uint32_t pc = 0;
     int32_t sp = 0;
     int32_t bp = 0;
+
+    uint32_t nextVarReference = 1;
+
+    vector<uint32_t> pcs;
+    uint32_t lastValidPc;
 
     typedef void (*interpFuncType)(Interpreter *);
     vector<interpFuncType> table;
@@ -215,7 +221,7 @@ public:
             interpretJump,
             interpretCalli,
             interpretCall,
-            interpretRet,
+            interpretReturn,
             interpretExit,
             interpretPanic,
             interpretMalloc,
@@ -224,8 +230,7 @@ public:
   }
 
     void interpret();
-    void step();
-    void callIndex(int32_t index);
+    void callIndex(uint32_t index);
 
     void dumpStack();
 

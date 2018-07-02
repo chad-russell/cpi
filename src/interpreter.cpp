@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string.h>
 #include <algorithm>
+#include <sstream>
 
 using namespace std;
 
@@ -25,111 +26,177 @@ void printCurrentStmt(Interpreter *interp, bool withLineInfo = false) {
     printStmt(interp, interp->pc, withLineInfo);
 }
 
-void debugPrintVar(Interpreter *interp, TypeData td, int32_t offset) {
+void debugPrintVar(ostream &target, Interpreter *interp, int32_t bp, TypeData td, int32_t offset, vector<string> &extraLines);
+
+void debugPrintVar(Interpreter *interp, int32_t bp, TypeData td, int32_t offset, vector<string> &extraLines) {
+    debugPrintVar(cout, interp, bp, td, offset, extraLines);
+}
+
+void debugPrintVar(ostream &target, Interpreter *interp, int32_t bp, TypeData td, int32_t offset, vector<string> &extraLines) {
     switch (td.kind) {
         case NodeTypekind::NONE: {
-            cout << "{}";
+            target << "{}";
         };
         case NodeTypekind::INT_LITERAL: {
-            cout << td.intTypeData;
+            target << td.intTypeData;
         } break;
         case NodeTypekind::I8: {
-            cout << interp->readFromStack<char>(offset);
+            target << interp->readFromStack<char>(offset);
         } break;
         case NodeTypekind::I32: {
-            cout << interp->readFromStack<int32_t>(offset);
+            target << interp->readFromStack<int32_t>(offset);
         } break;
         case NodeTypekind::I64: {
-            cout << interp->readFromStack<int64_t>(offset);
+            target << interp->readFromStack<int64_t>(offset);
         } break;
         case NodeTypekind::FLOAT_LITERAL: {
-            cout << td.floatTypeData;
+            target << td.floatTypeData;
         } break;
         case NodeTypekind::BOOLEAN_LITERAL: {
-            cout << td.boolTypeData;
+            target << td.boolTypeData;
         } break;
         case NodeTypekind::BOOLEAN: {
-            cout << (interp->readFromStack<int32_t>(offset) == 1 ? "true" : "false");
+            target << (interp->readFromStack<int32_t>(offset) == 1 ? "true" : "false");
         } break;
         case NodeTypekind::F32: {
-            cout << interp->readFromStack<float>(offset);
+            target << interp->readFromStack<float>(offset);
         } break;
         case NodeTypekind::F64: {
-            cout << interp->readFromStack<double>(offset);
+            target << interp->readFromStack<double>(offset);
         } break;
         case NodeTypekind::POINTER: {
-            cout << interp->readFromStack<int32_t>(offset);
+            target << "0x" << hex << (int64_t) (interp->stack.data()) + interp->readFromStack<int32_t>(offset) << dec;
         } break;
         case NodeTypekind::FN: {
-            cout << interp->readFromStack<int32_t>(offset) << " (todo(chad): look up the fn name)";
+            target << interp->readFromStack<int32_t>(offset) << " (todo(chad): look up the fn name)";
         } break;
         case NodeTypekind::STRUCT: {
             if (td.structTypeData.isSecretlyEnum) {
-                cout << "todo(chad): enums";
+                auto tag = interp->readFromStack<int64_t>(offset);
+
+                auto param = vector_at(td.structTypeData.params, (unsigned long) tag);
+                assert(param->type == NodeType::DECL_PARAM);
+
+                target << "{" << atomTable->backwardAtoms[param->paramData.name->symbolData.atomId] << ": ";
+                debugPrintVar(interp, bp, resolve(param->typeInfo)->typeData, offset + 8, extraLines);
+                target << "}";
             }
             else if (td.structTypeData.isSecretlyArray) {
-                cout << "todo(chad): arrays";
+                auto resolvedElementType = resolve(td.structTypeData.secretArrayElementType);
+
+                auto size = interp->readFromStack<int32_t>(offset + 8);
+                auto ts = typeSize(td.structTypeData.secretArrayElementType);
+                auto array_offset = bp + interp->readFromStack<int64_t>(offset);
+
+                if (resolvedElementType->typeData.kind == NodeTypekind::I8) {
+                    target << "\"";
+                    for (int32_t i = 0; i < size; i++) {
+                        target << interp->readFromStack<char>((int32_t) array_offset);
+                        array_offset += ts;
+                    }
+                    target << "\"";
+                }
+                else {
+                    target << "[]{";
+                    for (int32_t i = 0; i < size; i++) {
+                        debugPrintVar(interp, bp, resolve(td.structTypeData.secretArrayElementType)->typeData, (int32_t) array_offset, extraLines);
+                        array_offset += ts;
+
+                        if (i < size - 1) {
+                            target << " ";
+                        }
+                    }
+                    target << "}";
+                }
             }
             else {
+                auto nvr = interp->nextVarReference;
+                interp->nextVarReference += 1;
+
+                target << "#" << nvr;
+
                 // plain old struct
-                cout << "{";
+                ostringstream extra("");
+                extra << "#" << nvr << ": ";
+                extra << "{";
                 auto sizeSoFar = 0;
-                auto idx = 0;
+                unsigned long idx = 0;
 
                 for (const auto &param : td.structTypeData.params) {
-                    debugPrintVar(interp, param->typeInfo->typeData, offset + sizeSoFar);
+                    auto name = "_" + to_string(idx);
+                    if (param->paramData.name != nullptr) {
+                        name = atomTable->backwardAtoms[param->paramData.name->symbolData.atomId];
+                    }
+                    extra << name << ":";
+
+                    debugPrintVar(extra, interp, bp, param->typeInfo->typeData, offset + sizeSoFar, extraLines);
                     if (idx < td.structTypeData.params.length - 1) {
-                        cout << ", ";
+                        extra << " ";
                     }
 
                     sizeSoFar += typeSize(param->typeInfo);
                     idx += 1;
                 }
-                cout << "}";
+                extra << "}";
+
+                extraLines.push_back(extra.str());
             }
         } break;
-        default: {
-            cout << "unsupported typekind " << td.kind << endl;
-        } break;
+        default: assert(false);
     }
 }
 
-void debugPrintVar(Interpreter *interp, Node *n) {
-    if (!n->isLocal || n->isBytecodeLocal) {
-        cout << "no info";
-        return;
-    }
+void debugPrintVar(Interpreter *interp, int32_t bp, Node *n) {
+    assert(n->isLocal || n->isBytecodeLocal);
 
     auto resolvedTypeinfo = resolve(resolve(n)->typeInfo);
-    debugPrintVar(interp, resolvedTypeinfo->typeData, n->localOffset);
+
+    vector<string> extra;
+    debugPrintVar(interp, bp, resolvedTypeinfo->typeData, bp + n->localOffset, extra);
+    cout << endl;
+    for (const auto &e : extra) {
+        cout << e << endl;
+    }
 }
 
-void printCurrentVars(Interpreter *interp) {
+void printCurrentVars(Interpreter *interp, int32_t bp, uint32_t pc) {
     for (auto stmt : interp->sourceMap.statements) {
-        if (stmt.instIndex == (unsigned long) interp->pc) {
+        if (stmt.instIndex == (unsigned long) pc) {
             auto node = stmt.node;
             if (node == nullptr) {
-                cout << "ERROR: no debug info";
-                return;
+                continue;
+            }
+
+            // hack
+            if (node->type == NodeType::FN_DECL && node->fnDeclData.body.length > 0) {
+                node = vector_at(node->fnDeclData.body, 0);
             }
 
             for (auto i = 0; i < node->scope->symbols->bucket_count; i++) {
                 auto bucket = node->scope->symbols->buckets[i];
                 if (bucket != nullptr) {
-                    cout << atomTable->backwardAtoms[bucket->key] << ": ";
-                    debugPrintVar(interp, bucket->value);
-                    cout << endl;
+                    if (bucket->value->isLocal || bucket->value->isBytecodeLocal) {
+                        cout << atomTable->backwardAtoms[bucket->key] << ": ";
+                        debugPrintVar(interp, bp, bucket->value);
+                    }
 
                     while (bucket->next != nullptr) {
                         bucket = bucket->next;
-                        cout << atomTable->backwardAtoms[bucket->key] << ": ";
-                        debugPrintVar(interp, bucket->value);
-                        cout << endl;
+
+                        if (bucket->value->isLocal || bucket->value->isBytecodeLocal) {
+                            cout << atomTable->backwardAtoms[bucket->key] << ": ";
+                            debugPrintVar(interp, bp, bucket->value);
+                        }
                     }
                 }
             }
         }
     }
+}
+
+void printInfo(Interpreter *interp, int32_t bp, uint32_t pc) {
+    // next: one line per vairable
+    printCurrentVars(interp, bp, pc);
 }
 
 void Interpreter::interpret() {
@@ -141,10 +208,9 @@ void Interpreter::interpret() {
         if (debugFlag) {
             auto stmtStop = false;
             for (auto&& s : sourceMap.statements) {
-                if (s.instIndex == (unsigned long) pc) { stmtStop = true; }
-            }
-
-            if (stmtStop) {
+                if (s.instIndex == (unsigned long) pc) {
+                    stmtStop = true;
+                }
             }
 
             auto breakStopIf = find(breakpoints.begin(), breakpoints.end(), pc);
@@ -157,8 +223,10 @@ void Interpreter::interpret() {
             continuing = false;
             overDepth = (2 << 15) + 1;
 
-            printCurrentStmt(this);
-            cout << "> ";
+//            printCurrentStmt(this);
+//            cout << "> ";
+
+            lastValidPc = pc;
 
             string line;
             getline(cin, line);
@@ -197,7 +265,31 @@ void Interpreter::interpret() {
                             cout << stmt.startLine << endl;
                         }
                     }
-                } else if (line == "stmt" || line == "line") {
+                } else if (line == "info") {
+                    this->nextVarReference = 1;
+
+                    cout << this->depth + 1 << endl;
+
+                    auto bp = this->bp;
+                    auto pc = this->pc;
+
+                    for (uint16_t i = 0; i < this->depth + 1; i++) {
+                        // line 1: location
+                        for (auto stmt : this->sourceMap.statements) {
+                            if (stmt.instIndex == (unsigned long) pc) {
+                                cout << stmt.startLine << endl;
+                            }
+                        }
+
+                        printInfo(this, bp, pc);
+                        bp = this->readFromStack<int32_t>(bp - 8);
+
+                        if (i < this->depth) {
+                            pc = (uint32_t) this->pcs.at(this->pcs.size() - 1 - i);
+                            cout << "---" << endl;
+                        }
+                    }
+                } else if (line == "stmt") {
                     printCurrentStmt(this);
                 } else if (line == "asm") {
                     // print all insts between this stmt and the next one
@@ -213,12 +305,22 @@ void Interpreter::interpret() {
 
                     cout << mp->debugString(firstIndex, lastIndex);
                 } else if (line == "vars") {
-                    printCurrentVars(this);
+                    printCurrentVars(this, this->bp, this->pc);
                 } else if (line == "step") {
                     shouldStop = false;
                     break;
                 } else if (line == "over") {
-                    overDepth = depth + 1;
+                    auto instAt = table.at(instructions[pc]);
+                    if (instAt == interpretCall || instAt == interpretCalli) {
+                        overDepth = depth + 1;
+                    }
+                    shouldStop = false;
+                    break;
+                } else if (line == "out") {
+                    // prevent accidentally stepping 'out' of main fn
+                    if (depth > 0) {
+                        overDepth = depth;
+                    }
                     shouldStop = false;
                     break;
                 } else if (line == "continue") {
@@ -232,7 +334,7 @@ void Interpreter::interpret() {
                     cout << "unrecognized command" << endl;
                 }
 
-                cout << "> ";
+//                cout << "> ";
                 getline(cin, line);
             }
         }
@@ -297,11 +399,13 @@ void interpretCalli(Interpreter *interp) {
 
 // call
 void interpretCall(Interpreter *interp) {
-    interp->callIndex(interp->consume<int32_t>());
+    interp->callIndex((uint32_t) interp->consume<int32_t>());
 }
 
-void Interpreter::callIndex(int index) {
+void Interpreter::callIndex(uint32_t index) {
     depth += 1;
+
+    pcs.push_back(lastValidPc);
 
     pushToStack(bp);
     pushToStack(pc);
@@ -334,11 +438,13 @@ void interpretBumpSP(Interpreter *interp) {
 }
 
 // ret
-void interpretRet(Interpreter *interp) {
+void interpretReturn(Interpreter *interp) {
     interp->sp = interp->bp - 8;
     interp->pc = interp->readFromStack<int32_t>(interp->bp - 4);
     interp->bp = interp->readFromStack<int32_t>(interp->bp - 8);
     interp->depth -= 1;
+
+    interp->pcs.pop_back();
 }
 
 // jumpif
@@ -357,7 +463,8 @@ void interpretJumpIf(Interpreter *interp) {
 
 // jump
 void interpretJump(Interpreter *interp) {
-    auto index = interp->consume<int32_t>();
+    auto index = (uint32_t)interp->consume<int32_t>();
+
     interp->pc = index;
 }
 

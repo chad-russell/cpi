@@ -123,7 +123,7 @@ void BytecodeGen::gen(Node *node) {
         return;
     }
 
-    if (node->sourceMapStatement) {
+    if (node->sourceMapStatement && node->type != NodeType::FN_CALL) {
         sourceMap.statements.push_back(SourceMapStatement{
                 instructions.size(),
                 instructions.size(),
@@ -576,6 +576,21 @@ void BytecodeGen::gen(Node *node) {
             }
 
             auto resolvedFn = resolve(node->fnCallData.fn);
+            if (resolvedFn->type != NodeType::FN_DECL && resolvedFn->type != NodeType::DECL) {
+                gen(resolvedFn);
+            }
+
+            sourceMap.statements.push_back(SourceMapStatement{
+                    instructions.size(),
+                    instructions.size(),
+
+                    node->region.start.line,
+                    node->region.start.byteIndex,
+                    node->region.end.byteIndex,
+
+                    node
+            });
+
             if (resolvedFn->type == NodeType::FN_DECL) {
                 append(instructions, Instruction::CALL);
                 hash_insert(fixups, (int64_t) instructions.size(), resolvedFn);
@@ -585,16 +600,12 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, Instruction::RELI32);
                 append(instructions, toBytes32(resolvedFn->localOffset));
             } else if (resolvedFn->type == NodeType::DEREF) {
-                gen(resolvedFn);
-
                 storeValue(resolvedFn, node->fnCallData.fn->localOffset);
 
                 append(instructions, Instruction::CALLI);
                 append(instructions, Instruction::RELI32);
                 append(instructions, toBytes32(node->fnCallData.fn->localOffset));
             } else if (resolvedFn->type == NodeType::DOT) {
-                gen(resolvedFn);
-
                 storeValue(resolvedFn, node->fnCallData.fn->localOffset);
 
                 assert(resolvedFn->isLocal || resolvedFn->isBytecodeLocal);
@@ -602,8 +613,6 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, Instruction::RELI32);
                 append(instructions, toBytes(resolvedFn->localOffset));
             } else {
-                gen(resolvedFn);
-
                 storeValue(resolvedFn, node->fnCallData.fn->localOffset);
 
                 append(instructions, Instruction::CALLI);
@@ -807,7 +816,7 @@ void BytecodeGen::gen(Node *node) {
             }
 
             unsigned long skipElseBranchOverwrite = 0;
-            auto hasElse = !node->ifData.elseStmts.length == 0;
+            auto hasElse = node->ifData.elseStmts.length != 0;
             if (hasElse) {
                 append(instructions, Instruction::JUMP);
 

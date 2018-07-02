@@ -445,7 +445,7 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
         index += 1;
     }
 
-    if (!data->ctParams.length == 0 && !data->cameFromPolymorph) {
+    if (data->ctParams.length != 0 && !data->cameFromPolymorph) {
         return;
     }
 
@@ -594,6 +594,18 @@ void resolveBooleanLiteral(Semantic *semantic, Node *node) {
     node->typeInfo->typeData.boolTypeData = node->boolLiteralData.value;
 }
 
+Node *constantize(Semantic *semantic, Node *node) {
+    switch (node->type) {
+        case NodeType::BINOP: {
+            assert(false);
+        } break;
+        default:
+            assert(false);
+    }
+
+    return nullptr;
+}
+
 void resolveArrayIndex(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->arrayIndexData.target);
     semantic->resolveTypes(node->arrayIndexData.indexValue);
@@ -618,6 +630,8 @@ void resolveArrayIndex(Semantic *semantic, Node *node) {
     }
     if (!resolvedTargetTypeInfo->typeData.structTypeData.isSecretlyArray) {
         auto resolvedIndexValue = resolve(node->arrayIndexData.indexValue);
+        assert(false);
+        resolvedIndexValue = constantize(semantic, resolvedIndexValue);
 
         // todo(chad): bounds checking
 
@@ -1033,9 +1047,11 @@ Node *Semantic::deepCopy(Node *node, Scope *scope) {
 }
 
 void resolveFnCall(Semantic *semantic, Node *node) {
+    node->sourceMapStatement = true;
+
     semantic->resolveTypes(node->fnCallData.fn);
     auto resolvedFn = resolve(node->fnCallData.fn);
-    auto isPoly = resolvedFn->type == NodeType::FN_DECL && !resolvedFn->fnDeclData.ctParams.length == 0;
+    auto isPoly = resolvedFn->type == NodeType::FN_DECL && resolvedFn->fnDeclData.ctParams.length != 0;
     Node *polyResolvedFn = nullptr;
 
     if (isPoly) {
@@ -1647,7 +1663,7 @@ void resolveArrayLiteral(Semantic *semantic, Node *node) {
     if (node->arrayLiteralData.elementType != nullptr) {
         typeOfElem = node->arrayLiteralData.elementType;
     }
-    else if (!node->arrayLiteralData.elements.length == 0) {
+    else if (node->arrayLiteralData.elements.length != 0) {
         typeOfElem = new Node(node->region.srcInfo, NodeType::TYPEOF, node->scope);
         typeOfElem->nodeData = vector_at(node->arrayLiteralData.elements, 0);
     }
