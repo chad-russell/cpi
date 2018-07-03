@@ -1,12 +1,10 @@
 fn main() {
-    s := {x: false, y: "foo", z: 99};
-    #for a, it: []{1, 2, 3} {
-        puts("::");
-        print(s[it + 0]);
-        puts("::\n");
-    }
+    a := #run foo({x: 3, y: 4});
+    return a;
+}
 
-    return 0;
+fn foo(n: struct{x: i32, y: i32}) {
+    return n.x + n.y;
 }
 
 fn print( T := typeof(t) )(t: T) {

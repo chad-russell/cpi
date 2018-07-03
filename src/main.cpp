@@ -85,7 +85,7 @@ InputType inputTypeFromExtension(const string &fileName) {
 
     printHelp();
 
-    assert(false);
+    cpi_assert(false);
     return {};
 }
 
@@ -284,7 +284,7 @@ int main(int argc, char **argv) {
 
         // todo(chad): look at the return type of the 'main' fn and determine which of these to print!!
         auto mainReturnType = resolve(resolve(parser->mainFn)->fnDeclData.returnType);
-        assert(mainReturnType->type == NodeType::TYPE);
+        cpi_assert(mainReturnType->type == NodeType::TYPE);
 
         switch (mainReturnType->typeData.kind) {
             case NodeTypekind::BOOLEAN: {

@@ -30,7 +30,7 @@ int bytesInCodepoint(char firstByte) {
     if (firstByte >= '\xF0' && firstByte <= '\xF4') {
         return 4;
     }
-    assert(false);
+    cpi_assert(false);
 }
 
 bool startsWith(string *s, string pre) {
@@ -53,6 +53,13 @@ bool endsWith(string *s, string suf) {
     }
 
     return (0 == s->compare(s->length() - suf.length(), suf.length(), suf));
+}
+
+void cpi_assert(bool check) {
+    if (!check) {
+        cout << "Assertion Failed" << endl;
+        abort();
+    }
 }
 
 ostream &operator<<(ostream &os, Location location) {
@@ -189,7 +196,7 @@ ostream &operator<<(ostream &os, NodeTypekind kind) {
         case NodeTypekind::EXPOSED_AST: {
             return os << "ast";
         }
-        default: assert(false);
+        default: cpi_assert(false);
     }
 }
 
@@ -218,7 +225,7 @@ ostream &operator<<(ostream &os, TypeData td) {
         case NodeTypekind::FN: {
             os << "fn (";
             for (auto param : td.fnTypeData.params) {
-                assert(param->type == NodeType::DECL_PARAM);
+                cpi_assert(param->type == NodeType::DECL_PARAM);
                 os << param->paramData.type->typeData << ", ";
             }
             os << ")";
@@ -410,7 +417,7 @@ ostream &operator<<(ostream &os, Node *node) {
         case NodeType::FLOAT_LITERAL: {
             cout << node->floatLiteralData.value;
         } break;
-        default: assert(false);
+        default: cpi_assert(false);
     }
 
     for (auto stmt : node->postStmts) {

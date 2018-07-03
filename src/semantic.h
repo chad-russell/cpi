@@ -11,7 +11,9 @@ public:
 
     Lexer *lexer;
 
-    Node *deepCopy(Node *node, Scope *scope);
+    Node *deepCopyScopedStmt(Node *node, Scope *scope);
+    Node *deepCopyRvalue(Node *node, Scope *scope);
+
     void reportError(vector<Node *> affectedNodes, Error error);
     void resolveTypes(Node *node);
     void addLocal(Node *local);

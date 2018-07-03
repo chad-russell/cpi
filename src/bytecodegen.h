@@ -18,6 +18,8 @@ public:
     queue<Node *> toProcess;
     bool processFnDecls = false;
 
+    vector_t<Node *> generatedNodes = vector_init<Node *>(20);
+
     bool isMainFn;
 
     // for going back at the end and setting call/jump locations

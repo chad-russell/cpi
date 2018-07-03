@@ -144,80 +144,80 @@ entry:
   %2 = call i64 ()* %1()
   %3 = call i64 %2()
   %4 = icmp eq i64 %3, 3
-  %5 = call {} @assert(i1 %4)
+  %5 = call {} @cpi_assert(i1 %4)
   %6 = call i64 @apply(i64 (i64)* nonnull @inc, i64 1)
   %7 = call i64 @apply_overboard(i64 (i64)* nonnull @inc, i64 0)
   %8 = add i64 %7, %6
   %9 = icmp eq i64 %8, 3
-  %10 = call {} @assert(i1 %9)
-  %11 = call {} @assert(i1 true)
-  %12 = call {} @assert(i1 true)
+  %10 = call {} @cpi_assert(i1 %9)
+  %11 = call {} @cpi_assert(i1 true)
+  %12 = call {} @cpi_assert(i1 true)
   %13 = call i64 @a5_fn()
   %14 = icmp eq i64 %13, 3
-  %15 = call {} @assert(i1 %14)
+  %15 = call {} @cpi_assert(i1 %14)
   %16 = call i64 @a5_fn()
   %17 = icmp eq i64 %16, 3
-  %18 = call {} @assert(i1 %17)
+  %18 = call {} @cpi_assert(i1 %17)
   %19 = call i64 @anon.4()
   %20 = icmp eq i64 %19, 3
-  %21 = call {} @assert(i1 %20)
+  %21 = call {} @cpi_assert(i1 %20)
   %22 = call i64 @bar()
   %23 = icmp eq i64 %22, 3
-  %24 = call {} @assert(i1 %23)
+  %24 = call {} @cpi_assert(i1 %23)
   %25 = call i64 @testA9()
   %26 = icmp eq i64 %25, 3
-  %27 = call {} @assert(i1 %26)
+  %27 = call {} @cpi_assert(i1 %26)
   %28 = call i64 @testStruct1()
   %29 = icmp eq i64 %28, 3
-  %30 = call {} @assert(i1 %29)
+  %30 = call {} @cpi_assert(i1 %29)
   %31 = call i64 @testStruct2()
   %32 = icmp eq i64 %31, 3
-  %33 = call {} @assert(i1 %32)
+  %33 = call {} @cpi_assert(i1 %32)
   %34 = call i64 @testNestedCall()
   %35 = icmp eq i64 %34, 3
-  %36 = call {} @assert(i1 %35)
+  %36 = call {} @cpi_assert(i1 %35)
   %37 = call i64 @testDerefParam()
   %38 = icmp eq i64 %37, 3
-  %39 = call {} @assert(i1 %38)
+  %39 = call {} @cpi_assert(i1 %38)
   %40 = call i64 @testSetter()
   %41 = icmp eq i64 %40, 3
-  %42 = call {} @assert(i1 %41)
+  %42 = call {} @cpi_assert(i1 %41)
   %43 = call i64 @testLinkedList()
   %44 = icmp eq i64 %43, 3
-  %45 = call {} @assert(i1 %44)
+  %45 = call {} @cpi_assert(i1 %44)
   %46 = call i64 @testWeirdLinkedList()
   %47 = icmp eq i64 %46, 9
-  %48 = call {} @assert(i1 %47)
+  %48 = call {} @cpi_assert(i1 %47)
   %49 = call i64 @testMoreDotsAndDerefs()
   %50 = icmp eq i64 %49, 3
-  %51 = call {} @assert(i1 %50)
+  %51 = call {} @cpi_assert(i1 %50)
   %52 = call {} @test23()
   %53 = call {} @test24()
   %54 = call {} @test25()
   %55 = call i64 @testDoubleDeref()
   %56 = icmp eq i64 %55, 3
-  %57 = call {} @assert(i1 %56)
+  %57 = call {} @cpi_assert(i1 %56)
   %58 = call i64 @more_struct()
   %59 = icmp eq i64 %58, 3
-  %60 = call {} @assert(i1 %59)
+  %60 = call {} @cpi_assert(i1 %59)
   %61 = call i64 @test_S2_stuff()
   %62 = icmp eq i64 %61, 3
-  %63 = call {} @assert(i1 %62)
+  %63 = call {} @cpi_assert(i1 %62)
   %64 = call i64 @testSetFromParam()
   %65 = icmp eq i64 %64, 3
-  %66 = call {} @assert(i1 %65)
+  %66 = call {} @cpi_assert(i1 %65)
   %67 = call i32 @fib(i32 10)
   %68 = icmp eq i32 %67, 89
-  %69 = call {} @assert(i1 %68)
+  %69 = call {} @cpi_assert(i1 %68)
   %70 = call i64 @stupid_sqrt(i64 5)
   %71 = icmp eq i64 %70, 0
-  %72 = call {} @assert(i1 %71)
+  %72 = call {} @cpi_assert(i1 %71)
   %73 = call i64 @stupid_sqrt(i64 9)
   %74 = icmp eq i64 %73, 3
-  %75 = call {} @assert(i1 %74)
+  %75 = call {} @cpi_assert(i1 %74)
   %76 = call i32 @id(i32 3)
   %77 = icmp eq i32 %76, 3
-  %78 = call {} @assert(i1 %77)
+  %78 = call {} @cpi_assert(i1 %77)
   %.repack = getelementptr inbounds %0, %0* %p, i64 0, i32 0
   store i64 0, i64* %.repack, align 8
   %79 = getelementptr inbounds %0, %0* %p, i64 0, i32 1
@@ -226,24 +226,24 @@ entry:
   %80 = call %0 @id.6(%0 { i64 8, i64 0 })
   %.elt = extractvalue %0 %80, 0
   %81 = icmp eq i64 %.elt, 8
-  %82 = call {} @assert(i1 %81)
+  %82 = call {} @cpi_assert(i1 %81)
   store i64 3, i64* %local373_, align 8
   %83 = call i64 @deref_ct(i64* nonnull %local373_)
   %84 = icmp eq i64 %83, 3
-  %85 = call {} @assert(i1 %84)
+  %85 = call {} @cpi_assert(i1 %84)
   %86 = call i32 @add_static(i32 5)
   %87 = icmp eq i32 %86, 12
-  %88 = call {} @assert(i1 %87)
+  %88 = call {} @cpi_assert(i1 %87)
   %89 = call i32 @apply_static(i32 3)
   %90 = icmp eq i32 %89, 4
-  %91 = call {} @assert(i1 %90)
+  %91 = call {} @cpi_assert(i1 %90)
   %92 = call i32 @apply_static.7(i32 3)
   %93 = icmp eq i32 %92, 6
-  %94 = call {} @assert(i1 %93)
+  %94 = call {} @cpi_assert(i1 %93)
   %95 = call %0 @id.9(%0 { i64 8, i64 0 })
   %.elt94 = extractvalue %0 %95, 0
   %96 = icmp eq i64 %.elt94, 8
-  %97 = call {} @assert(i1 %96)
+  %97 = call {} @cpi_assert(i1 %96)
   %98 = call {} @testArray1()
   %99 = call {} @testArray2()
   %100 = call {} @testArray3()
@@ -268,11 +268,11 @@ entry:
   %108 = load i64, i64* %parith, align 8
   %109 = call i64 @inc(i64 %108)
   %110 = icmp eq i64 %109, 3
-  %111 = call {} @assert(i1 %110)
+  %111 = call {} @cpi_assert(i1 %110)
   %112 = call {} @testWhile1()
-  %113 = call {} @assert(i1 true)
-  %114 = call {} @assert(i1 true)
-  %115 = call {} @assert(i1 true)
+  %113 = call {} @cpi_assert(i1 true)
+  %114 = call {} @cpi_assert(i1 true)
+  %115 = call {} @cpi_assert(i1 true)
   %116 = call {} @testMalloc()
   %117 = call {} @testFor1()
   %118 = call {} @testFor2()
@@ -306,7 +306,7 @@ entry:
   ret i64 3
 }
 
-define {} @assert(i1) {
+define {} @cpi_assert(i1) {
 entry:
   br i1 %0, label %if_cont, label %then
 
@@ -659,7 +659,7 @@ entry:
   %22 = load i32 ()*, i32 ()** %21, align 8
   %23 = call i32 %22()
   %24 = icmp eq i32 %23, 123
-  %25 = call {} @assert(i1 %24)
+  %25 = call {} @cpi_assert(i1 %24)
   %26 = bitcast %8*** %17 to i32*****
   %27 = load i32****, i32***** %26, align 8
   %28 = load i32***, i32**** %27, align 8
@@ -667,14 +667,14 @@ entry:
   %30 = load i32*, i32** %29, align 8
   %31 = load i32, i32* %30, align 4
   %32 = icmp eq i32 %31, 3
-  %33 = call {} @assert(i1 %32)
+  %33 = call {} @cpi_assert(i1 %32)
   %34 = load i32****, i32***** %26, align 8
   %35 = load i32***, i32**** %34, align 8
   %36 = load i32**, i32*** %35, align 8
   %37 = load i32*, i32** %36, align 8
   %38 = load i32, i32* %37, align 4
   %39 = icmp eq i32 %38, 3
-  %40 = call {} @assert(i1 %39)
+  %40 = call {} @cpi_assert(i1 %39)
   %41 = bitcast %8*** %9 to i32*****
   %42 = inttoptr i64 %.cast8 to i32****
   %43 = load i32***, i32**** %42, align 8
@@ -682,13 +682,13 @@ entry:
   %45 = load i32*, i32** %44, align 8
   %46 = load i32, i32* %45, align 4
   %47 = icmp eq i32 %46, 3
-  %48 = call {} @assert(i1 %47)
+  %48 = call {} @cpi_assert(i1 %47)
   %49 = getelementptr inbounds %8, %8* %qux, i64 0, i32 0
   %50 = load i32**, i32*** %49, align 8
   %51 = load i32*, i32** %50, align 8
   %52 = load i32, i32* %51, align 4
   %53 = icmp eq i32 %52, 3
-  %54 = call {} @assert(i1 %53)
+  %54 = call {} @cpi_assert(i1 %53)
   ret {} zeroinitializer
 }
 
@@ -778,7 +778,7 @@ entry:
   %31 = getelementptr %12, %12* %30, i64 0, i32 0
   %32 = load i32, i32* %31, align 4
   %33 = icmp eq i32 %32, 6
-  %34 = call {} @assert(i1 %33)
+  %34 = call {} @cpi_assert(i1 %33)
   %35 = load %12*****, %12****** %16, align 8
   %36 = load %12****, %12***** %35, align 8
   %37 = load %12***, %12**** %36, align 8
@@ -787,7 +787,7 @@ entry:
   %40 = getelementptr %12, %12* %39, i64 0, i32 0
   %41 = load i32, i32* %40, align 4
   %42 = icmp eq i32 %41, 6
-  %43 = call {} @assert(i1 %42)
+  %43 = call {} @cpi_assert(i1 %42)
   %44 = load %12****, %12***** %local1603_, align 8
   %45 = load %12***, %12**** %44, align 8
   %46 = load %12**, %12*** %45, align 8
@@ -795,10 +795,10 @@ entry:
   %48 = getelementptr %12, %12* %47, i64 0, i32 0
   %49 = load i32, i32* %48, align 4
   %50 = icmp eq i32 %49, 6
-  %51 = call {} @assert(i1 %50)
+  %51 = call {} @cpi_assert(i1 %50)
   %52 = load i32, i32* %7, align 8
   %53 = icmp eq i32 %52, 6
-  %54 = call {} @assert(i1 %53)
+  %54 = call {} @cpi_assert(i1 %53)
   %55 = load %12*****, %12****** %16, align 8
   %56 = load %12****, %12***** %55, align 8
   %57 = load %12***, %12**** %56, align 8
@@ -817,7 +817,7 @@ entry:
   %69 = getelementptr %12, %12* %68, i64 0, i32 0
   %70 = load i32, i32* %69, align 4
   %71 = icmp eq i32 %70, 8
-  %72 = call {} @assert(i1 %71)
+  %72 = call {} @cpi_assert(i1 %71)
   %73 = load %12*****, %12****** %16, align 8
   %74 = load %12****, %12***** %73, align 8
   %75 = load %12***, %12**** %74, align 8
@@ -826,7 +826,7 @@ entry:
   %78 = getelementptr %12, %12* %77, i64 0, i32 0
   %79 = load i32, i32* %78, align 4
   %80 = icmp eq i32 %79, 8
-  %81 = call {} @assert(i1 %80)
+  %81 = call {} @cpi_assert(i1 %80)
   %82 = load %12****, %12***** %local1603_, align 8
   %83 = load %12***, %12**** %82, align 8
   %84 = load %12**, %12*** %83, align 8
@@ -834,10 +834,10 @@ entry:
   %86 = getelementptr %12, %12* %85, i64 0, i32 0
   %87 = load i32, i32* %86, align 4
   %88 = icmp eq i32 %87, 8
-  %89 = call {} @assert(i1 %88)
+  %89 = call {} @cpi_assert(i1 %88)
   %90 = load i32, i32* %7, align 8
   %91 = icmp eq i32 %90, 8
-  %92 = call {} @assert(i1 %91)
+  %92 = call {} @cpi_assert(i1 %91)
   store i32 3, i32* %7, align 8
   %93 = load %10**, %10*** %14, align 8
   %94 = load %10*, %10** %93, align 8
@@ -850,7 +850,7 @@ entry:
   %101 = getelementptr %12, %12* %100, i64 0, i32 0
   %102 = load i32, i32* %101, align 4
   %103 = icmp eq i32 %102, 3
-  %104 = call {} @assert(i1 %103)
+  %104 = call {} @cpi_assert(i1 %103)
   %105 = load %12*****, %12****** %16, align 8
   %106 = load %12****, %12***** %105, align 8
   %107 = load %12***, %12**** %106, align 8
@@ -859,7 +859,7 @@ entry:
   %110 = getelementptr %12, %12* %109, i64 0, i32 0
   %111 = load i32, i32* %110, align 4
   %112 = icmp eq i32 %111, 3
-  %113 = call {} @assert(i1 %112)
+  %113 = call {} @cpi_assert(i1 %112)
   %114 = load %12*****, %12****** %10, align 8
   %115 = load %12****, %12***** %114, align 8
   %116 = load %12***, %12**** %115, align 8
@@ -868,10 +868,10 @@ entry:
   %119 = getelementptr %12, %12* %118, i64 0, i32 0
   %120 = load i32, i32* %119, align 4
   %121 = icmp eq i32 %120, 3
-  %122 = call {} @assert(i1 %121)
+  %122 = call {} @cpi_assert(i1 %121)
   %123 = load i32, i32* %7, align 8
   %124 = icmp eq i32 %123, 3
-  %125 = call {} @assert(i1 %124)
+  %125 = call {} @cpi_assert(i1 %124)
   %126 = load %10**, %10*** %14, align 8
   %127 = load %10*, %10** %126, align 8
   %128 = getelementptr %10, %10* %127, i64 0, i32 1, i32 1
@@ -1058,7 +1058,7 @@ entry:
   %308 = getelementptr %12, %12* %307, i64 0, i32 0
   %309 = load i32, i32* %308, align 4
   %310 = icmp eq i32 %309, 39
-  %311 = call {} @assert(i1 %310)
+  %311 = call {} @cpi_assert(i1 %310)
   ret {} zeroinitializer
 }
 
@@ -1114,7 +1114,7 @@ entry:
   %23 = load i64*, i64** %22, align 8
   %24 = load i64, i64* %23, align 8
   %25 = icmp eq i64 %24, 443
-  %26 = call {} @assert(i1 %25)
+  %26 = call {} @cpi_assert(i1 %25)
   %27 = load %15*, %15** %10, align 8
   %28 = getelementptr %15, %15* %27, i64 0, i32 1
   %29 = bitcast %16** %28 to i64****
@@ -1123,19 +1123,19 @@ entry:
   %32 = load i64*, i64** %31, align 8
   %33 = load i64, i64* %32, align 8
   %34 = icmp eq i64 %33, 443
-  %35 = call {} @assert(i1 %34)
+  %35 = call {} @cpi_assert(i1 %34)
   %36 = load i64***, i64**** %14, align 8
   %37 = load i64**, i64*** %36, align 8
   %38 = load i64*, i64** %37, align 8
   %39 = load i64, i64* %38, align 8
   %40 = icmp eq i64 %39, 443
-  %41 = call {} @assert(i1 %40)
+  %41 = call {} @cpi_assert(i1 %40)
   %42 = getelementptr inbounds %16, %16* %qux, i64 0, i32 0
   %43 = load i64**, i64*** %42, align 8
   %44 = load i64*, i64** %43, align 8
   %45 = load i64, i64* %44, align 8
   %46 = icmp eq i64 %45, 443
-  %47 = call {} @assert(i1 %46)
+  %47 = call {} @cpi_assert(i1 %46)
   %48 = load %15*, %15** %10, align 8
   %49 = getelementptr %15, %15* %48, i64 0, i32 1
   %50 = bitcast %16** %49 to i64****
@@ -1151,7 +1151,7 @@ entry:
   %59 = load i64*, i64** %58, align 8
   %60 = load i64, i64* %59, align 8
   %61 = icmp eq i64 %60, 442
-  %62 = call {} @assert(i1 %61)
+  %62 = call {} @cpi_assert(i1 %61)
   %63 = load %15*, %15** %10, align 8
   %64 = getelementptr %15, %15* %63, i64 0, i32 1
   %65 = bitcast %16** %64 to i64****
@@ -1160,18 +1160,18 @@ entry:
   %68 = load i64*, i64** %67, align 8
   %69 = load i64, i64* %68, align 8
   %70 = icmp eq i64 %69, 442
-  %71 = call {} @assert(i1 %70)
+  %71 = call {} @cpi_assert(i1 %70)
   %72 = load i64***, i64**** %14, align 8
   %73 = load i64**, i64*** %72, align 8
   %74 = load i64*, i64** %73, align 8
   %75 = load i64, i64* %74, align 8
   %76 = icmp eq i64 %75, 442
-  %77 = call {} @assert(i1 %76)
+  %77 = call {} @cpi_assert(i1 %76)
   %78 = load i64**, i64*** %42, align 8
   %79 = load i64*, i64** %78, align 8
   %80 = load i64, i64* %79, align 8
   %81 = icmp eq i64 %80, 442
-  %82 = call {} @assert(i1 %81)
+  %82 = call {} @cpi_assert(i1 %81)
   ret {} zeroinitializer
 }
 
@@ -1380,17 +1380,17 @@ entry:
   %parith = getelementptr i64, i64* %.unpack, i64 2
   %7 = load i64, i64* %parith, align 8
   %8 = icmp eq i64 %7, 3
-  %9 = call {} @assert(i1 %8)
+  %9 = call {} @cpi_assert(i1 %8)
   %10 = load i64, i64* %parith, align 8
   %11 = icmp eq i64 %10, 3
-  %12 = call {} @assert(i1 %11)
+  %12 = call {} @cpi_assert(i1 %11)
   %13 = load i64, i64* %parith, align 8
   %14 = icmp eq i64 %13, 3
-  %15 = call {} @assert(i1 %14)
+  %15 = call {} @cpi_assert(i1 %14)
   store i64 19, i64* %parith, align 8
-  %16 = call {} @assert(i1 true)
+  %16 = call {} @cpi_assert(i1 true)
   store i64 23, i64* %parith, align 8
-  %17 = call {} @assert(i1 true)
+  %17 = call {} @cpi_assert(i1 true)
   ret {} zeroinitializer
 }
 
@@ -1427,7 +1427,7 @@ entry:
   %.elt18 = getelementptr inbounds %2, %2* %.unpack, i64 1, i32 1
   %.unpack19 = load i64, i64* %.elt18, align 8
   %8 = icmp eq i64 %.unpack19, 3
-  %9 = call {} @assert(i1 %8)
+  %9 = call {} @cpi_assert(i1 %8)
   %.repack = getelementptr inbounds %25, %25* %local7125_, i64 0, i32 0
   store i32 1, i32* %.repack, align 8
   %10 = getelementptr inbounds %25, %25* %local7125_, i64 0, i32 1
@@ -1450,7 +1450,7 @@ entry:
   store i32 3, i32* %15, align 4
   %16 = bitcast %25** %local7129_ to i32**
   %parith1 = getelementptr i32, i32* %.repack39, i64 1
-  %17 = call {} @assert(i1 true)
+  %17 = call {} @cpi_assert(i1 true)
   ret {} zeroinitializer
 }
 
@@ -1485,27 +1485,27 @@ entry:
   %parith = getelementptr i32, i32* %7, i64 1
   %8 = load i32, i32* %parith, align 4
   %9 = icmp eq i32 %8, 2
-  %10 = call {} @assert(i1 %9)
+  %10 = call {} @cpi_assert(i1 %9)
   %.elt26 = getelementptr inbounds { i32*, i64 }, { i32*, i64 }* %copied, i64 0, i32 0
   %11 = load i32, i32* %parith, align 4
   %12 = icmp eq i32 %11, 2
-  %13 = call {} @assert(i1 %12)
+  %13 = call {} @cpi_assert(i1 %12)
   store i32 18, i32* %parith, align 4
-  %14 = call {} @assert(i1 true)
+  %14 = call {} @cpi_assert(i1 true)
   %.unpack39 = load i32*, i32** %.elt26, align 8
   %parith6 = getelementptr i32, i32* %.unpack39, i64 1
   %15 = load i32, i32* %parith6, align 4
   %16 = icmp eq i32 %15, 18
-  %17 = call {} @assert(i1 %16)
+  %17 = call {} @cpi_assert(i1 %16)
   store i32 99, i32* %parith6, align 4
   %.unpack47 = load i32*, i32** %.elt, align 8
   %parith9 = getelementptr i32, i32* %.unpack47, i64 1
   %18 = load i32, i32* %parith9, align 4
   %19 = icmp eq i32 %18, 99
-  %20 = call {} @assert(i1 %19)
+  %20 = call {} @cpi_assert(i1 %19)
   %21 = load i32, i32* %parith6, align 4
   %22 = icmp eq i32 %21, 99
-  %23 = call {} @assert(i1 %22)
+  %23 = call {} @cpi_assert(i1 %22)
   ret {} zeroinitializer
 }
 
@@ -1605,7 +1605,7 @@ entry:
   %31 = load i64*, i64** %local1265_, align 8
   %32 = load i64, i64* %31, align 8
   %33 = icmp eq i64 %32, 18
-  %34 = call {} @assert(i1 %33)
+  %34 = call {} @cpi_assert(i1 %33)
   ret {} zeroinitializer
 }
 
@@ -1638,7 +1638,7 @@ entry:
   %.unpack1315 = load i64*, i64** %.unpack9101416, align 8
   %7 = load i64, i64* %.unpack1315, align 8
   %8 = icmp eq i64 %7, 3
-  %9 = call {} @assert(i1 %8)
+  %9 = call {} @cpi_assert(i1 %8)
   %.repack = getelementptr inbounds %31, %31* %local7353_, i64 0, i32 0
   store i64 1, i64* %.repack, align 8
   %10 = getelementptr inbounds %31, %31* %local7353_, i64 0, i32 1
@@ -1661,7 +1661,7 @@ entry:
   store i64 3, i64* %15, align 8
   %16 = bitcast %31** %local7357_ to i64**
   %parith2 = getelementptr i64, i64* %.repack31, i64 2
-  %17 = call {} @assert(i1 true)
+  %17 = call {} @cpi_assert(i1 true)
   %.repack37 = getelementptr inbounds %32, %32* %local7389_, i64 0, i32 0
   store i64 1, i64* %.repack37, align 8
   %18 = getelementptr inbounds %32, %32* %local7389_, i64 0, i32 1
@@ -1775,7 +1775,7 @@ entry:
   %parith5 = getelementptr i64, i64* %60, i64 2
   %61 = load i64, i64* %parith5, align 8
   %62 = icmp eq i64 %61, 6
-  %63 = call {} @assert(i1 %62)
+  %63 = call {} @cpi_assert(i1 %62)
   ret {} zeroinitializer
 }
 
@@ -1793,7 +1793,7 @@ then:                                             ; preds = %cond
   br label %cond
 
 if_cont:                                          ; preds = %cond
-  %3 = call {} @assert(i1 true)
+  %3 = call {} @cpi_assert(i1 true)
   ret {} zeroinitializer
 }
 
@@ -1815,7 +1815,7 @@ entry:
   store i64 200, i64* %6, align 8
   %7 = load i64, i64* %3, align 8
   %8 = icmp eq i64 %7, 199
-  %9 = call {} @assert(i1 %8)
+  %9 = call {} @cpi_assert(i1 %8)
   ret {} zeroinitializer
 }
 
@@ -1882,7 +1882,7 @@ then:                                             ; preds = %cond
 
 if_cont:                                          ; preds = %cond
   %18 = icmp eq i64 %12, 120
-  %19 = call {} @assert(i1 %18)
+  %19 = call {} @cpi_assert(i1 %18)
   ret {} zeroinitializer
 }
 
@@ -1943,7 +1943,7 @@ entry:
   %16 = insertvalue { i32*, i64 } %15, i64 5, 1
   %17 = call i32 @add_array({ i32*, i64 } %16)
   %18 = icmp eq i32 %17, 15
-  %19 = call {} @assert(i1 %18)
+  %19 = call {} @cpi_assert(i1 %18)
   ret {} zeroinitializer
 }
 
@@ -2053,7 +2053,7 @@ then:                                             ; preds = %cond
 
 if_cont:                                          ; preds = %cond
   %24 = icmp eq i64 %10, 51
-  %25 = call {} @assert(i1 %24)
+  %25 = call {} @cpi_assert(i1 %24)
   ret {} zeroinitializer
 
 cond5:                                            ; preds = %then6, %then
@@ -2134,7 +2134,7 @@ then:                                             ; preds = %cond
 
 if_cont:                                          ; preds = %cond
   %18 = icmp eq i64 %13, 10
-  %19 = call {} @assert(i1 %18)
+  %19 = call {} @cpi_assert(i1 %18)
   ret {} zeroinitializer
 }
 
@@ -2163,20 +2163,20 @@ entry:
   store i32 0, i32* %.repack11.repack12, align 4
   store i64 18, i64* %4, align 8
   store i64 1, i64* %.repack9, align 8
-  %6 = call {} @assert(i1 true)
-  %7 = call {} @assert(i1 true)
+  %6 = call {} @cpi_assert(i1 true)
+  %7 = call {} @cpi_assert(i1 true)
   %8 = load i64, i64* %y, align 8
   store i64 %8, i64* %4, align 8
   store i64 2, i64* %.repack9, align 8
-  %9 = call {} @assert(i1 true)
+  %9 = call {} @cpi_assert(i1 true)
   store i64 13, i64* %4, align 8
   store i64 1, i64* %.repack9, align 8
-  %10 = call {} @assert(i1 true)
+  %10 = call {} @cpi_assert(i1 true)
   %11 = getelementptr inbounds { i64, [8 x i8] }, { i64, [8 x i8] }* %a, i64 0, i32 1, i64 4
   %12 = bitcast i8* %11 to i32*
   store i32 18, i32* %12, align 4
   store i64 2, i64* %.repack9, align 8
-  %13 = call {} @assert(i1 true)
+  %13 = call {} @cpi_assert(i1 true)
   ret {} zeroinitializer
 }
 
@@ -2227,11 +2227,11 @@ entry:
   %12 = call %45 @buffer_get(%44* nonnull %b, i64 200)
   %.elt32 = extractvalue %45 %12, 0
   %13 = icmp eq i32 %.elt32, 3
-  %14 = call {} @assert(i1 %13)
+  %14 = call {} @cpi_assert(i1 %13)
   %15 = call %45 @buffer_get.11(%44* nonnull %b, i64 200)
   %.elt37 = extractvalue %45 %15, 1
   %16 = icmp eq i32 %.elt37, 4
-  %17 = call {} @assert(i1 %16)
+  %17 = call {} @cpi_assert(i1 %16)
   ret {} zeroinitializer
 }
 
@@ -2530,10 +2530,10 @@ if_cont15:                                        ; preds = %cond13
 
 define {} @testDefault() {
 entry:
-  %0 = call {} @assert(i1 true)
-  %1 = call {} @assert(i1 true)
-  %2 = call {} @assert(i1 true)
-  %3 = call {} @assert(i1 true)
+  %0 = call {} @cpi_assert(i1 true)
+  %1 = call {} @cpi_assert(i1 true)
+  %2 = call {} @cpi_assert(i1 true)
+  %3 = call {} @cpi_assert(i1 true)
   ret {} zeroinitializer
 }
 
@@ -2608,7 +2608,7 @@ entry:
   %23 = bitcast [24 x i8]* %.repack63.repack66 to %49**
   %24 = getelementptr { i64, [24 x i8] }, { i64, [24 x i8] }* %.unpack778182.pre, i64 0, i32 0
   %25 = icmp eq i64 %.pre, 3
-  %26 = call {} @assert(i1 %25)
+  %26 = call {} @cpi_assert(i1 %25)
   %.unpack.elt.phi.trans.insert = getelementptr inbounds %49, %49* %22, i64 0, i32 0, i32 0
   %.unpack.unpack.pre = load i8*, i8** %.unpack.elt.phi.trans.insert, align 8
   %parith23.phi.trans.insert = getelementptr i8, i8* %.unpack.unpack.pre, i64 3
@@ -2630,7 +2630,7 @@ entry:
   %33 = lshr i32 %31, 24
   %34 = trunc i32 %33 to i8
   %35 = icmp eq i8 %.pre99, %34
-  %36 = call {} @assert(i1 %35)
+  %36 = call {} @cpi_assert(i1 %35)
   ret {} zeroinitializer
 }
 

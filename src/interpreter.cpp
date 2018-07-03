@@ -65,21 +65,54 @@ void debugPrintVar(ostream &target, Interpreter *interp, int32_t bp, TypeData td
             target << interp->readFromStack<double>(offset);
         } break;
         case NodeTypekind::POINTER: {
-            target << "0x" << hex << (int64_t) (interp->stack.data()) + interp->readFromStack<int32_t>(offset) << dec;
+//            target << "0x" << hex << (int64_t) (interp->stack.data()) + interp->readFromStack<int32_t>(offset) << dec;
+
+            auto nvr = interp->nextVarReference;
+            interp->nextVarReference += 1;
+
+            auto loadedOffset = interp->readFromStack<int32_t>(offset);
+            auto found = hash_get(interp->pointerRecursion, loadedOffset);
+            if (found != nullptr) {
+                target << *found;
+                break;
+            }
+
+            auto toInsert = string("#" + to_string(nvr));
+            hash_insert(interp->pointerRecursion, loadedOffset, toInsert);
+
+            target << "#" << nvr;
+
+            ostringstream extra("");
+            extra << "#" << nvr << ": ";
+            debugPrintVar(extra, interp, bp, resolve(td.pointerTypeData.underlyingType)->typeData, (int32_t) loadedOffset, extraLines);
+            extraLines.push_back(extra.str());
         } break;
         case NodeTypekind::FN: {
             target << interp->readFromStack<int32_t>(offset) << " (todo(chad): look up the fn name)";
         } break;
         case NodeTypekind::STRUCT: {
             if (td.structTypeData.isSecretlyEnum) {
+                auto nvr = interp->nextVarReference;
+                interp->nextVarReference += 1;
+
+                target << "#" << nvr;
+
                 auto tag = interp->readFromStack<int64_t>(offset);
 
                 auto param = vector_at(td.structTypeData.params, (unsigned long) tag);
-                assert(param->type == NodeType::DECL_PARAM);
+                cpi_assert(param->type == NodeType::DECL_PARAM);
 
-                target << "{" << atomTable->backwardAtoms[param->paramData.name->symbolData.atomId] << ": ";
-                debugPrintVar(interp, bp, resolve(param->typeInfo)->typeData, offset + 8, extraLines);
-                target << "}";
+                ostringstream extra("");
+                extra << "#" << nvr << ": ";
+                extra << "{";
+                if (tag > 0) {
+                    extra << "tag:" << tag << " ";
+                }
+                extra << atomTable->backwardAtoms[param->paramData.name->symbolData.atomId] << ":";
+                debugPrintVar(extra, interp, bp, resolve(param->typeInfo)->typeData, offset + 8, extraLines);
+                extra << "}";
+
+                extraLines.push_back(extra.str());
             }
             else if (td.structTypeData.isSecretlyArray) {
                 auto resolvedElementType = resolve(td.structTypeData.secretArrayElementType);
@@ -97,16 +130,29 @@ void debugPrintVar(ostream &target, Interpreter *interp, int32_t bp, TypeData td
                     target << "\"";
                 }
                 else {
-                    target << "[]{";
+                    auto nvr = interp->nextVarReference;
+                    interp->nextVarReference += 1;
+
+                    target << "#" << nvr;
+
+                    // array
+                    ostringstream extra("");
+                    extra << "#" << nvr << ": ";
+
+                    extra << "[";
                     for (int32_t i = 0; i < size; i++) {
-                        debugPrintVar(interp, bp, resolve(td.structTypeData.secretArrayElementType)->typeData, (int32_t) array_offset, extraLines);
+                        extra << to_string(i) << ":";
+
+                        debugPrintVar(extra, interp, bp, resolve(td.structTypeData.secretArrayElementType)->typeData, (int32_t) array_offset, extraLines);
                         array_offset += ts;
 
                         if (i < size - 1) {
-                            target << " ";
+                            extra << " ";
                         }
                     }
-                    target << "}";
+                    extra << "]";
+
+                    extraLines.push_back(extra.str());
                 }
             }
             else {
@@ -142,12 +188,12 @@ void debugPrintVar(ostream &target, Interpreter *interp, int32_t bp, TypeData td
                 extraLines.push_back(extra.str());
             }
         } break;
-        default: assert(false);
+        default: cpi_assert(false);
     }
 }
 
 void debugPrintVar(Interpreter *interp, int32_t bp, Node *n) {
-    assert(n->isLocal || n->isBytecodeLocal);
+    cpi_assert(n->isLocal || n->isBytecodeLocal);
 
     auto resolvedTypeinfo = resolve(resolve(n)->typeInfo);
 
@@ -267,6 +313,7 @@ void Interpreter::interpret() {
                     }
                 } else if (line == "info") {
                     this->nextVarReference = 1;
+                    this->pointerRecursion = hash_init<int32_t, string>(50);
 
                     cout << this->depth + 1 << endl;
 
@@ -289,6 +336,8 @@ void Interpreter::interpret() {
                             cout << "---" << endl;
                         }
                     }
+
+                    // todo(chad): free pointerRecursion
                 } else if (line == "stmt") {
                     printCurrentStmt(this);
                 } else if (line == "asm") {
@@ -525,6 +574,6 @@ void interpretStoreConst(Interpreter *interp) {
         auto value = interp->consume<double>();
         memcpy(&interp->stack[storeOffset], &value, sizeof(double));
     } else {
-        assert(false);
+        cpi_assert(false);
     }
 }

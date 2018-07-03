@@ -81,9 +81,10 @@ public:
     int32_t bp = 0;
 
     uint32_t nextVarReference = 1;
+    hash_t<int32_t, string> *pointerRecursion;
 
-    vector<uint32_t> pcs;
-    uint32_t lastValidPc;
+    vector<uint32_t> pcs = {};
+    uint32_t lastValidPc = 0;
 
     typedef void (*interpFuncType)(Interpreter *);
     vector<interpFuncType> table;
@@ -286,7 +287,7 @@ public:
           return consume<T>();
       }
 
-      assert(false && "unrecognized inst for read<T>");
+      cpi_assert(false && "unrecognized inst for read<T>");
       return {};
   }
 
@@ -361,7 +362,7 @@ void interpretMathDiv(Interpreter *interp) {
 
 template <typename T>
 void interpretMathMod(Interpreter *interp) {
-    assert(false && "todo(chad)");
+    cpi_assert(false && "todo(chad)");
 
 //    auto a = interp->read<T>();
 //    auto b = interp->read<T>();

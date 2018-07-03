@@ -589,7 +589,7 @@ Node *Parser::parseRet() {
 Node *Parser::buildDots(stack<Node *> rvalues) {
     auto top = rvalues.top();
 
-    assert(!rvalues.empty());
+    cpi_assert(!rvalues.empty());
 
     if (rvalues.size() == 1) {
         return top;
@@ -1168,7 +1168,7 @@ Node *Parser::parseLvalueOrLiteral() {
         popFront();
     }
 
-    assert(symbol != nullptr);
+    cpi_assert(symbol != nullptr);
     return parseLvalueHelper(symbol, saved);
 }
 
@@ -1305,7 +1305,7 @@ Node *Parser::parseStringLiteral() {
     ostringstream s("");
     for (auto i = node->region.start.byteIndex + 1; i < node->region.end.byteIndex - 1; i++) {
         if (node->region.srcInfo.source->at(i) == '\\') {
-            assert(node->region.srcInfo.source->size() > i + 1);
+            cpi_assert(node->region.srcInfo.source->size() > i + 1);
             switch (node->region.srcInfo.source->at(i + 1)) {
                 case 'n': {
                     s << '\n';
@@ -1357,7 +1357,7 @@ int8_t Parser::operatorPrecedence(LexerTokenType type) {
         case LexerTokenType::VERTICAL_BAR:
             return 5;
 
-        default: assert(false);
+        default: cpi_assert(false);
     }
 }
 

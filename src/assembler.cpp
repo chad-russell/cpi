@@ -135,7 +135,7 @@ int AssemblyLexer::getArgCount(TokenType tt) {
     }
 
     cout << "unknown TokenType for argCount: '" << ttName << "'";
-    assert(false);
+    cpi_assert(false);
 }
 
 void AssemblyLexer::popFront() {
@@ -228,7 +228,7 @@ void AssemblyLexer::popFront() {
             case Instruction::CONSTF64: {
                 newInst = toBytes(parsed);
             } break;
-            default: assert(false);
+            default: cpi_assert(false);
         }
 
         newNext.type = TokenType::CONSTFLOAT;
@@ -270,7 +270,7 @@ void AssemblyLexer::popFront() {
          << sourceMap.sourceInfo.source->substr(loc.byteIndex, 10)
          << ")...";
 
-    assert(false);
+    cpi_assert(false);
 }
 
 void AssemblyLexer::popFrontFinalize(Token newNext, vector<unsigned char> newInst) {
@@ -603,7 +603,7 @@ void MnemonicPrinter::readTypeAndIntOrFloat()
         readTypeAndFloat();
     } else {
         instructionString.append("<<error readTypeAndIntOrFloat>>");
-//        assert(false);
+//        cpi_assert(false);
     }
 }
 

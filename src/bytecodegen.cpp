@@ -66,7 +66,7 @@ void BytecodeGen::binopHelper(string instructionStr, Node *node, int32_t scale) 
             bytecodeStr = "RELF64";
         } break;
         default:
-            assert(false);
+            cpi_assert(false);
     }
 
     if (isBoolean) {
@@ -109,7 +109,9 @@ void BytecodeGen::gen(Node *node) {
     }
 
     if (node->gen) { return; }
+
     node->gen = true;
+    vector_append(this->generatedNodes, node);
 
     for (auto stmt : node->preStmts) {
         gen(stmt);
@@ -200,7 +202,7 @@ void BytecodeGen::gen(Node *node) {
                     auto litData = node->intLiteralData.value;
                     append(node->bytecode, toBytes(litData));
                 } break;
-                default: assert(false);
+                default: cpi_assert(false);
             }
         } break;
         case NodeType::SIZEOF: {
@@ -228,7 +230,7 @@ void BytecodeGen::gen(Node *node) {
                 }
                     break;
                 default:
-                    assert(false);
+                    cpi_assert(false);
             }
         }
             break;
@@ -277,7 +279,7 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, Instruction::RELCONSTI32);
                 append(instructions, toBytes(data.rhs->localOffset));
 
-                assert(resolvedDecl->derefData.target->typeInfo->typeData.kind == NodeTypekind::POINTER);
+                cpi_assert(resolvedDecl->derefData.target->typeInfo->typeData.kind == NodeTypekind::POINTER);
                 append(instructions, toBytes32(typeSize(resolvedDecl->typeInfo)));
             } else if (resolvedDecl->type == NodeType::DOT) {
                 // store rvalue into it's slot
@@ -300,7 +302,7 @@ void BytecodeGen::gen(Node *node) {
 
                 append(instructions, toBytes32(typeSize(resolvedDecl->typeInfo)));
             } else {
-                assert(false);
+                cpi_assert(false);
             }
         } break;
         case NodeType::SYMBOL: {
@@ -315,7 +317,7 @@ void BytecodeGen::gen(Node *node) {
                         append(node->bytecode, Instruction::RELCONSTI32);
                         append(node->bytecode, toBytes32(resolved->fnDeclData.tableIndex));
                     } else {
-                        assert(resolved->type == NodeType::DECL || resolved->type == NodeType::DECL_PARAM);
+                        cpi_assert(resolved->type == NodeType::DECL || resolved->type == NodeType::DECL_PARAM);
                         append(node->bytecode, Instruction::RELI32);
                         append(node->bytecode, toBytes32(localOffset));
                     }
@@ -350,7 +352,7 @@ void BytecodeGen::gen(Node *node) {
                     // nothing to do
                 } break;
                 default:
-                    assert(false);
+                    cpi_assert(false);
             }
 
             node->localOffset = resolved->localOffset;
@@ -541,7 +543,7 @@ void BytecodeGen::gen(Node *node) {
                         binopHelper("SGE", node);
                     } break;
                     default:
-                        assert(false);
+                        cpi_assert(false);
                 }
             }
         } break;
@@ -608,7 +610,7 @@ void BytecodeGen::gen(Node *node) {
             } else if (resolvedFn->type == NodeType::DOT) {
                 storeValue(resolvedFn, node->fnCallData.fn->localOffset);
 
-                assert(resolvedFn->isLocal || resolvedFn->isBytecodeLocal);
+                cpi_assert(resolvedFn->isLocal || resolvedFn->isBytecodeLocal);
                 append(instructions, Instruction::CALLI);
                 append(instructions, Instruction::RELI32);
                 append(instructions, toBytes(resolvedFn->localOffset));
@@ -662,7 +664,7 @@ void BytecodeGen::gen(Node *node) {
             gen(node->nodeData);
 
             if (hasNoLocalByDefault(node->nodeData)) {
-                assert(node->nodeData->isLocal);
+                cpi_assert(node->nodeData->isLocal);
                 storeValue(node->nodeData, node->nodeData->localOffset);
             }
 
@@ -687,7 +689,7 @@ void BytecodeGen::gen(Node *node) {
             gen(node->dotData.lhs);
 
             if (hasNoLocalByDefault(node->dotData.lhs)) {
-                assert(node->dotData.lhs->isLocal);
+                cpi_assert(node->dotData.lhs->isLocal);
                 storeValue(node->dotData.lhs, node->dotData.lhs->localOffset);
             }
 
@@ -790,13 +792,13 @@ void BytecodeGen::gen(Node *node) {
             append(instructions, Instruction::JUMPIF);
 
             if (node->ifData.condition->isLocal || node->ifData.condition->isBytecodeLocal) {
-                assert(node->ifData.condition->isLocal || node->ifData.condition->isBytecodeLocal);
+                cpi_assert(node->ifData.condition->isLocal || node->ifData.condition->isBytecodeLocal);
 
                 append(instructions, Instruction::RELI32);
                 append(instructions, toBytes(node->ifData.condition->localOffset));
             }
             else {
-                assert(!node->ifData.condition->bytecode.empty());
+                cpi_assert(!node->ifData.condition->bytecode.empty());
                 append(instructions, node->ifData.condition->bytecode);
             }
 
@@ -897,7 +899,7 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, toBytes32(node->nodeData->localOffset));
             }
             else {
-                assert(!node->nodeData->bytecode.empty());
+                cpi_assert(!node->nodeData->bytecode.empty());
 
                 append(instructions, Instruction::FREE);
                 append(instructions, node->nodeData->bytecode);
@@ -919,7 +921,7 @@ void BytecodeGen::gen(Node *node) {
             }
         } break;
         case NodeType::TAGCHECK: {
-            assert(node->resolved);
+            cpi_assert(node->resolved);
             gen(node->resolved);
             node->bytecode = node->resolved->bytecode;
 
@@ -956,7 +958,7 @@ void BytecodeGen::gen(Node *node) {
         case NodeType::PUTS: {
             gen(node->nodeData);
 
-            assert(node->nodeData->isLocal || node->nodeData->isBytecodeLocal);
+            cpi_assert(node->nodeData->isLocal || node->nodeData->isBytecodeLocal);
             storeValue(node->nodeData, node->nodeData->localOffset);
             append(instructions, Instruction::PUTS);
             append(instructions, Instruction::RELCONSTI32);
@@ -970,7 +972,7 @@ void BytecodeGen::gen(Node *node) {
             node->bytecode = node->resolved->bytecode;
         } break;
         default:
-            assert(false);
+            cpi_assert(false);
     }
 
     for (auto stmt : node->postStmts) {
@@ -988,7 +990,7 @@ void BytecodeGen::fixup() {
         auto bucket = fixups->buckets[i];
         if (bucket != nullptr) {
             auto node = bucket->value;
-            assert(node->type == NodeType::FN_DECL);
+            cpi_assert(node->type == NodeType::FN_DECL);
             auto instOffset = static_cast<int32_t>(node->fnDeclData.instOffset);
             memcpy(&instructions[bucket->key], &instOffset, sizeof(int32_t));
 
@@ -996,7 +998,7 @@ void BytecodeGen::fixup() {
                 bucket = bucket->next;
 
                 node = bucket->value;
-                assert(node->type == NodeType::FN_DECL);
+                cpi_assert(node->type == NodeType::FN_DECL);
                 instOffset = static_cast<int32_t>(node->fnDeclData.instOffset);
                 memcpy(&instructions[bucket->key], &instOffset, sizeof(int32_t));
             }
@@ -1117,7 +1119,7 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
                 tagValue->typeInfo = new Node(NodeTypekind::I64);
                 tagValue->intLiteralData.value = tagIndex;
 
-                assert(value->type == NodeType::VALUE_PARAM);
+                cpi_assert(value->type == NodeType::VALUE_PARAM);
 
                 gen(tagValue);
                 gen(value->paramData.value);
@@ -1161,7 +1163,7 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
             append(instructions, toBytes32(8));
         } break;
         default:
-            assert(false);
+            cpi_assert(false);
     }
 }
 

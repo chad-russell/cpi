@@ -21,11 +21,11 @@ void debugType(void *ty) {
 }
 
 llvm::Value *LlvmGen::store(llvm::Value *val, llvm::Value *ptr) {
-    assert(val);
-    assert(ptr);
+    cpi_assert(val);
+    cpi_assert(ptr);
 
     auto ptrToValType = llvm::PointerType::get(val->getType(), 0);
-//    assert(((llvm::StructType *) val->getType())->isLayoutIdentical((llvm::StructType *) ptr->getType()->getContainedType(0)));
+//    cpi_assert(((llvm::StructType *) val->getType())->isLayoutIdentical((llvm::StructType *) ptr->getType()->getContainedType(0)));
 
     return builder.CreateStore(val, builder.CreateBitCast(ptr, ptrToValType));
 //    return builder.CreateStore(val, ptr);
@@ -128,7 +128,7 @@ LlvmGen::LlvmGen(const char *fileName) : builder(context), module(llvm::make_uni
 
 void emitDebugLocation(LlvmGen *gen, Node *node) {
 #if DBUILDER
-    assert(gen->currentScope != nullptr);
+    cpi_assert(gen->currentScope != nullptr);
     gen->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(static_cast<unsigned int>(node->region.start.line),
                                                              static_cast<unsigned int>(node->region.start.col),
                                                              gen->currentScope));
@@ -150,7 +150,7 @@ void LlvmGen::finalize() {
 llvm::Type *LlvmGen::typeFor(Node *node) {
     node = resolve(node);
 
-    assert(node->type == NodeType::TYPE);
+    cpi_assert(node->type == NodeType::TYPE);
     switch (node->typeData.kind) {
         case NodeTypekind::BOOLEAN_LITERAL: {
             return builder.getInt1Ty();
@@ -258,7 +258,7 @@ llvm::Type *LlvmGen::typeFor(Node *node) {
         case NodeTypekind::NONE: {
             return llvm::StructType::get(context, false);
         }
-        default: assert(false);
+        default: cpi_assert(false);
     }
 
     return nullptr;
@@ -282,7 +282,7 @@ llvm::Value *LlvmGen::rvalueFor(Node *node) {
 llvm::DIType *diTypeFor(LlvmGen *gen, Node *type) {
     auto resolved = resolve(type);
 
-    assert(resolved->type == NodeType::TYPE);
+    cpi_assert(resolved->type == NodeType::TYPE);
 
     switch (resolved->typeData.kind) {
         case NodeTypekind::INT_LITERAL:
@@ -304,7 +304,7 @@ llvm::DIType *diTypeFor(LlvmGen *gen, Node *type) {
             llvm::SmallVector<llvm::Metadata *, 8> diTypes;
             diTypes.push_back(diTypeFor(gen, resolved->typeData.fnTypeData.returnType));
             for (auto pt : resolved->typeData.fnTypeData.params) {
-                assert(pt->type == NodeType::DECL_PARAM);
+                cpi_assert(pt->type == NodeType::DECL_PARAM);
                 diTypes.push_back(diTypeFor(gen, pt->paramData.type));
             }
             return gen->dBuilder->createSubroutineType(gen->dBuilder->getOrCreateTypeArray(diTypes));
@@ -402,7 +402,7 @@ llvm::DIType *diTypeFor(LlvmGen *gen, Node *type) {
             return gen->dBuilder->createBasicType("none", 0, llvm::dwarf::DW_ATE_unsigned);
         }
         default:
-            assert(false);
+            cpi_assert(false);
     }
 
     return nullptr;
@@ -450,7 +450,7 @@ void LlvmGen::gen(Node *node) {
 
             std::vector<llvm::Type*> paramTypes = {};
             for (const auto& param : node->fnDeclData.params) {
-                assert(param->type == NodeType::DECL_PARAM);
+                cpi_assert(param->type == NodeType::DECL_PARAM);
                 paramTypes.push_back(typeFor(param->paramData.type));
             }
 
@@ -498,13 +498,13 @@ void LlvmGen::gen(Node *node) {
                     nodeTypeToAlloca = resolve(resolvedLocal->typeInfo);
                 } else if (resolvedTypeInfo->type == NodeType::TYPEOF) {
                     // todo(chad): this should probably be disallowed, and we should instead find a way to always have typeInfo be NodeType::TYPE
-                    assert(resolvedLocal->typeInfo->staticValue);
+                    cpi_assert(resolvedLocal->typeInfo->staticValue);
                     nodeTypeToAlloca = resolvedLocal->typeInfo->staticValue;
                 } else {
-                    assert(false);
+                    cpi_assert(false);
                 }
 
-                assert(nodeTypeToAlloca->type == NodeType::TYPE);
+                cpi_assert(nodeTypeToAlloca->type == NodeType::TYPE);
 
                 auto isAutoDerefStorage = resolvedLocal->type == NodeType::DOT
                                           && resolvedLocal->dotData.lhs->typeInfo->typeData.kind == NodeTypekind::POINTER;
@@ -516,7 +516,7 @@ void LlvmGen::gen(Node *node) {
                 if (shouldCreateAlloca) {
                     if (resolvedLocal->type == NodeType::DECL) {
                         if (resolvedLocal->declData.lvalue != nullptr) {
-                            assert(resolvedLocal->declData.lvalue->type == NodeType::SYMBOL);
+                            cpi_assert(resolvedLocal->declData.lvalue->type == NodeType::SYMBOL);
                             auto atomId = resolvedLocal->declData.lvalue->symbolData.atomId;
 
                             auto localName = atomTable->backwardAtoms[atomId];
@@ -631,7 +631,7 @@ void LlvmGen::gen(Node *node) {
             emitDebugLocation(this, node);
 
             if (data.initialValue == nullptr) {
-                assert(node->llvmLocal);
+                cpi_assert(node->llvmLocal);
             }
             else {
                 gen(data.initialValue);
@@ -821,7 +821,7 @@ void LlvmGen::gen(Node *node) {
                             case LexerTokenType::NE: {
                                 value = builder.CreateFCmpONE(lhsValue, rhsValue);
                             } break;
-                            default: assert(false);
+                            default: cpi_assert(false);
                         }
                     }
                     else {
@@ -856,7 +856,7 @@ void LlvmGen::gen(Node *node) {
                             case LexerTokenType::LE: {
                                 value = builder.CreateICmpSLE(lhsValue, rhsValue);
                             } break;
-                            default: assert(false);
+                            default: cpi_assert(false);
                         }
                     }
 
@@ -975,7 +975,7 @@ void LlvmGen::gen(Node *node) {
 
                 node->llvmData = gep;
             } else {
-                assert(false);
+                cpi_assert(false);
             }
         } break;
         case NodeType::DOT: {
@@ -988,7 +988,7 @@ void LlvmGen::gen(Node *node) {
 
             auto foundParam = node->dotData.resolved;
 
-            assert(foundParam->type == NodeType::DECL_PARAM || foundParam->type == NodeType::VALUE_PARAM);
+            cpi_assert(foundParam->type == NodeType::DECL_PARAM || foundParam->type == NodeType::VALUE_PARAM);
             uint32_t paramIndex = static_cast<uint32_t>(foundParam->paramData.index);
 
             auto tagAtom = atomTable->insertStr("tag");
@@ -1138,9 +1138,9 @@ void LlvmGen::gen(Node *node) {
                 // we need to store the tag and the value.
                 auto tagIndex = vector_at(node->typeInfo->typeData.structTypeData.params, 0)->paramData.index;
 
-                assert(node->structLiteralData.params.length == 1);
+                cpi_assert(node->structLiteralData.params.length == 1);
                 auto value = vector_at(node->structLiteralData.params, 0);
-                assert(value->type == NodeType::VALUE_PARAM);
+                cpi_assert(value->type == NodeType::VALUE_PARAM);
 
                 gen(value->paramData.value);
                 auto paramValue = rvalueFor(value->paramData.value);
@@ -1172,7 +1172,7 @@ void LlvmGen::gen(Node *node) {
 
                     auto valueToInsert = rvalueFor(param->paramData.value);
                     auto computedType = typeFor(param->paramData.value->typeInfo);
-                    assert(valueToInsert);
+                    cpi_assert(valueToInsert);
 
                     if (node->typeInfo->typeData.structTypeData.isSecretlyArray && idx == 0) {
                         valueToInsert = builder.CreateBitCast(valueToInsert,
@@ -1293,7 +1293,7 @@ void LlvmGen::gen(Node *node) {
                        || node->typeInfo->typeData.kind == NodeTypekind::F64) {
                 node->llvmData = builder.CreateFNeg(rvalueFor(node->nodeData));
             } else {
-                assert(false);
+                cpi_assert(false);
             }
         } break;
         case NodeType::MALLOC: {
@@ -1351,7 +1351,7 @@ void LlvmGen::gen(Node *node) {
         } break;
         case NodeType::ISKIND:
         case NodeType::TAGCHECK: {
-            assert(node->resolved);
+            cpi_assert(node->resolved);
             gen(node->resolved);
 
             node->llvmData = node->resolved->llvmData;
@@ -1360,7 +1360,7 @@ void LlvmGen::gen(Node *node) {
             }
         } break;
         case NodeType::FIELDSOF: {
-            assert(node->resolved);
+            cpi_assert(node->resolved);
             gen(node->resolved);
 
             node->llvmData = node->resolved->llvmData;
@@ -1368,7 +1368,7 @@ void LlvmGen::gen(Node *node) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
         } break;
-        default: assert(false);
+        default: cpi_assert(false);
     }
 
     for (auto stmt : node->postStmts) {

@@ -6,6 +6,7 @@
 #define CPI_CONTAINER_H
 
 #include <string>
+#include "util.h"
 
 using namespace std;
 

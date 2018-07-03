@@ -25,6 +25,8 @@ bool endsWith(string *s, string suf);
 
 int bytesInCodepoint(char firstByte);
 
+void cpi_assert(bool check);
+
 class Node;
 class Scope;
 
@@ -510,7 +512,7 @@ string suffixForType() {
     if (is_same<T, float>::value) { return "F32"; }
     if (is_same<T, double>::value) { return "F64"; }
 
-    assert(false);
+    cpi_assert(false);
 }
 
 struct SourceRegion {

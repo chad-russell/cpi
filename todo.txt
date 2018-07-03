@@ -1,9 +1,5 @@
 TODO:
     - better interpreter debugging
-        - expansion for:
-            - arrays
-            - enums
-            - pointers
         - better 'step over' feature
         - include column info
         - evaluate
