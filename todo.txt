@@ -1,18 +1,19 @@
 TODO:
     - better interpreter debugging
-        - better 'step over' feature
-        - include column info
-        - evaluate
-        - conditional breakpoints
         - implement option to have memory as a rope structure -- infinite undo/redo of program execution state
             - use this for step/continue backwards in vscode
+        - conditional breakpoints
+        - ctfe debugging
 
-    - arguments in #run
-        - must be constant-ized first
+    - special syntax for auto-compile-time args
+        - `fn f(t: !T) { return t; }`
+            - short for `fn f(T := typeof(t))(t: T) { return t; }`
 
     - pipe operator
 
     - libraries / namespaces / modules
+
+    - defer
 
     - possibly bring back 'Type' as a way of asserting something must be a type
         - writing 'fn foo(t: Any)() { ... }' is a little weird considering the vast majority of the time we actually just want to accept a type here and not any random ast node
@@ -30,9 +31,7 @@ TODO:
 
             }
         }
-        -- on other things (??)
-
-    - defer
+        -- only real benefit is that the compiler could warn you if you miss a case
 
     - parse symbols in backticks
         - `0n3:s!mb()l` := 3;
@@ -44,11 +43,9 @@ TODO:
     - array bounds checking
 
     - how to make custom stretchy buffer that's also pretty
-        - support a pre-check for opEquals and opEqualsAssign (?)
-        - a := buf!(i32)(10); a|append(3); return a|at(1);
-        - a := [10]i32{}; a|append(3); return a[1];
-        - maybe just get rid of `[]` syntax... instead of giving all types a way to
+        - probably just get rid of `[]` syntax... instead of giving all types a way to
             access to special syntax, we can just have less special syntax
+        - a := buf!(i32)(10); a|append(3); return a|at(1);
 
     - varargs
         - fn print(args: ...) { }

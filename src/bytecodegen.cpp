@@ -131,6 +131,7 @@ void BytecodeGen::gen(Node *node) {
                 instructions.size(),
 
                 node->region.start.line,
+                node->region.start.col,
                 node->region.start.byteIndex,
                 node->region.end.byteIndex,
 
@@ -510,6 +511,9 @@ void BytecodeGen::gen(Node *node) {
 
                 auto scale = node->binopData.rhsScale;
 
+                auto kind = node->typeInfo->typeData.kind;
+                auto isFloat = (kind == NodeTypekind::FLOAT_LITERAL || kind == NodeTypekind::F32 || kind == NodeTypekind::F64);
+
                 switch (node->binopData.type) {
                     case LexerTokenType::ADD: {
                         if (scale > 1) {
@@ -525,7 +529,12 @@ void BytecodeGen::gen(Node *node) {
                         binopHelper("MUL", node);
                     } break;
                     case LexerTokenType::DIV: {
-                        binopHelper("SDIV", node);
+                        if (isFloat) {
+                            binopHelper("DIV", node);
+                        }
+                        else {
+                            binopHelper("SDIV", node);
+                        }
                     } break;
                     case LexerTokenType::EQ_EQ: {
                         binopHelper("EQ", node);
@@ -534,13 +543,28 @@ void BytecodeGen::gen(Node *node) {
                         binopHelper("NEQ", node);
                     } break;
                     case LexerTokenType::LT: {
-                        binopHelper("SLT", node);
+                        if (isFloat) {
+                            binopHelper("LT", node);
+                        }
+                        else {
+                            binopHelper("SLT", node);
+                        }
                     } break;
                     case LexerTokenType::GT: {
-                        binopHelper("SGT", node);
+                        if (isFloat) {
+                            binopHelper("GT", node);
+                        }
+                        else {
+                            binopHelper("SGT", node);
+                        }
                     } break;
                     case LexerTokenType::GE: {
-                        binopHelper("SGE", node);
+                        if (isFloat) {
+                            binopHelper("GE", node);
+                        }
+                        else {
+                            binopHelper("SGE", node);
+                        }
                     } break;
                     default:
                         cpi_assert(false);
@@ -552,7 +576,7 @@ void BytecodeGen::gen(Node *node) {
 
             auto paramCount = node->fnCallData.params.length;
             int32_t totalParamsSize = 0;
-            for (auto i = 0; i < paramCount; i++) {
+            for (unsigned int i = 0; i < paramCount; i++) {
                 auto paramValue = vector_at(node->fnCallData.params, i)->paramData.value;
                 resolve(paramValue);
                 totalParamsSize += typeSize(paramValue->typeInfo);
@@ -580,6 +604,7 @@ void BytecodeGen::gen(Node *node) {
             auto resolvedFn = resolve(node->fnCallData.fn);
             if (resolvedFn->type != NodeType::FN_DECL && resolvedFn->type != NodeType::DECL) {
                 gen(resolvedFn);
+                storeValue(resolvedFn, node->fnCallData.fn->localOffset);
             }
 
             sourceMap.statements.push_back(SourceMapStatement{
@@ -587,6 +612,8 @@ void BytecodeGen::gen(Node *node) {
                     instructions.size(),
 
                     node->region.start.line,
+                    node->region.start.col,
+
                     node->region.start.byteIndex,
                     node->region.end.byteIndex,
 
@@ -602,21 +629,15 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, Instruction::RELI32);
                 append(instructions, toBytes32(resolvedFn->localOffset));
             } else if (resolvedFn->type == NodeType::DEREF) {
-                storeValue(resolvedFn, node->fnCallData.fn->localOffset);
-
                 append(instructions, Instruction::CALLI);
                 append(instructions, Instruction::RELI32);
                 append(instructions, toBytes32(node->fnCallData.fn->localOffset));
             } else if (resolvedFn->type == NodeType::DOT) {
-                storeValue(resolvedFn, node->fnCallData.fn->localOffset);
-
                 cpi_assert(resolvedFn->isLocal || resolvedFn->isBytecodeLocal);
                 append(instructions, Instruction::CALLI);
                 append(instructions, Instruction::RELI32);
                 append(instructions, toBytes(resolvedFn->localOffset));
             } else {
-                storeValue(resolvedFn, node->fnCallData.fn->localOffset);
-
                 append(instructions, Instruction::CALLI);
                 append(instructions, resolvedFn->bytecode);
             }

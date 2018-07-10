@@ -159,7 +159,8 @@ void vector_grow(vector_t<T> &vector) {
     vector.capacity = new_capacity;
     vector.items = new_items;
 
-    free(old_items);
+    // todo(chad): why might this fail??
+//    free(old_items);
 }
 
 template<typename T>

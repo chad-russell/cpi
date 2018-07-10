@@ -173,7 +173,7 @@ int main(int argc, char **argv) {
     }
 
     if (inputType == InputType::CPI) {
-        auto lexer = new Lexer(inputFile);
+        auto lexer = new Lexer(inputFile, true);
         parser = new Parser(lexer);
         parser->parseRoot();
 

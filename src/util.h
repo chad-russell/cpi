@@ -585,6 +585,8 @@ struct SourceMapStatement {
     unsigned long instEndIndex;
 
     unsigned long startLine;
+    unsigned long startCol;
+
     unsigned long startByte;
     unsigned long endByte;
 

@@ -38,21 +38,26 @@ Lexer::Lexer(Lexer *lexer, Node *node) {
     this->popFront();
 }
 
-Lexer::Lexer(string fileName) {
-    ifstream t(fileName);
-    string fileBytes;
-
-    t.seekg(0, ios::end);   
-    fileBytes.reserve((unsigned long) t.tellg());
-    t.seekg(0, ios::beg);
-
-    fileBytes.assign((istreambuf_iterator<char>(t)),
-                istreambuf_iterator<char>());
-
+Lexer::Lexer(string fileName, bool isFile) {
     auto lines = vector_init<unsigned long>(1);
     vector_append(lines, (unsigned long) 0);
 
-    srcInfo = {new string(fileName), new string(fileBytes), lines};
+    if (isFile) {
+        ifstream t(fileName);
+        string fileBytes;
+
+        t.seekg(0, ios::end);
+        fileBytes.reserve((unsigned long) t.tellg());
+        t.seekg(0, ios::beg);
+
+        fileBytes.assign((istreambuf_iterator<char>(t)),
+                         istreambuf_iterator<char>());
+
+        srcInfo = {new string(fileName), new string(fileBytes), lines};
+    }
+    else {
+        srcInfo = {new string("unknown"), new string(fileName), lines};
+    }
 
     lastLoc = {0, 1, 1};
     loc = {0, 1, 1};

@@ -1,5 +1,8 @@
 #include "interpreter.h"
 #include "node.h"
+#include "parser.h"
+#include "bytecodegen.h"
+#include "semantic.h"
 
 #include <iostream>
 #include <string.h>
@@ -251,10 +254,12 @@ void Interpreter::interpret() {
     while ((unsigned long) pc < instructions.size() && !terminated) {
 
         bool shouldStop = false;
+        SourceMapStatement stoppedOnStatement;
         if (debugFlag) {
             auto stmtStop = false;
             for (auto&& s : sourceMap.statements) {
                 if (s.instIndex == (unsigned long) pc) {
+                    stoppedOnStatement = s;
                     stmtStop = true;
                 }
             }
@@ -309,6 +314,7 @@ void Interpreter::interpret() {
                     for (auto stmt : sourceMap.statements) {
                         if (stmt.instIndex == (unsigned long) pc) {
                             cout << stmt.startLine << endl;
+                            cout << stmt.startCol << endl;
                         }
                     }
                 } else if (line == "info") {
@@ -325,6 +331,7 @@ void Interpreter::interpret() {
                         for (auto stmt : this->sourceMap.statements) {
                             if (stmt.instIndex == (unsigned long) pc) {
                                 cout << stmt.startLine << endl;
+                                cout << stmt.startCol << endl;
                             }
                         }
 
@@ -338,6 +345,61 @@ void Interpreter::interpret() {
                     }
 
                     // todo(chad): free pointerRecursion
+                } else if (startsWith(&line, "eval")) {
+                    auto stmt = line.substr(5);
+
+                    auto evalLexer = new Lexer(stmt, false);
+
+                    auto evalFnDecl = new Node(stoppedOnStatement.node->region.srcInfo, NodeType::FN_DECL, stoppedOnStatement.node->scope);
+
+                    auto semantic = new Semantic();
+                    semantic->lexer = evalLexer;
+
+                    auto evalParser = new Parser(evalLexer);
+                    evalParser->isCopying = true;
+                    evalParser->scopes.pop();
+                    evalParser->scopes.push(stoppedOnStatement.node->scope);
+                    evalParser->currentFnDecl = evalFnDecl;
+                    auto parsed = evalParser->parseRvalue();
+
+                    evalLexer->srcInfo = stoppedOnStatement.node->region.srcInfo;
+                    semantic->resolveTypes(parsed);
+
+                    // gen
+                    auto gen = new BytecodeGen();
+                    gen->isMainFn = true;
+                    gen->sourceMap.sourceInfo = parsed->region.srcInfo;
+                    gen->processFnDecls = true;
+
+                    // todo(chad): wrap this in a fn call
+                    gen->gen(parsed);
+                    gen->instructions.push_back((unsigned char) Instruction::EXIT);
+                    while (!gen->toProcess.empty()) {
+                        gen->isMainFn = false;
+                        gen->processFnDecls = true;
+                        gen->gen(gen->toProcess.front());
+                        gen->toProcess.pop();
+                    }
+                    gen->fixup();
+
+                    for (auto g : gen->generatedNodes) {
+                        g->gen = false;
+                    }
+
+                    auto interp = new Interpreter();
+                    interp->instructions = gen->instructions;
+                    interp->fnTable = gen->fnTable;
+                    interp->stack = this->stack; // todo(chad): this copies a lot of stuff. Make stack a vector_t?
+                    interp->sourceMap = gen->sourceMap;
+
+                    interp->continuing = true;
+                    interp->instructions = gen->instructions;
+                    interp->fnTable = gen->fnTable;
+                    interp->interpret();
+
+                    // todo(chad): present the type of the answer appropriately -- don't just assume it's i64
+                    auto answer = interp->readFromStack<int64_t>(0);
+                    cout << "answer: " << answer << endl;
                 } else if (line == "stmt") {
                     printCurrentStmt(this);
                 } else if (line == "asm") {
@@ -491,6 +553,7 @@ void interpretReturn(Interpreter *interp) {
     interp->sp = interp->bp - 8;
     interp->pc = interp->readFromStack<int32_t>(interp->bp - 4);
     interp->bp = interp->readFromStack<int32_t>(interp->bp - 8);
+
     interp->depth -= 1;
 
     interp->pcs.pop_back();

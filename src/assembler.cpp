@@ -284,6 +284,8 @@ void AssemblyLexer::popFrontFinalize(Token newNext, vector<unsigned char> newIns
                 instructions.size(),
 
                 savedLoc.line,
+                savedLoc.col,
+
                 savedLoc.byteIndex,
                 newNext.region.end.byteIndex,
 

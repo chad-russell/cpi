@@ -23,7 +23,7 @@ public:
     const static vector<string> lexerTokenTypeStrings;
 
     Lexer(Lexer *lexer, Node *node);
-    Lexer(string fileName);
+    Lexer(string fileName, bool isFile);
 
     void popFront();
     void popFrontFinalize(LexerToken newNext);
