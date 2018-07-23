@@ -8,6 +8,9 @@
 #include <string.h>
 #include <algorithm>
 #include <sstream>
+#include <dlfcn.h>
+#include <ffi.h>
+#include <SDL2/SDL.h>
 
 using namespace std;
 
@@ -243,11 +246,6 @@ void printCurrentVars(Interpreter *interp, int32_t bp, uint32_t pc) {
     }
 }
 
-void printInfo(Interpreter *interp, int32_t bp, uint32_t pc) {
-    // next: one line per vairable
-    printCurrentVars(interp, bp, pc);
-}
-
 void Interpreter::interpret() {
     auto mp = new MnemonicPrinter(this->instructions);
 
@@ -335,7 +333,7 @@ void Interpreter::interpret() {
                             }
                         }
 
-                        printInfo(this, bp, pc);
+                        printCurrentVars(this, bp, pc);
                         bp = this->readFromStack<int32_t>(bp - 8);
 
                         if (i < this->depth) {
@@ -348,12 +346,9 @@ void Interpreter::interpret() {
                 } else if (startsWith(&line, "eval")) {
                     auto stmt = line.substr(5);
 
-                    auto evalLexer = new Lexer(stmt, false);
-
                     auto evalFnDecl = new Node(stoppedOnStatement.node->region.srcInfo, NodeType::FN_DECL, stoppedOnStatement.node->scope);
 
-                    auto semantic = new Semantic();
-                    semantic->lexer = evalLexer;
+                    auto evalLexer = new Lexer(stmt, false);
 
                     auto evalParser = new Parser(evalLexer);
                     evalParser->isCopying = true;
@@ -362,18 +357,29 @@ void Interpreter::interpret() {
                     evalParser->currentFnDecl = evalFnDecl;
                     auto parsed = evalParser->parseRvalue();
 
+                    // set the srcInfo to the original srcInfo in case there's polymorphs
                     evalLexer->srcInfo = stoppedOnStatement.node->region.srcInfo;
+
+                    auto semantic = new Semantic();
+                    semantic->lexer = evalLexer;
+                    semantic->currentFnDecl = evalFnDecl;
+
+                    auto wrappedRet = new Node(parsed->region.srcInfo, NodeType::RETURN, parsed->scope);
+                    wrappedRet->nodeData = parsed;
+
+                    vector_append(evalFnDecl->fnDeclData.body, wrappedRet);
+                    vector_append(evalFnDecl->fnDeclData.returns, wrappedRet);
                     semantic->resolveTypes(parsed);
+                    semantic->resolveTypes(evalFnDecl);
 
                     // gen
                     auto gen = new BytecodeGen();
                     gen->isMainFn = true;
-                    gen->sourceMap.sourceInfo = parsed->region.srcInfo;
+                    gen->sourceMap.sourceInfo = evalFnDecl->region.srcInfo;
                     gen->processFnDecls = true;
 
-                    // todo(chad): wrap this in a fn call
-                    gen->gen(parsed);
-                    gen->instructions.push_back((unsigned char) Instruction::EXIT);
+                    // todo(chad): make it so this works and stuff
+                    gen->gen(evalFnDecl);
                     while (!gen->toProcess.empty()) {
                         gen->isMainFn = false;
                         gen->processFnDecls = true;
@@ -384,14 +390,19 @@ void Interpreter::interpret() {
 
                     for (auto g : gen->generatedNodes) {
                         g->gen = false;
+                        g->bytecode = {};
                     }
 
+//                    auto m = new MnemonicPrinter(gen->instructions);
+//                    m->fnTable = gen->fnTable;
+//                    cout << m->debugString() << endl;
+
                     auto interp = new Interpreter();
+                    interp->externalFnTable = gen->externalFnTable;
                     interp->instructions = gen->instructions;
                     interp->fnTable = gen->fnTable;
-                    interp->stack = this->stack; // todo(chad): this copies a lot of stuff. Make stack a vector_t?
+                    interp->stack = this->stack; // todo(chad): this copies a lot of stuff. Make stack a vector_t? (or maybe we actually want to copy...)
                     interp->sourceMap = gen->sourceMap;
-
                     interp->continuing = true;
                     interp->instructions = gen->instructions;
                     interp->fnTable = gen->fnTable;
@@ -508,6 +519,110 @@ void interpretCalli(Interpreter *interp) {
     interp->callIndex((int32_t) callIndex);
 }
 
+ffi_type *ffiTypeFor(Node *type) {
+    type = resolve(type);
+    cpi_assert(type->type == NodeType::TYPE);
+
+    switch (type->typeData.kind) {
+        case NodeTypekind::NONE: return &ffi_type_void;
+        case NodeTypekind::I8: return &ffi_type_sint8;
+        case NodeTypekind::I32: return &ffi_type_sint32;
+        case NodeTypekind::I64: return &ffi_type_sint64;
+        case NodeTypekind::F32: return &ffi_type_float;
+        case NodeTypekind::F64: return &ffi_type_double;
+        case NodeTypekind::STRUCT: {
+            // todo(chad): @Leak
+            auto args = (ffi_type **) malloc((type->typeData.structTypeData.params.length + 1) * sizeof(ffi_type *));
+            for (unsigned long i = 0; i < type->typeData.structTypeData.params.length; i++) {
+                args[i] = ffiTypeFor(vector_at(type->typeData.structTypeData.params, i)->typeInfo);
+                i += 1;
+            }
+
+            args[type->typeData.structTypeData.params.length] = nullptr;
+            auto dp_type = (ffi_type *) malloc(sizeof(ffi_type));
+            *dp_type = {.size = 0, .alignment = 0, .type = FFI_TYPE_STRUCT, .elements = args};
+            return dp_type;
+        }
+        case NodeTypekind::POINTER: return &ffi_type_pointer;
+
+        default: cpi_assert(false);
+    }
+
+    cpi_assert(false);
+    return &ffi_type_void;
+}
+
+// calle
+void interpretCalle(Interpreter *interp) {
+    auto fnTableIndex = interp->consume<int32_t>();
+    auto originalCallNode = vector_at(interp->externalFnTable, (unsigned long) fnTableIndex);
+    assert(originalCallNode != nullptr);
+
+    void *libhandle = dlopen("/usr/local/lib/libsdl2.dylib", RTLD_LAZY);
+//    void *libhandle = dlopen("/Users/chadrussell/Projects/cpi/test/libfoo.dylib", RTLD_LAZY);
+    if (!libhandle) {
+        fprintf(stderr, "dlopen error: %s\n", dlerror());
+        exit(1);
+    }
+
+    auto originalFn = resolve(originalCallNode->fnCallData.fn);
+    assert(originalFn->type == NodeType::FN_DECL);
+    auto fnName = atomTable->backwardAtoms[originalFn->fnDeclData.name->symbolData.atomId];
+
+    void* add_fn = dlsym(libhandle, fnName.c_str());
+    char* err = dlerror();
+    if (err) {
+        fprintf(stderr, "dlsym failed: %s\n", err);
+        exit(1);
+    }
+
+    auto paramCount = originalFn->fnDeclData.params.length;
+    auto ffiArgs = (ffi_type **) malloc(paramCount * sizeof(ffi_type *));
+
+    for (auto i = 0; i < paramCount; i++) {
+        ffiArgs[i] = ffiTypeFor(vector_at(originalFn->fnDeclData.params, i)->typeInfo);
+    }
+
+    ffi_cif cif;
+    auto returnType = ffiTypeFor(originalFn->fnDeclData.returnType);
+    ffi_status status = ffi_prep_cif(&cif, FFI_DEFAULT_ABI, paramCount, returnType, ffiArgs);
+    if (status != FFI_OK) {
+        fprintf(stderr, "ffi_prep_cif failed: %d\n", status);
+        exit(1);
+    }
+
+    auto values = (void **) malloc(paramCount * sizeof(void *));
+    auto paramSp = interp->sp;
+
+    for (unsigned long i = 0; i < paramCount; i++) {
+        auto paramType = vector_at(originalFn->fnDeclData.params, i)->typeInfo;
+        paramSp -= typeSize(paramType);
+
+//        if (paramType->typeData.kind == NodeTypekind::POINTER) {
+//            auto offset = interp->readFromStack<int64_t>(paramSp);
+//            auto stackPtr = (char *) &interp->stack[0];
+//            auto offset64 = (int64_t) (stackPtr + offset);
+//            auto offset64Ptr = (void *) offset64;
+//            values[i] = &offset64Ptr;
+//        }
+//        else {
+//            auto offsetPtr = &interp->stack[paramSp];
+//            values[i] = offsetPtr;
+//        }
+
+        auto offsetPtr = &interp->stack[paramSp];
+        values[i] = offsetPtr;
+    }
+
+    // call function copying return value bits to return slot
+    // todo(chad): according to ffi this *must* be at least an int32_t unless the return type is void. So we'll need to deal with return types smaller than that
+    ffi_call(&cif, FFI_FN(add_fn), &interp->stack[interp->sp + 8], values);
+    auto debugSlot = &interp->stack[interp->sp + 8];
+
+    free(ffiArgs);
+    free(values);
+}
+
 // call
 void interpretCall(Interpreter *interp) {
     interp->callIndex((uint32_t) interp->consume<int32_t>());
@@ -588,7 +703,9 @@ void interpretStore(Interpreter *interp) {
 
     auto size = interp->consume<int32_t>();
 
-    memcpy(&interp->stack[storeOffset], &interp->stack[readOffset], static_cast<size_t>(size));
+    auto to = &interp->stack[storeOffset];
+    auto from = &interp->stack[readOffset];
+    memcpy(to, from, static_cast<size_t>(size));
 
 //    if (size == 4) {
 //        auto debugValue = *((int32_t *) (&interp->stack[storeOffset]));

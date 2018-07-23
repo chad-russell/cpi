@@ -46,7 +46,7 @@ enum class NodeType {
     BOOLEAN_LITERAL = 12,
     BOOLEAN = 13,
     UNARY_NEG = 14,
-    RET = 15,
+    RETURN = 15,
     IF = 16,
     WHILE = 17,
     DECL_PARAM = 18,
@@ -132,7 +132,7 @@ enum class LexerTokenType : int32_t {
     SYMBOL,
     INT_LITERAL,
     FLOAT_LITERAL,
-    RET,
+    RETURN,
     STRING,
     BOOLEAN,
     I8,
@@ -251,6 +251,7 @@ struct FnDeclData {
     int32_t stackSize;
     uint64_t instOffset;
     bool isLiteral;
+    bool isExternal;
     uint32_t tableIndex;
     bool cameFromPolymorph;
 };
@@ -455,13 +456,6 @@ public:
 };
 
 template<typename T>
-class Optional {
-public:
-    bool isPresent;
-    T value;
-};
-
-template<typename T> 
 vector<unsigned char> toBytes(T object) {
     vector<unsigned char> bytes;
     bytes.reserve(sizeof(T));

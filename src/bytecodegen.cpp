@@ -160,7 +160,7 @@ void BytecodeGen::gen(Node *node) {
                 if (stmt->type != NodeType::FN_DECL && stmt->type != NodeType::TYPE) {
                     gen(stmt);
                 }
-                if (stmt->type == NodeType::RET || stmt->type == NodeType::PANIC) { didTerminate = true; }
+                if (stmt->type == NodeType::RETURN || stmt->type == NodeType::PANIC) { didTerminate = true; }
             }
             if (!didTerminate) {
                 if (isMainFn) {
@@ -172,8 +172,8 @@ void BytecodeGen::gen(Node *node) {
 
             currentFnStackSize = savedCurrentFnStackSize;
         } break;
-        case NodeType::RET: {
-            // todo(chad): don't do any storing if this is just 'ret' with no value
+        case NodeType::RETURN: {
+            // todo(chad): don't do any storing if this is just 'return' with no value
 
             gen(node->retData.value);
 
@@ -574,6 +574,7 @@ void BytecodeGen::gen(Node *node) {
         case NodeType::FN_CALL: {
             if (!node->fnCallData.hasRuntimeParams) { break; }
 
+            auto resolvedFn = resolve(node->fnCallData.fn);
             auto paramCount = node->fnCallData.params.length;
             int32_t totalParamsSize = 0;
             for (unsigned int i = 0; i < paramCount; i++) {
@@ -601,7 +602,6 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, toBytes(totalParamsSize));
             }
 
-            auto resolvedFn = resolve(node->fnCallData.fn);
             if (resolvedFn->type != NodeType::FN_DECL && resolvedFn->type != NodeType::DECL) {
                 gen(resolvedFn);
                 storeValue(resolvedFn, node->fnCallData.fn->localOffset);
@@ -621,9 +621,16 @@ void BytecodeGen::gen(Node *node) {
             });
 
             if (resolvedFn->type == NodeType::FN_DECL) {
-                append(instructions, Instruction::CALL);
-                hash_insert(fixups, (int64_t) instructions.size(), resolvedFn);
-                append(instructions, toBytes32(999));
+                if (resolvedFn->fnDeclData.isExternal) {
+                    append(instructions, Instruction::CALLE);
+                    append(instructions, toBytes32(this->externalFnTable.length));
+                    vector_append(this->externalFnTable, node);
+                }
+                else {
+                    append(instructions, Instruction::CALL);
+                    hash_insert(fixups, (int64_t) instructions.size(), resolvedFn);
+                    append(instructions, toBytes32(999));
+                }
             } else if (resolvedFn->type == NodeType::DECL) {
                 append(instructions, Instruction::CALLI);
                 append(instructions, Instruction::RELI32);
@@ -1151,10 +1158,18 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
             else {
                 auto sizeSoFar = 0;
                 for (const auto &param : node->structLiteralData.params) {
+                    auto paramSize = typeSize(param->paramData.value->typeInfo);
+
                     gen(param->paramData.value);
 
+                    // alignment
+                    if (sizeSoFar > 0 && paramSize > 0) {
+                        sizeSoFar += sizeSoFar % paramSize;
+                    }
+
                     storeValue(param->paramData.value, offset + sizeSoFar);
-                    sizeSoFar += typeSize(param->paramData.value->typeInfo);
+
+                    sizeSoFar += paramSize;
                 }
             }
         } break;

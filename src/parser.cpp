@@ -228,6 +228,8 @@ Node *Parser::parseFnDecl() {
     // if there's no more then it's an external declaration
     // todo(chad): once we have annotations, make an @extern. Everything else can be a faster calling convention
     if (lexer->front.type != LexerTokenType::LCURLY) {
+        decl->fnDeclData.isExternal = true;
+
         decl->region.end = decl->fnDeclData.returnType->region.end;
 
         scopes.pop();
@@ -299,7 +301,7 @@ Node *Parser::parseScopedStmt() {
     }
 
     // ret
-    if (lexer->front.type == LexerTokenType::RET) {
+    if (lexer->front.type == LexerTokenType::RETURN) {
         return parseRet();
     }
 
@@ -569,9 +571,9 @@ Node *Parser::parseFor() {
 
 Node *Parser::parseRet() {
     auto saved = lexer->front.region.start;
-    expect(LexerTokenType::RET, "return");
+    expect(LexerTokenType::RETURN, "return");
 
-    auto ret = new Node(lexer->srcInfo, NodeType::RET, scopes.top());
+    auto ret = new Node(lexer->srcInfo, NodeType::RETURN, scopes.top());
     ret->retData.value = parseRvalue();
     ret->region = {lexer->srcInfo, saved, ret->retData.value->region.end};
 
@@ -1268,12 +1270,13 @@ Node *Parser::parseIntLiteral() {
 
     ostringstream s("");
     for (auto i = node->region.start.byteIndex; i < node->region.end.byteIndex; i++) {
-        if (lexer->srcInfo.source->at(i) != '_') {
-            s << lexer->srcInfo.source->at(i);
+        if (node->region.srcInfo.source->at(i) != '_') {
+            s << node->region.srcInfo.source->at(i);
         }
     }
 
-    node->intLiteralData.value = stoi(s.str());
+    auto str = s.str();
+    node->intLiteralData.value = stoi(str);
 
     return node;
 }

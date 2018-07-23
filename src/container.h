@@ -152,7 +152,7 @@ void vector_grow(vector_t<T> &vector) {
     unsigned long new_capacity = vector.capacity * 2;
 
     auto new_items = (T *) calloc((size_t) new_capacity, sizeof(T));
-    auto old_items = vector.items;
+//    auto old_items = vector.items;
 
     memcpy(new_items, vector.items, vector.capacity * sizeof(T));
 

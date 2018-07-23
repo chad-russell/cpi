@@ -42,6 +42,13 @@ int32_t typeSize(Node *type) {
             auto tagSizeInBytes = 8;
 
             for (auto param : resolved->typeData.structTypeData.params) {
+                auto size = typeSize(param->paramData.type);
+
+                // alignment
+                if (size > 0 && total % size > 0) {
+                    total += total % size;
+                }
+
                 // if it's a union and we're not assigning to the 'tag' part, then the offset is the size of the tag
                 if (resolved->typeData.structTypeData.isSecretlyEnum && param->paramData.index > 0) {
                     param->localOffset = tagSizeInBytes;
@@ -51,7 +58,6 @@ int32_t typeSize(Node *type) {
                 }
                 cpi_assert(param->type == NodeType::DECL_PARAM);
 
-                auto size = typeSize(param->paramData.type);
                 total += size;
 
                 if (size > largest) {
@@ -60,7 +66,12 @@ int32_t typeSize(Node *type) {
             }
 
             if (resolved->typeData.structTypeData.isSecretlyEnum) {
-                return tagSizeInBytes + largest;
+                total = tagSizeInBytes + largest;
+            }
+
+            // alignment
+            if (total > 0 && total % largest > 0) {
+                total += largest - (total % largest);
             }
 
             return total;
@@ -612,11 +623,10 @@ Node *constantize(Semantic *semantic, Node *node) {
 
         auto savedCurrentFnDecl = semantic->currentFnDecl;
         semantic->currentFnDecl = wrappedFn;
-        auto wrappedRet = new Node(node->region.srcInfo, NodeType::RET, node->scope);
+        auto wrappedRet = new Node(node->region.srcInfo, NodeType::RETURN, node->scope);
 
         wrappedRet->nodeData = semantic->deepCopyRvalue(node, node->scope);
-
-        semantic->currentFnDecl = savedCurrentFnDecl;
+//        semantic->currentFnDecl = savedCurrentFnDecl;
 
         vector_append(wrappedFn->fnDeclData.body, wrappedRet);
         vector_append(wrappedFn->fnDeclData.returns, wrappedRet);
@@ -648,6 +658,7 @@ Node *constantize(Semantic *semantic, Node *node) {
     interp->instructions = gen->instructions;
     interp->fnTable = gen->fnTable;
     interp->sourceMap = gen->sourceMap;
+    interp->externalFnTable = gen->externalFnTable;
     auto instructions = gen->instructions;
 
     interp->continuing = true;
@@ -1016,12 +1027,16 @@ void resolveType(Semantic *semantic, Node *node) {
             auto localIndex = 0;
 
             for (auto param : node->typeData.structTypeData.params) {
+                semantic->resolveTypes(param);
+                auto size = typeSize(param->paramData.type);
+
+                if (size > 0) { total += total % size; } // alignment
+
                 param->localOffset = total;
                 param->paramData.index = localIndex;
 
-                semantic->resolveTypes(param);
+                total += size;
 
-                total += typeSize(param->paramData.type);
                 localIndex += 1;
             }
         } break;
@@ -2119,7 +2134,7 @@ void resolveRun(Semantic *semantic, Node *node) {
 
     // wrap in a function that simply returns the value -- that way we get args and stuff
     auto wrappedFn = new Node(node->region.srcInfo, NodeType::FN_DECL, node->scope);
-    auto wrappedRet = new Node(node->region.srcInfo, NodeType::RET, node->scope);
+    auto wrappedRet = new Node(node->region.srcInfo, NodeType::RETURN, node->scope);
     wrappedRet->nodeData = node->nodeData;
     vector_append(wrappedFn->fnDeclData.body, wrappedRet);
     vector_append(wrappedFn->fnDeclData.returns, wrappedRet);
@@ -2142,6 +2157,7 @@ void resolveRun(Semantic *semantic, Node *node) {
     interp->instructions = gen->instructions;
     interp->fnTable = gen->fnTable;
     interp->sourceMap = gen->sourceMap;
+    interp->externalFnTable = gen->externalFnTable;
     auto instructions = gen->instructions;
     auto fnTable = gen->fnTable;
 
@@ -2328,7 +2344,7 @@ void Semantic::resolveTypes(Node *node) {
         case NodeType::FN_DECL: {
             resolveFnDecl(this, node);
         } break;
-        case NodeType::RET: {
+        case NodeType::RETURN: {
             resolveRet(this, node);
         } break;
         case NodeType::INT_LITERAL: {

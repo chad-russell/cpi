@@ -560,7 +560,7 @@ void LlvmGen::gen(Node *node) {
 
             auto didTerminate = false;
             for (const auto& stmt : node->fnDeclData.body) {
-                if (stmt->type == NodeType::RET) { didTerminate = true; }
+                if (stmt->type == NodeType::RETURN) { didTerminate = true; }
                 gen(stmt);
             }
             if (!didTerminate) {
@@ -578,7 +578,7 @@ void LlvmGen::gen(Node *node) {
 
             allFns.push_back(F);
         } break;
-        case NodeType::RET: {
+        case NodeType::RETURN: {
             gen(node->retData.value);
             emitDebugLocation(this, node);
 
@@ -1087,7 +1087,7 @@ void LlvmGen::gen(Node *node) {
             builder.SetInsertPoint(thenBlock);
             auto didTerminate = false;
             for (auto stmt : node->ifData.stmts) {
-                if (stmt->type == NodeType::RET) { didTerminate = true; }
+                if (stmt->type == NodeType::RETURN) { didTerminate = true; }
                 gen(stmt);
             }
             if (!didTerminate) {
@@ -1097,7 +1097,7 @@ void LlvmGen::gen(Node *node) {
             builder.SetInsertPoint(elseBlock);
             didTerminate = false;
             for (auto stmt : node->ifData.elseStmts) {
-                if (stmt->type == NodeType::RET) { didTerminate = true; }
+                if (stmt->type == NodeType::RETURN) { didTerminate = true; }
                 gen(stmt);
             }
             if (!didTerminate) {
@@ -1120,7 +1120,7 @@ void LlvmGen::gen(Node *node) {
             builder.SetInsertPoint(thenBlock);
             auto didTerminate = false;
             for (auto stmt : node->whileData.stmts) {
-                if (stmt->type == NodeType::RET) { didTerminate = true; }
+                if (stmt->type == NodeType::RETURN) { didTerminate = true; }
                 gen(stmt);
             }
             if (!didTerminate) {

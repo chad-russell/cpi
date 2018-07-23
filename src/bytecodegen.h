@@ -18,7 +18,8 @@ public:
     queue<Node *> toProcess;
     bool processFnDecls = false;
 
-    vector_t<Node *> generatedNodes = vector_init<Node *>(20);
+    vector_t<Node *> generatedNodes = vector_init<Node *>(16);
+    vector_t<Node *> externalFnTable = vector_init<Node *>(8);
 
     bool isMainFn;
 

@@ -344,7 +344,7 @@ ostream &operator<<(ostream &os, Node *node) {
 
 //             cout << node->arrayLiteralData.structLiteralRepresentation;
         } break;
-        case NodeType::RET: {
+        case NodeType::RETURN: {
             cout << "return " << node->retData.value << ";" << endl;
         } break;
         case NodeType::HEAPIFY: {

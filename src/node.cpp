@@ -157,6 +157,7 @@ void initFnDeclData(Node *node) {
     node->fnDeclData.instOffset = 0;
     node->fnDeclData.cameFromPolymorph = false;
     node->fnDeclData.isLiteral = false;
+    node->fnDeclData.isExternal = false;
     node->fnDeclData.tableIndex = 0;
 }
 
@@ -257,7 +258,7 @@ ostream &operator<<(ostream &os, NodeType type) {
         case NodeType::BOOLEAN_LITERAL: {
             return os << "boolean literal";
         }
-        case NodeType::RET: {
+        case NodeType::RETURN: {
             return os << "return";
         }
         case NodeType::IF: {

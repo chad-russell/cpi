@@ -157,7 +157,7 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "type", LexerTokenType::TYPE)) { return; }
     if (tryEatKeyword(&next, "struct", LexerTokenType::STRUCT)) { return; }
     if (tryEatKeyword(&next, "enum", LexerTokenType::ENUM)) { return; }
-    if (tryEatKeyword(&next, "return", LexerTokenType::RET)) { return; }
+    if (tryEatKeyword(&next, "return", LexerTokenType::RETURN)) { return; }
     if (tryEatKeyword(&next, "string", LexerTokenType::STRING)) { return; }
     if (tryEatKeyword(&next, "bool", LexerTokenType::BOOLEAN)) { return; }
     if (tryEatKeyword(&next, "i8", LexerTokenType::I8)) { return;}
@@ -287,6 +287,11 @@ void Lexer::popFront() {
         next.type = LexerTokenType::INT_LITERAL;
         while (isdigit(srcInfo.source->at(loc.byteIndex)) || srcInfo.source->at(loc.byteIndex) == '_') {
             eat();
+
+            if (loc.byteIndex >= srcInfo.source->size()) {
+                popFrontFinalize(0, next);
+                return;
+            }
         }
 
         if (srcInfo.source->at(loc.byteIndex) == '.') {

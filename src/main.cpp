@@ -200,6 +200,7 @@ int main(int argc, char **argv) {
             interp->instructions = gen->instructions;
             interp->fnTable = gen->fnTable;
             interp->sourceMap = gen->sourceMap;
+            interp->externalFnTable = gen->externalFnTable;
 
             instructions = gen->instructions;
             fnTable = gen->fnTable;

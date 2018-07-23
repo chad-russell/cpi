@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # MAC OS
-include_directories(/usr/local/opt/llvm@6/include)
+include_directories(/usr/local/opt/llvm@6/include /usr/include/ffi)
 set(LLVM_CONFIG_PATH "/usr/local/opt/llvm@6/bin/llvm-config")
 
 # WINDOWS
@@ -72,3 +72,5 @@ set(SOURCE_FILES
         src/container.h)
 
 add_executable(cpi ${SOURCE_FILES})
+
+target_link_libraries(cpi ffi)

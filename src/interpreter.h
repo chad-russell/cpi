@@ -53,6 +53,7 @@ template <typename T>
 void interpretCmpLte(Interpreter *interp);
 
 void interpretCalli(Interpreter *interp);
+void interpretCalle(Interpreter *interp);
 void interpretCall(Interpreter *interp);
 void interpretBumpSP(Interpreter *interp);
 void interpretReturn(Interpreter *interp);
@@ -94,6 +95,8 @@ public:
     SourceMap sourceMap;
     vector<unsigned long> breakpoints = {};
     bool continuing = false;
+
+    vector_t<Node *> externalFnTable;
 
     // used for stepping 'over' functions (as opposed to normal step which goes 'into')
     uint16_t depth = 0;
@@ -221,6 +224,7 @@ public:
             interpretJumpIf,
             interpretJump,
             interpretCalli,
+            interpretCalle,
             interpretCall,
             interpretReturn,
             interpretExit,

@@ -139,7 +139,8 @@ fn saved() {
 
 fn testPrinting() {
     e: enum {x: i32, y: bool} = { y: false };
-    printWithSpaces({ 123, "string", false, []{1, 2, 3}, {x: 3, y: &8767} , e});
+    printWithSpaces({123, "string", false, []{1, 2, 3}, {x: 3, y: &8767} , e});
+
     puts("\n\n");
 }
 
@@ -969,14 +970,12 @@ fn print( T := typeof(t) )(t: T) {
         }
     }
     else if #iskind(T, struct) {
-        fieldCount := #fieldsof(T).count;
-
         puts("{");
         #for it, i: #fieldsof(T) {
             print(it.name);
             print(": ");
             print(t[i]);
-            if i < fieldCount - 1 { puts(", "); }
+            if i < #fieldsof(T).count - 1 { puts(", "); }
         }
         puts("}");
     }

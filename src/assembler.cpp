@@ -123,6 +123,7 @@ int AssemblyLexer::getArgCount(TokenType tt) {
                || tt == TokenType::JUMP
                || tt == TokenType::CALL
                || tt == TokenType::CALLI
+               || tt == TokenType::CALLE
                || tt == TokenType::STORECONST
                || tt == TokenType::FREE
                || tt == TokenType::PUTS) {
@@ -355,6 +356,7 @@ const vector<string> AssemblyLexer::tokenTypeStrings = {
     "JUMPIF",
     "JUMP",
     "CALLI",
+    "CALLE",
     "CALL", 
     "RET", 
     "EXIT",
@@ -414,7 +416,8 @@ const vector<string> AssemblyLexer::instructionStrings = {
     "BUMPSP",
     "JUMPIF",
     "JUMP",
-    "CALLI", 
+    "CALLI",
+    "CALLE",
     "CALL", 
     "RET", 
     "EXIT",
@@ -573,6 +576,10 @@ void MnemonicPrinter::step() {
         instructionString.append(inst);
         instructionString.append(" ");
         readTypeAndInt();
+    } else if (startsWith(&inst, "CALLE")) {
+        instructionString.append(inst);
+        instructionString.append(" ");
+        instructionString.append(to_string(consume<int32_t>()));
     } else if (startsWith(&inst, "BUMPSP") || startsWith(&inst, "JUMP") || startsWith(&inst, "CALL")) {
         instructionString.append(inst);
         instructionString.append(" ");
