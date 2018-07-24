@@ -1,10 +1,4 @@
-fn string_length(s: *i8, x: i32, y: i32) i32
-fn int_deref(i: *i32) i32
-
 fn main() {
-    x: i32 = 3;
-    y: i32 = 4;
-    z := string_length(cast(*i8) "Y\0".data, x, y);
-    q := 123;
-    return z;
+    a := &3;
+    return a;
 }

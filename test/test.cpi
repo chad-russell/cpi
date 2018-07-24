@@ -40,13 +40,12 @@ fn main() {
     a11 := testStruct2();
     assert(a11 == 3);
 
-    a: i32 = 13;
-
     a12 := testNestedCall();
     assert(a12 == 3);
 
     a13 := testDerefParam();
     assert(a13 == 3);
+
     a19 := testSetter();
     assert(a19 == 3);
 
@@ -123,8 +122,11 @@ fn main() {
     testFor4();
 
     testUnion1();
+
     testBuffer();
+
     testDefault();
+
     testAnySimple1();
 
     testPrinting();
@@ -734,6 +736,8 @@ fn test23() {
     assert(3 == ^^bar.baz.qux.value);
     assert(3 == ^^baz.qux.value);
     assert(3 == ^^qux.value);
+
+    return 0;
 }
 
 fn buffer(T: Ast)(capacity: i64) {

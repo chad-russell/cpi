@@ -444,8 +444,7 @@ public:
     bool skipAllButPostStmts = false;
 
     // the offset of the storage for this node from the current base pointer
-    // todo(chad): make this 64 bits
-    int32_t localOffset = 0;
+    int64_t localOffset = 0;
 
     void *llvmLocal = nullptr;
     void *llvmData = nullptr;
@@ -479,17 +478,17 @@ vector<unsigned char> toBytes64(const T object) {
 }
 
 template<typename T>
-T bytesTo(const vector<unsigned char> &bytes, int32_t start) {
+T bytesTo(const vector<unsigned char> &bytes, int64_t start) {
     return *(reinterpret_cast<const T *>(&bytes[start]));
 }
 
 template<>
-inline int64_t bytesTo(const vector<unsigned char> &bytes, int32_t start) {
+inline int64_t bytesTo(const vector<unsigned char> &bytes, int64_t start) {
     return *(reinterpret_cast<const int64_t *>(&bytes[start]));
 }
 
 template<>
-inline int32_t bytesTo(const vector<unsigned char> &bytes, int32_t start) {
+inline int32_t bytesTo(const vector<unsigned char> &bytes, int64_t start) {
     return *(reinterpret_cast<const int32_t *>(&bytes[start]));
 }
 

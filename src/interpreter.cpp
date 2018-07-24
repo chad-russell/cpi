@@ -482,7 +482,7 @@ void interpretPanic(Interpreter *interp) {
 
 void interpretMalloc(Interpreter *interp) {
     auto numBytes = interp->read<int64_t>();
-    auto storeOffset = interp->consume<int32_t>();
+    auto storeOffset = interp->consume<int64_t>();
 
 //    cout << "allocating " << numBytes << " bytes...";
 
@@ -502,11 +502,11 @@ void interpretFree(Interpreter *interp) {
 
 // puts
 void interpretPuts(Interpreter *interp) {
-    auto offset_from_stack = interp->read<int32_t>();
-    auto ptr_to_offset = (int32_t *) ((int8_t *) interp->stack.data() + offset_from_stack);
+    auto offset_from_stack = interp->read<int64_t>();
+    auto ptr_to_offset = (int64_t *) ((int8_t *) interp->stack.data() + offset_from_stack);
     auto followed_ptr = (char *) ((int8_t *) interp->stack.data() + *ptr_to_offset);
 
-    auto ptr_to_count = (int32_t *) ((int8_t *) interp->stack.data() + offset_from_stack + 8);
+    auto ptr_to_count = (int64_t *) ((int8_t *) interp->stack.data() + offset_from_stack + 8);
     auto count = static_cast<size_t>(*ptr_to_count);
 
     fwrite(followed_ptr, sizeof(char), count, stdout);
@@ -514,9 +514,9 @@ void interpretPuts(Interpreter *interp) {
 
 // calli
 void interpretCalli(Interpreter *interp) {
-    auto fnTableIndex = interp->read<int32_t>();
+    auto fnTableIndex = interp->read<int64_t>();
     auto callIndex = *hash_get(interp->fnTable, (uint32_t) fnTableIndex);
-    interp->callIndex((int32_t) callIndex);
+    interp->callIndex(callIndex);
 }
 
 ffi_type *ffiTypeFor(Node *type) {
@@ -598,18 +598,6 @@ void interpretCalle(Interpreter *interp) {
         auto paramType = vector_at(originalFn->fnDeclData.params, i)->typeInfo;
         paramSp -= typeSize(paramType);
 
-//        if (paramType->typeData.kind == NodeTypekind::POINTER) {
-//            auto offset = interp->readFromStack<int64_t>(paramSp);
-//            auto stackPtr = (char *) &interp->stack[0];
-//            auto offset64 = (int64_t) (stackPtr + offset);
-//            auto offset64Ptr = (void *) offset64;
-//            values[i] = &offset64Ptr;
-//        }
-//        else {
-//            auto offsetPtr = &interp->stack[paramSp];
-//            values[i] = offsetPtr;
-//        }
-
         auto offsetPtr = &interp->stack[paramSp];
         values[i] = offsetPtr;
     }
@@ -625,10 +613,10 @@ void interpretCalle(Interpreter *interp) {
 
 // call
 void interpretCall(Interpreter *interp) {
-    interp->callIndex((uint32_t) interp->consume<int32_t>());
+    interp->callIndex(interp->consume<int32_t>());
 }
 
-void Interpreter::callIndex(uint32_t index) {
+void Interpreter::callIndex(int64_t index) {
     depth += 1;
 
     pcs.push_back(lastValidPc);
@@ -653,7 +641,7 @@ void interpretMathAddSI64(Interpreter *interp) {
     auto b = interp->read<int64_t>();
     auto c = interp->consume<int32_t>();
     auto result = a + b * c;
-    auto storeOffset = interp->consume<int32_t>();
+    auto storeOffset = interp->consume<int64_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }
 
@@ -666,7 +654,7 @@ void interpretBumpSP(Interpreter *interp) {
 // ret
 void interpretReturn(Interpreter *interp) {
     interp->sp = interp->bp - 8;
-    interp->pc = interp->readFromStack<int32_t>(interp->bp - 4);
+    interp->pc = (uint32_t) interp->readFromStack<int32_t>(interp->bp - 4);
     interp->bp = interp->readFromStack<int32_t>(interp->bp - 8);
 
     interp->depth -= 1;
@@ -696,9 +684,9 @@ void interpretJump(Interpreter *interp) {
 }
 
 void interpretStore(Interpreter *interp) {
-    auto storeOffset = interp->read<int32_t>();
+    auto storeOffset = interp->read<int64_t>();
 
-    auto maybeReadOffset = interp->read<int32_t>();
+    auto maybeReadOffset = interp->read<int64_t>();
     auto readOffset = maybeReadOffset;
 
     auto size = interp->consume<int32_t>();
@@ -721,7 +709,7 @@ void interpretStore(Interpreter *interp) {
 }
 
 void interpretStoreConst(Interpreter *interp) {
-    auto storeOffset = interp->read<int32_t>();
+    auto storeOffset = interp->read<int64_t>();
 
     if (storeOffset >= interp->stackSize) {
         cout << "STACK OVERFLOW!!!!" << endl;
@@ -738,12 +726,12 @@ void interpretStoreConst(Interpreter *interp) {
     } else if (inst == Instruction::CONSTI16) {
         int16_t value = interp->consume<int16_t>();
         memcpy(&interp->stack[storeOffset], &value, sizeof(int16_t));
-    } else if (inst == Instruction::CONSTI32 || inst == Instruction::RELCONSTI32) {
-        int32_t value = interp->consume<int32_t>();
-        if (inst == Instruction::RELCONSTI32) {
-            value += interp->bp;
-        }
+    } else if (inst == Instruction::CONSTI32) {
+        int64_t value = interp->consume<int32_t>();
         memcpy(&interp->stack[storeOffset], &value, sizeof(int32_t));
+    } else if (inst == Instruction::RELCONSTI64) {
+        int64_t value = interp->consume<int64_t>() + interp->bp;
+        memcpy(&interp->stack[storeOffset], &value, sizeof(int64_t));
     } else if (inst == Instruction::CONSTI64) {
         int64_t value = interp->consume<int64_t>();
         memcpy(&interp->stack[storeOffset], &value, sizeof(int64_t));

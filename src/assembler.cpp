@@ -255,7 +255,7 @@ void AssemblyLexer::popFront() {
                     newInst = toBytes(static_cast<int64_t>(parsed));
                 } break;
                 default: {
-                    newInst = toBytes32(parsed);
+                    newInst = toBytes(parsed);
                 }
             }
 
@@ -508,7 +508,7 @@ void MnemonicPrinter::step() {
             instructionString.append(" ");
             readTypeAndInt();
             instructionString.append(" ");
-            instructionString.append(to_string(consume<int32_t>()));
+            instructionString.append(to_string(consume<int64_t>()));
     } else if (inst == "ADD_S_I64") {
         instructionString.append(inst);
 
@@ -630,6 +630,8 @@ void MnemonicPrinter::readTypeAndInt()
         instructionString.append(to_string(consume<int8_t>()));
     } else if (endsWith(&instStr, "CONSTI16")) {
         instructionString.append(to_string(consume<int16_t>()));
+    } else if (endsWith(&instStr, "RELCONSTI32")) {
+        instructionString.append(to_string(consume<int64_t>()));
     } else if (endsWith(&instStr, "CONSTI32")) {
         instructionString.append(to_string(consume<int32_t>()));
     } else if (endsWith(&instStr, "CONSTI64")) {
@@ -638,7 +640,7 @@ void MnemonicPrinter::readTypeAndInt()
         || endsWith(&instStr, "I16")
         || endsWith(&instStr, "I32")
         || endsWith(&instStr, "I64")) {
-        instructionString.append(to_string(consume<int32_t>()));
+        instructionString.append(to_string(consume<int64_t>()));
     } else {
         instructionString.append("<<<ERROR>>>");
     }

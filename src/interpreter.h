@@ -235,12 +235,12 @@ public:
   }
 
     void interpret();
-    void callIndex(uint32_t index);
+    void callIndex(int64_t index);
 
     void dumpStack();
 
   template <typename T>
-  void copyToStack(T t, int32_t offset) {
+  void copyToStack(T t, int64_t offset) {
       memcpy(&stack[offset], &t, sizeof(T));
   }
 
@@ -251,7 +251,7 @@ public:
   }
 
   template <typename T>
-  inline T readFromStack(int32_t offset) {
+  inline T readFromStack(int64_t offset) {
       return bytesTo<T>(stack, offset);
   }
 
@@ -279,7 +279,7 @@ public:
           || inst == Instruction::RELI32 || inst == Instruction::RELI64
           || inst == Instruction::RELF32 || inst == Instruction::RELF64) {
           pc += 1;
-          auto consumed = consume<int32_t>();
+          auto consumed = consume<int64_t>();
           return readFromStack<T>(consumed + bp);
       }
 
@@ -333,7 +333,7 @@ void interpretMathAdd(Interpreter *interp) {
     auto a = interp->read<T>();
     auto b = interp->read<T>();
     auto result = a + b;
-    auto storeOffset = interp->consume<int32_t>();
+    auto storeOffset = interp->consume<int64_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }
 
@@ -342,7 +342,7 @@ void interpretMathSub(Interpreter *interp) {
     auto a = interp->read<T>();
     auto b = interp->read<T>();
     auto result = a - b;
-    auto storeOffset = interp->consume<int32_t>();
+    auto storeOffset = interp->consume<int64_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }
 
@@ -351,7 +351,7 @@ void interpretMathMul(Interpreter *interp) {
     auto a = interp->read<T>();
     auto b = interp->read<T>();
     auto result = a * b;
-    auto storeOffset = interp->consume<int32_t>();
+    auto storeOffset = interp->consume<int64_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }
 
@@ -360,7 +360,7 @@ void interpretMathDiv(Interpreter *interp) {
     auto a = interp->read<T>();
     auto b = interp->read<T>();
     auto result = a / b;
-    auto storeOffset = interp->consume<int32_t>();
+    auto storeOffset = interp->consume<int64_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }
 
@@ -371,7 +371,7 @@ void interpretMathMod(Interpreter *interp) {
 //    auto a = interp->read<T>();
 //    auto b = interp->read<T>();
 //    auto result = a % b;
-//    auto storeOffset = interp->consume<int32_t>();
+//    auto storeOffset = interp->consume<int64_t>();
 //    interp->copyToStack(result, interp->bp + storeOffset);
 }
 
@@ -381,7 +381,7 @@ void interpretMathBitwiseOr(Interpreter *interp) {
     auto a = interp->readBits<bits, T>();
     auto b = interp->readBits<bits, T>();
     auto result = a | b;
-    auto storeOffset = interp->consume<int32_t>();
+    auto storeOffset = interp->consume<int64_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }
 
@@ -390,7 +390,7 @@ void interpretMathBitwiseAnd(Interpreter *interp) {
     auto a = interp->readBits<bits, T>();
     auto b = interp->readBits<bits, T>();
     auto result = a & b;
-    auto storeOffset = interp->consume<int32_t>();
+    auto storeOffset = interp->consume<int64_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }
 
@@ -399,7 +399,7 @@ void interpretMathBitwiseXor(Interpreter *interp) {
     auto a = interp->readBits<bits, T>();
     auto b = interp->readBits<bits, T>();
     auto result = a ^ b;
-    auto storeOffset = interp->consume<int32_t>();
+    auto storeOffset = interp->consume<int64_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }
 
@@ -409,7 +409,7 @@ void interpretCmpEq(Interpreter *interp) {
     auto a = interp->read<T>();
     auto b = interp->read<T>();
     int32_t result = a == b ? 1 : 0;
-    auto storeOffset = interp->consume<int32_t>();
+    auto storeOffset = interp->consume<int64_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }
 
@@ -418,7 +418,7 @@ void interpretCmpNeq(Interpreter *interp) {
     auto a = interp->read<T>();
     auto b = interp->read<T>();
     int32_t result = a != b ? 1 : 0;
-    auto storeOffset = interp->consume<int32_t>();
+    auto storeOffset = interp->consume<int64_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }
 
@@ -427,7 +427,7 @@ void interpretCmpGt(Interpreter *interp) {
     auto a = interp->read<T>();
     auto b = interp->read<T>();
     int32_t result = a > b ? 1 : 0;
-    auto storeOffset = interp->consume<int32_t>();
+    auto storeOffset = interp->consume<int64_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }
 
@@ -436,7 +436,7 @@ void interpretCmpGte(Interpreter *interp) {
     auto a = interp->read<T>();
     auto b = interp->read<T>();
     int32_t result = a >= b ? 1 : 0;
-    auto storeOffset = interp->consume<int32_t>();
+    auto storeOffset = interp->consume<int64_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }
 
@@ -445,7 +445,7 @@ void interpretCmpLt(Interpreter *interp) {
     auto a = interp->read<T>();
     auto b = interp->read<T>();
     int32_t result = a < b ? 1 : 0;
-    auto storeOffset = interp->consume<int32_t>();
+    auto storeOffset = interp->consume<int64_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }
 
@@ -454,7 +454,7 @@ void interpretCmpLte(Interpreter *interp) {
     auto a = interp->read<T>();
     auto b = interp->read<T>();
     int32_t result = a <= b ? 1 : 0;
-    auto storeOffset = interp->consume<int32_t>();
+    auto storeOffset = interp->consume<int64_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }
 

@@ -32,7 +32,7 @@ public:
     void gen(Node *node);
     void fixup();
 
-    void storeValue(Node *node, int32_t offset);
+    void storeValue(Node *node, int64_t offset);
 
     BytecodeGen();
 };

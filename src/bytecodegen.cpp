@@ -91,8 +91,8 @@ void BytecodeGen::binopHelper(string instructionStr, Node *node, int32_t scale) 
         append(instructions, toBytes32(scale));
     }
 
-    append(instructions, toBytes32(node->localOffset));
-    append(node->bytecode, toBytes32(node->localOffset));
+    append(instructions, toBytes(node->localOffset));
+    append(node->bytecode, toBytes(node->localOffset));
 }
 
 void BytecodeGen::gen(Node *node) {
@@ -262,7 +262,7 @@ void BytecodeGen::gen(Node *node) {
 
             auto resolvedDecl = resolve(data.lhs);
             if (resolvedDecl->type == NodeType::DECL) {
-                auto localOffset = static_cast<int32_t>(resolvedDecl->localOffset);
+                auto localOffset = static_cast<int64_t>(resolvedDecl->localOffset);
                 storeValue(data.rhs, localOffset);
             } else if (resolvedDecl->type == NodeType::DEREF) {
                 gen(data.lhs);
@@ -270,14 +270,14 @@ void BytecodeGen::gen(Node *node) {
                 // store rvalue into it's slot
                 storeValue(data.rhs, data.rhs->localOffset);
 
-                auto localOffset = static_cast<int32_t>(resolve(resolvedDecl->derefData.target)->localOffset);
+                auto localOffset = static_cast<int64_t>(resolve(resolvedDecl->derefData.target)->localOffset);
 
                 append(instructions, Instruction::STORE);
 
-                append(instructions, Instruction::RELI32);
+                append(instructions, Instruction::RELI64);
                 append(instructions, toBytes(localOffset));
 
-                append(instructions, Instruction::RELCONSTI32);
+                append(instructions, Instruction::RELCONSTI64);
                 append(instructions, toBytes(data.rhs->localOffset));
 
                 cpi_assert(resolvedDecl->derefData.target->typeInfo->typeData.kind == NodeTypekind::POINTER);
@@ -291,15 +291,15 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, Instruction::STORE);
 
                 if (resolvedDecl->dotData.pointerIsRelative) {
-                    append(instructions, Instruction::RELI32);
+                    append(instructions, Instruction::RELI64);
                     append(instructions, toBytes(resolvedDecl->localOffset));
                 } else {
-                    append(instructions, Instruction::RELCONSTI32);
+                    append(instructions, Instruction::RELCONSTI64);
                     append(instructions, toBytes(resolvedDecl->localOffset));
                 }
 
-                append(instructions, Instruction::RELCONSTI32);
-                append(instructions, toBytes32(data.rhs->localOffset));
+                append(instructions, Instruction::RELCONSTI64);
+                append(instructions, toBytes(data.rhs->localOffset));
 
                 append(instructions, toBytes32(typeSize(resolvedDecl->typeInfo)));
             } else {
@@ -319,34 +319,34 @@ void BytecodeGen::gen(Node *node) {
                         append(node->bytecode, toBytes32(resolved->fnDeclData.tableIndex));
                     } else {
                         cpi_assert(resolved->type == NodeType::DECL || resolved->type == NodeType::DECL_PARAM);
-                        append(node->bytecode, Instruction::RELI32);
-                        append(node->bytecode, toBytes32(localOffset));
+                        append(node->bytecode, Instruction::RELI64);
+                        append(node->bytecode, toBytes(localOffset));
                     }
                 } break;
                 case NodeTypekind::I8: {
                     append(node->bytecode, Instruction::RELI8);
-                    append(node->bytecode, toBytes32(localOffset));
+                    append(node->bytecode, toBytes(localOffset));
                 } break;
                 case NodeTypekind::BOOLEAN_LITERAL:
                 case NodeTypekind::BOOLEAN:
                 case NodeTypekind::I32: {
-                    append(node->bytecode, Instruction::RELI32);
-                    append(node->bytecode, toBytes32(localOffset));
+                    append(node->bytecode, Instruction::RELI64);
+                    append(node->bytecode, toBytes(localOffset));
                 } break;
                 case NodeTypekind::POINTER:
                 case NodeTypekind::INT_LITERAL:
                 case NodeTypekind::I64: {
                     append(node->bytecode, Instruction::RELI64);
-                    append(node->bytecode, toBytes32(localOffset));
+                    append(node->bytecode, toBytes(localOffset));
                 } break;
                 case NodeTypekind::FLOAT_LITERAL:
                 case NodeTypekind::F32: {
                     append(node->bytecode, Instruction::RELF32);
-                    append(node->bytecode, toBytes32(localOffset));
+                    append(node->bytecode, toBytes(localOffset));
                 } break;
                 case NodeTypekind::F64: {
                     append(node->bytecode, Instruction::RELF64);
-                    append(node->bytecode, toBytes32(localOffset));
+                    append(node->bytecode, toBytes(localOffset));
                 } break;
                 case NodeTypekind::NONE:
                 case NodeTypekind::STRUCT: {
@@ -362,12 +362,12 @@ void BytecodeGen::gen(Node *node) {
             if (node->binopData.type == LexerTokenType::AND) {
                 // a and b ====> { result := false; if a { if b { result = true; } }
 
-                append(node->bytecode, Instruction::RELI32);
+                append(node->bytecode, Instruction::RELI64);
                 append(node->bytecode, toBytes(node->localOffset));
 
                 // initially store false
                 append(instructions, Instruction::STORECONST);
-                append(instructions, Instruction::RELCONSTI32);
+                append(instructions, Instruction::RELCONSTI64);
                 append(instructions, toBytes(node->localOffset));
                 append(instructions, Instruction::CONSTI32);
                 append(instructions, toBytes32((int32_t) 0));
@@ -408,7 +408,7 @@ void BytecodeGen::gen(Node *node) {
 
                     // set to true
                     append(instructions, Instruction::STORECONST);
-                    append(instructions, Instruction::RELCONSTI32);
+                    append(instructions, Instruction::RELCONSTI64);
                     append(instructions, toBytes(node->localOffset));
                     append(instructions, Instruction::CONSTI32);
                     append(instructions, toBytes32((int32_t) 1));
@@ -430,12 +430,12 @@ void BytecodeGen::gen(Node *node) {
             } else if (node->binopData.type == LexerTokenType::OR) {
                 // a or b ====> { result := false; if a { result = true; } else if b { result = true; } }
 
-                append(node->bytecode, Instruction::RELI32);
+                append(node->bytecode, Instruction::RELI64);
                 append(node->bytecode, toBytes(node->localOffset));
 
                 // initially store true
                 append(instructions, Instruction::STORECONST);
-                append(instructions, Instruction::RELCONSTI32);
+                append(instructions, Instruction::RELCONSTI64);
                 append(instructions, toBytes(node->localOffset));
                 append(instructions, Instruction::CONSTI32);
                 append(instructions, toBytes32((int32_t) 0));
@@ -458,7 +458,7 @@ void BytecodeGen::gen(Node *node) {
 
                 // store true
                 append(instructions, Instruction::STORECONST);
-                append(instructions, Instruction::RELCONSTI32);
+                append(instructions, Instruction::RELCONSTI64);
                 append(instructions, toBytes(node->localOffset));
                 append(instructions, Instruction::CONSTI32);
                 append(instructions, toBytes32((int32_t) 1));
@@ -491,7 +491,7 @@ void BytecodeGen::gen(Node *node) {
 
                     // store true
                     append(instructions, Instruction::STORECONST);
-                    append(instructions, Instruction::RELCONSTI32);
+                    append(instructions, Instruction::RELCONSTI64);
                     append(instructions, toBytes(node->localOffset));
                     append(instructions, Instruction::CONSTI32);
                     append(instructions, toBytes32((int32_t) 1));
@@ -633,16 +633,16 @@ void BytecodeGen::gen(Node *node) {
                 }
             } else if (resolvedFn->type == NodeType::DECL) {
                 append(instructions, Instruction::CALLI);
-                append(instructions, Instruction::RELI32);
-                append(instructions, toBytes32(resolvedFn->localOffset));
+                append(instructions, Instruction::RELI64);
+                append(instructions, toBytes(resolvedFn->localOffset));
             } else if (resolvedFn->type == NodeType::DEREF) {
                 append(instructions, Instruction::CALLI);
-                append(instructions, Instruction::RELI32);
-                append(instructions, toBytes32(node->fnCallData.fn->localOffset));
+                append(instructions, Instruction::RELI64);
+                append(instructions, toBytes(node->fnCallData.fn->localOffset));
             } else if (resolvedFn->type == NodeType::DOT) {
                 cpi_assert(resolvedFn->isLocal || resolvedFn->isBytecodeLocal);
                 append(instructions, Instruction::CALLI);
-                append(instructions, Instruction::RELI32);
+                append(instructions, Instruction::RELI64);
                 append(instructions, toBytes(resolvedFn->localOffset));
             } else {
                 append(instructions, Instruction::CALLI);
@@ -658,21 +658,21 @@ void BytecodeGen::gen(Node *node) {
             auto returnTypeSize = typeSize(resolvedFn->typeInfo->typeData.fnTypeData.returnType);
             if (returnTypeSize > 0) {
                 append(instructions, Instruction::STORE);
-                append(instructions, Instruction::RELCONSTI32);
-                append(instructions, toBytes32(node->localOffset));
-                append(instructions, Instruction::RELCONSTI32);
-                append(instructions, toBytes32(currentFnStackSize + totalParamsSize + 8));
+                append(instructions, Instruction::RELCONSTI64);
+                append(instructions, toBytes(node->localOffset));
+                append(instructions, Instruction::RELCONSTI64);
+                append(instructions, toBytes(currentFnStackSize + totalParamsSize + 8));
                 append(instructions, toBytes32(returnTypeSize));
             }
 
-            append(node->bytecode, Instruction::RELI32);
-            append(node->bytecode, toBytes32(node->localOffset));
+            append(node->bytecode, Instruction::RELI64);
+            append(node->bytecode, toBytes(node->localOffset));
 
             toProcess.push(resolvedFn);
         } break;
         case NodeType::DECL_PARAM: {
-            append(node->bytecode, Instruction::RELI32);
-            append(node->bytecode, toBytes32(node->localOffset));
+            append(node->bytecode, Instruction::RELI64);
+            append(node->bytecode, toBytes(node->localOffset));
         } break;
         case NodeType::DEREF: {
             gen(node->derefData.target);
@@ -681,9 +681,9 @@ void BytecodeGen::gen(Node *node) {
 
             if (node->isLocal || node->isBytecodeLocal) {
                 append(instructions, Instruction::STORE);
-                append(instructions, Instruction::RELCONSTI32);
+                append(instructions, Instruction::RELCONSTI64);
                 append(instructions, toBytes(node->localOffset));
-                append(instructions, Instruction::RELI32);
+                append(instructions, Instruction::RELI64);
                 append(instructions, toBytes(node->derefData.target->localOffset));
                 append(instructions, toBytes(typeSize(node->typeInfo)));
             }
@@ -696,14 +696,14 @@ void BytecodeGen::gen(Node *node) {
                 storeValue(node->nodeData, node->nodeData->localOffset);
             }
 
-            append(node->bytecode, Instruction::RELCONSTI32);
+            append(node->bytecode, Instruction::RELCONSTI64);
             append(node->bytecode, toBytes(node->nodeData->localOffset));
 
             if (node->isLocal || node->isBytecodeLocal) {
                 append(instructions, Instruction::STORECONST);
-                append(instructions, Instruction::RELCONSTI32);
+                append(instructions, Instruction::RELCONSTI64);
                 append(instructions, toBytes(node->localOffset));
-                append(instructions, Instruction::RELCONSTI32);
+                append(instructions, Instruction::RELCONSTI64);
                 append(instructions, toBytes(node->nodeData->localOffset));
             }
         } break;
@@ -732,17 +732,17 @@ void BytecodeGen::gen(Node *node) {
             for (auto i = 0; i < pointerCount - 1; i++) {
                 append(instructions, Instruction::STORE);
 
-                append(instructions, Instruction::RELCONSTI32);
+                append(instructions, Instruction::RELCONSTI64);
                 append(instructions, toBytes(node->dotData.autoDerefStorage->localOffset));
 
-                append(instructions, Instruction::RELI32);
+                append(instructions, Instruction::RELI64);
                 if (i == 0) {
-                    append(instructions, toBytes32(node->dotData.lhs->localOffset));
+                    append(instructions, toBytes(node->dotData.lhs->localOffset));
                 } else {
-                    append(instructions, toBytes32(node->dotData.autoDerefStorage->localOffset));
+                    append(instructions, toBytes(node->dotData.autoDerefStorage->localOffset));
                 }
 
-                append(instructions, toBytes32(4));
+                append(instructions, toBytes32(8));
             }
 
             // dot is one of the few places where we actually *set* the node->localOffset, instead of just storing to it.
@@ -762,24 +762,24 @@ void BytecodeGen::gen(Node *node) {
 
                 append(instructions, Instruction::STORE);
 
-                append(instructions, Instruction::RELCONSTI32);
+                append(instructions, Instruction::RELCONSTI64);
                 append(instructions, toBytes(hijackedOffsetLocation));
 
-                append(instructions, Instruction::RELI32);
+                append(instructions, Instruction::RELI64);
                 append(instructions, toBytes(hijackedOffsetLocation));
 
-                append(instructions, toBytes32(4));
+                append(instructions, toBytes32(8));
             }
 
             if (node->dotData.autoDerefStorage) {
                 node->dotData.pointerIsRelative = true;
 
-                append(instructions, Instruction::ADDI32);
+                append(instructions, Instruction::ADDI64);
 
-                append(instructions, Instruction::RELI32);
+                append(instructions, Instruction::RELI64);
                 append(instructions, toBytes(hijackedOffsetLocation));
 
-                append(instructions, Instruction::CONSTI32);
+                append(instructions, Instruction::CONSTI64);
                 append(instructions, toBytes(offsetWords));
 
                 append(instructions, toBytes(node->dotData.autoDerefStorage->localOffset));
@@ -789,12 +789,12 @@ void BytecodeGen::gen(Node *node) {
             } else if (lhsRel) {
                 node->dotData.pointerIsRelative = true;
 
-                append(instructions, Instruction::ADDI32);
+                append(instructions, Instruction::ADDI64);
 
-                append(instructions, Instruction::RELI32);
+                append(instructions, Instruction::RELI64);
                 append(instructions, toBytes(hijackedOffsetLocation));
 
-                append(instructions, Instruction::CONSTI32);
+                append(instructions, Instruction::CONSTI64);
                 append(instructions, toBytes(offsetWords));
 
                 append(instructions, toBytes(hijackedOffsetLocation));
@@ -822,7 +822,7 @@ void BytecodeGen::gen(Node *node) {
             if (node->ifData.condition->isLocal || node->ifData.condition->isBytecodeLocal) {
                 cpi_assert(node->ifData.condition->isLocal || node->ifData.condition->isBytecodeLocal);
 
-                append(instructions, Instruction::RELI32);
+                append(instructions, Instruction::RELI64);
                 append(instructions, toBytes(node->ifData.condition->localOffset));
             }
             else {
@@ -924,7 +924,7 @@ void BytecodeGen::gen(Node *node) {
                 storeValue(node->nodeData, node->nodeData->localOffset);
                 append(instructions, Instruction::FREE);
                 append(instructions, Instruction::RELI64);
-                append(instructions, toBytes32(node->nodeData->localOffset));
+                append(instructions, toBytes(node->nodeData->localOffset));
             }
             else {
                 cpi_assert(!node->nodeData->bytecode.empty());
@@ -972,16 +972,16 @@ void BytecodeGen::gen(Node *node) {
             // store into the value pointed to by our local offset the value in nodeData
             append(instructions, Instruction::STORE);
 
-            append(instructions, Instruction::RELI32);
+            append(instructions, Instruction::RELI64);
             append(instructions, toBytes(node->localOffset));
 
-            append(instructions, Instruction::RELCONSTI32);
+            append(instructions, Instruction::RELCONSTI64);
             append(instructions, toBytes(node->nodeData->localOffset));
 
             append(instructions, toBytes32(sizeInBytes));
 
             append(node->bytecode, Instruction::RELCONSTI64);
-            append(node->bytecode, toBytes32(node->localOffset));
+            append(node->bytecode, toBytes(node->localOffset));
         } break;
         case NodeType::PUTS: {
             gen(node->nodeData);
@@ -989,8 +989,8 @@ void BytecodeGen::gen(Node *node) {
             cpi_assert(node->nodeData->isLocal || node->nodeData->isBytecodeLocal);
             storeValue(node->nodeData, node->nodeData->localOffset);
             append(instructions, Instruction::PUTS);
-            append(instructions, Instruction::RELCONSTI32);
-            append(instructions, toBytes32(node->nodeData->localOffset));
+            append(instructions, Instruction::RELCONSTI64);
+            append(instructions, toBytes(node->nodeData->localOffset));
         } break;
         case NodeType::FIELDSOF: {
             gen(node->resolved);
@@ -1035,14 +1035,14 @@ void BytecodeGen::fixup() {
 }
 
 // todo(chad): If this supported a non-constant offest (i.e. runtime offset), then a lot of the 'store rvalue into slot' stuff could go away
-void BytecodeGen::storeValue(Node *node, int32_t offset) {
+void BytecodeGen::storeValue(Node *node, int64_t offset) {
     node = resolve(node);
 
     switch (node->type) {
         case NodeType::BOOLEAN_LITERAL: {
             append(instructions, Instruction::STORECONST);
 
-            append(instructions, Instruction::RELCONSTI32);
+            append(instructions, Instruction::RELCONSTI64);
             append(instructions, toBytes(offset));
 
             append(instructions, node->bytecode);
@@ -1051,7 +1051,7 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
         case NodeType::SIZEOF: {
             append(instructions, Instruction::STORECONST);
 
-            append(instructions, Instruction::RELCONSTI32);
+            append(instructions, Instruction::RELCONSTI64);
             append(instructions, toBytes(offset));
 
             append(instructions, node->bytecode);
@@ -1059,7 +1059,7 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
         case NodeType::NIL_LITERAL: {
             append(instructions, Instruction::STORECONST);
 
-            append(instructions, Instruction::RELCONSTI32);
+            append(instructions, Instruction::RELCONSTI64);
             append(instructions, toBytes(offset));
 
             append(instructions, node->bytecode);
@@ -1067,7 +1067,7 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
         case NodeType::FLOAT_LITERAL: {
             append(instructions, Instruction::STORECONST);
 
-            append(instructions, Instruction::RELCONSTI32);
+            append(instructions, Instruction::RELCONSTI64);
             append(instructions, toBytes(offset));
 
             append(instructions, node->bytecode);
@@ -1075,7 +1075,7 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
         case NodeType::FN_DECL: {
             append(instructions, Instruction::STORECONST);
 
-            append(instructions, Instruction::RELCONSTI32);
+            append(instructions, Instruction::RELCONSTI64);
             append(instructions, toBytes(offset));
 
             append(instructions, Instruction::CONSTI32);
@@ -1084,19 +1084,19 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
         case NodeType::ADDRESS_OF: {
             append(instructions, Instruction::STORECONST);
 
-            append(instructions, Instruction::RELCONSTI32);
+            append(instructions, Instruction::RELCONSTI64);
             append(instructions, toBytes(offset));
 
-            append(instructions, Instruction::RELCONSTI32);
+            append(instructions, Instruction::RELCONSTI64);
             append(instructions, toBytes(node->nodeData->localOffset));
         } break;
         case NodeType::DEREF: {
             append(instructions, Instruction::STORE);
 
-            append(instructions, Instruction::RELCONSTI32);
+            append(instructions, Instruction::RELCONSTI64);
             append(instructions, toBytes(offset));
 
-            append(instructions, Instruction::RELI32);
+            append(instructions, Instruction::RELI64);
             auto resolvedDeref = resolve(node->derefData.target);
             append(instructions, toBytes(resolvedDeref->localOffset));
 
@@ -1108,26 +1108,26 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
         case NodeType::DECL: {
             append(instructions, Instruction::STORE);
 
-            append(instructions, Instruction::RELCONSTI32);
+            append(instructions, Instruction::RELCONSTI64);
             append(instructions, toBytes(offset));
 
-            append(instructions, Instruction::RELCONSTI32);
+            append(instructions, Instruction::RELCONSTI64);
             append(instructions, toBytes(node->localOffset));
 
-            append(instructions, toBytes(typeSize(node->typeInfo)));
+            append(instructions, toBytes32(typeSize(node->typeInfo)));
         } break;
         case NodeType::DOT: {
             gen(node);
 
             append(instructions, Instruction::STORE);
-            append(instructions, Instruction::RELCONSTI32);
-            append(instructions, toBytes32(offset));
+            append(instructions, Instruction::RELCONSTI64);
+            append(instructions, toBytes(offset));
 
             if (node->dotData.pointerIsRelative) {
-                append(instructions, Instruction::RELI32);
+                append(instructions, Instruction::RELI64);
                 append(instructions, toBytes(node->localOffset));
             } else {
-                append(instructions, Instruction::RELCONSTI32);
+                append(instructions, Instruction::RELCONSTI64);
                 append(instructions, toBytes(node->localOffset));
             }
 
@@ -1189,10 +1189,10 @@ void BytecodeGen::storeValue(Node *node, int32_t offset) {
         case NodeType::HEAPIFY: {
             append(instructions, Instruction::STORE);
 
-            append(instructions, Instruction::RELCONSTI32);
-            append(instructions, toBytes32(offset));
+            append(instructions, Instruction::RELCONSTI64);
+            append(instructions, toBytes(offset));
 
-            append(instructions, Instruction::RELCONSTI32);
+            append(instructions, Instruction::RELCONSTI64);
             append(instructions, toBytes(node->localOffset));
 
             // the size is the size of a pointer -- or 8 bytes
