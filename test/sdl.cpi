@@ -1,0 +1,111 @@
+fn SDL_Init(flags: i32) i32
+fn SDL_CreateWindow(name: *i8, x: i32, y: i32, w: i32, h: i32, flags: i32) *none
+fn SDL_CreateRenderer(window: *none, index: i32, flags: i32) *none
+fn SDL_RenderSetLogicalSize(renderer: *none, width: i32, height: i32) none
+fn SDL_SetRenderDrawColor(renderer: *none, r: i8, g: i8, b: i8, a: i8) none
+fn SDL_PollEvent(event: *SDL_KeyboardEvent) i32
+fn SDL_RenderClear(renderer: *none) none
+fn SDL_RenderFillRect(renderer: *none, playerPos: *SDL_Rect) none
+fn SDL_RenderPresent(renderer: *none) none
+
+type SDL_Rect struct {
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32
+}
+
+type SDL_KeyboardEvent struct {
+    _type: i32,
+    timetamp: i32,
+    windowId: i32,
+    state: i8,
+    repeat: i8,
+    padding2: i8,
+    padding3: i8,
+    keysym: SDL_Keysym
+}
+
+type SDL_Keysym struct {
+    scancode: i32,
+    sym: i32,
+    mod1: i8,
+    mod2: i8,
+    unused: i32
+}
+
+fn main() {
+    SDL_INIT_EVERYTHING: i32 = 29233;
+    SDL_QUIT: i32 = 256;
+    SDL_KEYDOWN: i32 = 768;
+    SDLK_RIGHT: i32 = 1073741903;
+    SDLK_LEFT: i32 = 1073741904;
+    SDLK_UP: i32 = 1073741906;
+    SDLK_DOWN: i32 = 1073741905;
+
+    playerPos: SDL_Rect;
+
+    winX: i32 = 100;
+    winY: i32 = 200;
+    sizeX: i32 = 300;
+    sizeY: i32 = 400;
+    winFlags: i32 = 0;
+
+    h := cast(*i8) malloc(4 * sizeof(i8));
+
+    SDL_Init(SDL_INIT_EVERYTHING);
+    window := SDL_CreateWindow(h, winX, winY, sizeX, sizeY, winFlags);
+    renderer := SDL_CreateRenderer(window, cast(i32) -1, cast(i32) 0);
+}
+
+fn id( T := typeof(t) )(t: T) {
+    return t;
+}
+
+fn saved() {
+    renderer := SDL_CreateRenderer(window, cast(i32) -1, cast(i32) 0);
+
+    SDL_RenderSetLogicalSize(renderer, sizeX, sizeY);
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+
+    playerPos.x = 20;
+    playerPos.y = 20;
+    playerPos.w = 50;
+    playerPos.h = 20;
+
+    event: SDL_KeyboardEvent;
+
+    loop := true;
+    while loop
+    {
+        pe := SDL_PollEvent(&event);
+        while pe != 0
+        {
+            if event._type == SDL_QUIT {
+                puts("bye bye\n");
+                loop = false;
+            }
+            else if event._type == SDL_KEYDOWN
+            {
+                if event.keysym.sym == SDLK_RIGHT {
+                    playerPos.x = playerPos.x + 10;
+                }
+                else if event.keysym.sym == SDLK_LEFT {
+                    playerPos.x = playerPos.x - 10;
+                }
+                else if event.keysym.sym == SDLK_UP {
+                    playerPos.y = playerPos.y - 10;
+                }
+                else if event.keysym.sym == SDLK_DOWN {
+                    playerPos.y = playerPos.y + 10;
+                }
+            }
+
+            SDL_RenderClear(renderer);
+            SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
+            SDL_RenderFillRect(renderer, &playerPos);
+            SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+            SDL_RenderPresent(renderer);
+        }
+    }
+}
