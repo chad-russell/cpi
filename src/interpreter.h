@@ -291,6 +291,15 @@ public:
           return consume<T>();
       }
 
+      if (inst == Instruction::I64) {
+          pc += 1;
+          auto consumed = consume<int64_t>();
+          auto read = readFromStack<int64_t>(consumed + bp);
+          auto stackData = (int64_t) stack.data();
+          auto offsetRead = read - stackData;
+          return offsetRead;
+      }
+
       cpi_assert(false && "unrecognized inst for read<T>");
       return {};
   }

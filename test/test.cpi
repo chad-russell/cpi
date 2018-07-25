@@ -67,6 +67,8 @@ fn main() {
     a15 := testDoubleDeref();
     assert(a15 == 3);
 
+    testArray1();
+
     a16 := more_struct();
     assert(a16 == 3);
 
@@ -134,9 +136,12 @@ fn main() {
     assert({1, 2, 3}[id(1)] == 2);
 
     return 0;
+
+    return 0;
 }
 
 fn saved() {
+
 }
 
 fn testPrinting() {
@@ -602,13 +607,13 @@ fn fib(n: i32) i32 {
 fn testStruct1() {
 	f: S;
 	f.y = 3;
-	return ^^&&(f.y);
+	return f.y;
 }
 
 fn testStruct2() {
 	f: S;
 	f.y = 3;
-	return f.y;
+	return ^^&&(f.y);
 }
 
 fn bad() i64 { return 999; }

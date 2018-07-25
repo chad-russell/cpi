@@ -487,9 +487,9 @@ void interpretMalloc(Interpreter *interp) {
 //    cout << "allocating " << numBytes << " bytes...";
 
     auto allocated = malloc(static_cast<size_t>(numBytes));
-    auto offset_from_stack = static_cast<int64_t>((int8_t *) allocated - (int8_t *) interp->stack.data());
+//    auto offset_from_stack = static_cast<int64_t>((int8_t *) allocated - (int8_t *) interp->stack.data());
 //    cout << " offset -- " << offset_from_stack << " ...";
-    interp->copyToStack(offset_from_stack, interp->bp + storeOffset);
+    interp->copyToStack((int64_t) allocated, interp->bp + storeOffset);
 
 //    cout << " done!" << endl;
 }
@@ -503,8 +503,8 @@ void interpretFree(Interpreter *interp) {
 // puts
 void interpretPuts(Interpreter *interp) {
     auto offset_from_stack = interp->read<int64_t>();
-    auto ptr_to_offset = (int64_t *) ((int8_t *) interp->stack.data() + offset_from_stack);
-    auto followed_ptr = (char *) ((int8_t *) interp->stack.data() + *ptr_to_offset);
+    auto ptr_to_offset = (int64_t *) (interp->stack.data() + offset_from_stack);
+    auto followed_ptr = (char *) *ptr_to_offset;
 
     auto ptr_to_count = (int64_t *) ((int8_t *) interp->stack.data() + offset_from_stack + 8);
     auto count = static_cast<size_t>(*ptr_to_count);
@@ -686,35 +686,18 @@ void interpretJump(Interpreter *interp) {
 void interpretStore(Interpreter *interp) {
     auto storeOffset = interp->read<int64_t>();
 
-    auto maybeReadOffset = interp->read<int64_t>();
-    auto readOffset = maybeReadOffset;
+    auto readOffset = interp->read<int64_t>();
 
     auto size = interp->consume<int32_t>();
 
     auto to = &interp->stack[storeOffset];
     auto from = &interp->stack[readOffset];
-    memcpy(to, from, static_cast<size_t>(size));
 
-//    if (size == 4) {
-//        auto debugValue = *((int32_t *) (&interp->stack[storeOffset]));
-//        cout << "stored " << debugValue << " to " << storeOffset << " (from " << readOffset << ")" << endl;
-//    }
-//    else if (size == 8) {
-//        auto debugValue = *((int64_t *) (&interp->stack[storeOffset]));
-//        cout << "stored " << debugValue << " to " << storeOffset << " (from " << readOffset << ")" << endl;
-//    }
-//    else {
-//        cout << "stored something";
-//    }
+    memcpy(to, from, static_cast<size_t>(size));
 }
 
 void interpretStoreConst(Interpreter *interp) {
     auto storeOffset = interp->read<int64_t>();
-
-    if (storeOffset >= interp->stackSize) {
-        cout << "STACK OVERFLOW!!!!" << endl;
-        exit(1);
-    }
 
     auto inst = static_cast<Instruction>(interp->instructions[interp->pc]);
     auto instStr = AssemblyLexer::instructionStrings[interp->instructions[interp->pc]];
@@ -731,6 +714,9 @@ void interpretStoreConst(Interpreter *interp) {
         memcpy(&interp->stack[storeOffset], &value, sizeof(int32_t));
     } else if (inst == Instruction::RELCONSTI64) {
         int64_t value = interp->consume<int64_t>() + interp->bp;
+        memcpy(&interp->stack[storeOffset], &value, sizeof(int64_t));
+    } else if (inst == Instruction::RELI64) {
+        int64_t value = interp->consume<int64_t>() + interp->bp + (int64_t) interp->stack.data();
         memcpy(&interp->stack[storeOffset], &value, sizeof(int64_t));
     } else if (inst == Instruction::CONSTI64) {
         int64_t value = interp->consume<int64_t>();

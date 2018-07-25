@@ -522,7 +522,7 @@ void MnemonicPrinter::step() {
         instructionString.append(to_string(consume<int32_t>()));
 
         instructionString.append(" ");
-        instructionString.append(to_string(consume<int32_t>()));
+        instructionString.append(to_string(consume<int64_t>()));
     } else if (startsWith(&inst, "ADDF")
         || startsWith(&inst, "SUBF")
         || startsWith(&inst, "MULF")
@@ -590,7 +590,7 @@ void MnemonicPrinter::step() {
         instructionString.append(" ");
         readTypeAndInt();
         instructionString.append(" ");
-        auto storageOffset = consume<int32_t>();
+        auto storageOffset = consume<int64_t>();
         instructionString.append(to_string(storageOffset));
     } else if (startsWith(&inst, "FREE") || startsWith(&inst, "PUTS")) {
         instructionString.append(inst);

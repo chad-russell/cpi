@@ -309,7 +309,7 @@ int main(int argc, char **argv) {
                 cout << "(f64) " << interp->readFromStack<double>(0) << endl;
             } break;
             default: {
-                cout << "(other) " << interp->readFromStack<int32_t>(0) << endl;
+                cout << "(other) " << interp->readFromStack<int64_t>(0) << endl;
             }
         }
     }
