@@ -4,3 +4,4 @@ build/*
 *.o
 test/*.dylib
 cmake-build-debug/*
+cmake-build-release/*

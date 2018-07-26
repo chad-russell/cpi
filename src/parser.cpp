@@ -70,23 +70,34 @@ void Parser::parseRoot() {
 }
 
 Node *Parser::parseTopLevel() {
-        // comment
-        while (lexer->front.type == LexerTokenType::COMMENT) {
-            popFront();
-        }
+    // comment
+    while (lexer->front.type == LexerTokenType::COMMENT) {
+        popFront();
+    }
 
-        // fn decl
-        if (lexer->front.type == LexerTokenType::FN) {
-            return parseFnDecl();
-        }
+    // fn decl
+    if (lexer->front.type == LexerTokenType::FN) {
+        return parseFnDecl();
+    }
 
-        // type definition
-        if (lexer->front.type == LexerTokenType::TYPE) {
-            return parseTypeDecl();
-        }
+    // type definition
+    if (lexer->front.type == LexerTokenType::TYPE) {
+        return parseTypeDecl();
+    }
 
-        reportError("Expected top level declaration");
-        exit(1);
+    // module declaration
+    if (lexer->front.type == LexerTokenType::MODULE) {
+        return parseModuleDecl();
+    }
+
+    // declaration/assignment combo
+    auto declAss = parseScopedStmt();
+    if (declAss != nullptr && declAss->type == NodeType::DECL && declAss->declData.isConstant) {
+        return declAss;
+    }
+
+    reportError("Expected top level declaration");
+    exit(1);
 }
 
 vector_t<Node *> Parser::parseDeclParams() {
@@ -283,6 +294,32 @@ Node *Parser::parseTypeDecl() {
     return typeDecl;
 }
 
+Node *Parser::parseModuleDecl() {
+    auto saved = lexer->front.region.start;
+
+    expect(LexerTokenType::MODULE, "module");
+
+    auto moduleDecl = new Node(lexer->srcInfo, NodeType::MODULE, scopes.top());
+    moduleDecl->moduleData.name = parseSymbol();
+    scopeInsert(moduleDecl->moduleData.name->symbolData.atomId, moduleDecl);
+
+    scopes.push(new Scope(scopes.top()));
+    moduleDecl->scope = scopes.top();
+
+    expect(LexerTokenType::LCURLY, "{");
+
+    while (lexer->front.type != LexerTokenType::RCURLY) {
+        vector_append(moduleDecl->moduleData.stmts, parseTopLevel());
+    }
+    scopes.pop();
+
+    moduleDecl->region = Region{lexer->srcInfo, saved, lexer->front.region.end};
+
+    expect(LexerTokenType::RCURLY, "}");
+
+    return moduleDecl;
+}
+
 Node *Parser::parseSymbol() {
     LexerToken front = expect(LexerTokenType::SYMBOL, "identifier");
     auto sym = new Node(lexer->srcInfo, NodeType::SYMBOL, scopes.top());
@@ -291,9 +328,132 @@ Node *Parser::parseSymbol() {
     return sym;
 }
 
-Node *Parser::parseScopedStmt() {
-    Node *stmt = nullptr;
+Node *Parser::parseDeclarationOrAssignmentOrCombo() {
+    auto saved = lexer->front.region.start;
+    auto lvalue = parseLvalue();
 
+    bool isConstant = false;
+
+    if (lvalue->type == NodeType::FN_CALL || lvalue->type == NodeType::PANIC) {
+        lvalue->sourceMapStatement = true;
+        expectSemicolon();
+        return lvalue;
+    }
+
+    // declaration
+    if (lexer->front.type == LexerTokenType::COLON || lexer->front.type == LexerTokenType::COLON_COLON) {
+        if (lexer->front.type == LexerTokenType::COLON_COLON) {
+            isConstant = true;
+        }
+
+        // cannot declare anything but a symbol
+        if (lvalue->type != NodeType::SYMBOL) {
+            ostringstream s("invalid lhs for declaration: ");
+            s << lvalue->type;
+            reportError(s.str());
+        }
+
+        popFront();
+        auto type = parseType();
+
+        Node *rvalue = nullptr;
+        if (lexer->front.type == LexerTokenType::EQ) {
+            popFront();
+            rvalue = parseRvalue();
+        }
+        else if (isConstant) {
+            reportError("expected a value for constant declaration");
+        }
+
+        expectSemicolon();
+
+        auto decl = new Node(lexer->srcInfo, NodeType::DECL, scopes.top());
+
+        if (!isConstant) {
+            addLocal(decl);
+        }
+
+        decl->declData.lvalue = lvalue;
+        decl->declData.initialValue = rvalue;
+        decl->declData.type = type;
+        decl->declData.isConstant = isConstant;
+
+        decl->region = {lexer->srcInfo, saved, last.region.end};
+        decl->sourceMapStatement = true;
+
+        scopeInsert(lvalue->symbolData.atomId, decl);
+
+        return decl;
+    }
+
+    // declaration-assignment combo
+    if (lexer->front.type == LexerTokenType::COLON_EQ || lexer->front.type == LexerTokenType::COLON_COLON_EQ) {
+        if (lexer->front.type == LexerTokenType::COLON_COLON_EQ) {
+            isConstant = true;
+        }
+
+        // cannot declaration-assign anything but a symbol
+        if (lvalue->type != NodeType::SYMBOL) {
+            ostringstream s("cannot assign to ");
+            s << lvalue->type;
+        }
+
+        popFront();
+        auto rvalue = parseRvalue();
+
+        expectSemicolon();
+
+        auto decl = new Node(lexer->srcInfo, NodeType::DECL, scopes.top());
+
+        if (!isConstant) {
+            addLocal(decl);
+        }
+
+        decl->declData.lvalue = lvalue;
+        decl->declData.initialValue = rvalue;
+        decl->declData.isConstant = isConstant;
+
+        decl->region = {lexer->srcInfo, saved, last.region.end};
+        decl->sourceMapStatement = true;
+
+        scopeInsert(lvalue->symbolData.atomId, decl);
+
+        return decl;
+    }
+
+    // assignment
+    if (lexer->front.type == LexerTokenType::EQ) {
+        // cannot assign anything but a symbol
+        if (lvalue->type != NodeType::SYMBOL && lvalue->type != NodeType::DEREF && lvalue->type != NodeType::DOT) {
+            ostringstream s("cannot assign to ");
+            s << lvalue->type;
+        }
+
+        popFront();
+        auto rvalue = parseRvalue();
+
+        expectSemicolon();
+
+        auto ass = new Node(lexer->srcInfo, NodeType::ASSIGN, scopes.top());
+
+        ass->assignData.lhs = lvalue;
+        ass->assignData.rhs = rvalue;
+        ass->region = {lexer->srcInfo, saved, last.region.end};
+
+        if (lvalue->type == NodeType::DEREF || lvalue->type == NodeType::DOT || lvalue->type == NodeType::ARRAY_INDEX) {
+            addLocal(rvalue);
+        }
+
+        ass->sourceMapStatement = true;
+
+        return ass;
+    }
+
+    reportError("expected a declaration or an assignment");
+    exit(1);
+}
+
+Node *Parser::parseScopedStmt() {
     // comment
     if (lexer->front.type == LexerTokenType::COMMENT) {
         popFront();
@@ -342,107 +502,13 @@ Node *Parser::parseScopedStmt() {
         return parseFor();
     }
 
-    auto saved = lexer->front.region.start;
-    auto lvalue = parseLvalue();
-
-    if (lvalue->type == NodeType::FN_CALL || lvalue->type == NodeType::PANIC) {
-        lvalue->sourceMapStatement = true;
-        expectSemicolon();
-        return lvalue;
+    // module
+    if (lexer->front.type == LexerTokenType::MODULE) {
+        return parseModuleDecl();
     }
 
-    // declaration
-    if (lexer->front.type == LexerTokenType::COLON) {
-        // cannot declare anything but a symbol
-        if (lvalue->type != NodeType::SYMBOL) {
-            ostringstream s("invalid lhs for declaration: ");
-            s << lvalue->type;
-            reportError(s.str());
-        }
-
-        popFront();
-        auto type = parseType();
-
-        Node *rvalue = nullptr;
-        if (lexer->front.type == LexerTokenType::EQ) {
-            popFront();
-            rvalue = parseRvalue();
-        }
-
-        expectSemicolon();
-
-        auto decl = new Node(lexer->srcInfo, NodeType::DECL, scopes.top());
-        addLocal(decl);
-
-        decl->declData.lvalue = lvalue;
-        decl->declData.initialValue = rvalue;
-        decl->declData.type = type;
-
-        decl->region = {lexer->srcInfo, saved, last.region.end};
-        decl->sourceMapStatement = true;
-
-        scopeInsert(lvalue->symbolData.atomId, decl);
-
-        return decl;
-    }
-
-    // declaration-assignment combo
-    if (lexer->front.type == LexerTokenType::COLON_EQ) {
-        // cannot declaration-assign anything but a symbol
-        if (lvalue->type != NodeType::SYMBOL) {
-            ostringstream s("cannot assign to ");
-            s << lvalue->type;
-        }
-
-        popFront();
-        auto rvalue = parseRvalue();
-
-        expectSemicolon();
-
-        auto decl = new Node(lexer->srcInfo, NodeType::DECL, scopes.top());
-        addLocal(decl);
-
-        decl->declData.lvalue = lvalue;
-        decl->declData.initialValue = rvalue;
-
-        decl->region = {lexer->srcInfo, saved, last.region.end};
-        decl->sourceMapStatement = true;
-
-        scopeInsert(lvalue->symbolData.atomId, decl);
-
-        return decl;
-    }
-
-    // assignment
-    if (lexer->front.type == LexerTokenType::EQ) {
-        // cannot assign anything but a symbol
-        if (lvalue->type != NodeType::SYMBOL && lvalue->type != NodeType::DEREF && lvalue->type != NodeType::DOT) {
-            ostringstream s("cannot assign to ");
-            s << lvalue->type;
-        }
-
-        popFront();
-        auto rvalue = parseRvalue();
-
-        expectSemicolon();
-
-        auto ass = new Node(lexer->srcInfo, NodeType::ASSIGN, scopes.top());
-
-        ass->assignData.lhs = lvalue;
-        ass->assignData.rhs = rvalue;
-        ass->region = {lexer->srcInfo, saved, last.region.end};
-
-        if (lvalue->type == NodeType::DEREF || lvalue->type == NodeType::DOT || lvalue->type == NodeType::ARRAY_INDEX) {
-            addLocal(rvalue);
-        }
-
-        ass->sourceMapStatement = true;
-
-        return ass;
-    }
-
-    reportError("expected a declaration or an assignment");
-    exit(1);
+    // declaration/assignment/combo
+    return parseDeclarationOrAssignmentOrCombo();
 }
 
 Node *Parser::parseIf() {
@@ -788,9 +854,21 @@ Node *Parser::parseType() {
             type->typeData.fnTypeData.returnType = parseType();
         } break;
         case LexerTokenType::SYMBOL: {
-            auto typeName = parseSymbol();
-            type->typeData.kind = NodeTypekind::SYMBOL;
-            type->typeData.symbolTypeData.atomId = typeName->symbolData.atomId;
+            auto typeName = parseLvalue();
+
+            switch (typeName->type) {
+                case NodeType::SYMBOL: {
+                    type->typeData.kind = NodeTypekind::SYMBOL;
+                    type->typeData.symbolTypeData.atomId = typeName->symbolData.atomId;
+                } break;
+                case NodeType::DOT: {
+                    type->typeData.kind = NodeTypekind::DOT;
+                    type->typeData.dotTypeData = typeName;
+                } break;
+                default: {
+                    reportError("expected a symbol or dot for type name");
+                }
+            }
         } break;
         case LexerTokenType::STRUCT: {
             expect(LexerTokenType::STRUCT, "struct");

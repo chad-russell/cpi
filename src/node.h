@@ -34,5 +34,6 @@ void initParamData(Node *node);
 void initFnDeclData(Node *node);
 void initStructTypeData(Node *node);
 void initFnTypeData(Node *node);
+void initModuleData(Node *node);
 
 #endif // NODE_H

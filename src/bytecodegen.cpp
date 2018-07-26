@@ -95,6 +95,105 @@ void BytecodeGen::binopHelper(string instructionStr, Node *node, int32_t scale) 
     append(node->bytecode, toBytes(node->localOffset));
 }
 
+void BytecodeGen::genDot(Node *node) {
+    auto foundParam = node->dotData.resolved;
+    auto offsetWords = foundParam->localOffset;
+
+    gen(node->dotData.lhs);
+
+    if (hasNoLocalByDefault(node->dotData.lhs)) {
+        cpi_assert(node->dotData.lhs->isLocal);
+        storeValue(node->dotData.lhs, node->dotData.lhs->localOffset);
+    }
+
+    auto resolvedTypeInfo = resolve(resolve(node->dotData.lhs)->typeInfo);
+
+    auto pointerCount = 0;
+
+    while (resolvedTypeInfo->typeData.kind == NodeTypekind::POINTER) {
+        resolvedTypeInfo = resolve(resolvedTypeInfo->typeData.pointerTypeData.underlyingType);
+        pointerCount += 1;
+    }
+    for (auto i = 0; i < pointerCount - 1; i++) {
+        append(instructions, Instruction::STORE);
+
+        append(instructions, Instruction::RELCONSTI64);
+        append(instructions, toBytes(node->dotData.autoDerefStorage->localOffset));
+
+        append(instructions, Instruction::I64);
+        if (i == 0) {
+            append(instructions, toBytes(node->dotData.lhs->localOffset));
+        } else {
+            append(instructions, toBytes(node->dotData.autoDerefStorage->localOffset));
+        }
+
+        append(instructions, toBytes32(8));
+    }
+
+    // dot is one of the few places where we actually *set* the node->localOffset, instead of just storing to it.
+    // This is both for performance and to enable lvalue semantics. So we need to know where we are 'hijacking' our
+    // localOffset from.
+    auto hijackedOffsetLocation = node->dotData.lhs->localOffset;
+    if (pointerCount > 1) {
+        hijackedOffsetLocation = node->dotData.autoDerefStorage->localOffset;
+    }
+
+    auto lhsRel = node->dotData.lhs->type == NodeType::DOT && node->dotData.lhs->dotData.pointerIsRelative;
+
+    // if we are an autoderef doing a dot on a relative lhs, then we need to
+    // load it again, as it will be a double-pointer from our perspective
+    if (lhsRel && node->dotData.autoDerefStorage) {
+        node->dotData.pointerIsRelative = true;
+
+        append(instructions, Instruction::STORE);
+
+        append(instructions, Instruction::RELCONSTI64);
+        append(instructions, toBytes(hijackedOffsetLocation));
+
+        append(instructions, Instruction::I64);
+        append(instructions, toBytes(hijackedOffsetLocation));
+
+        append(instructions, toBytes32(8));
+    }
+
+    if (node->dotData.autoDerefStorage) {
+        node->dotData.pointerIsRelative = true;
+
+        append(instructions, Instruction::ADDI64);
+
+        append(instructions, Instruction::RELI64);
+        append(instructions, toBytes(hijackedOffsetLocation));
+
+        append(instructions, Instruction::CONSTI64);
+        append(instructions, toBytes(offsetWords));
+
+        append(instructions, toBytes(node->dotData.autoDerefStorage->localOffset));
+
+        node->isBytecodeLocal = true;
+        node->localOffset = node->dotData.autoDerefStorage->localOffset;
+    } else if (lhsRel) {
+        node->dotData.pointerIsRelative = true;
+
+        append(instructions, Instruction::ADDI64);
+
+        append(instructions, Instruction::RELI64);
+        append(instructions, toBytes(hijackedOffsetLocation));
+
+        append(instructions, Instruction::CONSTI64);
+        append(instructions, toBytes(offsetWords));
+
+        append(instructions, toBytes(hijackedOffsetLocation));
+
+        node->isBytecodeLocal = true;
+        node->localOffset = hijackedOffsetLocation;
+    } else {
+        node->dotData.pointerIsRelative = false;
+
+        node->isBytecodeLocal = true;
+        node->localOffset = hijackedOffsetLocation + offsetWords;
+    }
+}
+
 void BytecodeGen::gen(Node *node) {
     // avoids generating code for a fn decl within another fn decl
     if (node->type == NodeType::FN_DECL && !processFnDecls) {
@@ -244,15 +343,20 @@ void BytecodeGen::gen(Node *node) {
             // nothing to do here! wait until we actually need to store it somewhere
         } break;
         case NodeType::DECL: {
-            auto data = node->declData;
+            if (node->staticValue != nullptr) {
+                gen(node->staticValue);
+            }
+            else {
+                auto data = node->declData;
 
-            auto localOffset = node->localOffset;
+                auto localOffset = node->localOffset;
 
-            if (data.initialValue != nullptr) {
-                gen(data.initialValue);
-                auto resolvedInitialValue = resolve(data.initialValue);
-                gen(resolvedInitialValue);
-                storeValue(resolvedInitialValue, localOffset);
+                if (data.initialValue != nullptr) {
+                    gen(data.initialValue);
+                    auto resolvedInitialValue = resolve(data.initialValue);
+                    gen(resolvedInitialValue);
+                    storeValue(resolvedInitialValue, localOffset);
+                }
             }
         } break;
         case NodeType::ASSIGN: {
@@ -711,101 +815,11 @@ void BytecodeGen::gen(Node *node) {
             // just a type declaration, nothing to do here!
         } break;
         case NodeType::DOT: {
-            auto foundParam = node->dotData.resolved;
-            auto offsetWords = foundParam->localOffset;
-
-            gen(node->dotData.lhs);
-
-            if (hasNoLocalByDefault(node->dotData.lhs)) {
-                cpi_assert(node->dotData.lhs->isLocal);
-                storeValue(node->dotData.lhs, node->dotData.lhs->localOffset);
+            if (node->resolved != nullptr) {
+                gen(node->resolved);
             }
-
-            auto resolvedTypeInfo = resolve(resolve(node->dotData.lhs)->typeInfo);
-
-            auto pointerCount = 0;
-
-            while (resolvedTypeInfo->typeData.kind == NodeTypekind::POINTER) {
-                resolvedTypeInfo = resolve(resolvedTypeInfo->typeData.pointerTypeData.underlyingType);
-                pointerCount += 1;
-            }
-            for (auto i = 0; i < pointerCount - 1; i++) {
-                append(instructions, Instruction::STORE);
-
-                append(instructions, Instruction::RELCONSTI64);
-                append(instructions, toBytes(node->dotData.autoDerefStorage->localOffset));
-
-                append(instructions, Instruction::I64);
-                if (i == 0) {
-                    append(instructions, toBytes(node->dotData.lhs->localOffset));
-                } else {
-                    append(instructions, toBytes(node->dotData.autoDerefStorage->localOffset));
-                }
-
-                append(instructions, toBytes32(8));
-            }
-
-            // dot is one of the few places where we actually *set* the node->localOffset, instead of just storing to it.
-            // This is both for performance and to enable lvalue semantics. So we need to know where we are 'hijacking' our
-            // localOffset from.
-            auto hijackedOffsetLocation = node->dotData.lhs->localOffset;
-            if (pointerCount > 1) {
-                hijackedOffsetLocation = node->dotData.autoDerefStorage->localOffset;
-            }
-
-            auto lhsRel = node->dotData.lhs->type == NodeType::DOT && node->dotData.lhs->dotData.pointerIsRelative;
-
-            // if we are an autoderef doing a dot on a relative lhs, then we need to
-            // load it again, as it will be a double-pointer from our perspective
-            if (lhsRel && node->dotData.autoDerefStorage) {
-                node->dotData.pointerIsRelative = true;
-
-                append(instructions, Instruction::STORE);
-
-                append(instructions, Instruction::RELCONSTI64);
-                append(instructions, toBytes(hijackedOffsetLocation));
-
-                append(instructions, Instruction::I64);
-                append(instructions, toBytes(hijackedOffsetLocation));
-
-                append(instructions, toBytes32(8));
-            }
-
-            if (node->dotData.autoDerefStorage) {
-                node->dotData.pointerIsRelative = true;
-
-                append(instructions, Instruction::ADDI64);
-
-                append(instructions, Instruction::RELI64);
-                append(instructions, toBytes(hijackedOffsetLocation));
-
-                append(instructions, Instruction::CONSTI64);
-                append(instructions, toBytes(offsetWords));
-
-                append(instructions, toBytes(node->dotData.autoDerefStorage->localOffset));
-
-                node->isBytecodeLocal = true;
-                node->localOffset = node->dotData.autoDerefStorage->localOffset;
-            } else if (lhsRel) {
-                node->dotData.pointerIsRelative = true;
-
-                append(instructions, Instruction::ADDI64);
-
-                append(instructions, Instruction::RELI64);
-                append(instructions, toBytes(hijackedOffsetLocation));
-
-                append(instructions, Instruction::CONSTI64);
-                append(instructions, toBytes(offsetWords));
-
-                append(instructions, toBytes(hijackedOffsetLocation));
-
-                node->isBytecodeLocal = true;
-                node->localOffset = hijackedOffsetLocation;
-            } else {
-                node->dotData.pointerIsRelative = false;
-
-                node->isBytecodeLocal = true;
-                node->localOffset = hijackedOffsetLocation + offsetWords;
+            else {
+                genDot(node);
             }
         } break;
         case NodeType::PANIC: {
@@ -999,6 +1013,9 @@ void BytecodeGen::gen(Node *node) {
             gen(node->resolved);
             node->bytecode = node->resolved->bytecode;
         } break;
+        case NodeType::MODULE: {
+            // nothing to do!
+        } break;
         default:
             cpi_assert(false);
     }
@@ -1106,15 +1123,20 @@ void BytecodeGen::storeValue(Node *node, int64_t offset) {
         case NodeType::FN_CALL:
         case NodeType::BINOP:
         case NodeType::DECL: {
-            append(instructions, Instruction::STORE);
+            if (node->staticValue != nullptr) {
+                storeValue(node->staticValue, offset);
+            }
+            else {
+                append(instructions, Instruction::STORE);
 
-            append(instructions, Instruction::RELCONSTI64);
-            append(instructions, toBytes(offset));
+                append(instructions, Instruction::RELCONSTI64);
+                append(instructions, toBytes(offset));
 
-            append(instructions, Instruction::RELCONSTI64);
-            append(instructions, toBytes(node->localOffset));
+                append(instructions, Instruction::RELCONSTI64);
+                append(instructions, toBytes(node->localOffset));
 
-            append(instructions, toBytes32(typeSize(node->typeInfo)));
+                append(instructions, toBytes32(typeSize(node->typeInfo)));
+            }
         } break;
         case NodeType::DOT: {
             gen(node);

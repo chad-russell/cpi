@@ -49,6 +49,7 @@ struct Parser {
     vector_t<Node *> parseValueParams();
     Node *parseFnDecl();
     Node *parseTypeDecl();
+    Node *parseModuleDecl();
     Node *parseSymbol();
     Node *parseScopedStmt();
     Node *parseIf();
@@ -80,6 +81,7 @@ struct Parser {
     Node *parseFnCall();
     Node *parseArrayIndex();
     Node *buildDots(stack<Node *> rvalues);
+    Node *parseDeclarationOrAssignmentOrCombo();
 };
 
 #endif // PARSER_H

@@ -334,6 +334,9 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
 }
 
 Node *defaultValueFor(Semantic *semantic, Node *type) {
+    type = resolve(type);
+    semantic->resolveTypes(type);
+
     cpi_assert(type->type == NodeType::TYPE);
 
     switch (type->typeData.kind) {
@@ -445,6 +448,12 @@ void Semantic::reportError(vector<Node *> nodes, Error error) {
     }
 
     cout << s.str() << endl;
+}
+
+void resolveModule(Semantic *semantic, Node *node) {
+    for (auto stmt : node->moduleData.stmts) {
+        semantic->resolveTypes(stmt);
+    }
 }
 
 void resolveFnDecl(Semantic *semantic, Node *node) {
@@ -1000,6 +1009,10 @@ void resolveDecl(Semantic *semantic, Node *node) {
     if (matchedUnion == 1) {
         semantic->reportError({}, Error{node->region, "error assigning struct literal to union - unmatched field name"});
     }
+
+    if (node->declData.isConstant) {
+        node->staticValue = constantize(semantic, node->declData.initialValue);
+    }
 }
 
 void resolveType(Semantic *semantic, Node *node) {
@@ -1056,6 +1069,10 @@ void resolveType(Semantic *semantic, Node *node) {
         } break;
         case NodeTypekind::POINTER: {
             semantic->resolveTypes(node->typeData.pointerTypeData.underlyingType);
+        } break;
+        case NodeTypekind::DOT: {
+            semantic->resolveTypes(node->typeData.dotTypeData);
+            node->typeData = resolve(node->typeData.dotTypeData)->typeData;
         } break;
     }
 }
@@ -1549,11 +1566,27 @@ void createTagCheck(Semantic *semantic, Node *node) {
     vector_append(node->preStmts, ifCheck);
 }
 
+void resolveModuleDot(Semantic *semantic, Node *node) {
+    auto found = resolve(node->dotData.lhs)->scope->find(node->dotData.rhs->symbolData.atomId);
+    semantic->resolveTypes(found);
+
+    node->resolved = found;
+    node->typeInfo = found->typeInfo;
+}
+
 void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
-    semantic->addLocal(node->dotData.lhs);
+    semantic->resolveTypes(lhs);
 
     auto resolvedLhs = resolve(lhs);
     semantic->resolveTypes(resolvedLhs);
+
+    if (resolvedLhs->type == NodeType::MODULE) {
+        resolveModuleDot(semantic, node);
+        return;
+    }
+
+    semantic->addLocal(node->dotData.lhs);
+
     Node *resolvedLhsTypeInfo;
 
     // follow the lhs all the way through pointers, symbols, etc. and assert it's a struct
@@ -2454,6 +2487,9 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::PUTS: {
             resolvePuts(this, node);
+        } break;
+        case NodeType::MODULE: {
+            resolveModule(this, node);
         } break;
         default: cpi_assert(false);
     }

@@ -1,8 +1,11 @@
 TODO:
-    - libraries / namespaces / modules
-
     - top-level (module-level?) constants
         - constant counts as anything ctfe-able (constantize)
+
+    - libraries / namespaces / modules
+
+    - make sure 'constantize' works with any type
+        - at least print an error if we try to do it with sometihng (like a pointer, etc.) which isn't supported
 
     - special syntax for auto-compile-time args
         - `fn f(t: !T) { return t; }`

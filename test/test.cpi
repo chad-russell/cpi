@@ -135,13 +135,32 @@ fn main() {
 
     assert({1, 2, 3}[id(1)] == 2);
 
-    return 0;
+    testModule();
 
     return 0;
 }
 
 fn saved() {
 
+}
+
+fn testModule() {
+    module m1 {
+        fn f() {
+            return 4;
+        }
+
+        module m2 {
+            fn f() {
+                return 3;
+            }
+        }
+    }
+    fn f() { return 5; }
+
+    assert(f() == 5);
+    assert(m1.f() == 4);
+    assert(m1.m2.f() == 3);
 }
 
 fn testPrinting() {

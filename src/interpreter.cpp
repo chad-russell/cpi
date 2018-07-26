@@ -42,7 +42,7 @@ void debugPrintVar(ostream &target, Interpreter *interp, int32_t bp, TypeData td
     switch (td.kind) {
         case NodeTypekind::NONE: {
             target << "{}";
-        };
+        } break;
         case NodeTypekind::INT_LITERAL: {
             target << td.intTypeData;
         } break;

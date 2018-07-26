@@ -1,4 +1,3 @@
 fn main() {
-    a := &&^&23;
-    return ^^a;
+    return 3;
 }

@@ -630,7 +630,11 @@ void LlvmGen::gen(Node *node) {
 
             emitDebugLocation(this, node);
 
-            if (data.initialValue == nullptr) {
+            if (node->staticValue != nullptr) {
+                gen(node->staticValue);
+                node->llvmData = node->staticValue->llvmData;
+            }
+            else if (data.initialValue == nullptr) {
                 cpi_assert(node->llvmLocal);
             }
             else {
@@ -1367,6 +1371,9 @@ void LlvmGen::gen(Node *node) {
             if (node->isLocal) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
+        } break;
+        case NodeType::MODULE: {
+            // nothing to do
         } break;
         default: cpi_assert(false);
     }

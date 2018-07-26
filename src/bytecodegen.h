@@ -30,6 +30,7 @@ public:
     void binopHelper(string instructionStr, Node *node, int32_t scale = 1);
 
     void gen(Node *node);
+    void genDot(Node *node);
     void fixup();
 
     void storeValue(Node *node, int64_t offset);

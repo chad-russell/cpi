@@ -143,6 +143,8 @@ void Lexer::popFront() {
     if (tryEat(&next, ">", LexerTokenType::GT)) { return; }
     if (tryEat(&next, "&", LexerTokenType::AMP)) { return; }
     if (tryEat(&next, ".", LexerTokenType::DOT)) { return; }
+    if (tryEat(&next, "::=", LexerTokenType::COLON_COLON_EQ)) { return; }
+    if (tryEat(&next, "::", LexerTokenType::COLON_COLON)) { return; }
     if (tryEat(&next, ":=", LexerTokenType::COLON_EQ)) { return; }
     if (tryEat(&next, ":", LexerTokenType::COLON)) { return; }
     if (tryEat(&next, "=", LexerTokenType::EQ)) { return; }

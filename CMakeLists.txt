@@ -47,9 +47,6 @@ set(CMAKE_CXX_FLAGS "${LLVM_INCLUDEDIR} ${LLVM_LDFLAGS} ${LLVM_SYSTEMLIBS} ${LLV
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-set(CMAKE_BUILD_TYPE Debug)
-#set(CMAKE_BUILD_TYPE Release)
-
 set(SOURCE_FILES
         src/assembler.cpp
         src/assembler.h

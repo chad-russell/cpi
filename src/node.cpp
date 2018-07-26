@@ -50,6 +50,9 @@ Node::Node(SourceInfo srcInfo, NodeType type_, Scope *scope_) : Node() {
         case NodeType::FOR: {
             initForData(this);
         } break;
+        case NodeType::MODULE: {
+            initModuleData(this);
+        } break;
         default: {}
     }
 }
@@ -74,6 +77,11 @@ void initForData(Node *node) {
     node->forData.rewritten = vector_init<Node *>(10);
     node->forData.isStatic = false;
     node->forData.staticStmts = vector_init<Node *>(10);
+}
+
+void initModuleData(Node *node) {
+    node->moduleData.name = nullptr;
+    node->moduleData.stmts = vector_init<Node *>(10);
 }
 
 void initArrayLiteralData(Node *node) {
@@ -135,6 +143,7 @@ void initDeclData(Node *node) {
     node->declData.lvalue = nullptr;
     node->declData.type = nullptr;
     node->declData.initialValue = nullptr;
+    node->declData.isConstant = false;
 }
 
 void initParamData(Node *node) {

@@ -92,6 +92,7 @@ enum class NodeTypekind {
     SYMBOL,
     POINTER,
     EXPOSED_AST,
+    DOT,
 };
 
 enum class LexerTokenType : int32_t {
@@ -117,6 +118,8 @@ enum class LexerTokenType : int32_t {
     AMP,
     DOT,
     COLON_EQ,
+    COLON_COLON_EQ,
+    COLON_COLON,
     COLON,
     EQ,
     COMMA,
@@ -223,6 +226,7 @@ struct TypeData {
         StructTypeData structTypeData;
         PointerTypeData pointerTypeData;
         SymbolTypeData symbolTypeData;
+        Node *dotTypeData;
         double floatTypeData;
         int64_t intTypeData;
         bool boolTypeData;
@@ -260,6 +264,7 @@ struct DeclData {
     Node *lvalue;
     Node *type;
     Node *initialValue;
+    bool isConstant;
 };
 
 struct AssignData {
@@ -376,6 +381,11 @@ struct IsKindData {
     LexerTokenType tokenType;
 };
 
+struct ModuleData {
+    Node *name;
+    vector_t<Node *> stmts;
+};
+
 class Scope {
 public:
     hash_t<int64_t, Node *> *symbols;
@@ -424,6 +434,7 @@ public:
         ArrayLiteralData arrayLiteralData;
         ForData forData;
         IsKindData isKindData;
+        ModuleData moduleData;
     };
 
     Node *staticValue = nullptr;
