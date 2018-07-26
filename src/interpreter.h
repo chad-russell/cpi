@@ -82,7 +82,7 @@ public:
     int32_t bp = 0;
 
     uint32_t nextVarReference = 1;
-    hash_t<int32_t, string> *pointerRecursion;
+    hash_t<int64_t, string> *pointerRecursion;
 
     vector<uint32_t> pcs = {};
     uint32_t lastValidPc = 0;

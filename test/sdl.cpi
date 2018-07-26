@@ -43,8 +43,6 @@ fn main() {
     SDLK_UP: i32 = 1073741906;
     SDLK_DOWN: i32 = 1073741905;
 
-    playerPos: SDL_Rect;
-
     winX: i32 = 100;
     winY: i32 = 200;
     sizeX: i32 = 300;
@@ -56,33 +54,23 @@ fn main() {
     SDL_Init(SDL_INIT_EVERYTHING);
     window := SDL_CreateWindow(h, winX, winY, sizeX, sizeY, winFlags);
     renderer := SDL_CreateRenderer(window, cast(i32) -1, cast(i32) 0);
-}
-
-fn id( T := typeof(t) )(t: T) {
-    return t;
-}
-
-fn saved() {
-    renderer := SDL_CreateRenderer(window, cast(i32) -1, cast(i32) 0);
 
     SDL_RenderSetLogicalSize(renderer, sizeX, sizeY);
     SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
 
+    playerPos: SDL_Rect;
     playerPos.x = 20;
     playerPos.y = 20;
     playerPos.w = 50;
     playerPos.h = 20;
 
-    event: SDL_KeyboardEvent;
-
     loop := true;
     while loop
     {
-        pe := SDL_PollEvent(&event);
-        while pe != 0
+        event: SDL_KeyboardEvent;
+        while SDL_PollEvent(&event) != 0
         {
             if event._type == SDL_QUIT {
-                puts("bye bye\n");
                 loop = false;
             }
             else if event._type == SDL_KEYDOWN
@@ -108,4 +96,6 @@ fn saved() {
             SDL_RenderPresent(renderer);
         }
     }
+
+    return 0;
 }

@@ -32,13 +32,13 @@ void printCurrentStmt(Interpreter *interp, bool withLineInfo = false) {
     printStmt(interp, interp->pc, withLineInfo);
 }
 
-void debugPrintVar(ostream &target, Interpreter *interp, int32_t bp, TypeData td, int32_t offset, vector<string> &extraLines);
+void debugPrintVar(ostream &target, Interpreter *interp, int32_t bp, TypeData td, int64_t offset, vector<string> &extraLines);
 
 void debugPrintVar(Interpreter *interp, int32_t bp, TypeData td, int32_t offset, vector<string> &extraLines) {
     debugPrintVar(cout, interp, bp, td, offset, extraLines);
 }
 
-void debugPrintVar(ostream &target, Interpreter *interp, int32_t bp, TypeData td, int32_t offset, vector<string> &extraLines) {
+void debugPrintVar(ostream &target, Interpreter *interp, int32_t bp, TypeData td, int64_t offset, vector<string> &extraLines) {
     switch (td.kind) {
         case NodeTypekind::NONE: {
             target << "{}";
@@ -71,12 +71,10 @@ void debugPrintVar(ostream &target, Interpreter *interp, int32_t bp, TypeData td
             target << interp->readFromStack<double>(offset);
         } break;
         case NodeTypekind::POINTER: {
-//            target << "0x" << hex << (int64_t) (interp->stack.data()) + interp->readFromStack<int32_t>(offset) << dec;
-
             auto nvr = interp->nextVarReference;
             interp->nextVarReference += 1;
 
-            auto loadedOffset = interp->readFromStack<int32_t>(offset);
+            auto loadedOffset = interp->readFromStack<int64_t>(offset);
             auto found = hash_get(interp->pointerRecursion, loadedOffset);
             if (found != nullptr) {
                 target << *found;
@@ -90,8 +88,13 @@ void debugPrintVar(ostream &target, Interpreter *interp, int32_t bp, TypeData td
 
             ostringstream extra("");
             extra << "#" << nvr << ": ";
-            debugPrintVar(extra, interp, bp, resolve(td.pointerTypeData.underlyingType)->typeData, (int32_t) loadedOffset, extraLines);
-            extraLines.push_back(extra.str());
+            if (loadedOffset == 0) {
+                extra << "nil";
+            }
+            else {
+                debugPrintVar(extra, interp, bp, resolve(td.pointerTypeData.underlyingType)->typeData, ((int64_t) interp->stack.data()) - loadedOffset, extraLines);
+                extraLines.push_back(extra.str());
+            }
         } break;
         case NodeTypekind::FN: {
             target << interp->readFromStack<int32_t>(offset) << " (todo(chad): look up the fn name)";
@@ -317,7 +320,7 @@ void Interpreter::interpret() {
                     }
                 } else if (line == "info") {
                     this->nextVarReference = 1;
-                    this->pointerRecursion = hash_init<int32_t, string>(50);
+                    this->pointerRecursion = hash_init<int64_t, string>(50);
 
                     cout << this->depth + 1 << endl;
 
