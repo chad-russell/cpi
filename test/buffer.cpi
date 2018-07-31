@@ -1,0 +1,48 @@
+fn make(T: Ast)(capacity: i64) {
+    buf: []T;
+    buf.count = 0;
+    buf.data = cast(*T) malloc(capacity * sizeof(T));
+
+    return {
+        capacity: capacity,
+        buf: buf
+    };
+}
+
+fn release( T := typeof(b) )(b: T) {
+    free(b.buf.data);
+}
+
+fn ensureCapacity( T := typeof(b), E := typeof(b.buf[0]) )(b: T, index: i64) {
+    if b.capacity == 0 {
+        b.capacity = 1;
+    }
+
+    while index >= b.capacity {
+        b.capacity = b.capacity * 2;
+
+        newBuf: []E;
+        newBuf.count = b.buf.count;
+        newBuf.data = cast(*E) malloc(b.capacity * sizeof(E));
+
+        idx := 0;
+        while idx < b.buf.count {
+            newBuf[idx] = b.buf[idx];
+            idx = idx + 1;
+        }
+
+        b.buf = newBuf;
+    }
+}
+
+fn set( T := typeof(^b), E := typeof(b.buf[0]) )(b: *T, index: i64, e: E) {
+    ensureCapacity(b, index);
+
+    b.buf[index] = e;
+    return b.capacity;
+}
+
+fn get( T := typeof(b) )(b: T, index: i64) {
+    ensureCapacity(b, index);
+    return b.buf[index];
+}
