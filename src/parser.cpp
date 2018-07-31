@@ -706,7 +706,7 @@ Node *Parser::parseIf() {
 
     staticIfScope = nullptr;
 
-    if (isToplevel) {
+    if (isStatic) {
         vector_append(this->staticIfStmts, if_);
     }
 

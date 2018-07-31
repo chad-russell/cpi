@@ -2,14 +2,6 @@ import "printing";
 import "buffer";
 
 fn main() {
-    if (true == false) {
-        return 3;
-    }
-
-    return 0;
-}
-
-fn saved() {
     f := fn() {
         return fn() {
             return foo;
@@ -152,6 +144,8 @@ fn saved() {
     testModule3();
 
     assert(topLevel == 123);
+
+    return 0;
 }
 
 fn testModule3() {
@@ -178,14 +172,14 @@ fn testModule2() {
         a ::= 5;
     }
 
-    -- if false {
-        -- import foo;
-        -- return a;
-    -- }
-    -- else {
-        -- import bar;
-        -- return a;
-    -- }
+    if false {
+        import foo;
+        return a;
+    }
+    else {
+        import bar;
+        return a;
+    }
 
     return 10;
 }

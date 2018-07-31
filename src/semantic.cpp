@@ -1184,7 +1184,6 @@ void resolveBinop(Semantic *semantic, Node *node) {
                               Error{node->region, "type mismatch - both sides of binary operation need to be the same type"});
     }
 
-
     if (isBooleanBinop(node->binopData.type)) {
         node->typeInfo = new Node(NodeTypekind::BOOLEAN);
     } else {
