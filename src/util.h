@@ -73,7 +73,8 @@ enum class NodeType {
     ARRAY_LITERAL = 39,
     FOR = 40,
     HEAPIFY = 41,
-    ISKIND = 42
+    ISKIND = 42,
+    DEFER = 43,
 };
 
 enum class NodeTypekind {
@@ -392,6 +393,10 @@ struct ModuleData {
     vector_t<Node *> stmts;
 };
 
+struct DeferData {
+    vector_t<Node *> stmts;
+};
+
 class Scope {
 public:
     hash_t<int64_t, Node *> *symbols;
@@ -441,6 +446,7 @@ public:
         ForData forData;
         IsKindData isKindData;
         ModuleData moduleData;
+        DeferData deferData;
     };
 
     Node *staticValue = nullptr;

@@ -244,11 +244,20 @@ void maybeAddAutoPolyFor(Node *decl, vector_t<Node *> params) {
 
     if (isAutoPoly) {
         decl->fnDeclData.params = params;
+
+        auto newCtParams = vector_init<Node *>(decl->fnDeclData.ctParams.length + params.length + 1);
+
         for (auto p : params) {
             if (p->paramData.isAutoPolyParam) {
-                vector_append(decl->fnDeclData.ctParams, makeAutoPolyCtParam(p));
+                vector_append(newCtParams, makeAutoPolyCtParam(p));
             }
         }
+
+        for (auto p : decl->fnDeclData.ctParams) {
+            vector_append(newCtParams, p);
+        }
+
+        decl->fnDeclData.ctParams = newCtParams;
     }
 }
 
@@ -413,10 +422,20 @@ Node *Parser::parseImport() {
 
 Node *Parser::parseDefer() {
     auto saved = lexer->front.region.start;
-
     popFront();
 
-    
+    auto node = new Node(lexer->srcInfo, NodeType::DEFER, scopes.top());
+
+    expect(LexerTokenType::LCURLY, "{");
+
+    while (lexer->front.type != LexerTokenType::RCURLY) {
+        vector_append(node->deferData.stmts, parseScopedStmt());
+    }
+
+    node->region = Region{lexer->srcInfo, saved, lexer->front.region.end};
+    expect(LexerTokenType::RCURLY, "}");
+
+    return node;
 }
 
 Node *Parser::parseTypeDecl() {

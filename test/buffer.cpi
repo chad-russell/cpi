@@ -13,7 +13,7 @@ fn release(b: !T) {
     free(b.buf.data);
 }
 
-fn ensureCapacity( T := typeof(b), E := typeof(b.buf[0]) )(b: T, index: i64) {
+fn ensureCapacity( E := typeof(b.buf[0]) )(b: !T, index: i64) {
     if b.capacity == 0 {
         b.capacity = 1;
     }

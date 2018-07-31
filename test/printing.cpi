@@ -131,7 +131,7 @@ fn print(t: !T) {
     }
 }
 
-fn printWithSeparator( sep: []i8 )(t: !T) {
+fn printWithSeparator( T := typeof(t), sep: []i8 )(t: T) {
     fieldCount := #fieldsof(T).count;
 
     #for it, i: t {
@@ -143,7 +143,7 @@ fn printWithSeparator( sep: []i8 )(t: !T) {
 }
 
 fn printWithSpaces(t: !T) {
-    printWithSeparator!(", ")(t);
+    printWithSeparator!(sep: ", ")(t);
 }
 
 fn println(s: []i8) {
