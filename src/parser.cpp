@@ -2,10 +2,16 @@
 #include <stdlib.h>
 
 #include "parser.h"
+#include "semantic.h"
 
 Parser::Parser(Lexer *lexer_) {
     lexer = lexer_;
     last = lexer->front;
+
+    mainAtom = atomTable->insertStr("main");
+    imports = vector_init<Node *>(128);
+    staticIfStmts = vector_init<Node *>(128);
+    allTopLevel = vector_init<Node *>(256);
 
     scopes.push(new Scope(nullptr));
 }
@@ -64,7 +70,8 @@ void Parser::parseRoot() {
         }
 
         if (!lexer->isEmpty()) {
-            parseTopLevel();
+            auto topLevel = parseTopLevel();
+            vector_append(allTopLevel, topLevel);
         }
     }
 }
@@ -88,6 +95,16 @@ Node *Parser::parseTopLevel() {
     // module declaration
     if (lexer->front.type == LexerTokenType::MODULE) {
         return parseModuleDecl();
+    }
+
+    // import
+    if (lexer->front.type == LexerTokenType::IMPORT) {
+        return parseImport();
+    }
+
+    // if
+    if (lexer->front.type == LexerTokenType::STATIC_IF) {
+        return parseIf();
     }
 
     // declaration/assignment combo
@@ -118,6 +135,11 @@ vector_t<Node *> Parser::parseDeclParams() {
         if (lexer->front.type == LexerTokenType::COLON) {
             popFront();
 
+            if (lexer->front.type == LexerTokenType::NOT) {
+                // fn foo(t: !T) { ... }
+                popFront();
+                node->paramData.isAutoPolyParam = true;
+            }
             node->paramData.type = parseType();
 
             if (lexer->front.type == LexerTokenType::EQ) {
@@ -184,6 +206,52 @@ vector_t<Node *> Parser::parseValueParams() {
     return params;
 }
 
+Node *makeAutoPolyCtParam(Node *originalParam) {
+    // fn foo(t: !T) ==> fn foo(T := typeof(t))(t: T)
+
+    cpi_assert(originalParam->type == NodeType::DECL_PARAM);
+    cpi_assert(originalParam->paramData.isAutoPolyParam);
+
+    auto paramType = originalParam->paramData.type;
+    cpi_assert(paramType->type == NodeType::TYPE);
+    cpi_assert(paramType->typeData.kind == NodeTypekind::SYMBOL);
+    auto paramTypeDebug = atomTable->backwardAtoms[paramType->typeData.symbolTypeData.atomId];
+
+    auto paramName = originalParam->paramData.name;
+    cpi_assert(paramName->type == NodeType::SYMBOL);
+    auto paramNameDebug = atomTable->backwardAtoms[paramName->symbolData.atomId];
+
+    auto newParam = new Node(originalParam->region.srcInfo, NodeType::DECL_PARAM, originalParam->scope);
+
+    newParam->paramData.name = new Node(originalParam->region.srcInfo, NodeType::SYMBOL, originalParam->scope);
+    newParam->paramData.name->symbolData.atomId = paramType->typeData.symbolTypeData.atomId;
+
+    newParam->paramData.value = new Node(originalParam->region.srcInfo, NodeType::TYPEOF, originalParam->scope);
+
+    newParam->paramData.value->nodeData = new Node(originalParam->region.srcInfo, NodeType::SYMBOL, originalParam->scope);
+    newParam->paramData.value->nodeData->symbolData.atomId = paramName->symbolData.atomId;
+
+    return newParam;
+}
+
+void maybeAddAutoPolyFor(Node *decl, vector_t<Node *> params) {
+    auto isAutoPoly = false;
+    for (auto p : params) {
+        if (p->paramData.isAutoPolyParam) {
+            isAutoPoly = true;
+        }
+    }
+
+    if (isAutoPoly) {
+        decl->fnDeclData.params = params;
+        for (auto p : params) {
+            if (p->paramData.isAutoPolyParam) {
+                vector_append(decl->fnDeclData.ctParams, makeAutoPolyCtParam(p));
+            }
+        }
+    }
+}
+
 Node *Parser::parseFnDecl() {
     auto decl = new Node(lexer->srcInfo, NodeType::FN_DECL, scopes.top());
     decl->region.start = lexer->front.region.start;
@@ -200,10 +268,7 @@ Node *Parser::parseFnDecl() {
         auto name = parseSymbol();
         decl->fnDeclData.name = name;
 
-        ostringstream nameStringstream("");
-        nameStringstream << SourceRegion{name->region};
-        auto nameString = nameStringstream.str();
-        if (nameString == "main") {
+        if (name->symbolData.atomId == mainAtom) {
             mainFn = decl;
         }
 
@@ -227,8 +292,12 @@ Node *Parser::parseFnDecl() {
 
         decl->fnDeclData.ctParams = firstParams;
         decl->fnDeclData.params = secondParams;
+
+        maybeAddAutoPolyFor(decl, secondParams);
     } else {
         decl->fnDeclData.params = firstParams;
+
+        maybeAddAutoPolyFor(decl, firstParams);
     }
 
     // return type
@@ -277,6 +346,69 @@ Node *Parser::parseFnDecl() {
     currentFnDecl = savedCurrentFnDecl;
 
     return decl;
+}
+
+Node *Parser::parseImport() {
+    auto saved = lexer->front.region.start;
+    expect(LexerTokenType::IMPORT, "import");
+
+    auto isFileImport = false;
+
+    Node *importName;
+    if (this->lexer->front.type == LexerTokenType::DOUBLE_QUOTE) {
+        isFileImport = true;
+
+        importName = parseStringLiteral();
+
+        auto concatPath = *importName->stringLiteralData.value + ".cpi";
+        auto path = realpath(concatPath.c_str(), nullptr);
+
+        cpi_assert(path != nullptr);
+        auto found = false;
+
+        for (auto i : toSemantic) {
+            auto iName = atomTable->backwardAtoms[i->moduleData.name->symbolData.atomId].c_str();
+            if (strcmp(iName, importName->stringLiteralData.value->c_str()) == 0) {
+                found = true;
+
+                importName = i;
+                scopeInsert(i->moduleData.name->symbolData.atomId, i);
+            }
+        }
+
+        if (!found) {
+            auto lexer = new Lexer(path, true);
+            auto parser = new Parser(lexer);
+
+            auto fileModule = new Node(lexer->srcInfo, NodeType::MODULE, nullptr);
+            fileModule->moduleData.name = new Node(lexer->srcInfo, NodeType::SYMBOL, parser->scopes.top());
+            fileModule->moduleData.name->symbolData.atomId = atomTable->insertStr(*importName->stringLiteralData.value);
+            vector_append(toSemantic, fileModule);
+
+            fileModule->scope = parser->scopes.top();
+            parser->parseRoot();
+
+            fileModule->moduleData.stmts = parser->allTopLevel;
+
+            importName = fileModule;
+
+            scopeInsert(fileModule->moduleData.name->symbolData.atomId, fileModule);
+        }
+    } else {
+        importName = parseLvalue();
+    }
+
+    expectSemicolon();
+
+    auto importNode = new Node(this->lexer->srcInfo, NodeType::IMPORT, scopes.top());
+    importNode->nodeData = importName;
+    importNode->region = Region{lexer->srcInfo, saved, lexer->front.region.end};
+
+    if (!isFileImport) {
+        vector_append(this->imports, importNode);
+    }
+
+    return importNode;
 }
 
 Node *Parser::parseTypeDecl() {
@@ -328,7 +460,66 @@ Node *Parser::parseSymbol() {
     return sym;
 }
 
-Node *Parser::parseDeclarationOrAssignmentOrCombo() {
+Node *Parser::parseScopedStmt() {
+    // comment
+    if (lexer->front.type == LexerTokenType::COMMENT) {
+        popFront();
+        return nullptr;
+    }
+
+    // ret
+    if (lexer->front.type == LexerTokenType::RETURN) {
+        return parseRet();
+    }
+
+    // fn decl
+    if (lexer->front.type == LexerTokenType::FN) {
+        return parseFnDecl();
+    }
+
+    // type definition
+    if (lexer->front.type == LexerTokenType::TYPE) {
+        return parseTypeDecl();
+    }
+
+    // if
+    if (lexer->front.type == LexerTokenType::IF || lexer->front.type == LexerTokenType::STATIC_IF) {
+        return parseIf();
+    }
+
+    // while
+    if (lexer->front.type == LexerTokenType::WHILE) {
+        return parseWhile();
+    }
+
+    // free
+    if (lexer->front.type == LexerTokenType::FREE) {
+        auto freeStmt = parseFree();
+        expectSemicolon();
+        return freeStmt;
+    }
+
+    // puts
+    if (lexer->front.type == LexerTokenType::PUTS) {
+        return parsePuts();
+    }
+
+    // for
+    if (lexer->front.type == LexerTokenType::FOR || lexer->front.type == LexerTokenType::STATIC_FOR) {
+        return parseFor();
+    }
+
+    // module
+    if (lexer->front.type == LexerTokenType::MODULE) {
+        return parseModuleDecl();
+    }
+
+    // import
+    if (lexer->front.type == LexerTokenType::IMPORT) {
+        return parseImport();
+    }
+
+    // declaration/assignment/combo
     auto saved = lexer->front.region.start;
     auto lvalue = parseLvalue();
 
@@ -453,65 +644,15 @@ Node *Parser::parseDeclarationOrAssignmentOrCombo() {
     exit(1);
 }
 
-Node *Parser::parseScopedStmt() {
-    // comment
-    if (lexer->front.type == LexerTokenType::COMMENT) {
-        popFront();
-        return nullptr;
-    }
-
-    // ret
-    if (lexer->front.type == LexerTokenType::RETURN) {
-        return parseRet();
-    }
-
-    // fn decl
-    if (lexer->front.type == LexerTokenType::FN) {
-        return parseFnDecl();
-    }
-
-    // type definition
-    if (lexer->front.type == LexerTokenType::TYPE) {
-        return parseTypeDecl();
-    }
-
-    // if
-    if (lexer->front.type == LexerTokenType::IF) {
-        return parseIf();
-    }
-
-    // while
-    if (lexer->front.type == LexerTokenType::WHILE) {
-        return parseWhile();
-    }
-
-    // free
-    if (lexer->front.type == LexerTokenType::FREE) {
-        auto freeStmt = parseFree();
-        expectSemicolon();
-        return freeStmt;
-    }
-
-    // puts
-    if (lexer->front.type == LexerTokenType::PUTS) {
-        return parsePuts();
-    }
-
-    // for
-    if (lexer->front.type == LexerTokenType::FOR || lexer->front.type == LexerTokenType::STATIC_FOR) {
-        return parseFor();
-    }
-
-    // module
-    if (lexer->front.type == LexerTokenType::MODULE) {
-        return parseModuleDecl();
-    }
-
-    // declaration/assignment/combo
-    return parseDeclarationOrAssignmentOrCombo();
-}
-
 Node *Parser::parseIf() {
+    auto isStatic = lexer->front.type == LexerTokenType::STATIC_IF;
+
+    auto isToplevel = false;
+    if (staticIfScope == nullptr) {
+        staticIfScope = scopes.top();
+        isToplevel = true;
+    }
+
     auto saved = lexer->front.region.start;
     popFront();
 
@@ -519,6 +660,8 @@ Node *Parser::parseIf() {
     if_->region.start = saved;
     if_->ifData.condition = parseRvalue();
     if_->ifData.condition->sourceMapStatement = true;
+    if_->ifData.isStatic = isStatic;
+    if_->ifData.staticIfScope = staticIfScope;
 
     if_->sourceMapStatement = true;
     if_->ifData.condition->sourceMapStatement = true;
@@ -541,14 +684,15 @@ Node *Parser::parseIf() {
     if (lexer->front.type == LexerTokenType::ELSE) {
         popFront();
 
-        if (lexer->front.type == LexerTokenType::IF) {
+        scopes.push(new Scope(scopes.top()));
+
+        if (lexer->front.type == LexerTokenType::IF || lexer->front.type == LexerTokenType::STATIC_IF) {
             vector_append(if_->ifData.elseStmts, parseIf());
+            scopes.pop();
             return if_;
         }
 
         expect(LexerTokenType::LCURLY, "{");
-
-        scopes.push(new Scope(scopes.top()));
 
         while (lexer->front.type != LexerTokenType::RCURLY) {
             vector_append(if_->ifData.elseStmts, parseScopedStmt());
@@ -558,6 +702,12 @@ Node *Parser::parseIf() {
 
         if_->region.end = lexer->front.region.end;
         expect(LexerTokenType::RCURLY, "}");
+    }
+
+    staticIfScope = nullptr;
+
+    if (isToplevel) {
+        vector_append(this->staticIfStmts, if_);
     }
 
     return if_;

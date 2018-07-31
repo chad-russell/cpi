@@ -1,22 +1,17 @@
 TODO:
-    - top-level (module-level?) constants
-        - constant counts as anything ctfe-able (constantize)
-
-    - libraries / namespaces / modules
-
-    - make sure 'constantize' works with any type
-        - at least print an error if we try to do it with sometihng (like a pointer, etc.) which isn't supported
-
-    - special syntax for auto-compile-time args
-        - `fn f(t: !T) { return t; }`
-            - short for `fn f(T := typeof(t))(t: T) { return t; }`
-
     - think about the future of 'heap' -- we probably don't even need it except for arrays
         - how best to specify the default heapifier for arrays? *probably* with implicit parameter passing
+            (alternatively with thread-local storage)
 
     - defer
 
     - pipe operator
+
+    - make sure 'constantize' works with any type
+        - at least print an error if we try to do it with sometihng (like a pointer, etc.) which isn't supported
+        - if we want it to work with more than just numeric types (pointers, structs, etc). we'll need to  have a concept of
+            global storage/variables at runtime... maybe not the best.
+            maybe *all* global stuff is bad and should be stuck in the context. idk.
 
     - better interpreter debugging
         - implement option to have memory as a rope structure -- infinite undo/redo of program execution state

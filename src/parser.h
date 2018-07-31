@@ -8,6 +8,10 @@
 #include "lexer.h"
 #include "node.h"
 
+struct Parser;
+
+extern vector_t<Node *> toSemantic;
+
 enum class ShuntingYardType {
     NODE,
     OP
@@ -27,9 +31,16 @@ struct Parser {
     Lexer *lexer = nullptr;
     LexerToken last;
     Node *mainFn = nullptr;
+    vector_t<Node *> allTopLevel;
     stack<Scope *> scopes;
     Node *currentFnDecl = nullptr;
     bool isCopying = false;
+    int64_t mainAtom;
+
+    vector_t<Node *> imports = vector_init<Node *>(16);
+
+    vector_t<Node *> staticIfStmts = vector_init<Node *>(16);
+    Scope *staticIfScope = nullptr;
 
     explicit Parser(Lexer *lexer_);
 
@@ -48,6 +59,7 @@ struct Parser {
     vector_t<Node *> parseDeclParams();
     vector_t<Node *> parseValueParams();
     Node *parseFnDecl();
+    Node *parseImport();
     Node *parseTypeDecl();
     Node *parseModuleDecl();
     Node *parseSymbol();
@@ -81,7 +93,6 @@ struct Parser {
     Node *parseFnCall();
     Node *parseArrayIndex();
     Node *buildDots(stack<Node *> rvalues);
-    Node *parseDeclarationOrAssignmentOrCombo();
 };
 
 #endif // PARSER_H

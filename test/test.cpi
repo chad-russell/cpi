@@ -1,4 +1,15 @@
+import "printing";
+import "buffer";
+
 fn main() {
+    if (true == false) {
+        return 3;
+    }
+
+    return 0;
+}
+
+fn saved() {
     f := fn() {
         return fn() {
             return foo;
@@ -24,7 +35,6 @@ fn main() {
 
     a7 := (^&(fn() i64 { return 3; }))();
     assert(a7 == 3);
-
     a8_helper1 := &&bad;
     a8_helper2 := &&bar;
     ^a8_helper1 = ^a8_helper2;
@@ -137,11 +147,47 @@ fn main() {
 
     testModule();
 
-    return 0;
+    assert(testModule2() == 5);
+
+    testModule3();
+
+    assert(topLevel == 123);
 }
 
-fn saved() {
+fn testModule3() {
+    module foo {
+        a ::= 2;
+        module bar {
+            a ::= 3;
+            module baz {
+                a ::= 4;
+            }
+        }
+    }
 
+    import foo.bar.baz;
+    assert(a == 4);
+}
+
+fn testModule2() {
+    module foo {
+        a ::= 3;
+    }
+
+    module bar {
+        a ::= 5;
+    }
+
+    -- if false {
+        -- import foo;
+        -- return a;
+    -- }
+    -- else {
+        -- import bar;
+        -- return a;
+    -- }
+
+    return 10;
 }
 
 fn testModule() {
@@ -165,7 +211,7 @@ fn testModule() {
 
 fn testPrinting() {
     e: enum {x: i32, y: bool} = { y: false };
-    printWithSpaces({123, "string", false, []{1, 2, 3}, {x: 3, y: &8767} , e});
+    printing.printWithSpaces({123, "string", false, []{1, 2, 3}, {x: 3, y: &8767} , e});
 
     puts("\n\n");
 }
@@ -764,67 +810,24 @@ fn test23() {
     return 0;
 }
 
-fn buffer(T: Ast)(capacity: i64) {
-    buf: []T;
-    buf.count = 0;
-    buf.data = cast(*T) malloc(capacity * sizeof(T));
-
-    return {
-        capacity: capacity,
-        buf: buf
-    };
-}
-
-fn ensureCapacity( T := typeof(b), E := typeof(b.buf[0]) )(b: T, index: i64) {
-    if b.capacity == 0 {
-        b.capacity = 1;
-    }
-
-    while index >= b.capacity {
-        b.capacity = b.capacity * 2;
-
-        newBuf: []E;
-        newBuf.count = b.buf.count;
-        newBuf.data = cast(*E) malloc(b.capacity * sizeof(E));
-
-        idx := 0;
-        while idx < b.buf.count {
-            newBuf[idx] = b.buf[idx];
-            idx = idx + 1;
-        }
-
-        b.buf = newBuf;
-    }
-}
-
-fn buffer_set( T := typeof(^b), E := typeof(b.buf[0]) )(b: *T, index: i64, e: E) {
-    ensureCapacity(b, index);
-
-    b.buf[index] = e;
-    return b.capacity;
-}
-
-fn buffer_get( T := typeof(b) )(b: T, index: i64) {
-    ensureCapacity(b, index);
-    return b.buf[index];
-}
-
 fn testBuffer() {
     type foo struct {
         x: i32,
         y: i32
     }
 
-    b := buffer!(foo)(0);
+    b := buffer.make!(foo)(0);
 
     f: foo;
     f.x = 3;
     f.y = 4;
 
-    buffer_set(&b, 200, f);
+    buffer.set(&b, 200, f);
 
-    assert(buffer_get(&b, 200).x == 3);
-    assert(buffer_get(&b, 200).y == 4);
+    assert(buffer.get(&b, 200).x == 3);
+    assert(buffer.get(&b, 200).y == 4);
+
+    buffer.release(b);
 }
 
 fn testAnySimple1() {
@@ -894,160 +897,9 @@ fn testAnySimple1() {
     assert(a._type.STRUCT.params[0].name[3] == "duck"[3]);
 }
 
-fn putchar(c: i8) {
-    s := ".";
-    s[0] = c;
-    puts(s);
+fn someCheck() { return true; }
+
+#if someCheck() {
+    topLevel ::= 123;
 }
 
-fn mod( T := typeof(x) )(x: T, y: T) {
-    return x - (x / y) * y;
-}
-
-fn printInt( T := typeof(t) )(t: T) {
-    base := 10;
-    table := []{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"};
-
-    b: []i8;
-    b.data = cast(*i8) malloc(20 * sizeof(i8));
-
-    n := t;
-    idx : i32 = 0;
-
-    while n > base {
-        m := mod(n, base);
-        n = n / base;
-        b[idx] = table[m][0];
-        idx = idx + 1;
-    }
-
-    m := mod(n, base);
-    n = n / base;
-    b[idx] = table[m][0];
-
-    while idx >= 0 {
-        putchar(b[idx]);
-        idx = idx - 1;
-    }
-}
-
-fn printHex( T := typeof(t) )(t: T) {
-    base := 16;
-    table := []{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"};
-
-    b: []i8;
-    b.data = cast(*i8) malloc(20 * sizeof(i8));
-
-    n := t;
-    idx : i32 = 0;
-
-    while n > base {
-        m := mod(n, base);
-        n = n / base;
-        b[idx] = table[m][0];
-        idx = idx + 1;
-    }
-
-    m := mod(n, base);
-    n = n / base;
-    b[idx] = table[m][0];
-
-    puts("0x");
-    while idx >= 0 {
-        putchar(b[idx]);
-        idx = idx - 1;
-    }
-}
-
-fn print( T := typeof(t) )(t: T) {
-    if #iskind(T, i8) {
-        printInt(t);
-    }
-    else if #iskind(T, i32) {
-        printInt(t);
-    }
-    else if #iskind(T, i64) {
-        printInt(t);
-    }
-    else if #iskind(T, f32) {
-        print("<<some f32>>");
-    }
-    else if #iskind(T, f64) {
-        printInt("<<some f64>>");
-    }
-    else if #iskind(T, bool) {
-        if t {
-            puts("true");
-        }
-        else {
-            puts("false");
-        }
-    }
-    else if #iskind(T, []) {
-        -- could be a string, or something else
-        if #iskind(typeof(t[0]), i8) {
-            puts(t);
-        }
-        else {
-            puts("[]{");
-            for it, i: t {
-                print(it);
-                if i < t.count - 1 { puts(", "); }
-            }
-            puts("}");
-        }
-    }
-    else if #iskind(T, struct) {
-        puts("{");
-        #for it, i: #fieldsof(T) {
-            print(it.name);
-            print(": ");
-            print(t[i]);
-            if i < #fieldsof(T).count - 1 { puts(", "); }
-        }
-        puts("}");
-    }
-    else if #iskind(T, enum) {
-        fieldCount2 := cast(i64) #fieldsof(T).count;
-
-        puts("{");
-        #for it, i: #fieldsof(T) {
-            if t.tag == it.index {
-                print(it.name);
-                print(": ");
-                print(t[it.index]);
-            }
-        }
-        puts("}");
-    }
-    else if #iskind(T, *) {
-        puts("*(");
-        printHex(cast(i64) t);
-        puts(")");
-    }
-}
-
-fn printMany( T := typeof(t) )(t: T) {
-    #for it: t {
-        print(it);
-    }
-}
-
-fn printWithSeparator( sep: []i8, T := typeof(t) )(t: T) {
-    fieldCount := #fieldsof(T).count;
-
-    #for it, i: t {
-        print(it);
-        if i < fieldCount - 1 {
-            print(sep);
-        }
-    }
-}
-
-fn printWithSpaces( T := typeof(t) )(t: T) {
-    printWithSeparator!(", ")(t);
-}
-
-fn println(s: []i8) {
-    puts(s); puts("\n");
-}

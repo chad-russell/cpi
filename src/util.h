@@ -144,6 +144,7 @@ enum class LexerTokenType : int32_t {
     F32,
     F64,
     IF,
+    STATIC_IF,
     WHILE,
     ELSE,
     TRUE_,
@@ -239,6 +240,7 @@ struct ParamData {
     Node *value;
 
     Node *polyLink;
+    bool isAutoPolyParam;
 
     int64_t index;
 };
@@ -331,6 +333,9 @@ struct IfData {
     Node *condition;
     vector_t<Node *> stmts;
     vector_t<Node *> elseStmts;
+
+    bool isStatic;
+    Scope *staticIfScope;
 };
 
 struct WhileData {

@@ -365,6 +365,8 @@ void Interpreter::interpret() {
 
                     auto semantic = new Semantic();
                     semantic->lexer = evalLexer;
+                    semantic->parser = evalParser;
+                    semantic->addImports();
                     semantic->currentFnDecl = evalFnDecl;
 
                     auto wrappedRet = new Node(parsed->region.srcInfo, NodeType::RETURN, parsed->scope);
@@ -499,7 +501,7 @@ void interpretMalloc(Interpreter *interp) {
 
 void interpretFree(Interpreter *interp) {
     auto offset_from_stack = interp->read<int64_t>();
-    auto ptr_to_free = (int8_t *) interp->stack.data() + offset_from_stack;
+    auto ptr_to_free = (int8_t *) offset_from_stack;
     free(ptr_to_free);
 }
 

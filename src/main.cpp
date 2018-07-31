@@ -4,6 +4,7 @@
 #include <fstream>
 #include <sstream>
 #include <chrono>
+#include <stdlib.h>
 
 #include "assembler.h"
 #include "interpreter.h"
@@ -44,6 +45,7 @@ unsigned long nodeId;
 unsigned long fnTableId;
 int debugFlag;
 AtomTable *atomTable;
+vector_t<Node *> toSemantic;
 
 static int printAsmFlag = 0;
 static int printAstFlag = 0;
@@ -96,6 +98,8 @@ int main(int argc, char **argv) {
     atomTable = new AtomTable();
     atomTable->atoms = hash_init<string, int64_t>(1000);
 
+    toSemantic = vector_init<Node *>(4);
+
     AssemblyLexer::populateMaps();
 
     // ./cpi [-o outputFile] [--print-asm] [--debug] inputFile
@@ -142,7 +146,7 @@ int main(int argc, char **argv) {
         printHelp();
     }
 
-    auto inputFile = argv[optind];
+    auto inputFile = string(realpath(argv[optind], nullptr));
     auto inputType = inputTypeFromExtension(inputFile);
 
     auto interp = new Interpreter();
@@ -175,11 +179,25 @@ int main(int argc, char **argv) {
     if (inputType == InputType::CPI) {
         auto lexer = new Lexer(inputFile, true);
         parser = new Parser(lexer);
+
+        auto fileModule = new Node(lexer->srcInfo, NodeType::MODULE, parser->scopes.top());
+        vector_append(toSemantic, fileModule);
+        fileModule->moduleData.name = new Node(lexer->srcInfo, NodeType::SYMBOL, parser->scopes.top());
+        auto f = inputFile.substr(0, inputFile.length() - 4);
+        fileModule->moduleData.name->symbolData.atomId = atomTable->insertStr(f);
+        fileModule->moduleData.stmts = parser->allTopLevel;
+
         parser->parseRoot();
 
         semantic = new Semantic();
         semantic->lexer = lexer;
-        semantic->resolveTypes(parser->mainFn);
+        semantic->parser = parser;
+        semantic->addImports();
+
+        // todo(chad): only need to loop through all top level if this is imported. Otherwise just do the main fn
+        for (auto tl : parser->allTopLevel) {
+            semantic->resolveTypes(tl);
+        }
         if (semantic->encounteredErrors) { return -1; }
 
         if (interpretFlag != 0 || outputType == OutputType::CAS || outputType == OutputType::CBC || printAsmFlag != 0) {
@@ -345,7 +363,7 @@ int main(int argc, char **argv) {
             out << instructions;
         } else if (endsWith(outputFileNameString, ".ll")) {
             // .ll
-            auto llvmGen = new LlvmGen(inputFile);
+            auto llvmGen = new LlvmGen(inputFile.c_str());
 
             llvmGen->gen(parser->mainFn);
             llvmGen->finalize();
@@ -359,7 +377,7 @@ int main(int argc, char **argv) {
             out.close();
         } else {
             // assume we are generating an executable
-            auto llvmGen = new LlvmGen(inputFile);
+            auto llvmGen = new LlvmGen(inputFile.c_str());
 
             std::error_code EC;
             raw_fd_ostream dest("output.bc", EC, sys::fs::F_None);

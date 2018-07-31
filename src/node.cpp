@@ -105,6 +105,8 @@ void initIfData(Node *node) {
     node->ifData.condition = nullptr;
     node->ifData.stmts = vector_init<Node *>(10);
     node->ifData.elseStmts = vector_init<Node *>(10);
+    node->ifData.isStatic = false;
+    node->ifData.staticIfScope = nullptr;
 }
 
 void initStructLiteralData(Node *node) {

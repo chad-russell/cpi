@@ -420,6 +420,49 @@ Node *defaultValueFor(Semantic *semantic, Node *type) {
     return nullptr;
 }
 
+void addAllFromScopeToScope(Semantic *semantic, Scope *from, Scope *to) {
+    for (auto i = 0; i < from->symbols->bucket_count; i++) {
+        auto bucket = from->symbols->buckets[i];
+        if (bucket != nullptr) {
+            auto node = bucket->value;
+            auto found = hash_get(to->symbols, bucket->key);
+            if (found != nullptr) {
+                ostringstream s("");
+                s << "redeclaration of symbol '" << atomTable->backwardAtoms[bucket->key] << "', from import";
+                semantic->reportError({}, Error{(*found)->region, s.str()});
+            }
+            hash_insert(to->symbols, bucket->key, node);
+
+            while (bucket->next != nullptr) {
+                bucket = bucket->next;
+
+                found = hash_get(to->symbols, bucket->key);
+                if (found != nullptr) {
+                    ostringstream s("");
+                    s << "redeclaration of symbol '" << atomTable->backwardAtoms[bucket->key] << "', from import";
+                    semantic->reportError({}, Error{(*found)->region, s.str()});
+                }
+                hash_insert(to->symbols, bucket->key, node);
+            }
+        }
+    }
+}
+
+// todo(chad): this is SLOW! probably should keep an extra linear list
+void Semantic::addImports() {
+    for (auto ifStmt : this->parser->staticIfStmts) {
+        this->resolveTypes(ifStmt);
+    }
+
+    for (auto import : this->parser->imports) {
+        this->resolveTypes(import);
+        auto target = resolve(import->nodeData);
+        cpi_assert(target->type == NodeType::MODULE);
+
+        addAllFromScopeToScope(this, target->scope, import->scope);
+    }
+}
+
 void Semantic::reportError(vector<Node *> nodes, Error error) {
     encounteredErrors = true;
 
@@ -454,6 +497,10 @@ void resolveModule(Semantic *semantic, Node *node) {
     for (auto stmt : node->moduleData.stmts) {
         semantic->resolveTypes(stmt);
     }
+}
+
+void resolveImport(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->nodeData);
 }
 
 void resolveFnDecl(Semantic *semantic, Node *node) {
@@ -683,13 +730,18 @@ Node *constantize(Semantic *semantic, Node *node) {
     auto resolvedTypeInfo = resolve(copied->typeInfo);
     cpi_assert(resolvedTypeInfo->typeData.kind == NodeTypekind::I64
                || resolvedTypeInfo->typeData.kind == NodeTypekind::I32
-               || resolvedTypeInfo->typeData.kind == NodeTypekind::INT_LITERAL);
+               || resolvedTypeInfo->typeData.kind == NodeTypekind::INT_LITERAL
+               || resolvedTypeInfo->typeData.kind == NodeTypekind::BOOLEAN
+               || resolvedTypeInfo->typeData.kind == NodeTypekind::BOOLEAN_LITERAL);
+
+    auto isBoolean = (resolvedTypeInfo->typeData.kind == NodeTypekind::BOOLEAN || resolvedTypeInfo->typeData.kind == NodeTypekind::BOOLEAN_LITERAL);
 
     auto staticValue = interp->readFromStack<int64_t>(copied->localOffset);
 
     auto staticNode = new Node();
-    staticNode->type = NodeType::INT_LITERAL;
+    staticNode->type = isBoolean ? NodeType::BOOLEAN_LITERAL : NodeType::INT_LITERAL;
     staticNode->intLiteralData.value = staticValue;
+    semantic->resolveTypes(staticNode);
 
     node->staticValue = staticNode;
     copied->staticValue = staticNode;
@@ -1141,7 +1193,11 @@ void resolveBinop(Semantic *semantic, Node *node) {
 }
 
 Node *Semantic::deepCopyScopedStmt(Node *node, Scope *scope) {
-    auto copyingLexer = new Lexer(lexer, node);
+    auto copyingLexer = new Lexer(*node->region.srcInfo.fileName, true);
+    copyingLexer->lastLoc = node->region.start;
+    copyingLexer->loc = node->region.start;
+    copyingLexer->popFront();
+    copyingLexer->popFront();
 
     auto copyingParser = new Parser(copyingLexer);
     copyingParser->isCopying = true;
@@ -1686,6 +1742,10 @@ void resolveStructLiteral(Semantic *semantic, Node *node) {
 void resolveIf(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->ifData.condition);
 
+    if (node->ifData.isStatic) {
+        node->ifData.condition = constantize(semantic, node->ifData.condition);
+    }
+
     auto resolvedTypeInfo = resolve(node->ifData.condition->typeInfo);
     auto resolvedKind = resolvedTypeInfo->typeData.kind;
     if (resolvedKind != NodeTypekind::BOOLEAN && resolvedKind != NodeTypekind::BOOLEAN_LITERAL) {
@@ -1709,11 +1769,21 @@ void resolveIf(Semantic *semantic, Node *node) {
         for (const auto& stmt : node->ifData.stmts) {
             semantic->resolveTypes(stmt);
         }
+
+        // if constant, add all the things in the 'if' scope to the outer scope
+        if (node->ifData.isStatic && node->ifData.stmts.length > 0) {
+            addAllFromScopeToScope(semantic, (*node->ifData.stmts.items)->scope, node->ifData.staticIfScope);
+        }
     }
 
     if (shouldResolveElseStmts) {
         for (const auto& stmt : node->ifData.elseStmts) {
             semantic->resolveTypes(stmt);
+        }
+
+        // if constant, add all the things in the 'else' scope to the outer scope
+        if (node->ifData.isStatic && node->ifData.elseStmts.length > 0) {
+            addAllFromScopeToScope(semantic, (*node->ifData.elseStmts.items)->scope, node->ifData.staticIfScope);
         }
     }
 }
@@ -2490,6 +2560,9 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::MODULE: {
             resolveModule(this, node);
+        } break;
+        case NodeType::IMPORT: {
+            resolveImport(this, node);
         } break;
         default: cpi_assert(false);
     }

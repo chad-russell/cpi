@@ -10,6 +10,9 @@ public:
     Node *currentFnDecl = nullptr;
 
     Lexer *lexer;
+    Parser *parser;
+
+    void addImports();
 
     Node *deepCopyScopedStmt(Node *node, Scope *scope);
     Node *deepCopyRvalue(Node *node, Scope *scope);

@@ -167,6 +167,7 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "i64", LexerTokenType::I64)) { return;}
     if (tryEatKeyword(&next, "f32", LexerTokenType::F32)) { return;}
     if (tryEatKeyword(&next, "f64", LexerTokenType::F64)) { return;}
+    if (tryEatKeyword(&next, "#if", LexerTokenType::STATIC_IF)) { return; }
     if (tryEatKeyword(&next, "if", LexerTokenType::IF)) { return; }
     if (tryEatKeyword(&next, "while", LexerTokenType::WHILE)) { return; }
     if (tryEatKeyword(&next, "else", LexerTokenType::ELSE)) { return; }

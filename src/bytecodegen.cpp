@@ -1013,7 +1013,8 @@ void BytecodeGen::gen(Node *node) {
             gen(node->resolved);
             node->bytecode = node->resolved->bytecode;
         } break;
-        case NodeType::MODULE: {
+        case NodeType::MODULE:
+        case NodeType::IMPORT: {
             // nothing to do!
         } break;
         default:
