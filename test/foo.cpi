@@ -1,8 +1,15 @@
-fn main() {
-    assert(true);
-    return 0;
+type buf struct {
+    capacity: i64,
+    buf: []i64
 }
 
-fn assert(b: bool) {
-    if (b == false) { panic(); }
+fn ensureCapacity( E := typeof(b.buf[0]), T := typeof(b) )(b: T, index: i64) {
+
+}
+
+fn main() {
+    b: buf;
+    ensureCapacity(b, 3);
+
+    return 0;
 }

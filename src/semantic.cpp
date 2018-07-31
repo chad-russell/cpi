@@ -2284,9 +2284,7 @@ void resolveRun(Semantic *semantic, Node *node) {
 
 void resolveTypeof(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->nodeData);
-
     node->typeInfo = new Node(NodeTypekind::EXPOSED_AST);
-
     node->staticValue = node->nodeData->typeInfo;
 }
 

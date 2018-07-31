@@ -9,7 +9,7 @@ fn make(T: Ast)(capacity: i64) {
     };
 }
 
-fn release( T := typeof(b) )(b: T) {
+fn release(b: !T) {
     free(b.buf.data);
 }
 
@@ -42,7 +42,7 @@ fn set( T := typeof(^b), E := typeof(b.buf[0]) )(b: *T, index: i64, e: E) {
     return b.capacity;
 }
 
-fn get( T := typeof(b) )(b: T, index: i64) {
+fn get(b: !T, index: i64) {
     ensureCapacity(b, index);
     return b.buf[index];
 }

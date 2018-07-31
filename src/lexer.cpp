@@ -192,6 +192,7 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "tagcheck", LexerTokenType::TAGCHECK)) { return; }
     if (tryEatKeyword(&next, "for", LexerTokenType::FOR)) { return; }
     if (tryEatKeyword(&next, "#for", LexerTokenType::STATIC_FOR)) { return; }
+    if (tryEatKeyword(&next, "defer", LexerTokenType::DEFER)) { return; }
 
     // BACK_TICK
     if (srcInfo.source->at(loc.byteIndex) == '`') {

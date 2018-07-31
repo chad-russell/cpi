@@ -400,15 +400,15 @@ fn apply_static(f: Ast)(t: i32) {
     return f(t);
 }
 
-fn poly_inc(T := typeof(n))(n: i32) {
+fn poly_inc(n: !T) {
     return n + 1;
 }
 
-fn id(T := typeof(t))(t: T) T {
+fn id(t: !T) T {
     return t;
 }
 
-fn deref_ct(T := typeof(t))(t: T) {
+fn deref_ct(t: !T) {
     return ^t;
 }
 

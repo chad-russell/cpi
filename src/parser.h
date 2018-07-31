@@ -93,6 +93,7 @@ struct Parser {
     Node *parseFnCall();
     Node *parseArrayIndex();
     Node *buildDots(stack<Node *> rvalues);
+    Node *parseDefer();
 };
 
 #endif // PARSER_H

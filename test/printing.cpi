@@ -4,11 +4,11 @@ fn putchar(c: i8) {
     puts(s);
 }
 
-fn mod( T := typeof(x) )(x: T, y: T) {
+fn mod(x: !T, y: T) {
     return x - (x / y) * y;
 }
 
-fn printInt( T := typeof(t) )(t: T) {
+fn printInt(t: !T) {
     base := 10;
     table := []{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"};
 
@@ -35,7 +35,7 @@ fn printInt( T := typeof(t) )(t: T) {
     }
 }
 
-fn printHex( T := typeof(t) )(t: T) {
+fn printHex(t: !T) {
     base := 16;
     table := []{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"};
 
@@ -63,7 +63,7 @@ fn printHex( T := typeof(t) )(t: T) {
     }
 }
 
-fn print( T := typeof(t) )(t: T) {
+fn print(t: !T) {
     if #iskind(T, i8) {
         printInt(t);
     }
@@ -131,7 +131,7 @@ fn print( T := typeof(t) )(t: T) {
     }
 }
 
-fn printWithSeparator( sep: []i8, T := typeof(t) )(t: T) {
+fn printWithSeparator( sep: []i8 )(t: !T) {
     fieldCount := #fieldsof(T).count;
 
     #for it, i: t {
@@ -142,7 +142,7 @@ fn printWithSeparator( sep: []i8, T := typeof(t) )(t: T) {
     }
 }
 
-fn printWithSpaces( T := typeof(t) )(t: T) {
+fn printWithSpaces(t: !T) {
     printWithSeparator!(", ")(t);
 }
 

@@ -411,6 +411,14 @@ Node *Parser::parseImport() {
     return importNode;
 }
 
+Node *Parser::parseDefer() {
+    auto saved = lexer->front.region.start;
+
+    popFront();
+
+    
+}
+
 Node *Parser::parseTypeDecl() {
     auto saved = lexer->front.region.start;
 
@@ -517,6 +525,11 @@ Node *Parser::parseScopedStmt() {
     // import
     if (lexer->front.type == LexerTokenType::IMPORT) {
         return parseImport();
+    }
+
+    // defer
+    if (lexer->front.type == LexerTokenType::DEFER) {
+        return parseDefer();
     }
 
     // declaration/assignment/combo

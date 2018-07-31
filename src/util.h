@@ -173,6 +173,7 @@ enum class LexerTokenType : int32_t {
     STATIC_FOR,
     HEAP,
     ISKIND,
+    DEFER,
 };
 
 struct SourceInfo {
