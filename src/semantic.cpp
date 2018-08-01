@@ -280,6 +280,9 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
         }
 
         auto encounteredError = assignParams(semantic, actual, desired->typeData.structTypeData.params, actual->typeData.structTypeData.params);
+        for (auto p : actual->typeData.structTypeData.params) {
+            semantic->resolveTypes(p);
+        }
 
         if (!encounteredError) {
             if (!actual->typeData.structTypeData.isLiteral && desired->typeData.structTypeData.isLiteral) {
@@ -916,7 +919,7 @@ void resolveSymbol(Semantic *semantic, Node *node) {
     node->typeInfo = node->resolved->typeInfo;
 }
 
-bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<Node *> &declParams, vector_t<Node *> &givenParams, bool isCt) {
+bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<Node *> &declParams, vector_t<Node *> &givenParams) {
     vector_t<bool> openParams = vector_init<bool>(declParams.length + 1);
     vector_t<Node *> newParams = vector_init<Node *>(declParams.length + 1);
 
@@ -1000,10 +1003,6 @@ bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<No
             vector_set_at(openParams, i, false);
             declParam->paramData.value->typeInfo = declParam->paramData.type;
             vector_set_at(newParams, i, wrapInValueParam(declParam->paramData.value, declParam->paramData.name));
-
-            if (!isCt) {
-                semantic->resolveTypes(vector_at(newParams, i));
-            }
         }
     }
 
@@ -1253,6 +1252,10 @@ void resolveFnCall(Semantic *semantic, Node *node) {
         }
 
         auto encounteredError = assignParams(semantic, node, declParams, node->fnCallData.params);
+        for (auto p : node->fnCallData.params) {
+            semantic->resolveTypes(p);
+        }
+
         if (encounteredError) {
             cpi_assert(false);
         }
@@ -1267,7 +1270,7 @@ void resolveFnCall(Semantic *semantic, Node *node) {
 
     // assign compile-time params
     if (isPoly) {
-        auto encounteredError = assignParams(semantic, node, resolvedFn->fnDeclData.ctParams, node->fnCallData.ctParams, true);
+        auto encounteredError = assignParams(semantic, node, resolvedFn->fnDeclData.ctParams, node->fnCallData.ctParams);
         if (encounteredError) {
             cpi_assert(false);
         }

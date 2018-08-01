@@ -22,8 +22,4 @@ public:
     void addLocal(Node *local);
 };
 
-bool assignParams(Semantic *semantic,
-                  Node *errorReportTarget,
-                  const vector_t<Node *> &declParams,
-                  vector_t<Node *> &givenParams,
-                  bool isCt = false);
+bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<Node *> &declParams, vector_t<Node *> &givenParams);
