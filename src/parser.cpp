@@ -231,6 +231,8 @@ Node *makeAutoPolyCtParam(Node *originalParam) {
     newParam->paramData.value->nodeData = new Node(originalParam->region.srcInfo, NodeType::SYMBOL, originalParam->scope);
     newParam->paramData.value->nodeData->symbolData.atomId = paramName->symbolData.atomId;
 
+    newParam->paramData.isAutoPolyParam = true;
+
     return newParam;
 }
 
@@ -245,19 +247,11 @@ void maybeAddAutoPolyFor(Node *decl, vector_t<Node *> params) {
     if (isAutoPoly) {
         decl->fnDeclData.params = params;
 
-        auto newCtParams = vector_init<Node *>(decl->fnDeclData.ctParams.length + params.length + 1);
-
         for (auto p : params) {
             if (p->paramData.isAutoPolyParam) {
-                vector_append(newCtParams, makeAutoPolyCtParam(p));
+                vector_append(decl->fnDeclData.ctParams, makeAutoPolyCtParam(p));
             }
         }
-
-        for (auto p : decl->fnDeclData.ctParams) {
-            vector_append(newCtParams, p);
-        }
-
-        decl->fnDeclData.ctParams = newCtParams;
     }
 }
 

@@ -25,4 +25,5 @@ public:
 bool assignParams(Semantic *semantic,
                   Node *errorReportTarget,
                   const vector_t<Node *> &declParams,
-                  vector_t<Node *> &givenParams);
+                  vector_t<Node *> &givenParams,
+                  bool isCt = false);

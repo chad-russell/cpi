@@ -916,7 +916,7 @@ void resolveSymbol(Semantic *semantic, Node *node) {
     node->typeInfo = node->resolved->typeInfo;
 }
 
-bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<Node *> &declParams, vector_t<Node *> &givenParams) {
+bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<Node *> &declParams, vector_t<Node *> &givenParams, bool isCt) {
     vector_t<bool> openParams = vector_init<bool>(declParams.length + 1);
     vector_t<Node *> newParams = vector_init<Node *>(declParams.length + 1);
 
@@ -1001,7 +1001,9 @@ bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<No
             declParam->paramData.value->typeInfo = declParam->paramData.type;
             vector_set_at(newParams, i, wrapInValueParam(declParam->paramData.value, declParam->paramData.name));
 
-            semantic->resolveTypes(vector_at(newParams, i));
+            if (!isCt) {
+                semantic->resolveTypes(vector_at(newParams, i));
+            }
         }
     }
 
@@ -1265,12 +1267,22 @@ void resolveFnCall(Semantic *semantic, Node *node) {
 
     // assign compile-time params
     if (isPoly) {
-        auto ctDeclParams = resolvedFn->fnDeclData.ctParams;
-        auto ctGivenParams = node->fnCallData.ctParams;
-        auto encounteredError = assignParams(semantic, node, ctDeclParams, ctGivenParams);
+        auto encounteredError = assignParams(semantic, node, resolvedFn->fnDeclData.ctParams, node->fnCallData.ctParams, true);
         if (encounteredError) {
             cpi_assert(false);
         }
+
+        for (unsigned long i = 0; i < resolvedFn->fnCallData.ctParams.length; i++) {
+            if (vector_at(resolvedFn->fnDeclData.ctParams, i)->paramData.isAutoPolyParam) {
+                semantic->resolveTypes(vector_at(node->fnCallData.ctParams, i));
+            }
+        }
+        for (unsigned long i = 0; i < resolvedFn->fnCallData.ctParams.length; i++) {
+            semantic->resolveTypes(vector_at(node->fnCallData.ctParams, i));
+        }
+
+        auto ctDeclParams = resolvedFn->fnDeclData.ctParams;
+        auto ctGivenParams = node->fnCallData.ctParams;
 
         // Make sure the ctDeclParams resolve to their compile-time values
         for (unsigned long i = 0; i < ctGivenParams.length; i++) {
@@ -1307,6 +1319,8 @@ void resolveFnCall(Semantic *semantic, Node *node) {
             // @Hack!!!
             for (auto d : declParams) {
                 d->semantic = false;
+            }
+            for (auto d : declParams) {
                 semantic->resolveTypes(d);
             }
         }
@@ -1324,19 +1338,56 @@ void resolveFnCall(Semantic *semantic, Node *node) {
             auto declParam = vector_at(ctDeclParams, i);
             auto givenParam = vector_at(ctGivenParams, i);
 
+            if (!declParam->paramData.isAutoPolyParam) {
+                continue;
+            }
+
             semantic->resolveTypes(declParam);
             semantic->resolveTypes(givenParam);
 
-            // if declParam is an exposed 'Any' type, convert the givenParam to that
-            if (declParam->typeInfo->typeData.kind == NodeTypekind::EXPOSED_AST) {
-                givenParam->typeInfo = new Node(NodeTypekind::EXPOSED_AST);
-                givenParam->typeInfo->staticValue = givenParam;
+            // todo(chad): just skipping everything if the typeInfo is null seems really dangerous...
+            // probably want to find another way to categorize these based on some polymorphic quality/flag
+            if (declParam->typeInfo != nullptr) {
+                if (declParam->typeInfo->typeData.kind == NodeTypekind::EXPOSED_AST) {
+                    // if declParam is an exposed 'Any' type, convert the givenParam to that
+                    givenParam->typeInfo = new Node(NodeTypekind::EXPOSED_AST);
+                    givenParam->typeInfo->staticValue = givenParam;
+                }
+                else {
+                    if (!typesMatch(declParam->typeInfo, givenParam->paramData.value->typeInfo, semantic)) {
+                        // todo if match exposed to real type then set resolved on exposed to real and pass match
+                        // unless already set then error?
+                        semantic->reportError({node, declParam, givenParam}, Error{node->region, "static type mismatch!"});
+                    }
+                }
             }
-            else {
-                if (!typesMatch(declParam->typeInfo, givenParam->paramData.value->typeInfo, semantic)) {
-                    // todo if match exposed to real type then set resolved on exposed to real and pass match
-                    // unless already set then error?
-                    semantic->reportError({node, declParam, givenParam}, Error{node->region, "static type mismatch!"});
+        }
+
+        for (unsigned long i = 0; i < ctGivenParams.length; i++) {
+            auto declParam = vector_at(ctDeclParams, i);
+            auto givenParam = vector_at(ctGivenParams, i);
+
+            if (declParam->paramData.isAutoPolyParam) {
+                continue;
+            }
+
+            semantic->resolveTypes(declParam);
+            semantic->resolveTypes(givenParam);
+
+            // todo(chad): just skipping everything if the typeInfo is null seems really dangerous...
+            // probably want to find another way to categorize these based on some polymorphic quality/flag
+            if (declParam->typeInfo != nullptr) {
+                if (declParam->typeInfo->typeData.kind == NodeTypekind::EXPOSED_AST) {
+                    // if declParam is an exposed 'Any' type, convert the givenParam to that
+                    givenParam->typeInfo = new Node(NodeTypekind::EXPOSED_AST);
+                    givenParam->typeInfo->staticValue = givenParam;
+                }
+                else {
+                    if (!typesMatch(declParam->typeInfo, givenParam->paramData.value->typeInfo, semantic)) {
+                        // todo if match exposed to real type then set resolved on exposed to real and pass match
+                        // unless already set then error?
+                        semantic->reportError({node, declParam, givenParam}, Error{node->region, "static type mismatch!"});
+                    }
                 }
             }
         }

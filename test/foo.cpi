@@ -1,8 +1,6 @@
-fn foo( sep: i64, T := typeof(t) )(t: T) {
-}
+fn foo( E := typeof(b[0]) )(b: !T) { }
 
 fn main() {
-    foo!(sep: 8)(3);
-
-    return 0;
+    return foo([]{1, 2, 3});
 }
+
