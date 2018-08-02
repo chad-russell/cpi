@@ -918,6 +918,8 @@ void BytecodeGen::gen(Node *node) {
         } break;
         case NodeType::CAST: {
             gen(node->castData.value);
+
+            node->resolved = node->castData.value;
         } break;
         case NodeType::STRING_LITERAL: {
             gen(node->resolved);
@@ -934,17 +936,19 @@ void BytecodeGen::gen(Node *node) {
         case NodeType::FREE: {
             gen(node->nodeData);
 
-            if (node->nodeData->isLocal || node->nodeData->isBytecodeLocal) {
-                storeValue(node->nodeData, node->nodeData->localOffset);
+            auto resolved = resolve(node->nodeData);
+
+            if (resolved->isLocal || resolved->isBytecodeLocal) {
+                storeValue(resolved, resolved->localOffset);
                 append(instructions, Instruction::FREE);
                 append(instructions, Instruction::RELI64);
-                append(instructions, toBytes(node->nodeData->localOffset));
+                append(instructions, toBytes(resolved->localOffset));
             }
             else {
-                cpi_assert(!node->nodeData->bytecode.empty());
+                cpi_assert(!resolved->bytecode.empty());
 
                 append(instructions, Instruction::FREE);
-                append(instructions, node->nodeData->bytecode);
+                append(instructions, resolved->bytecode);
             }
         } break;
         case NodeType::ARRAY_LITERAL: {

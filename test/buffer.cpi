@@ -10,7 +10,7 @@ fn make(T: Ast)(capacity: i64) {
 }
 
 fn release(b: !T) {
-    free(b.buf.data);
+    free(cast(*none) b.buf.data);
 }
 
 fn ensureCapacity( E := typeof(b.buf[0]) )(b: !T, index: i64) {

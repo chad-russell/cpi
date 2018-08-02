@@ -498,7 +498,7 @@ void LlvmGen::gen(Node *node) {
                     nodeTypeToAlloca = resolve(resolvedLocal->typeInfo);
                 } else if (resolvedTypeInfo->type == NodeType::TYPEOF) {
                     // todo(chad): this should probably be disallowed, and we should instead find a way to always have typeInfo be NodeType::TYPE
-                    cpi_assert(resolvedLocal->typeInfo->staticValue);
+                    cpi_assert(resolvedLocal->typeInfo->staticValue != nullptr);
                     nodeTypeToAlloca = resolvedLocal->typeInfo->staticValue;
                 } else {
                     cpi_assert(false);
@@ -545,16 +545,6 @@ void LlvmGen::gen(Node *node) {
                     }
 
                     local->llvmLocal = resolvedLocal->llvmLocal;
-                }
-            }
-
-            // gen all ctParams
-            for (auto ctParam : node->fnDeclData.ctParams) {
-                auto resolvedCtParam = resolve(ctParam);
-
-                // this shouldn't get us into trouble... right?
-                if (resolvedCtParam->type != NodeType::FN_DECL) {
-                    gen(resolvedCtParam);
                 }
             }
 
@@ -1374,6 +1364,7 @@ void LlvmGen::gen(Node *node) {
         } break;
         case NodeType::DEFER:
         case NodeType::END_SCOPE:
+        case NodeType::IMPORT:
         case NodeType::MODULE: {
             // nothing to do
         } break;

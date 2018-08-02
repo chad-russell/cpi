@@ -1303,14 +1303,20 @@ void resolveFnCall(Semantic *semantic, Node *node) {
             cpi_assert(false);
         }
 
+        // We want to resolve all semantic parameters, but we DON'T want to add any locals
+        auto savedFnDecl = semantic->currentFnDecl;
+        semantic->currentFnDecl = nullptr;
         for (unsigned long i = 0; i < resolvedFn->fnCallData.ctParams.length; i++) {
-            if (vector_at(resolvedFn->fnDeclData.ctParams, i)->paramData.isAutoPolyParam) {
+            auto paramI = vector_at(resolvedFn->fnDeclData.ctParams, i);
+            if (paramI->paramData.isAutoPolyParam) {
                 semantic->resolveTypes(vector_at(node->fnCallData.ctParams, i));
             }
         }
         for (unsigned long i = 0; i < resolvedFn->fnCallData.ctParams.length; i++) {
-            semantic->resolveTypes(vector_at(node->fnCallData.ctParams, i));
+            auto paramI = vector_at(resolvedFn->fnDeclData.ctParams, i);
+            semantic->resolveTypes(paramI);
         }
+        semantic->currentFnDecl = savedFnDecl;
 
         auto ctDeclParams = resolvedFn->fnDeclData.ctParams;
         auto ctGivenParams = node->fnCallData.ctParams;

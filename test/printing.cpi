@@ -132,11 +132,9 @@ fn print(t: !T) {
 }
 
 fn printWithSeparator( sep: []i8 )(t: !T) {
-    fieldCount := #fieldsof(T).count;
-
     #for it, i: t {
         print(it);
-        if i < fieldCount - 1 {
+        if i < #fieldsof(T).count - 1 {
             print(sep);
         }
     }
