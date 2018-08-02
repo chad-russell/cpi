@@ -1013,7 +1013,11 @@ void BytecodeGen::gen(Node *node) {
             gen(node->resolved);
             node->bytecode = node->resolved->bytecode;
         } break;
+        case NodeType::END_SCOPE: {
+            append(instructions, Instruction::NOP);
+        } break;
         case NodeType::MODULE:
+        case NodeType::DEFER:
         case NodeType::IMPORT: {
             // nothing to do!
         } break;

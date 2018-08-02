@@ -145,7 +145,17 @@ fn main() {
 
     assert(topLevel == 123);
 
+    assert(testDefer() == 4);
+
     return 0;
+}
+
+fn testDefer() {
+    a := 3;
+    defer {
+        a = a + 1;
+    }
+    return a;
 }
 
 fn testModule3() {

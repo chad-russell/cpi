@@ -75,6 +75,7 @@ enum class NodeType {
     HEAPIFY = 41,
     ISKIND = 42,
     DEFER = 43,
+    END_SCOPE = 44,
 };
 
 enum class NodeTypekind {
@@ -402,8 +403,13 @@ public:
     hash_t<int64_t, Node *> *symbols;
     Scope *parent = nullptr;
 
-    explicit Scope(Scope *parent);
+    // for deferred
+    bool isFunctionScope = false;
+    vector_t<Node *> deferredStmts = vector_init<Node *>(4);
+    bool insertedDeferredStmts = false;
 
+    // methods
+    explicit Scope(Scope *parent);
     Node *find(int64_t atomId);
 };
 

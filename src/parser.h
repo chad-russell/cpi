@@ -49,6 +49,9 @@ struct Parser {
     LexerToken expect(LexerTokenType type, string expectation);
     void expectSemicolon();
     void scopeInsert(int64_t atomId, Node *node);
+    void appendEndScope(vector_t<Node *> &stmts);
+
+    void possiblyInsertDeferreds(Node *node, bool isReturn);
 
     int8_t operatorPrecedence(LexerTokenType type);
     Node *unwindPolish(stack<ShuntingYard> *values);

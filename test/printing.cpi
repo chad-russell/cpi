@@ -146,6 +146,6 @@ fn printWithSpaces(t: !T) {
     printWithSeparator!(", ")(t);
 }
 
-fn println(s: []i8) {
-    puts(s); puts("\n");
+fn println(s: !T) {
+    print(s); puts("\n");
 }

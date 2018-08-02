@@ -66,6 +66,7 @@ void interpretPanic(Interpreter *interp);
 void interpretMalloc(Interpreter *interp);
 void interpretFree(Interpreter *interp);
 void interpretPuts(Interpreter *interp);
+void interpretNop(Interpreter *interp);
 
 class Interpreter {
 public:
@@ -231,7 +232,8 @@ public:
             interpretPanic,
             interpretMalloc,
             interpretFree,
-            interpretPuts};
+            interpretPuts,
+            interpretNop};
   }
 
     void interpret();

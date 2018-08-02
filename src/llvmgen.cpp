@@ -1372,6 +1372,8 @@ void LlvmGen::gen(Node *node) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
         } break;
+        case NodeType::DEFER:
+        case NodeType::END_SCOPE:
         case NodeType::MODULE: {
             // nothing to do
         } break;

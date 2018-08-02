@@ -5,12 +5,12 @@
 
 class Semantic {
 public:
-    bool encounteredErrors;
+    bool encounteredErrors = false;
     bool lvalueAssignmentContext = false;
     Node *currentFnDecl = nullptr;
 
-    Lexer *lexer;
-    Parser *parser;
+    Lexer *lexer = nullptr;
+    Parser *parser = nullptr;
 
     void addImports();
 

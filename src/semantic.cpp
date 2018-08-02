@@ -506,6 +506,12 @@ void resolveImport(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->nodeData);
 }
 
+void resolveDefer(Semantic *semantic, Node *node) {
+    for (auto stmt : node->deferData.stmts) {
+        semantic->resolveTypes(stmt);
+    }
+}
+
 void resolveFnDecl(Semantic *semantic, Node *node) {
     auto data = &node->fnDeclData;
 
@@ -544,7 +550,8 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
     else if (data->returns.length == 0) {
         data->returnType = new Node(NodeTypekind::NONE);
     }
-    else if (data->returnType == nullptr) {
+
+    if (data->returnType == nullptr) {
         auto firstReturn = vector_at(data->returns, 0);
         semantic->resolveTypes(firstReturn);
         data->returnType = firstReturn->typeInfo;
@@ -642,6 +649,10 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
 }
 
 void resolveRet(Semantic *semantic, Node *node) {
+    for (auto n : node->preStmts) {
+        semantic->resolveTypes(n);
+    }
+
     semantic->resolveTypes(node->retData.value);
     node->typeInfo = node->retData.value->typeInfo;
 }
@@ -1193,18 +1204,35 @@ void resolveBinop(Semantic *semantic, Node *node) {
 }
 
 Node *Semantic::deepCopyScopedStmt(Node *node, Scope *scope) {
-    auto copyingLexer = new Lexer(*node->region.srcInfo.fileName, true);
-    copyingLexer->lastLoc = node->region.start;
-    copyingLexer->loc = node->region.start;
-    copyingLexer->popFront();
-    copyingLexer->popFront();
+    Node *copied = nullptr;
 
-    auto copyingParser = new Parser(copyingLexer);
-    copyingParser->isCopying = true;
-    copyingParser->scopes.pop();
-    copyingParser->scopes.push(scope);
-    copyingParser->currentFnDecl = currentFnDecl;
-    return copyingParser->parseScopedStmt();
+    if (node->type == NodeType::END_SCOPE) {
+        copied = new Node(node->region.srcInfo, NodeType::END_SCOPE, node->scope);
+        copied->region = node->region;
+    }
+    else {
+        auto copyingLexer = new Lexer(*node->region.srcInfo.fileName, true);
+        copyingLexer->lastLoc = node->region.start;
+        copyingLexer->loc = node->region.start;
+        copyingLexer->popFront();
+        copyingLexer->popFront();
+
+        auto copyingParser = new Parser(copyingLexer);
+        copyingParser->isCopying = true;
+        copyingParser->scopes.pop();
+        copyingParser->scopes.push(scope);
+        copyingParser->currentFnDecl = currentFnDecl;
+        copied = copyingParser->parseScopedStmt();
+    }
+
+    for (auto s : node->preStmts) {
+        vector_append(copied->preStmts, deepCopyScopedStmt(s, s->scope));
+    }
+    for (auto s : node->postStmts) {
+        vector_append(copied->postStmts, deepCopyScopedStmt(s, s->scope));
+    }
+
+    return copied;
 }
 
 Node *Semantic::deepCopyRvalue(Node *node, Scope *scope) {
@@ -2494,6 +2522,13 @@ void Semantic::resolveTypes(Node *node) {
     if (node->semantic) { return; }
     node->semantic = true;
 
+    for (auto stmt : node->preStmts) {
+        resolveTypes(stmt);
+    }
+    for (auto stmt : node->postStmts) {
+        resolveTypes(stmt);
+    }
+
     switch (node->type) {
         case NodeType::FN_DECL: {
             resolveFnDecl(this, node);
@@ -2615,6 +2650,10 @@ void Semantic::resolveTypes(Node *node) {
         case NodeType::IMPORT: {
             resolveImport(this, node);
         } break;
+        case NodeType::DEFER: {
+            resolveDefer(this, node);
+        } break;
+        case NodeType::END_SCOPE: break;
         default: cpi_assert(false);
     }
 }

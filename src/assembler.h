@@ -52,6 +52,7 @@ enum class TokenType : unsigned char {
     MALLOC,
     FREE,
     PUTS,
+    NOP,
 
     // literals
     CONSTI8, CONSTI16, CONSTI32, CONSTI64, CONSTF32, CONSTF64,
@@ -111,6 +112,7 @@ enum class Instruction : unsigned char {
     MALLOC,
     FREE,
     PUTS,
+    NOP,
 
     // literals
     CONSTI8, CONSTI16, CONSTI32, CONSTI64, CONSTF32, CONSTF64,

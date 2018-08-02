@@ -56,6 +56,9 @@ Node::Node(SourceInfo srcInfo, NodeType type_, Scope *scope_) : Node() {
         case NodeType::DEFER: {
             initDeferData(this);
         } break;
+        case NodeType::END_SCOPE: {
+            initEndScopeData(this);
+        } break;
         default: {}
     }
 }
@@ -89,6 +92,10 @@ void initModuleData(Node *node) {
 
 void initDeferData(Node *node) {
     node->deferData.stmts = vector_init<Node *>(10);
+}
+
+void initEndScopeData(Node *node) {
+    node->sourceMapStatement = true;
 }
 
 void initArrayLiteralData(Node *node) {

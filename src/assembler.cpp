@@ -264,14 +264,6 @@ void AssemblyLexer::popFront() {
 
         return;
     }
-
-    cout << "could not parse token at byteIndex "
-         << loc.byteIndex
-         << "("
-         << sourceMap.sourceInfo.source->substr(loc.byteIndex, 10)
-         << ")...";
-
-    cpi_assert(false);
 }
 
 void AssemblyLexer::popFrontFinalize(Token newNext, vector<unsigned char> newInst) {
@@ -366,6 +358,7 @@ const vector<string> AssemblyLexer::tokenTypeStrings = {
     "FREE",
     "PUTS",
     "TAGCHECK",
+    "NOP",
 
     // literals
     "CONSTI8", "CONSTI16", "CONSTI32", "CONSTI64", "CONSTF32", "CONSTF64",
@@ -425,6 +418,7 @@ const vector<string> AssemblyLexer::instructionStrings = {
     "MALLOC",
     "FREE",
     "PUTS",
+    "NOP",
 
     // literals
     "CONSTI8", "CONSTI16", "CONSTI32", "CONSTI64", "CONSTF32", "CONSTF64",

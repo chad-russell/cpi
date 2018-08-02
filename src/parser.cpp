@@ -49,6 +49,15 @@ void Parser::expectSemicolon() {
     expect(LexerTokenType::SEMICOLON, "';'");
 }
 
+void Parser::appendEndScope(vector_t<Node *> &stmts) {
+    auto endScopeNode = new Node(lexer->srcInfo, NodeType::END_SCOPE, scopes.top());
+    endScopeNode->region = lexer->front.region;
+
+    possiblyInsertDeferreds(endScopeNode, false);
+
+    vector_append(stmts, endScopeNode);
+}
+
 void Parser::scopeInsert(int64_t atomId, Node *node) {
     auto _scope = scopes.top();
 
@@ -333,6 +342,7 @@ Node *Parser::parseFnDecl() {
     expect(LexerTokenType::LCURLY, "{");
 
     scopes.push(new Scope(scopes.top()));
+    scopes.top()->isFunctionScope = true;
 
     while (!lexer->isEmpty() && lexer->front.type != LexerTokenType::RCURLY) {
         auto scopedStmt = parseScopedStmt();
@@ -423,7 +433,9 @@ Node *Parser::parseDefer() {
     expect(LexerTokenType::LCURLY, "{");
 
     while (lexer->front.type != LexerTokenType::RCURLY) {
-        vector_append(node->deferData.stmts, parseScopedStmt());
+        auto deferredStmt = parseScopedStmt();
+        vector_append(node->deferData.stmts, deferredStmt);
+        vector_append(node->scope->deferredStmts, deferredStmt);
     }
 
     node->region = Region{lexer->srcInfo, saved, lexer->front.region.end};
@@ -673,10 +685,8 @@ Node *Parser::parseScopedStmt() {
 Node *Parser::parseIf() {
     auto isStatic = lexer->front.type == LexerTokenType::STATIC_IF;
 
-    auto isToplevel = false;
     if (staticIfScope == nullptr) {
         staticIfScope = scopes.top();
-        isToplevel = true;
     }
 
     auto saved = lexer->front.region.start;
@@ -701,6 +711,7 @@ Node *Parser::parseIf() {
             vector_append(if_->ifData.stmts, scopedStmt);
         }
     }
+    appendEndScope(if_->ifData.stmts);
 
     if_->region.end = lexer->front.region.end;
     expect(LexerTokenType::RCURLY, "}");
@@ -721,8 +732,12 @@ Node *Parser::parseIf() {
         expect(LexerTokenType::LCURLY, "{");
 
         while (lexer->front.type != LexerTokenType::RCURLY) {
-            vector_append(if_->ifData.elseStmts, parseScopedStmt());
+            auto scopedStmt = parseScopedStmt();
+            if (scopedStmt != nullptr) {
+                vector_append(if_->ifData.elseStmts, scopedStmt);
+            }
         }
+        appendEndScope(if_->ifData.elseStmts);
 
         scopes.pop();
 
@@ -759,6 +774,7 @@ Node *Parser::parseWhile() {
             vector_append(while_->whileData.stmts, scopedStmt);
         }
     }
+    appendEndScope(while_->whileData.stmts);
 
     while_->region.end = lexer->front.region.end;
     expect(LexerTokenType::RCURLY, "}");
@@ -802,6 +818,7 @@ Node *Parser::parseFor() {
             vector_append(for_->forData.stmts, scopedStmt);
         }
     }
+    appendEndScope(for_->forData.stmts);
 
     for_->region.end = lexer->front.region.end;
     expect(LexerTokenType::RCURLY, "}");
@@ -809,6 +826,26 @@ Node *Parser::parseFor() {
     scopes.pop();
 
     return for_;
+}
+
+void Parser::possiblyInsertDeferreds(Node *node, bool isReturn) {
+    if (node->scope->insertedDeferredStmts) {
+        return;
+    }
+    node->scope->insertedDeferredStmts = true;
+
+    auto scope = node->scope;
+    if (isReturn) {
+        while (!scope->isFunctionScope) {
+            for (auto i = static_cast<int64_t>(scope->deferredStmts.length - 1); i >= 0; i--) {
+                vector_append(node->preStmts, vector_at(scope->deferredStmts, static_cast<unsigned long>(i)));
+            }
+            scope = scope->parent;
+        }
+    }
+    for (auto i = static_cast<int64_t>(scope->deferredStmts.length - 1); i >= 0; i--) {
+        vector_append(node->preStmts, vector_at(scope->deferredStmts, static_cast<unsigned long>(i)));
+    }
 }
 
 Node *Parser::parseRet() {
@@ -826,6 +863,8 @@ Node *Parser::parseRet() {
     expectSemicolon();
 
     ret->sourceMapStatement = true;
+
+    possiblyInsertDeferreds(ret, true);
 
     return ret;
 }

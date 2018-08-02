@@ -1,6 +1,9 @@
-fn foo( E := typeof(b[0]) )(b: !T) { }
-
-fn main() {
-    return foo([]{1, 2, 3});
+fn inc(a: i32) {
+    return a + 1;
 }
 
+fn main() {
+    3|foo;
+
+    return 0;
+}

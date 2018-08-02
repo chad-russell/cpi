@@ -517,6 +517,11 @@ void interpretPuts(Interpreter *interp) {
     fwrite(followed_ptr, sizeof(char), count, stdout);
 }
 
+// nop
+void interpretNop(Interpreter *interp) {
+    // do nothing!
+}
+
 // calli
 void interpretCalli(Interpreter *interp) {
     auto fnTableIndex = interp->read<int64_t>();
