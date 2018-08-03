@@ -196,7 +196,7 @@ void Lexer::popFront() {
 
     // BACK_TICK
     if (srcInfo.source->at(loc.byteIndex) == '`') {
-        next.type = LexerTokenType::BACK_TICK;
+        next.type = LexerTokenType::SYMBOL;
         auto saved_loc = loc;
 
         eat(); // eat first back tick
@@ -220,7 +220,7 @@ void Lexer::popFront() {
 
     // SINGLE_QUOTE
     if (srcInfo.source->at(loc.byteIndex) == '\'') {
-        next.type = LexerTokenType::BACK_TICK;
+        next.type = LexerTokenType::SINGLE_QUOTE;
         auto savedLoc = loc;
 
         eat(); // eat first single quote
@@ -287,7 +287,26 @@ void Lexer::popFront() {
     }
 
     // int
-    if (isdigit(srcInfo.source->at(loc.byteIndex))) {
+    auto parsingInt = false;
+    auto parsingHex = false;
+    auto parsingBin = false;
+    if (srcInfo.source->at(loc.byteIndex) == '0' && srcInfo.source->length() > loc.byteIndex + 1) {
+        if (srcInfo.source->at(loc.byteIndex + 1) == 'x') {
+            parsingHex = true;
+            eat(2); // 0x
+        }
+        else if (srcInfo.source->at(loc.byteIndex + 1) == 'b') {
+            parsingBin = true;
+            eat(2); // 0b
+        }
+        else {
+            parsingInt = true;
+        }
+    }
+    else if (isdigit(srcInfo.source->at(loc.byteIndex))) {
+        parsingInt = true;
+    }
+    if (parsingInt || parsingHex || parsingBin) {
         next.type = LexerTokenType::INT_LITERAL;
         while (isdigit(srcInfo.source->at(loc.byteIndex)) || srcInfo.source->at(loc.byteIndex) == '_') {
             eat();
@@ -299,6 +318,11 @@ void Lexer::popFront() {
         }
 
         if (srcInfo.source->at(loc.byteIndex) == '.') {
+            if (parsingBin || parsingHex) {
+                reportError(Error{{this->srcInfo, lastLoc, loc}, "decimals not allowed when parsing binary/hex literal"});
+                return;
+            }
+
             next.type = LexerTokenType::FLOAT_LITERAL;
             eat();
             while (isdigit(srcInfo.source->at(loc.byteIndex)) || srcInfo.source->at(loc.byteIndex) == '_') {
@@ -309,10 +333,6 @@ void Lexer::popFront() {
         popFrontFinalize(0, next);
         return;
     }
-
-    // todo(chad): more number formats for convenience
-    // hex (0xCAFE)
-    // binary (0b100010)
 
     // SYMBOL
     next.type = LexerTokenType::SYMBOL;

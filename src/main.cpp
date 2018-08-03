@@ -45,7 +45,7 @@ unsigned long nodeId;
 unsigned long fnTableId;
 int debugFlag;
 AtomTable *atomTable;
-vector_t<Node *> toSemantic;
+vector_t<Node *> importedFileModules;
 
 static int printAsmFlag = 0;
 static int printAstFlag = 0;
@@ -98,7 +98,7 @@ int main(int argc, char **argv) {
     atomTable = new AtomTable();
     atomTable->atoms = hash_init<string, int64_t>(1000);
 
-    toSemantic = vector_init<Node *>(4);
+    importedFileModules = vector_init<Node *>(4);
 
     AssemblyLexer::populateMaps();
 
@@ -181,7 +181,7 @@ int main(int argc, char **argv) {
         parser = new Parser(lexer);
 
         auto fileModule = new Node(lexer->srcInfo, NodeType::MODULE, parser->scopes.top());
-        vector_append(toSemantic, fileModule);
+        vector_append(importedFileModules, fileModule);
         fileModule->moduleData.name = new Node(lexer->srcInfo, NodeType::SYMBOL, parser->scopes.top());
         auto f = inputFile.substr(0, inputFile.length() - 4);
         fileModule->moduleData.name->symbolData.atomId = atomTable->insertStr(f);
@@ -192,6 +192,7 @@ int main(int argc, char **argv) {
         semantic = new Semantic();
         semantic->lexer = lexer;
         semantic->parser = parser;
+        semantic->addStaticIfs(parser->scopes.top());
         semantic->addImports();
 
         // todo(chad): only need to loop through all top level if this is imported. Otherwise just do the main fn

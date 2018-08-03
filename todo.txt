@@ -1,45 +1,72 @@
 TODO:
-    - pipe operator
+    - better specification of paths for imports
+        - path should always be relative to the main file, regardless of where the compiler was run from
+        - allow for import paths
+            - #importPath "/usr/local/cpi/imports";
+            - allow from command line as well (?) (or possibly an environment variable?)
 
-    - think about the future of 'heap' -- we probably don't even need it except for arrays
-        - how best to specify the default heapifier for arrays? *probably* with implicit parameter passing
-            (alternatively with thread-local storage)
+    - specification of paths for lib linking
+        - path should always be relative to the main file, regardless of where the compiler was run from
+        - example:
+            - ```
+                #link "foo" {
+                    fn bar() i64;
+                    fn baz(i: i32) *none;
+                }
+            ```
+        - allow for link paths
+            - #linkPath "/usr/local/cpi/lib";
+            - allow from command line as well (?) (or possibly an environment variable?)
 
-    - make sure 'constantize' works with any type
-        - need concept of global variables first
-            - do we want this? (maybe global stuff should just universally go in the context, *OR* all global stuff should be something that can be inlined)
-        - at least print an error if we try to do it with something (like a pointer, etc.) which isn't supported
+    - create thread
+        - for llvm version, can call out to pthread routines
+        - for interpreter, should spin up another interpreter and add it to a list. Execution should round-robin over all interpreters in the list
+        - need:
+            - basic:
+                - create:
+                    - #async foo(3, "foo");
+                        - in llvm this should translate to: ```
+                            pthread_t __t;
+                            pthread_create(&__t, nil, cast(fn(data: *none) *none) thread_init_foo, cast(*none) &{3, bar});
+                        ```
+                        - each function which is #async'd needs a custom init function. thread_init_foo should look like: ```
+                            fn thread_init_foo(data: *{_0: i32, _1: []i8}) {
+                                foo(makeContext(), data._0, data._1);
+                            }
+                        ```
+
+    - global variables
+        - at top-level and module-level
+        - need them at the very least for mutexes, but also for global ids, etc. (i.e. if we're making a multi-threaded parser then node_id needs to be globally unique)
+
+    - mutexes
+        - ```
+            m: mutex; -- global. This should get initialized when the program starts
+            #sync(m) {
+                -- do stuff. Should lock at the beginning and unlock at the end
+            }
+        ```
+
+    - remove 'heap' as a concept -- should always just use the context
+
+    - more robustness for 'constantize'
+        - figure out what things can be constant and what things can't
+            - everything but pointers (??)
+        - error printing when things aren't supported
 
     - better interpreter debugging
-        - fix all the stuff we broke
+        - fix all the broken stuff
         - implement option to have memory as a rope structure -- infinite undo/redo of program execution state
             - will need to re-work how this works considering malloc/free escape out of our sandbox
-                - might not be an issue once we have context, especially considering that anything calling out to C won't work either
+                - might not be an issue once context is a thing, especially considering that anything calling out to C won't work either
             - use this for step/continue backwards in vscode
         - conditional breakpoints
         - ctfe debugging
 
-    - possibly bring back 'Type' as a way of asserting something must be a type
-        - writing 'fn foo(t: Any)() { ... }' is a little weird considering the vast majority of the time we actually just want to accept a type here and not any random ast node
-
     - switch (on enum (tag))
         - only real benefit is that the compiler could warn you if you miss a case
 
-    - parse symbols in backticks
-        - `0n3:s!mb()l` := 3;
-
-    - more integer formats
-        - hex (0x123)
-        - binary (0b10010011)
-
-    - array bounds checking
-
     - how to make custom stretchy buffer that's also pretty
         - probably just get rid of `[]` syntax... instead of giving all types a way to
-            access to special syntax, we can just have less special syntax
+            access to special syntax, can just have less special syntax
         - a := buf!(i32)(10); a|append(3); return a|at(1);
-
-    - varargs
-        - fn print(args: ...) { }
-        - e.g. `print("here is a value: ", 3, " and here is another one: ", {x: 13, y: &67}, ". That is all! :)");`
-        - implementation -- just pack them all into a struct

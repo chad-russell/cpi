@@ -10,7 +10,7 @@
 
 struct Parser;
 
-extern vector_t<Node *> toSemantic;
+extern vector_t<Node *> importedFileModules;
 
 enum class ShuntingYardType {
     NODE,
@@ -32,6 +32,7 @@ struct Parser {
     LexerToken last;
     Node *mainFn = nullptr;
     vector_t<Node *> allTopLevel;
+    // todo(chad): does this need to be a stack?? or can we keep track of it in the moment?
     stack<Scope *> scopes;
     Node *currentFnDecl = nullptr;
     bool isCopying = false;
@@ -39,7 +40,6 @@ struct Parser {
 
     vector_t<Node *> imports = vector_init<Node *>(16);
 
-    vector_t<Node *> staticIfStmts = vector_init<Node *>(16);
     Scope *staticIfScope = nullptr;
 
     explicit Parser(Lexer *lexer_);

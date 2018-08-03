@@ -463,7 +463,10 @@ void BytecodeGen::gen(Node *node) {
             node->localOffset = resolved->localOffset;
         } break;
         case NodeType::BINOP: {
-            if (node->binopData.type == LexerTokenType::AND) {
+            if (node->binopData.type == LexerTokenType::VERTICAL_BAR) {
+                gen(resolve(node));
+            }
+            else if (node->binopData.type == LexerTokenType::AND) {
                 // a and b ====> { result := false; if a { if b { result = true; } }
 
                 append(node->bytecode, Instruction::RELI64);

@@ -426,6 +426,10 @@ void LlvmGen::gen(Node *node) {
 
     switch (node->type) {
         case NodeType::FN_DECL: {
+            if (node->fnDeclData.ctParams.length != 0 && !node->fnDeclData.cameFromPolymorph) {
+                break;
+            }
+
             auto declOnly = node->fnDeclData.body.length == 0;
 
             // debug info
@@ -433,20 +437,6 @@ void LlvmGen::gen(Node *node) {
 
             auto savedScope = currentScope;
             auto savedScopeName = currentScopeName;
-
-#if DBUILDER
-            llvm::DISubprogram *SP = nullptr;
-            if (!declOnly) {
-                llvm::DIFile *unit = dBuilder->createFile(diCu->getFilename(), diCu->getDirectory());
-                 SP = dBuilder->createFunction(
-                        unit, fnName, fnName, unit, (unsigned int) node->region.start.line,
-                        static_cast<llvm::DISubroutineType *>(diTypeFor(this, node->typeInfo)),
-                        false /* internal linkage */, true /* definition */, (unsigned int) node->region.start.line,
-                        llvm::DINode::FlagZero, false, nullptr);
-                currentScope = SP;
-                currentScopeName = "SP_" + fnName;
-            }
-#endif
 
             std::vector<llvm::Type*> paramTypes = {};
             for (const auto& param : node->fnDeclData.params) {
@@ -459,13 +449,6 @@ void LlvmGen::gen(Node *node) {
             auto FT = llvm::FunctionType::get(returnType, paramTypes, false);
 
             auto *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, fnName, module.get());
-
-            if (!declOnly) {
-#if DBUILDER
-                emitDebugLocation(this, node);
-                F->setSubprogram(SP);
-#endif
-            }
 
             F->setCallingConv(llvm::CallingConv::C);
             node->llvmData = F;
@@ -691,7 +674,10 @@ void LlvmGen::gen(Node *node) {
         case NodeType::BINOP: {
             emitDebugLocation(this, node);
 
-            if (node->binopData.type == LexerTokenType::AND) {
+            if (node->binopData.type == LexerTokenType::VERTICAL_BAR) {
+                gen(node->resolved);
+            }
+            else if (node->binopData.type == LexerTokenType::AND) {
                 // a and b ====> { result := false; if a { if b { result = true; } }
 
                 // initially store false

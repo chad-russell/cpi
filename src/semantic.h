@@ -12,6 +12,7 @@ public:
     Lexer *lexer = nullptr;
     Parser *parser = nullptr;
 
+    void addStaticIfs(Scope *target);
     void addImports();
 
     Node *deepCopyScopedStmt(Node *node, Scope *scope);

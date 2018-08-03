@@ -1,8 +1,11 @@
-fn printWithSeparator( sep: []i8, T := typeof(3) )() {
-    puts(sep);
-}
-
 fn main() {
-    printWithSeparator!(", ")();
+    #if []{1, 2, 3}.count == 3 {
+        #if 5 != 8 {
+            import "printing": p;
+        }
+    }
+
+    p.println("hey!");
+
     return 0;
 }

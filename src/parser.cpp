@@ -10,10 +10,11 @@ Parser::Parser(Lexer *lexer_) {
 
     mainAtom = atomTable->insertStr("main");
     imports = vector_init<Node *>(128);
-    staticIfStmts = vector_init<Node *>(128);
     allTopLevel = vector_init<Node *>(256);
 
     scopes.push(new Scope(nullptr));
+
+    staticIfScope = scopes.top();
 }
 
 void Parser::popFront() {
@@ -344,6 +345,9 @@ Node *Parser::parseFnDecl() {
     scopes.push(new Scope(scopes.top()));
     scopes.top()->isFunctionScope = true;
 
+    auto savedStaticIfScope = this->staticIfScope;
+    this->staticIfScope = scopes.top();
+
     while (!lexer->isEmpty() && lexer->front.type != LexerTokenType::RCURLY) {
         auto scopedStmt = parseScopedStmt();
         if (scopedStmt != nullptr) {
@@ -353,6 +357,8 @@ Node *Parser::parseFnDecl() {
     auto end = expect(LexerTokenType::RCURLY, "}");
 
     decl->region.end = end.region.end;
+
+    this->staticIfScope = savedStaticIfScope;
 
     scopes.pop();
     scopes.pop();
@@ -379,13 +385,17 @@ Node *Parser::parseImport() {
         cpi_assert(path != nullptr);
         auto found = false;
 
-        for (auto i : toSemantic) {
+        auto importAtomId = atomTable->insertStr(*importName->stringLiteralData.value);
+        if (lexer->front.type == LexerTokenType::COLON) {
+            popFront(); // :
+            importAtomId = parseSymbol()->symbolData.atomId;
+        }
+
+        for (auto i : importedFileModules) {
             auto iName = atomTable->backwardAtoms[i->moduleData.name->symbolData.atomId].c_str();
             if (strcmp(iName, importName->stringLiteralData.value->c_str()) == 0) {
                 found = true;
-
-                importName = i;
-                scopeInsert(i->moduleData.name->symbolData.atomId, i);
+                scopeInsert(importAtomId, i);
             }
         }
 
@@ -396,25 +406,20 @@ Node *Parser::parseImport() {
             auto fileModule = new Node(lexer->srcInfo, NodeType::MODULE, nullptr);
             fileModule->moduleData.name = new Node(lexer->srcInfo, NodeType::SYMBOL, parser->scopes.top());
             fileModule->moduleData.name->symbolData.atomId = atomTable->insertStr(*importName->stringLiteralData.value);
-            vector_append(toSemantic, fileModule);
+            vector_append(importedFileModules, fileModule);
 
             fileModule->scope = parser->scopes.top();
             parser->parseRoot();
 
             fileModule->moduleData.stmts = parser->allTopLevel;
 
-            importName = fileModule;
-
-            scopeInsert(fileModule->moduleData.name->symbolData.atomId, fileModule);
+            scopeInsert(importAtomId, fileModule);
         }
-    } else {
-        importName = parseLvalue();
     }
 
     expectSemicolon();
 
     auto importNode = new Node(this->lexer->srcInfo, NodeType::IMPORT, scopes.top());
-    importNode->nodeData = importName;
     importNode->region = Region{lexer->srcInfo, saved, lexer->front.region.end};
 
     if (!isFileImport) {
@@ -685,10 +690,6 @@ Node *Parser::parseScopedStmt() {
 Node *Parser::parseIf() {
     auto isStatic = lexer->front.type == LexerTokenType::STATIC_IF;
 
-    if (staticIfScope == nullptr) {
-        staticIfScope = scopes.top();
-    }
-
     auto saved = lexer->front.region.start;
     popFront();
 
@@ -745,10 +746,8 @@ Node *Parser::parseIf() {
         expect(LexerTokenType::RCURLY, "}");
     }
 
-    staticIfScope = nullptr;
-
     if (isStatic) {
-        vector_append(this->staticIfStmts, if_);
+        vector_append(this->staticIfScope->staticIfs, if_);
     }
 
     return if_;
@@ -1569,7 +1568,16 @@ Node *Parser::parseIntLiteral() {
     }
 
     auto str = s.str();
-    node->intLiteralData.value = stoi(str);
+
+    if (str.length() > 2 && str[0] == '0' && str[1] == 'x') {
+        node->intLiteralData.value = stol(str.substr(2), nullptr, 16);
+    }
+    else if (str.length() > 2 && str[0] == '0' && str[1] == 'b') {
+        node->intLiteralData.value = stol(str.substr(2), nullptr, 2);
+    }
+    else {
+        node->intLiteralData.value = stol(str);
+    }
 
     return node;
 }

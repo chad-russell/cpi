@@ -423,6 +423,7 @@ Node *defaultValueFor(Semantic *semantic, Node *type) {
     return nullptr;
 }
 
+// todo(chad): this is SLOW! probably should keep an extra linear list
 void addAllFromScopeToScope(Semantic *semantic, Scope *from, Scope *to) {
     for (auto i = 0; i < from->symbols->bucket_count; i++) {
         auto bucket = from->symbols->buckets[i];
@@ -451,12 +452,13 @@ void addAllFromScopeToScope(Semantic *semantic, Scope *from, Scope *to) {
     }
 }
 
-// todo(chad): this is SLOW! probably should keep an extra linear list
-void Semantic::addImports() {
-    for (auto ifStmt : this->parser->staticIfStmts) {
+void Semantic::addStaticIfs(Scope *targetScope) {
+    for (auto ifStmt : targetScope->staticIfs) {
         this->resolveTypes(ifStmt);
     }
+}
 
+void Semantic::addImports() {
     for (auto import : this->parser->imports) {
         this->resolveTypes(import);
         auto target = resolve(import->nodeData);
@@ -523,6 +525,11 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
 
     if (data->ctParams.length != 0 && !data->cameFromPolymorph) {
         return;
+    }
+
+    if (data->body.length > 0) {
+        // todo(chad): add top-level scope for the function body as a member on data?
+        semantic->addStaticIfs(vector_at(data->body, 0)->scope);
     }
 
     auto savedFnDecl = semantic->currentFnDecl;
@@ -1148,7 +1155,47 @@ Node *makeTemporary(Semantic *semantic, Node *n) {
     return node;
 }
 
+void rewritePipe(Semantic *semantic, Node *node) {
+    auto resolvedLhs = resolve(node->binopData.lhs);
+    auto resolvedRhs = resolve(node->binopData.rhs);
+
+    semantic->resolveTypes(resolvedLhs);
+
+    auto fnCallNode = new Node(node->region.srcInfo, NodeType::FN_CALL, node->scope);
+    fnCallNode->region = node->region;
+    fnCallNode->fnCallData.hasRuntimeParams = true;
+    vector_append(fnCallNode->fnCallData.params, wrapInValueParam(resolvedLhs, nullptr));
+
+    if (resolvedRhs->type == NodeType::SYMBOL || resolvedRhs->type == NodeType::FN_DECL) {
+        // rhs is symbol or fn
+        fnCallNode->fnCallData.fn = resolvedRhs;
+    }
+    else if (resolvedRhs->type == NodeType::FN_CALL) {
+        // rhs is fn call
+        fnCallNode->fnCallData.fn = resolvedRhs->fnCallData.fn;
+        for (auto param : resolvedRhs->fnCallData.params) {
+            vector_append(fnCallNode->fnCallData.params, param);
+        }
+    }
+    else {
+        // error
+        cpi_assert(false);
+    }
+
+    semantic->resolveTypes(fnCallNode->fnCallData.fn);
+
+    node->resolved = fnCallNode;
+    semantic->resolveTypes(node->resolved);
+
+    node->typeInfo = node->resolved->typeInfo;
+}
+
 void resolveBinop(Semantic *semantic, Node *node) {
+    if (node->binopData.type == LexerTokenType::VERTICAL_BAR) {
+        rewritePipe(semantic, node);
+        return;
+    }
+
     semantic->resolveTypes(node->binopData.lhs);
     semantic->resolveTypes(node->binopData.rhs);
 

@@ -366,6 +366,7 @@ void Interpreter::interpret() {
                     auto semantic = new Semantic();
                     semantic->lexer = evalLexer;
                     semantic->parser = evalParser;
+                    semantic->addStaticIfs(evalParser->scopes.top());
                     semantic->addImports();
                     semantic->currentFnDecl = evalFnDecl;
 

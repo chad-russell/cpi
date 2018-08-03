@@ -408,6 +408,8 @@ public:
     vector_t<Node *> deferredStmts = vector_init<Node *>(4);
     bool insertedDeferredStmts = false;
 
+    vector_t<Node *> staticIfs = vector_init<Node *>(4);
+
     // methods
     explicit Scope(Scope *parent);
     Node *find(int64_t atomId);
