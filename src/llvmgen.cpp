@@ -141,9 +141,9 @@ void LlvmGen::finalize() {
     }
 
     // DO_OPTIMIZE
-    for (auto fn : allFns) {
-        TheFPM->run(*fn);
-    }
+//    for (auto fn : allFns) {
+//        TheFPM->run(*fn);
+//    }
     verifyModule(*module, &llvm::errs());
 }
 
@@ -880,7 +880,7 @@ void LlvmGen::gen(Node *node) {
             }
         } break;
         case NodeType::DEREF: {
-            auto resolved = node->derefData.target;
+            auto resolved = node->nodeData;
             gen(resolved);
 
             node->llvmData = builder.CreateLoad(rvalueFor(resolved));
@@ -905,7 +905,7 @@ void LlvmGen::gen(Node *node) {
                 // store rvalue into its slot
                 storeIfNeeded(resolvedRhs);
 
-                auto storageTargetNode = resolve(resolvedDecl->derefData.target);
+                auto storageTargetNode = resolve(resolvedDecl->nodeData);
                 gen(storageTargetNode);
 
                 auto storageTarget = (llvm::Value *) storageTargetNode->llvmLocal;
@@ -1060,9 +1060,10 @@ void LlvmGen::gen(Node *node) {
             auto elseBlock = llvm::BasicBlock::Create(context, "else", (llvm::Function *) currentFnDecl->llvmData);
             auto mergeBlock = llvm::BasicBlock::Create(context, "if_cont", (llvm::Function *) currentFnDecl->llvmData);
 
-            gen(node->ifData.condition);
+            auto resolvedCondition = resolve(node->ifData.condition);
+            gen(resolvedCondition);
 
-            builder.CreateCondBr(rvalueFor(node->ifData.condition), thenBlock, elseBlock);
+            builder.CreateCondBr(rvalueFor(resolvedCondition), thenBlock, elseBlock);
 
             builder.SetInsertPoint(thenBlock);
             auto didTerminate = false;

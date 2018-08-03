@@ -339,6 +339,8 @@ struct IfData {
 
     bool isStatic;
     Scope *staticIfScope;
+    vector_t<Node *> trueImports;
+    vector_t<Node *> falseImports;
 };
 
 struct WhileData {
@@ -360,10 +362,6 @@ struct RetData {
 
 struct SymbolData {
     int64_t atomId;
-};
-
-struct DerefData {
-    Node *target;
 };
 
 struct ArrayLiteralData {
@@ -409,6 +407,7 @@ public:
     bool insertedDeferredStmts = false;
 
     vector_t<Node *> staticIfs = vector_init<Node *>(4);
+    bool addedStaticIfs = false;
 
     // methods
     explicit Scope(Scope *parent);
@@ -449,7 +448,6 @@ public:
         CastData castData;
         RetData retData;
         SymbolData symbolData;
-        DerefData derefData;
         ArrayLiteralData arrayLiteralData;
         ForData forData;
         IsKindData isKindData;

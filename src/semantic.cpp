@@ -453,18 +453,36 @@ void addAllFromScopeToScope(Semantic *semantic, Scope *from, Scope *to) {
 }
 
 void Semantic::addStaticIfs(Scope *targetScope) {
+    if (targetScope->addedStaticIfs) {
+        return;
+    }
+    targetScope->addedStaticIfs = true;
+
     for (auto ifStmt : targetScope->staticIfs) {
-        this->resolveTypes(ifStmt);
+        this->resolveTypes(ifStmt->ifData.condition);
+        ifStmt->ifData.condition->staticValue = constantize(this, ifStmt->ifData.condition);
+
+        if (ifStmt->ifData.condition->staticValue->type == NodeType::BOOLEAN_LITERAL) {
+            if (ifStmt->ifData.condition->staticValue->boolLiteralData.value && ifStmt->ifData.stmts.length > 0) {
+                addAllFromScopeToScope(this, vector_at(ifStmt->ifData.stmts, 0)->scope, ifStmt->scope);
+            }
+            else if (!ifStmt->ifData.condition->staticValue->boolLiteralData.value && ifStmt->ifData.elseStmts.length > 0) {
+                addAllFromScopeToScope(this, vector_at(ifStmt->ifData.elseStmts, 0)->scope, ifStmt->scope);
+            }
+        }
     }
 }
 
-void Semantic::addImports() {
-    for (auto import : this->parser->imports) {
+void Semantic::addImports(vector_t<Node *> imports, Scope *target) {
+    for (auto import : imports) {
         this->resolveTypes(import);
-        auto target = resolve(import->nodeData);
-        cpi_assert(target->type == NodeType::MODULE);
+        auto importTarget = resolve(import->nodeData);
+        cpi_assert(importTarget->type == NodeType::MODULE);
 
-        addAllFromScopeToScope(this, target->scope, import->scope);
+        // todo(chad): this might be a @HACK, a better way would be to stop using nodeData for imports and keep track directly of whether it's a file import or not.
+        if (import->nodeData->type != NodeType::MODULE) {
+            addAllFromScopeToScope(this, importTarget->scope, target ? target : import->scope);
+        }
     }
 }
 
@@ -703,7 +721,7 @@ Node *constantize(Semantic *semantic, Node *node) {
         auto wrappedRet = new Node(node->region.srcInfo, NodeType::RETURN, node->scope);
 
         wrappedRet->nodeData = semantic->deepCopyRvalue(node, node->scope);
-//        semantic->currentFnDecl = savedCurrentFnDecl;
+        semantic->currentFnDecl = savedCurrentFnDecl;
 
         vector_append(wrappedFn->fnDeclData.body, wrappedRet);
         vector_append(wrappedFn->fnDeclData.returns, wrappedRet);
@@ -843,9 +861,9 @@ void resolveArrayIndex(Semantic *semantic, Node *node) {
     add->binopData.rhsScale = typeSize(node->typeInfo);
 
     auto deref = new Node(node->region.srcInfo, NodeType::DEREF, node->scope);
-    deref->derefData.target = add;
+    deref->nodeData = add;
 
-    semantic->addLocal(deref->derefData.target);
+    semantic->addLocal(deref->nodeData);
 
     node->resolved = deref;
 
@@ -1042,6 +1060,10 @@ bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<No
 }
 
 void maybeStructDefault(Semantic *semantic, Node *rhs, Node *lhsType) {
+    while (rhs->type == NodeType::ADDRESS_OF || rhs->type == NodeType::DEREF) {
+        rhs = rhs->nodeData;
+    }
+
     if (rhs->type == NodeType::STRUCT_LITERAL
         && lhsType->typeData.kind == NodeTypekind::STRUCT
         && !lhsType->typeData.structTypeData.isSecretlyEnum
@@ -1651,8 +1673,8 @@ void resolveValueParam(Semantic *semantic, Node *node) {
 }
 
 void resolveDeref(Semantic *semantic, Node *node) {
-    semantic->resolveTypes(node->derefData.target);
-    auto pointerType = resolve(node->derefData.target->typeInfo);
+    semantic->resolveTypes(node->nodeData);
+    auto pointerType = resolve(node->nodeData->typeInfo);
     cpi_assert(pointerType->typeData.kind == NodeTypekind::POINTER);
     node->typeInfo = pointerType->typeData.pointerTypeData.underlyingType;
 }
@@ -1669,7 +1691,7 @@ void resolveAddressOf(Semantic *semantic, Node *node) {
     }
 
     if (node->nodeData->type == NodeType::ARRAY_INDEX) {
-        node->resolved = resolve(node->nodeData)->derefData.target;
+        node->resolved = resolve(node->nodeData)->nodeData;
     }
 }
 
@@ -1894,20 +1916,28 @@ void resolveStructLiteral(Semantic *semantic, Node *node) {
 void resolveIf(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->ifData.condition);
 
-    if (node->ifData.isStatic) {
-        node->ifData.condition = constantize(semantic, node->ifData.condition);
-    }
-
     auto resolvedTypeInfo = resolve(node->ifData.condition->typeInfo);
     auto resolvedKind = resolvedTypeInfo->typeData.kind;
     if (resolvedKind != NodeTypekind::BOOLEAN && resolvedKind != NodeTypekind::BOOLEAN_LITERAL) {
         semantic->reportError({node, node->ifData.condition}, Error{node->ifData.condition->region, "Condition for 'if' must be a boolean!"});
     }
 
+    auto isStatic = false;
+    bool staticCondition;
+    if (node->ifData.isStatic) {
+        isStatic = true;
+        cpi_assert(node->ifData.condition->staticValue->type == NodeType::BOOLEAN_LITERAL);
+        staticCondition = node->ifData.condition->staticValue->boolLiteralData.value;
+    }
+    else if (resolvedTypeInfo->typeData.kind == NodeTypekind::BOOLEAN_LITERAL) {
+        isStatic = true;
+        staticCondition = resolvedTypeInfo->typeData.boolTypeData;
+    }
+
     bool shouldResolveIfStmts = true;
     bool shouldResolveElseStmts = true;
-    if (resolvedTypeInfo->typeData.kind == NodeTypekind::BOOLEAN_LITERAL) {
-        if (resolvedTypeInfo->typeData.boolTypeData) {
+    if (isStatic) {
+        if (staticCondition) {
             shouldResolveElseStmts = false;
             node->ifData.elseStmts = {};
         }
@@ -1921,21 +1951,11 @@ void resolveIf(Semantic *semantic, Node *node) {
         for (const auto& stmt : node->ifData.stmts) {
             semantic->resolveTypes(stmt);
         }
-
-        // if constant, add all the things in the 'if' scope to the outer scope
-        if (node->ifData.isStatic && node->ifData.stmts.length > 0) {
-            addAllFromScopeToScope(semantic, (*node->ifData.stmts.items)->scope, node->ifData.staticIfScope);
-        }
     }
 
     if (shouldResolveElseStmts) {
         for (const auto& stmt : node->ifData.elseStmts) {
             semantic->resolveTypes(stmt);
-        }
-
-        // if constant, add all the things in the 'else' scope to the outer scope
-        if (node->ifData.isStatic && node->ifData.elseStmts.length > 0) {
-            addAllFromScopeToScope(semantic, (*node->ifData.elseStmts.items)->scope, node->ifData.staticIfScope);
         }
     }
 }

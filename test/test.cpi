@@ -319,7 +319,7 @@ fn testDefault2() {
     t: TD2;
     assert(t.x == 3);
 
-    t = {};
+    t = ^&{};
     assert(t.x == 3);
 
     t2: TD2 = {};
@@ -937,4 +937,3 @@ fn someCheck() { return true; }
 #if someCheck() {
     topLevel ::= 123;
 }
-

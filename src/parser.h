@@ -38,7 +38,7 @@ struct Parser {
     bool isCopying = false;
     int64_t mainAtom;
 
-    vector_t<Node *> imports = vector_init<Node *>(16);
+    vector_t<Node *> *imports;
 
     Scope *staticIfScope = nullptr;
 

@@ -1,17 +1,13 @@
+type Context struct {
+    id: i64
+}
+
+fn foo(context: *Context) {
+    context.id = context.id + 1;
+}
+
 fn main() {
-    testPipe();
-}
-
-fn testPipe() {
-    fn polyInc(x: !T) { return x + 1; }
-    dec := fn(x: i64) { return x - 1; };
-
-    x := polyInc(2);
-    y := x|polyInc|dec|(fn omg(x: i64) { return x - 1; });
-
-    assert(y == 2);
-}
-
-fn assert(b: bool) {
-    if (b == false) { panic(); }
+    context: Context;
+    foo(&context);
+    return context.id;
 }

@@ -13,7 +13,7 @@ public:
     Parser *parser = nullptr;
 
     void addStaticIfs(Scope *target);
-    void addImports();
+    void addImports(vector_t<Node *> imports, Scope *target);
 
     Node *deepCopyScopedStmt(Node *node, Scope *scope);
     Node *deepCopyRvalue(Node *node, Scope *scope);
@@ -24,3 +24,4 @@ public:
 };
 
 bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<Node *> &declParams, vector_t<Node *> &givenParams);
+Node *constantize(Semantic *semantic, Node *node);

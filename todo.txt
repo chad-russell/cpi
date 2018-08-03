@@ -28,7 +28,7 @@ TODO:
             - todo(chad): what about functions which have return values
                 - they should probably just get ignored (what else?)
         - advanced:
-            - #async should resolve to a thread id (should be accessible through the context)
+            - #async should resolve to a thread id. That thread id should also be stored in the context
             - exit current thread
             - join thread with given id
 

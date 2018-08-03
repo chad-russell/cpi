@@ -9,7 +9,8 @@ Parser::Parser(Lexer *lexer_) {
     last = lexer->front;
 
     mainAtom = atomTable->insertStr("main");
-    imports = vector_init<Node *>(128);
+    imports = (vector_t<Node *> *) malloc(sizeof(vector_t<Node *>));
+    *imports = vector_init<Node *>(16);
     allTopLevel = vector_init<Node *>(256);
 
     scopes.push(new Scope(nullptr));
@@ -371,13 +372,9 @@ Node *Parser::parseImport() {
     auto saved = lexer->front.region.start;
     expect(LexerTokenType::IMPORT, "import");
 
-    auto isFileImport = false;
-
     auto importNode = new Node(this->lexer->srcInfo, NodeType::IMPORT, scopes.top());
 
     if (this->lexer->front.type == LexerTokenType::DOUBLE_QUOTE) {
-        isFileImport = true;
-
         auto importName = parseStringLiteral();
 
         auto concatPath = *importName->stringLiteralData.value + ".cpi";
@@ -397,6 +394,8 @@ Node *Parser::parseImport() {
             if (strcmp(iName, importName->stringLiteralData.value->c_str()) == 0) {
                 found = true;
                 scopeInsert(importAtomId, i);
+
+                importNode->nodeData = i;
             }
         }
 
@@ -415,6 +414,8 @@ Node *Parser::parseImport() {
             fileModule->moduleData.stmts = parser->allTopLevel;
 
             scopeInsert(importAtomId, fileModule);
+
+            importNode->nodeData = fileModule;
         }
     }
     else {
@@ -425,9 +426,7 @@ Node *Parser::parseImport() {
 
     importNode->region = Region{lexer->srcInfo, saved, lexer->front.region.end};
 
-    if (!isFileImport) {
-        vector_append(this->imports, importNode);
-    }
+    vector_append(*this->imports, importNode);
 
     return importNode;
 }
@@ -702,9 +701,13 @@ Node *Parser::parseIf() {
     if_->ifData.condition->sourceMapStatement = true;
     if_->ifData.isStatic = isStatic;
     if_->ifData.staticIfScope = staticIfScope;
-
     if_->sourceMapStatement = true;
     if_->ifData.condition->sourceMapStatement = true;
+
+    auto savedImports = this->imports;
+    if (isStatic) {
+        this->imports = &if_->ifData.trueImports;
+    }
 
     scopes.push(new Scope(scopes.top()));
 
@@ -733,6 +736,10 @@ Node *Parser::parseIf() {
             return if_;
         }
 
+        if (isStatic) {
+            this->imports = &if_->ifData.falseImports;
+        }
+
         expect(LexerTokenType::LCURLY, "{");
 
         while (lexer->front.type != LexerTokenType::RCURLY) {
@@ -751,6 +758,7 @@ Node *Parser::parseIf() {
 
     if (isStatic) {
         vector_append(this->staticIfScope->staticIfs, if_);
+        this->imports = savedImports;
     }
 
     return if_;
@@ -981,9 +989,9 @@ Node *Parser::parseLvalue() {
     if (lexer->front.type == LexerTokenType::DEREF) {
         popFront();
         auto deref = new Node(lexer->srcInfo, NodeType::DEREF, scopes.top());
-        deref->derefData.target = parseRvalueSimple();
+        deref->nodeData = parseRvalueSimple();
 
-        addLocal(deref->derefData.target);
+        addLocal(deref->nodeData);
 
         return deref;
     }
@@ -1489,11 +1497,11 @@ Node *Parser::parseRvalueSimple() {
         popFront();
         auto deref = new Node(lexer->srcInfo, NodeType::DEREF, scopes.top());
 
-        deref->derefData.target = parseRvalueSimple();
+        deref->nodeData = parseRvalueSimple();
 
-        addLocal(deref->derefData.target);
+        addLocal(deref->nodeData);
 
-        deref->region = Region{lexer->srcInfo, saved, deref->derefData.target->region.end};
+        deref->region = Region{lexer->srcInfo, saved, deref->nodeData->region.end};
         return deref;
     }
 

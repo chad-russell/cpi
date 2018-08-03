@@ -79,19 +79,19 @@ void initForData(Node *node) {
     node->forData.element_alias = nullptr;
     node->forData.iterator_alias = nullptr;
     node->forData.target = nullptr;
-    node->forData.stmts = vector_init<Node *>(10);
-    node->forData.rewritten = vector_init<Node *>(10);
+    node->forData.stmts = vector_init<Node *>(8);
+    node->forData.rewritten = vector_init<Node *>(8);
     node->forData.isStatic = false;
-    node->forData.staticStmts = vector_init<Node *>(10);
+    node->forData.staticStmts = vector_init<Node *>(8);
 }
 
 void initModuleData(Node *node) {
     node->moduleData.name = nullptr;
-    node->moduleData.stmts = vector_init<Node *>(10);
+    node->moduleData.stmts = vector_init<Node *>(8);
 }
 
 void initDeferData(Node *node) {
-    node->deferData.stmts = vector_init<Node *>(10);
+    node->deferData.stmts = vector_init<Node *>(8);
 }
 
 void initEndScopeData(Node *node) {
@@ -100,7 +100,7 @@ void initEndScopeData(Node *node) {
 
 void initArrayLiteralData(Node *node) {
     node->arrayLiteralData.elementType = nullptr;
-    node->arrayLiteralData.elements = vector_init<Node *>(10);
+    node->arrayLiteralData.elements = vector_init<Node *>(8);
     node->arrayLiteralData.structLiteralRepresentation = nullptr;
 }
 
@@ -112,19 +112,22 @@ void initCastData(Node *node) {
 
 void initWhileData(Node *node) {
     node->whileData.condition = nullptr;
-    node->whileData.stmts = vector_init<Node *>(10);
+    node->whileData.stmts = vector_init<Node *>(8);
 }
 
 void initIfData(Node *node) {
     node->ifData.condition = nullptr;
-    node->ifData.stmts = vector_init<Node *>(10);
-    node->ifData.elseStmts = vector_init<Node *>(10);
+    node->ifData.stmts = vector_init<Node *>(8);
+    node->ifData.elseStmts = vector_init<Node *>(8);
+
     node->ifData.isStatic = false;
     node->ifData.staticIfScope = nullptr;
+    node->ifData.trueImports = vector_init<Node *>(8);
+    node->ifData.falseImports = vector_init<Node *>(8);
 }
 
 void initStructLiteralData(Node *node) {
-  node->structLiteralData.params = vector_init<Node *>(10);
+  node->structLiteralData.params = vector_init<Node *>(8);
 }
 
 void initDotData(Node *node) {
@@ -145,8 +148,8 @@ void initBinopData(Node *node) {
 
 void initFnCallData(Node *node) {
     node->fnCallData.fn = nullptr;
-    node->fnCallData.ctParams = vector_init<Node *>(10);
-    node->fnCallData.params = vector_init<Node *>(10);
+    node->fnCallData.ctParams = vector_init<Node *>(8);
+    node->fnCallData.params = vector_init<Node *>(8);
     node->fnCallData.hasRuntimeParams = true;
 }
 
@@ -172,12 +175,12 @@ void initParamData(Node *node) {
 
 void initFnDeclData(Node *node) {
     node->fnDeclData.name = nullptr;
-    node->fnDeclData.ctParams = vector_init<Node *>(10);
-    node->fnDeclData.params = vector_init<Node *>(10);
+    node->fnDeclData.ctParams = vector_init<Node *>(8);
+    node->fnDeclData.params = vector_init<Node *>(8);
     node->fnDeclData.returnType = nullptr;
-    node->fnDeclData.body = vector_init<Node *>(10);
-    node->fnDeclData.locals = vector_init<Node *>(10);
-    node->fnDeclData.returns = vector_init<Node *>(10);
+    node->fnDeclData.body = vector_init<Node *>(8);
+    node->fnDeclData.locals = vector_init<Node *>(8);
+    node->fnDeclData.returns = vector_init<Node *>(8);
     node->fnDeclData.stackSize = 0;
     node->fnDeclData.instOffset = 0;
     node->fnDeclData.cameFromPolymorph = false;
@@ -190,7 +193,7 @@ void initStructTypeData(Node *node) {
     node->typeData.kind = NodeTypekind::STRUCT;
 
     node->typeData.structTypeData.isLiteral = false;
-    node->typeData.structTypeData.params = vector_init<Node *>(10);
+    node->typeData.structTypeData.params = vector_init<Node *>(8);
     node->typeData.structTypeData.isSecretlyArray = false;
     node->typeData.structTypeData.secretArrayElementType = nullptr;
     node->typeData.structTypeData.isSecretlyEnum = false;
@@ -201,7 +204,7 @@ void initFnTypeData(Node *node) {
     node->typeData.kind = NodeTypekind::FN;
 
     node->typeData.fnTypeData.returnType = nullptr;
-    node->typeData.fnTypeData.params = vector_init<Node *>(10);
+    node->typeData.fnTypeData.params = vector_init<Node *>(8);
 }
 
 Node *resolve(Node *n) {

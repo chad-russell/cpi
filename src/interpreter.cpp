@@ -367,7 +367,7 @@ void Interpreter::interpret() {
                     semantic->lexer = evalLexer;
                     semantic->parser = evalParser;
                     semantic->addStaticIfs(evalParser->scopes.top());
-                    semantic->addImports();
+                    semantic->addImports(*evalParser->imports, nullptr);
                     semantic->currentFnDecl = evalFnDecl;
 
                     auto wrappedRet = new Node(parsed->region.srcInfo, NodeType::RETURN, parsed->scope);

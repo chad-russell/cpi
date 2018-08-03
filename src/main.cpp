@@ -193,7 +193,7 @@ int main(int argc, char **argv) {
         semantic->lexer = lexer;
         semantic->parser = parser;
         semantic->addStaticIfs(parser->scopes.top());
-        semantic->addImports();
+        semantic->addImports(*parser->imports, nullptr);
 
         // todo(chad): only need to loop through all top level if this is imported. Otherwise just do the main fn
         for (auto tl : parser->allTopLevel) {
