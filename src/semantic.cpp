@@ -275,11 +275,11 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
             return true;
         }
 
-        if (desired->typeData.structTypeData.params.length != actual->typeData.structTypeData.params.length) {
+        auto encounteredError = assignParams(semantic, actual, desired->typeData.structTypeData.params, actual->typeData.structTypeData.params);
+        if (encounteredError) {
             return false;
         }
 
-        auto encounteredError = assignParams(semantic, actual, desired->typeData.structTypeData.params, actual->typeData.structTypeData.params);
         for (auto p : actual->typeData.structTypeData.params) {
             semantic->resolveTypes(p);
         }
@@ -1041,6 +1041,15 @@ bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<No
     return encounteredError;
 }
 
+void maybeStructDefault(Semantic *semantic, Node *rhs, Node *lhsType) {
+    if (rhs->type == NodeType::STRUCT_LITERAL
+        && lhsType->typeData.kind == NodeTypekind::STRUCT
+        && !lhsType->typeData.structTypeData.isSecretlyEnum
+        && !lhsType->typeData.structTypeData.isSecretlyArray) {
+        assignParams(semantic, rhs, lhsType->typeData.structTypeData.params, rhs->structLiteralData.params);
+    }
+}
+
 void resolveDecl(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->declData.type);
     semantic->resolveTypes(node->declData.initialValue);
@@ -1067,6 +1076,10 @@ void resolveDecl(Semantic *semantic, Node *node) {
     }
     else if (node->declData.initialValue == nullptr) {
         node->declData.initialValue = defaultValueFor(semantic, resolve(node->declData.type));
+    }
+
+    if (shouldCheckTypeMatch) {
+        maybeStructDefault(semantic, node->declData.initialValue, resolve(node->declData.type));
     }
 
     auto resolvedDeclDataType = resolve(node->declData.type);
@@ -1182,12 +1195,10 @@ void rewritePipe(Semantic *semantic, Node *node) {
         cpi_assert(false);
     }
 
-    semantic->resolveTypes(fnCallNode->fnCallData.fn);
+    semantic->resolveTypes(fnCallNode);
 
     node->resolved = fnCallNode;
-    semantic->resolveTypes(node->resolved);
-
-    node->typeInfo = node->resolved->typeInfo;
+    node->typeInfo = fnCallNode->typeInfo;
 }
 
 void resolveBinop(Semantic *semantic, Node *node) {
@@ -1295,6 +1306,7 @@ Node *Semantic::deepCopyRvalue(Node *node, Scope *scope) {
 
 void resolveFnCall(Semantic *semantic, Node *node) {
     node->sourceMapStatement = true;
+    semantic->addLocal(node);
 
     semantic->resolveTypes(node->fnCallData.fn);
     auto resolvedFn = resolve(node->fnCallData.fn);
@@ -1495,6 +1507,8 @@ void resolveFnCall(Semantic *semantic, Node *node) {
             if (!typesMatch(declParam->typeInfo, givenParam->typeInfo, semantic)) {
                 semantic->reportError({node, declParam, givenParam}, Error{node->region, "type mismatch!"});
             }
+
+            maybeStructDefault(semantic, givenParam->paramData.value, resolve(declParam->paramData.type));
         }
 
         node->typeInfo = resolvedFnType.fnTypeData.returnType;
@@ -1592,6 +1606,8 @@ void resolveAssign(Semantic *semantic, Node *node) {
                               Error{node->region, "assignment type mismatch"});
     }
 
+    maybeStructDefault(semantic, node->assignData.rhs, resolve(node->assignData.lhs->typeInfo));
+
     semantic->lvalueAssignmentContext = true;
     possiblyResolveAssignToUnion(semantic, node, node->assignData.lhs);
     semantic->lvalueAssignmentContext = false;
@@ -1624,6 +1640,8 @@ void resolveDeclParam(Semantic *semantic, Node *node) {
         if (!typesMatch(node->paramData.type, node->paramData.value->typeInfo, semantic)) {
             semantic->reportError({node}, Error{node->region, "Type mismatch decl param"});
         }
+
+        maybeStructDefault(semantic, node->paramData.value, resolve(node->paramData.type));
     }
 }
 
@@ -2132,7 +2150,7 @@ void resolveFor(Semantic *semantic, Node *node) {
     elementDecl->scope = node->scope;
     elementDecl->region = node->forData.element_alias->region;
     elementDecl->declData.type = resolvedTypeInfo->typeData.structTypeData.secretArrayElementType;
-    elementDecl->declData.lvalue = node->forData.element_alias;
+    elementDecl->declData.lhs = node->forData.element_alias;
     semantic->addLocal(elementDecl);
     semantic->resolveTypes(elementDecl);
 
@@ -2154,7 +2172,7 @@ void resolveFor(Semantic *semantic, Node *node) {
         indexDecl->region = node->forData.iterator_alias->region;
     }
     indexDecl->declData.type = new Node(NodeTypekind::I64);
-    indexDecl->declData.lvalue = node->forData.iterator_alias;
+    indexDecl->declData.lhs = node->forData.iterator_alias;
     indexDecl->declData.initialValue = zero;
     semantic->addLocal(indexDecl);
     semantic->resolveTypes(indexDecl);

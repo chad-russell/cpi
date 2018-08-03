@@ -373,11 +373,12 @@ Node *Parser::parseImport() {
 
     auto isFileImport = false;
 
-    Node *importName;
+    auto importNode = new Node(this->lexer->srcInfo, NodeType::IMPORT, scopes.top());
+
     if (this->lexer->front.type == LexerTokenType::DOUBLE_QUOTE) {
         isFileImport = true;
 
-        importName = parseStringLiteral();
+        auto importName = parseStringLiteral();
 
         auto concatPath = *importName->stringLiteralData.value + ".cpi";
         auto path = realpath(concatPath.c_str(), nullptr);
@@ -416,10 +417,12 @@ Node *Parser::parseImport() {
             scopeInsert(importAtomId, fileModule);
         }
     }
+    else {
+        importNode->nodeData = parseLvalue();
+    }
 
     expectSemicolon();
 
-    auto importNode = new Node(this->lexer->srcInfo, NodeType::IMPORT, scopes.top());
     importNode->region = Region{lexer->srcInfo, saved, lexer->front.region.end};
 
     if (!isFileImport) {
@@ -607,7 +610,7 @@ Node *Parser::parseScopedStmt() {
             addLocal(decl);
         }
 
-        decl->declData.lvalue = lvalue;
+        decl->declData.lhs = lvalue;
         decl->declData.initialValue = rvalue;
         decl->declData.type = type;
         decl->declData.isConstant = isConstant;
@@ -643,7 +646,7 @@ Node *Parser::parseScopedStmt() {
             addLocal(decl);
         }
 
-        decl->declData.lvalue = lvalue;
+        decl->declData.lhs = lvalue;
         decl->declData.initialValue = rvalue;
         decl->declData.isConstant = isConstant;
 

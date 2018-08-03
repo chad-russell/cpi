@@ -294,13 +294,13 @@ ostream &operator<<(ostream &os, Node *node) {
         } break;
         case NodeType::DECL: {
             if (node->declData.type == nullptr) {
-                cout << node->declData.lvalue << " := " << node->declData.initialValue;
+                cout << node->declData.lhs << " := " << node->declData.initialValue;
             }
             else if (node->declData.initialValue == nullptr) {
-                cout << node->declData.lvalue << " : " << node->declData.type;
+                cout << node->declData.lhs << " : " << node->declData.type;
             }
             else {
-                cout << node->declData.lvalue << " : " << node->declData.type << " = " << node->declData.initialValue;
+                cout << node->declData.lhs << " : " << node->declData.type << " = " << node->declData.initialValue;
             }
 
             cout << ";" << endl;

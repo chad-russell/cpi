@@ -266,7 +266,7 @@ struct FnDeclData {
 };
 
 struct DeclData {
-    Node *lvalue;
+    Node *lhs;
     Node *type;
     Node *initialValue;
     bool isConstant;

@@ -130,6 +130,7 @@ fn main() {
     testBuffer();
 
     testDefault();
+    testDefault2();
 
     testAnySimple1();
 
@@ -160,9 +161,6 @@ fn testPipe() {
     y := x|polyInc|dec|(fn omg(x: i64) { return x - 1; });
 
     assert(y == 2);
-
-    -- todo(chad): why do we need this??????
-    return 0;
 }
 
 fn testDefer() {
@@ -309,8 +307,26 @@ fn testDefault() {
     assert(p1.y == 10);
 
     p2: struct{x := 9, y := 10} = {y: 5, x: 15};
-    assert(p2.x == 5);
-    assert(p2.y == 15);
+    assert(p2.x == 15);
+    assert(p2.y == 5);
+}
+
+fn testDefault2() {
+    type TD2 struct {
+        x := 3
+    }
+
+    t: TD2;
+    assert(t.x == 3);
+
+    t = {};
+    assert(t.x == 3);
+
+    t2: TD2 = {};
+    assert(t2.x == 3);
+
+    fn getTDx(t: TD2) { return t.x; }
+    assert(getTDx({}) == 3);
 }
 
 fn alloc_pair() {

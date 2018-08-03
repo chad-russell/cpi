@@ -498,9 +498,9 @@ void LlvmGen::gen(Node *node) {
 
                 if (shouldCreateAlloca) {
                     if (resolvedLocal->type == NodeType::DECL) {
-                        if (resolvedLocal->declData.lvalue != nullptr) {
-                            cpi_assert(resolvedLocal->declData.lvalue->type == NodeType::SYMBOL);
-                            auto atomId = resolvedLocal->declData.lvalue->symbolData.atomId;
+                        if (resolvedLocal->declData.lhs != nullptr) {
+                            cpi_assert(resolvedLocal->declData.lhs->type == NodeType::SYMBOL);
+                            auto atomId = resolvedLocal->declData.lhs->symbolData.atomId;
 
                             auto localName = atomTable->backwardAtoms[atomId];
                             resolvedLocal->llvmLocal = builder.CreateAlloca(typeToAlloca, nullptr, localName);

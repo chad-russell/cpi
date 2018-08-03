@@ -1,4 +1,37 @@
 TODO:
+    - implement context and passing as implicit parameter
+        - remove 'heap' as a concept -- should always just use the context
+
+    - threading
+        - for interpreter, should create another interpreter and add it to a list. Execution should round-robin over all interpreters in the list
+        - for llvm version, can utilize pthread routines
+        - basic:
+            - create: ```
+                fn foo(i: i32, s: []i8);
+                #async foo(3, "a string");
+            ```
+            - in llvm this should translate to: ```
+                pthread_t __t;
+                pthread_create(&__t, nil, cast(fn(data: *none) *none) thread_init_foo, cast(*none) &{3, "a string"});
+            ```
+            - each function which is #async'd needs a custom init function. thread_init_foo should look like: ```
+                fn thread_init_foo(data: *{_0: i32, _1: []i8}) {
+                    foo(makeContext(), data._0, data._1);
+                }
+            ```
+            - todo(chad): what about calling external functions?
+                - in llvm should just work
+                - in interpreter, I *think* it should just be a matter of not passing the context in the calling args
+            - todo(chad): what about passing parameters?
+                - the parameters will have to potentially outlive the scope of the caller
+                - should the compiler give an error when this is not the case? or should it just be up to the programmer to know?
+            - todo(chad): what about functions which have return values
+                - they should probably just get ignored (what else?)
+        - advanced:
+            - #async should resolve to a thread id (should be accessible through the context)
+            - exit current thread
+            - join thread with given id
+
     - better specification of paths for imports
         - path should always be relative to the main file, regardless of where the compiler was run from
         - allow for import paths
@@ -18,23 +51,6 @@ TODO:
             - #linkPath "/usr/local/cpi/lib";
             - allow from command line as well (?) (or possibly an environment variable?)
 
-    - create thread
-        - for llvm version, can call out to pthread routines
-        - for interpreter, should spin up another interpreter and add it to a list. Execution should round-robin over all interpreters in the list
-        - need:
-            - basic:
-                - create:
-                    - #async foo(3, "foo");
-                        - in llvm this should translate to: ```
-                            pthread_t __t;
-                            pthread_create(&__t, nil, cast(fn(data: *none) *none) thread_init_foo, cast(*none) &{3, bar});
-                        ```
-                        - each function which is #async'd needs a custom init function. thread_init_foo should look like: ```
-                            fn thread_init_foo(data: *{_0: i32, _1: []i8}) {
-                                foo(makeContext(), data._0, data._1);
-                            }
-                        ```
-
     - global variables
         - at top-level and module-level
         - need them at the very least for mutexes, but also for global ids, etc. (i.e. if we're making a multi-threaded parser then node_id needs to be globally unique)
@@ -46,8 +62,6 @@ TODO:
                 -- do stuff. Should lock at the beginning and unlock at the end
             }
         ```
-
-    - remove 'heap' as a concept -- should always just use the context
 
     - more robustness for 'constantize'
         - figure out what things can be constant and what things can't

@@ -156,7 +156,7 @@ void initAssignData(Node *node) {
 }
 
 void initDeclData(Node *node) {
-    node->declData.lvalue = nullptr;
+    node->declData.lhs = nullptr;
     node->declData.type = nullptr;
     node->declData.initialValue = nullptr;
     node->declData.isConstant = false;
