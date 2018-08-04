@@ -8,14 +8,13 @@
 #include <utility>
 
 void addContextParameterForCall(Semantic *semantic, Node *node) {
-//    if (node->fnCallData.addedContextParam) {
-//        return;
-//    }
-//    node->fnCallData.addedContextParam = true;
+    return;
 
     auto newParams = vector_init<Node *>(node->fnCallData.params.length + 1);
+
     auto newParam = new Node(node->region.srcInfo, NodeType::SYMBOL, node->scope);
     newParam->symbolData.atomId = atomTable->insertStr("context");
+
     // if 'context' is in scope, then pass it. Otherwise create a new one
     if (node->scope->find(newParam->symbolData.atomId)) {
         semantic->resolveTypes(newParam);
@@ -23,12 +22,15 @@ void addContextParameterForCall(Semantic *semantic, Node *node) {
     else {
         newParam = semantic->parser->createInitContextCall(node->scope);
     }
+
     auto newWrappedParam = wrapInValueParam(newParam, "context");
     semantic->resolveTypes(newWrappedParam);
     vector_append(newParams, newWrappedParam);
+
     for (auto p : node->fnCallData.params) {
         vector_append(newParams, p);
     }
+
     node->fnCallData.params = newParams;
 }
 
@@ -1360,7 +1362,29 @@ void resolveFnCall(Semantic *semantic, Node *node) {
     auto isPoly = resolvedFn->type == NodeType::FN_DECL && resolvedFn->fnDeclData.ctParams.length != 0;
     Node *polyResolvedFn = nullptr;
 
-    addContextParameterForCall(semantic, node);
+//    bool shouldAddContextParam;
+//    if (resolvedFn->type != NodeType::FN_DECL) {
+//        shouldAddContextParam = true;
+//    }
+//    else if (resolvedFn->fnDeclData.name != nullptr && !resolvedFn->fnDeclData.isExternal) {
+//        auto initContextAtom = atomTable->insertStr("initContext");
+//
+//        if (resolvedFn->fnDeclData.name->type == NodeType::DOT) {
+//            auto fnNameAtom = resolvedFn->fnDeclData.name->dotData.rhs->symbolData.atomId;
+//            shouldAddContextParam = fnNameAtom != initContextAtom;
+//        }
+//        else if (resolvedFn->fnDeclData.name->type == NodeType::SYMBOL) {
+//            auto fnNameAtom = resolvedFn->fnDeclData.name->symbolData.atomId;
+//            shouldAddContextParam = fnNameAtom != semantic->parser->mainAtom && fnNameAtom != initContextAtom;
+//        }
+//    }
+//    else {
+//        shouldAddContextParam = true;
+//    }
+
+//    if (shouldAddContextParam) {
+//        addContextParameterForCall(semantic, node);
+//    }
 
     if (isPoly) {
         // make a new function

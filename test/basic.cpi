@@ -1,0 +1,9 @@
+type Context struct {
+    id: i64
+}
+
+fn initContext() *Context {
+    c := cast(*Context) malloc(sizeof(Context));
+    c.id = 0;
+    return c;
+}

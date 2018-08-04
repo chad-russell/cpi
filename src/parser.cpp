@@ -76,14 +76,19 @@ void Parser::scopeInsert(int64_t atomId, Node *node) {
 Node *Parser::createInitContextCall(Scope *scope) {
     auto fnNameSym = new Node(lexer->srcInfo, NodeType::SYMBOL, scope);
     fnNameSym->symbolData.atomId = atomTable->insertStr("initContext");
+
     auto basicSym = new Node(lexer->srcInfo, NodeType::SYMBOL, scope);
     basicSym->symbolData.atomId = atomTable->insertStr("basic");
+
     auto basicDotInitContext = new Node(lexer->srcInfo, NodeType::DOT, scope);
     basicDotInitContext->dotData.lhs = basicSym;
     basicDotInitContext->dotData.rhs = fnNameSym;
+
     auto call = new Node(lexer->srcInfo, NodeType::FN_CALL, scope);
+
     call->fnCallData.fn = basicDotInitContext;
     call->fnCallData.hasRuntimeParams = true;
+
     return call;
 }
 
@@ -131,34 +136,34 @@ void Parser::addBasicImport() {
     vector_append(allTopLevel, importNode);
 }
 
-void Parser::addContextParameterForDecl(Node *decl, Scope *scope) {
-//    if (decl->fnDeclData.addedContextParam) {
-//        return;
-//    }
-//    decl->fnDeclData.addedContextParam = true;
+void Parser::addContextParameterForDecl(vector_t<Node *> &currentParams, Scope *scope) {
+    return;
 
-    auto paramsWithContext = vector_init<Node *>(decl->fnDeclData.params.length + 1);
+    auto paramsWithContext = vector_init<Node *>(currentParams.length + 1);
 
     auto contextSym = new Node(lexer->srcInfo, NodeType::SYMBOL, scope);
     contextSym->symbolData.atomId = atomTable->insertStr("Context");
 
-//    auto basicSym = new Node(lexer->srcInfo, NodeType::SYMBOL, scope);
-//    basicSym->symbolData.atomId = atomTable->insertStr("basic");
+    auto basicSym = new Node(lexer->srcInfo, NodeType::SYMBOL, scope);
+    basicSym->symbolData.atomId = atomTable->insertStr("basic");
 
-//    auto basicDotContext = new Node(lexer->srcInfo, NodeType::DOT, scope);
-//    basicDotContext->dotData.lhs = basicSym;
-//    basicDotContext->dotData.rhs = contextSym;
+    auto basicDotContext = new Node(lexer->srcInfo, NodeType::DOT, scope);
+    basicDotContext->dotData.lhs = basicSym;
+    basicDotContext->dotData.rhs = contextSym;
 
     auto ptrToContextSym = new Node(NodeTypekind::POINTER);
-    ptrToContextSym->typeData.pointerTypeData.underlyingType = contextSym;
+    ptrToContextSym->typeData.pointerTypeData.underlyingType = basicDotContext;
     vector_append(paramsWithContext, wrapInDeclParam(ptrToContextSym, "context", 0));
-    for (auto p : decl->fnDeclData.params) {
+    for (auto p : currentParams) {
         vector_append(paramsWithContext, p);
     }
-    decl->fnDeclData.params = paramsWithContext;
+
+    currentParams = paramsWithContext;
 }
 
 void Parser::parseRoot() {
+//    addBasicImport();
+
     while (!lexer->isEmpty()) {
         // comment
         while (lexer->front.type == LexerTokenType::COMMENT) {
@@ -417,7 +422,12 @@ Node *Parser::parseFnDecl() {
         return decl;
     }
 
-    addContextParameterForDecl(decl, scopes.top());
+    // This is *not* an external declaration at this point
+    // so as long as it's not the main fn OR the initContext() fn, add `context: *basic.Context` as the first parameter
+//    auto initContextAtomId = atomTable->insertStr("initContext");
+//    if (decl->fnDeclData.name == nullptr || (decl->fnDeclData.name->symbolData.atomId != mainAtom && decl->fnDeclData.name->symbolData.atomId != initContextAtomId)) {
+//        addContextParameterForDecl(decl->fnDeclData.params, scopes.top());
+//    }
 
     // put params in scope
     for (auto param : decl->fnDeclData.ctParams) {
@@ -435,6 +445,10 @@ Node *Parser::parseFnDecl() {
 
     auto savedStaticIfScope = this->staticIfScope;
     this->staticIfScope = scopes.top();
+
+    if (mainFn == decl) {
+//        initContext(decl);
+    }
 
     while (!lexer->isEmpty() && lexer->front.type != LexerTokenType::RCURLY) {
         auto scopedStmt = parseScopedStmt();
@@ -1161,7 +1175,10 @@ Node *Parser::parseType() {
             popFront();
             initFnTypeData(type);
             expect(LexerTokenType::LPAREN, "(");
+
             type->typeData.fnTypeData.params = parseDeclParams();
+//            addContextParameterForDecl(type->typeData.fnTypeData.params, scopes.top());
+
             expect(LexerTokenType::RPAREN, ")");
             type->typeData.fnTypeData.returnType = parseType();
         } break;

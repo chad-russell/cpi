@@ -60,7 +60,7 @@ struct Parser {
     Node *createInitContextCall(Scope *scope);
     void initContext(Node *decl);
     void addBasicImport();
-    void addContextParameterForDecl(Node *decl, Scope *scope);
+    void addContextParameterForDecl(vector_t<Node *> &currentParams, Scope *scope);
 
     void parseRoot();
     Node *parseTopLevel();
