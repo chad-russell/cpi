@@ -763,10 +763,7 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, Instruction::RELCONSTI64);
                 append(instructions, toBytes(node->localOffset));
                 append(instructions, Instruction::RELCONSTI64);
-
                 append(instructions, toBytes(currentFnStackSize + totalParamsSize + 8));
-//                append(instructions, toBytes(currentFnStackSize + totalParamsSize + returnTypeSize));
-
                 append(instructions, toBytes32(returnTypeSize));
             }
 

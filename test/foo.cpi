@@ -1,12 +1,6 @@
 fn bar(i : i32) { }
 
-fn f() {
-    return bar;
-}
-
 fn main() {
-    a: i32 = 9;
-    b := 12;
-    c := f();
-    return c(a);
+    i: i32 = 9;
+    return bar(i);
 }
