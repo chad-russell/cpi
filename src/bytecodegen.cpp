@@ -683,6 +683,11 @@ void BytecodeGen::gen(Node *node) {
 
             auto resolvedFn = resolve(node->fnCallData.fn);
 
+            if (resolvedFn->type != NodeType::FN_DECL && resolvedFn->type != NodeType::DECL) {
+                gen(resolvedFn);
+                storeValue(resolvedFn, node->fnCallData.fn->localOffset);
+            }
+
             auto paramCount = node->fnCallData.params.length;
             int32_t totalParamsSize = 0;
             for (unsigned int i = 0; i < paramCount; i++) {
@@ -707,11 +712,6 @@ void BytecodeGen::gen(Node *node) {
 
                 append(instructions, Instruction::BUMPSP);
                 append(instructions, toBytes(totalParamsSize));
-            }
-
-            if (resolvedFn->type != NodeType::FN_DECL && resolvedFn->type != NodeType::DECL) {
-                gen(resolvedFn);
-                storeValue(resolvedFn, node->fnCallData.fn->localOffset);
             }
 
             sourceMap.statements.push_back(SourceMapStatement{

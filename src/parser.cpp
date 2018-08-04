@@ -95,12 +95,16 @@ Node *Parser::createInitContextCall(Scope *scope) {
 void Parser::initContext(Node *decl) {
     auto call = createInitContextCall(scopes.top());
     auto contextSym = new Node(lexer->srcInfo, NodeType::SYMBOL, scopes.top());
+
     contextSym->symbolData.atomId = atomTable->insertStr("context");
     auto contextDecl = new Node(lexer->srcInfo, NodeType::DECL, scopes.top());
+
     contextDecl->declData.lhs = contextSym;
     contextDecl->declData.initialValue = call;
     addLocal(contextDecl);
+
     scopeInsert(contextSym->symbolData.atomId, contextDecl);
+
     vector_append(decl->fnDeclData.body, contextDecl);
 }
 
@@ -137,8 +141,6 @@ void Parser::addBasicImport() {
 }
 
 void Parser::addContextParameterForDecl(vector_t<Node *> &currentParams, Scope *scope) {
-    return;
-
     auto paramsWithContext = vector_init<Node *>(currentParams.length + 1);
 
     auto contextSym = new Node(lexer->srcInfo, NodeType::SYMBOL, scope);
@@ -162,7 +164,7 @@ void Parser::addContextParameterForDecl(vector_t<Node *> &currentParams, Scope *
 }
 
 void Parser::parseRoot() {
-//    addBasicImport();
+    addBasicImport();
 
     while (!lexer->isEmpty()) {
         // comment
@@ -424,10 +426,10 @@ Node *Parser::parseFnDecl() {
 
     // This is *not* an external declaration at this point
     // so as long as it's not the main fn OR the initContext() fn, add `context: *basic.Context` as the first parameter
-//    auto initContextAtomId = atomTable->insertStr("initContext");
-//    if (decl->fnDeclData.name == nullptr || (decl->fnDeclData.name->symbolData.atomId != mainAtom && decl->fnDeclData.name->symbolData.atomId != initContextAtomId)) {
-//        addContextParameterForDecl(decl->fnDeclData.params, scopes.top());
-//    }
+    auto initContextAtomId = atomTable->insertStr("initContext");
+    if (decl->fnDeclData.name == nullptr || (decl->fnDeclData.name->symbolData.atomId != mainAtom && decl->fnDeclData.name->symbolData.atomId != initContextAtomId)) {
+        addContextParameterForDecl(decl->fnDeclData.params, scopes.top());
+    }
 
     // put params in scope
     for (auto param : decl->fnDeclData.ctParams) {
@@ -447,7 +449,7 @@ Node *Parser::parseFnDecl() {
     this->staticIfScope = scopes.top();
 
     if (mainFn == decl) {
-//        initContext(decl);
+        initContext(decl);
     }
 
     while (!lexer->isEmpty() && lexer->front.type != LexerTokenType::RCURLY) {
@@ -1177,7 +1179,7 @@ Node *Parser::parseType() {
             expect(LexerTokenType::LPAREN, "(");
 
             type->typeData.fnTypeData.params = parseDeclParams();
-//            addContextParameterForDecl(type->typeData.fnTypeData.params, scopes.top());
+            addContextParameterForDecl(type->typeData.fnTypeData.params, scopes.top());
 
             expect(LexerTokenType::RPAREN, ")");
             type->typeData.fnTypeData.returnType = parseType();

@@ -1,6 +1,7 @@
-fn bar(i : i32) { }
+fn id(t: !T) T {
+    return t;
+}
 
 fn main() {
-    i: i32 = 9;
-    return bar(i);
+    return id(3);
 }
