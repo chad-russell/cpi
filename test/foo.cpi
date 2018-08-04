@@ -1,7 +1,3 @@
-fn id(t: !T) T {
-    return t;
-}
-
 fn main() {
-    return id(3);
+    return 0;
 }

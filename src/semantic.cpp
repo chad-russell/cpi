@@ -188,6 +188,15 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
         return true;
     }
 
+    if (desired->type != NodeType::TYPE) {
+        semantic->resolveTypes(desired);
+        desired = resolve(desired);
+    }
+    if (actual->type != NodeType::TYPE) {
+        semantic->resolveTypes(actual);
+        actual = resolve(actual);
+    }
+
     cpi_assert(desired->type == NodeType::TYPE);
     cpi_assert(actual->type == NodeType::TYPE);
 
@@ -1397,10 +1406,11 @@ void resolveFnCall(Semantic *semantic, Node *node) {
 
     // assign runtime params
     if (node->fnCallData.hasRuntimeParams) {
-        vector_t<Node *> declParams = vector_init<Node *>(10);
+        vector_t<Node *> declParams;
 
         if (isPoly) {
             cpi_assert(resolvedFn->type == NodeType::FN_DECL);
+
             declParams = resolvedFn->fnDeclData.params;
         } else {
             auto resolvedFnType = resolve(resolvedFn->typeInfo)->typeData;
