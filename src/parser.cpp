@@ -73,6 +73,91 @@ void Parser::scopeInsert(int64_t atomId, Node *node) {
     hash_insert(_scope->symbols, atomId, node);
 }
 
+Node *Parser::createInitContextCall(Scope *scope) {
+    auto fnNameSym = new Node(lexer->srcInfo, NodeType::SYMBOL, scope);
+    fnNameSym->symbolData.atomId = atomTable->insertStr("initContext");
+    auto basicSym = new Node(lexer->srcInfo, NodeType::SYMBOL, scope);
+    basicSym->symbolData.atomId = atomTable->insertStr("basic");
+    auto basicDotInitContext = new Node(lexer->srcInfo, NodeType::DOT, scope);
+    basicDotInitContext->dotData.lhs = basicSym;
+    basicDotInitContext->dotData.rhs = fnNameSym;
+    auto call = new Node(lexer->srcInfo, NodeType::FN_CALL, scope);
+    call->fnCallData.fn = basicDotInitContext;
+    call->fnCallData.hasRuntimeParams = true;
+    return call;
+}
+
+void Parser::initContext(Node *decl) {
+    auto call = createInitContextCall(scopes.top());
+    auto contextSym = new Node(lexer->srcInfo, NodeType::SYMBOL, scopes.top());
+    contextSym->symbolData.atomId = atomTable->insertStr("context");
+    auto contextDecl = new Node(lexer->srcInfo, NodeType::DECL, scopes.top());
+    contextDecl->declData.lhs = contextSym;
+    contextDecl->declData.initialValue = call;
+    addLocal(contextDecl);
+    scopeInsert(contextSym->symbolData.atomId, contextDecl);
+    vector_append(decl->fnDeclData.body, contextDecl);
+}
+
+// todo(chad): remove code duplication here -- this is very similar to parseImport...
+void Parser::addBasicImport() {
+    auto importNode = new Node(this->lexer->srcInfo, NodeType::IMPORT, scopes.top());
+    auto path = realpath("basic.cpi", nullptr);
+    cpi_assert(path != nullptr);
+    auto found = false;
+    auto importAtomId = atomTable->insertStr("basic");
+    for (auto i : importedFileModules) {
+        auto iName = atomTable->backwardAtoms[i->moduleData.name->symbolData.atomId].c_str();
+        if (strcmp(iName, "basic") == 0) {
+            found = true;
+            scopeInsert(importAtomId, i);
+            importNode->nodeData = i;
+        }
+    }
+    if (!found) {
+        auto lexer = new Lexer(path, true);
+        auto parser = new Parser(lexer);
+        auto fileModule = new Node(lexer->srcInfo, NodeType::MODULE, nullptr);
+        fileModule->moduleData.name = new Node(lexer->srcInfo, NodeType::SYMBOL, parser->scopes.top());
+        fileModule->moduleData.name->symbolData.atomId = atomTable->insertStr("basic");
+        vector_append(importedFileModules, fileModule);
+        fileModule->scope = parser->scopes.top();
+        parser->parseRoot();
+        fileModule->moduleData.stmts = parser->allTopLevel;
+        scopeInsert(importAtomId, fileModule);
+        importNode->nodeData = fileModule;
+    }
+    vector_append(*this->imports, importNode);
+    vector_append(allTopLevel, importNode);
+}
+
+void Parser::addContextParameterForDecl(Node *decl, Scope *scope) {
+//    if (decl->fnDeclData.addedContextParam) {
+//        return;
+//    }
+//    decl->fnDeclData.addedContextParam = true;
+
+    auto paramsWithContext = vector_init<Node *>(decl->fnDeclData.params.length + 1);
+
+    auto contextSym = new Node(lexer->srcInfo, NodeType::SYMBOL, scope);
+    contextSym->symbolData.atomId = atomTable->insertStr("Context");
+
+//    auto basicSym = new Node(lexer->srcInfo, NodeType::SYMBOL, scope);
+//    basicSym->symbolData.atomId = atomTable->insertStr("basic");
+
+//    auto basicDotContext = new Node(lexer->srcInfo, NodeType::DOT, scope);
+//    basicDotContext->dotData.lhs = basicSym;
+//    basicDotContext->dotData.rhs = contextSym;
+
+    auto ptrToContextSym = new Node(NodeTypekind::POINTER);
+    ptrToContextSym->typeData.pointerTypeData.underlyingType = contextSym;
+    vector_append(paramsWithContext, wrapInDeclParam(ptrToContextSym, "context", 0));
+    for (auto p : decl->fnDeclData.params) {
+        vector_append(paramsWithContext, p);
+    }
+    decl->fnDeclData.params = paramsWithContext;
+}
+
 void Parser::parseRoot() {
     while (!lexer->isEmpty()) {
         // comment
@@ -331,6 +416,8 @@ Node *Parser::parseFnDecl() {
 
         return decl;
     }
+
+    addContextParameterForDecl(decl, scopes.top());
 
     // put params in scope
     for (auto param : decl->fnDeclData.ctParams) {

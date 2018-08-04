@@ -2,15 +2,26 @@ type Context struct {
     id: i64
 }
 
-fn bar(context: *Context) {
+fn bar() {
     return 3;
 }
 
-fn foo(context: *Context) {
+fn foo() {
     return bar;
 }
 
 fn main() {
-    context: Context;
-    return foo(&context)(&context);
+    f := fn() {
+        return fn() {
+            return foo;
+        };
+    };
+
+    assert(3 == f()()()());
+
+    return 0;
+}
+
+fn assert(b: bool) {
+    if (b == false) { panic(); }
 }

@@ -57,6 +57,11 @@ struct Parser {
     Node *unwindPolish(stack<ShuntingYard> *values);
     void addLocal(Node *local);
 
+    Node *createInitContextCall(Scope *scope);
+    void initContext(Node *decl);
+    void addBasicImport();
+    void addContextParameterForDecl(Node *decl, Scope *scope);
+
     void parseRoot();
     Node *parseTopLevel();
     vector_t<Node *> parseDeclParams();

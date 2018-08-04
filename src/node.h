@@ -16,8 +16,8 @@ Node *wrapInValueParam(Node *value, Node *name);
 Node *wrapInValueParam(Node *value, string name);
 Node *wrapInValueParam(Node *value, int64_t atomId);
 
-Node *wrapInDeclParam(Node *value, string name, int index);
-Node *wrapInDeclParam(Node *value, Node *name, int index);
+Node *wrapInDeclParam(Node *type, string name, int index);
+Node *wrapInDeclParam(Node *type, Node *name, int index);
 
 void initForData(Node *node);
 void initArrayLiteralData(Node *node);

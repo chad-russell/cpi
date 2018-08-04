@@ -7,6 +7,31 @@
 #include <memory>
 #include <utility>
 
+void addContextParameterForCall(Semantic *semantic, Node *node) {
+//    if (node->fnCallData.addedContextParam) {
+//        return;
+//    }
+//    node->fnCallData.addedContextParam = true;
+
+    auto newParams = vector_init<Node *>(node->fnCallData.params.length + 1);
+    auto newParam = new Node(node->region.srcInfo, NodeType::SYMBOL, node->scope);
+    newParam->symbolData.atomId = atomTable->insertStr("context");
+    // if 'context' is in scope, then pass it. Otherwise create a new one
+    if (node->scope->find(newParam->symbolData.atomId)) {
+        semantic->resolveTypes(newParam);
+    }
+    else {
+        newParam = semantic->parser->createInitContextCall(node->scope);
+    }
+    auto newWrappedParam = wrapInValueParam(newParam, "context");
+    semantic->resolveTypes(newWrappedParam);
+    vector_append(newParams, newWrappedParam);
+    for (auto p : node->fnCallData.params) {
+        vector_append(newParams, p);
+    }
+    node->fnCallData.params = newParams;
+}
+
 int32_t typeSize(Node *type) {
     auto resolved = resolve(type);
     cpi_assert(resolved->type == NodeType::TYPE);
@@ -1334,6 +1359,8 @@ void resolveFnCall(Semantic *semantic, Node *node) {
     auto resolvedFn = resolve(node->fnCallData.fn);
     auto isPoly = resolvedFn->type == NodeType::FN_DECL && resolvedFn->fnDeclData.ctParams.length != 0;
     Node *polyResolvedFn = nullptr;
+
+    addContextParameterForCall(semantic, node);
 
     if (isPoly) {
         // make a new function
