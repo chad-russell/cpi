@@ -2,12 +2,15 @@ type Context struct {
     id: i64
 }
 
+fn bar(context: *Context) {
+    return 3;
+}
+
 fn foo(context: *Context) {
-    context.id = context.id + 1;
+    return bar;
 }
 
 fn main() {
     context: Context;
-    foo(&context);
-    return context.id;
+    return foo(&context)(&context);
 }
