@@ -1,25 +1,12 @@
-type Context struct {
-    id: i64
-}
+fn bar(i : i32) { }
 
-fn bar(c1: *Context) {
-    return 3;
-}
-
-fn foo(c2: *Context) {
+fn f() {
     return bar;
 }
 
 fn main() {
-    fuck: *Context;
-
-    fn f(c3: *Context) {
-        return fn(c4: *Context) {
-            return foo;
-        };
-    }
-
-    f(fuck)(fuck)(fuck);
-
-    return fuck.id;
+    a: i32 = 9;
+    b := 12;
+    c := f();
+    return c(a);
 }

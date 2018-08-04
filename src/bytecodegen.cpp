@@ -682,11 +682,11 @@ void BytecodeGen::gen(Node *node) {
             if (!node->fnCallData.hasRuntimeParams) { break; }
 
             auto resolvedFn = resolve(node->fnCallData.fn);
+
             auto paramCount = node->fnCallData.params.length;
             int32_t totalParamsSize = 0;
             for (unsigned int i = 0; i < paramCount; i++) {
                 auto paramValue = vector_at(node->fnCallData.params, i)->paramData.value;
-                resolve(paramValue);
                 totalParamsSize += typeSize(paramValue->typeInfo);
             }
 
@@ -756,11 +756,6 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, resolvedFn->bytecode);
             }
 
-            if (totalParamsSize > 0) {
-                append(instructions, Instruction::BUMPSP);
-                append(instructions, toBytes(-totalParamsSize));
-            }
-
             // copy bytes
             auto returnTypeSize = typeSize(resolvedFn->typeInfo->typeData.fnTypeData.returnType);
             if (returnTypeSize > 0) {
@@ -768,8 +763,16 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, Instruction::RELCONSTI64);
                 append(instructions, toBytes(node->localOffset));
                 append(instructions, Instruction::RELCONSTI64);
+
                 append(instructions, toBytes(currentFnStackSize + totalParamsSize + 8));
+//                append(instructions, toBytes(currentFnStackSize + totalParamsSize + returnTypeSize));
+
                 append(instructions, toBytes32(returnTypeSize));
+            }
+
+            if (totalParamsSize > 0) {
+                append(instructions, Instruction::BUMPSP);
+                append(instructions, toBytes(-totalParamsSize));
             }
 
             append(node->bytecode, Instruction::RELI64);

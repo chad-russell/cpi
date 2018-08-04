@@ -526,7 +526,10 @@ void interpretNop(Interpreter *interp) {
 // calli
 void interpretCalli(Interpreter *interp) {
     auto fnTableIndex = interp->read<int64_t>();
-    auto callIndex = *hash_get(interp->fnTable, (uint32_t) fnTableIndex);
+
+    auto found = hash_get(interp->fnTable, (uint32_t) fnTableIndex);
+    auto callIndex = *found;
+
     interp->callIndex(callIndex);
 }
 

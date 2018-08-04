@@ -46,9 +46,9 @@ int32_t typeSize(Node *type) {
         case NodeTypekind::BOOLEAN:
         case NodeTypekind::BOOLEAN_LITERAL:
         case NodeTypekind::I32:
-        case NodeTypekind::FN:
         case NodeTypekind::FLOAT_LITERAL:
         case NodeTypekind::F32:
+        case NodeTypekind::FN:
             return 4;
         case NodeTypekind::POINTER:
         case NodeTypekind::INT_LITERAL:
@@ -550,7 +550,7 @@ void resolveModule(Semantic *semantic, Node *node) {
 }
 
 void resolveImport(Semantic *semantic, Node *node) {
-    semantic->resolveTypes(node->nodeData);
+     semantic->resolveTypes(node->nodeData);
 }
 
 void resolveDefer(Semantic *semantic, Node *node) {
