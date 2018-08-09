@@ -150,6 +150,8 @@ fn main() {
 
     testPipe();
 
+    printing.printMany({"fuckme: ", fuckme, "\n"});
+
     return 0;
 }
 
@@ -173,11 +175,11 @@ fn testDefer() {
 
 fn testModule3() {
     module foo {
-        a ::= 2;
+        alias a 2
         module bar {
-            a ::= 3;
+            alias a 3
             module baz {
-                a ::= 4;
+                alias a 4
             }
         }
     }
@@ -188,11 +190,11 @@ fn testModule3() {
 
 fn testModule2() {
     module foo {
-        a ::= 3;
+        alias a 3
     }
 
     module bar {
-        a ::= 5;
+        alias a 5
     }
 
     if false {
@@ -228,7 +230,7 @@ fn testModule() {
 
 fn testPrinting() {
     e: enum {x: i32, y: bool} = { y: false };
-    printing.printWithSpaces({123, "string", false, []{1, 2, 3}, {x: 3, y: &8767} , e});
+    printing.printWithSpaces({123, "string", false, []{1, 2, 3}, {x: 3, y: &8767}, e});
 
     puts("\n\n");
 }
@@ -449,6 +451,13 @@ fn id(t: !T) T {
     return t;
 }
 
+fn idC(t: !T) {
+    printing.println(^context);
+    return t;
+}
+
+alias fuckme idC(3)
+
 fn deref_ct(t: !T) {
     return ^t;
 }
@@ -662,8 +671,8 @@ fn testBug1() {
     qq1.y = 3;
 
     assert(p.y == 3);
-    -- assert(q.y == 3);
-    -- assert(qq1.y == 3);
+    assert(q.y == 3);
+    assert(qq1.y == 3);
 }
 
 fn deref(i: *i64) {
@@ -935,5 +944,6 @@ fn testAnySimple1() {
 fn someCheck() { return true; }
 
 #if someCheck() {
-    topLevel ::= 123;
+    alias topLevel id(123)
 }
+

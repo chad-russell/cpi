@@ -1,6 +1,25 @@
 TODO:
-    - implement context and passing as implicit parameter
-        - remove 'heap' as a concept -- should always just use the context
+    - more robustness for 'constantize'
+        - figure out what things can be constant and what things can't
+            - full list:
+                - int literals
+                - float literals
+                - bool literals
+                - string literals
+                - fn calls where the args/return type are constantizable
+                - struct literals whose members are all constantizable
+        - error printing when things aren't supported
+
+    - more robustness for compile-time parameters
+        - should only be allowed things which can be constantized
+        - figure out what 'Ast' does/should do, and if it should even be kept around... (hint - it shouldn't)
+
+    - 'heap' should either be removed or changed to utilize the context
+
+    - 'for' concept
+
+    - 'reader' functions, i.e. for reading literals?
+        - if we did this for strings we could maybe get rid of arrays entirely
 
     - threading
         - for interpreter, should create another interpreter and add it to a list. Execution should round-robin over all interpreters in the list
@@ -51,10 +70,6 @@ TODO:
             - #linkPath "/usr/local/cpi/lib";
             - allow from command line as well (?) (or possibly an environment variable?)
 
-    - global variables
-        - at top-level and module-level
-        - need them at the very least for mutexes, but also for global ids, etc. (i.e. if we're making a multi-threaded parser then node_id needs to be globally unique)
-
     - mutexes
         - ```
             m: mutex; -- global. This should get initialized when the program starts
@@ -62,11 +77,6 @@ TODO:
                 -- do stuff. Should lock at the beginning and unlock at the end
             }
         ```
-
-    - more robustness for 'constantize'
-        - figure out what things can be constant and what things can't
-            - everything but pointers (??)
-        - error printing when things aren't supported
 
     - better interpreter debugging
         - fix all the broken stuff

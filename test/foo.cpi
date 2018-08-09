@@ -1,3 +1,9 @@
+alias a {x: 1, y: 2}
+
 fn main() {
-    return 0;
+    return a.y + foo(a);
+}
+
+fn foo(s: struct{x: i64, y: i64}) {
+    return s.y - s.x;
 }

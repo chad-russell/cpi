@@ -1,7 +1,7 @@
 fn putchar(c: i8) {
-    s := ".";
-    s[0] = c;
-    puts(s);
+    ch := ".";
+    ch[0] = c;
+    puts(ch);
 }
 
 fn mod(x: !T, y: T) {
@@ -64,22 +64,23 @@ fn printHex(t: !T) {
 }
 
 fn print(t: !T) {
-    if #iskind(T, i8) {
+    -- todo(chad): change these to #if
+    #if #iskind(T, i8) {
         printInt(t);
     }
-    else if #iskind(T, i32) {
+    else #if #iskind(T, i32) {
         printInt(t);
     }
-    else if #iskind(T, i64) {
+    else #if #iskind(T, i64) {
         printInt(t);
     }
-    else if #iskind(T, f32) {
+    else #if #iskind(T, f32) {
         print("<<some f32>>");
     }
-    else if #iskind(T, f64) {
+    else #if #iskind(T, f64) {
         printInt("<<some f64>>");
     }
-    else if #iskind(T, bool) {
+    else #if #iskind(T, bool) {
         if t {
             puts("true");
         }
@@ -87,7 +88,7 @@ fn print(t: !T) {
             puts("false");
         }
     }
-    else if #iskind(T, []) {
+    else #if #iskind(T, []) {
         -- could be a string, or something else
         if #iskind(typeof(t[0]), i8) {
             puts(t);
@@ -101,7 +102,7 @@ fn print(t: !T) {
             puts("}");
         }
     }
-    else if #iskind(T, struct) {
+    else #if #iskind(T, struct) {
         puts("{");
         #for it, i: #fieldsof(T) {
             print(it.name);
@@ -111,7 +112,7 @@ fn print(t: !T) {
         }
         puts("}");
     }
-    else if #iskind(T, enum) {
+    else #if #iskind(T, enum) {
         fieldCount2 := cast(i64) #fieldsof(T).count;
 
         puts("{");
@@ -131,6 +132,12 @@ fn print(t: !T) {
     }
 }
 
+fn printMany(t: !T) {
+    #for it: t {
+        print(it);
+    }
+}
+
 fn printWithSeparator( sep: []i8 )(t: !T) {
     #for it, i: t {
         print(it);
@@ -141,7 +148,7 @@ fn printWithSeparator( sep: []i8 )(t: !T) {
 }
 
 fn printWithSpaces(t: !T) {
-    printWithSeparator!(", ")(t);
+    printWithSeparator!(" ")(t);
 }
 
 fn println(s: !T) {

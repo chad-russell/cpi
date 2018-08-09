@@ -384,7 +384,6 @@ void Interpreter::interpret() {
                     gen->sourceMap.sourceInfo = evalFnDecl->region.srcInfo;
                     gen->processFnDecls = true;
 
-                    // todo(chad): make it so this works and stuff
                     gen->gen(evalFnDecl);
                     while (!gen->toProcess.empty()) {
                         gen->isMainFn = false;
@@ -521,6 +520,12 @@ void interpretPuts(Interpreter *interp) {
 // nop
 void interpretNop(Interpreter *interp) {
     // do nothing!
+}
+
+void interpretReserveGlobal(Interpreter *interp) {
+    auto numBytes = interp->consume<int32_t>();
+    interp->sp += numBytes;
+    interp->bp += numBytes;
 }
 
 // calli

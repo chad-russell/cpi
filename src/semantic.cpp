@@ -566,6 +566,13 @@ void resolveDefer(Semantic *semantic, Node *node) {
     }
 }
 
+void resolveAlias(Semantic *semantic, Node *node) {
+    node->aliasData.value = constantize(semantic, node->aliasData.value);
+    semantic->resolveTypes(node->aliasData.value);
+
+    node->typeInfo = node->aliasData.value->typeInfo;
+}
+
 void resolveFnDecl(Semantic *semantic, Node *node) {
     auto data = &node->fnDeclData;
 
@@ -735,8 +742,34 @@ void resolveBooleanLiteral(Semantic *semantic, Node *node) {
 }
 
 Node *constantize(Semantic *semantic, Node *node) {
-    if (node->type == NodeType::INT_LITERAL) {
+    if (node->type == NodeType::INT_LITERAL || node->type == NodeType::STRING_LITERAL || node->type == NodeType::FN_DECL) {
         return node;
+    }
+
+    if (node->type == NodeType::ARRAY_LITERAL) {
+        auto constNode = new Node(node->region.srcInfo, NodeType::ARRAY_LITERAL, node->scope);
+        constNode->region = node->region;
+
+        constNode->arrayLiteralData.elementType = node->arrayLiteralData.elementType;
+
+        for (auto e : node->arrayLiteralData.elements) {
+            vector_append(constNode->arrayLiteralData.elements, constantize(semantic, e));
+        }
+
+        semantic->resolveTypes(constNode);
+        return constNode;
+    }
+
+    if (node->type == NodeType::STRUCT_LITERAL) {
+        auto constNode = new Node(node->region.srcInfo, NodeType::STRUCT_LITERAL, node->scope);
+        constNode->region = node->region;
+
+        for (auto e : node->structLiteralData.params) {
+            vector_append(constNode->structLiteralData.params, wrapInValueParam(constantize(semantic, e->paramData.value), e->paramData.name));
+        }
+
+        semantic->resolveTypes(constNode);
+        return constNode;
     }
 
     auto gen = new BytecodeGen();
@@ -747,8 +780,12 @@ Node *constantize(Semantic *semantic, Node *node) {
     auto copied = semantic->deepCopyRvalue(node, node->scope);
     semantic->resolveTypes(copied);
 
-    if (copied->type != NodeType::FN_CALL) {
+    if (copied->type != NodeType::FN_CALL || copied->fnCallData.params.length != 0) {
         auto wrappedFn = new Node(node->region.srcInfo, NodeType::FN_DECL, node->scope);
+
+        if (!noIppFlag) {
+            semantic->parser->addContextParameterForDecl(wrappedFn->fnDeclData.params, node->scope);
+        }
 
         auto savedCurrentFnDecl = semantic->currentFnDecl;
         semantic->currentFnDecl = wrappedFn;
@@ -801,19 +838,28 @@ Node *constantize(Semantic *semantic, Node *node) {
     interp->interpret();
 
     auto resolvedTypeInfo = resolve(copied->typeInfo);
-    cpi_assert(resolvedTypeInfo->typeData.kind == NodeTypekind::I64
-               || resolvedTypeInfo->typeData.kind == NodeTypekind::I32
-               || resolvedTypeInfo->typeData.kind == NodeTypekind::INT_LITERAL
-               || resolvedTypeInfo->typeData.kind == NodeTypekind::BOOLEAN
-               || resolvedTypeInfo->typeData.kind == NodeTypekind::BOOLEAN_LITERAL);
+    auto isStringLiteral = resolvedTypeInfo->typeData.kind == NodeTypekind::STRUCT
+                           && resolvedTypeInfo->typeData.structTypeData.isSecretlyArray
+                           && resolvedTypeInfo->typeData.structTypeData.secretArrayElementType->typeData.kind == NodeTypekind::I8;
 
     auto isBoolean = (resolvedTypeInfo->typeData.kind == NodeTypekind::BOOLEAN || resolvedTypeInfo->typeData.kind == NodeTypekind::BOOLEAN_LITERAL);
 
     auto staticValue = interp->readFromStack<int64_t>(copied->localOffset);
 
     auto staticNode = new Node();
-    staticNode->type = isBoolean ? NodeType::BOOLEAN_LITERAL : NodeType::INT_LITERAL;
-    staticNode->intLiteralData.value = staticValue;
+    if (isBoolean) {
+        staticNode->type = NodeType::BOOLEAN_LITERAL;
+        staticNode->boolLiteralData.value = staticValue != 0;
+    }
+    else if (isStringLiteral) {
+        staticNode->type = NodeType::STRING_LITERAL;
+        // todo(chad): set read memory and set staticNode->stringLiteralData.value
+    }
+    else {
+        staticNode->type = NodeType::INT_LITERAL;
+        staticNode->intLiteralData.value = staticValue;
+    }
+
     semantic->resolveTypes(staticNode);
 
     node->staticValue = staticNode;
@@ -937,7 +983,7 @@ void resolveStringLiteral(Semantic *semantic, Node *node) {
         vector_append(charArrayLiteral->structLiteralData.params, wrapInValueParam(charNode, ""));
     }
 
-    // heapifiedCharArrayLiteral = &{'h', 'e', 'l', 'l', 'o'}
+    // heapifiedCharArrayLiteral = heap({'h', 'e', 'l', 'l', 'o'})
     auto heapifiedCharArrayLiteral = new Node(node->region);
     heapifiedCharArrayLiteral->type = NodeType::HEAPIFY;
     heapifiedCharArrayLiteral->nodeData = charArrayLiteral;
@@ -950,7 +996,7 @@ void resolveStringLiteral(Semantic *semantic, Node *node) {
     countNode->typeInfo = new Node(NodeTypekind::I64);
     countNode->intLiteralData.value = static_cast<int64_t>(node->stringLiteralData.value->size());
 
-    // arrayLiteral = {&{'h', 'e', 'l', 'l', 'o'}, 5}
+    // arrayLiteral = {heap({'h', 'e', 'l', 'l', 'o'}), 5}
     vector_append(arrayLiteral->structLiteralData.params, wrapInValueParam(heapifiedCharArrayLiteral, "data"));
     vector_append(arrayLiteral->structLiteralData.params, wrapInValueParam(countNode, "count"));
 
@@ -961,7 +1007,8 @@ void resolveStringLiteral(Semantic *semantic, Node *node) {
 
     arrayLiteral->typeInfo->typeData.structTypeData.secretArrayElementType = new Node(NodeTypekind::I8);
 
-    node->resolved = arrayLiteral;
+//    node->resolved = arrayLiteral;
+    node->stringLiteralData.arrayLiteralRepresentation = arrayLiteral;
 }
 
 void resolveNilLiteral(Semantic *semantic, Node *node) {
@@ -1148,10 +1195,6 @@ void resolveDecl(Semantic *semantic, Node *node) {
     auto matchedUnion = maybeMatchUnionToStructLiteral(resolvedDeclDataType, node->declData.initialValue->typeInfo, semantic);
     if (matchedUnion == 1) {
         semantic->reportError({}, Error{node->region, "error assigning struct literal to union - unmatched field name"});
-    }
-
-    if (node->declData.isConstant) {
-        node->staticValue = constantize(semantic, node->declData.initialValue);
     }
 }
 
@@ -1369,28 +1412,33 @@ void resolveFnCall(Semantic *semantic, Node *node) {
     auto isPoly = resolvedFn->type == NodeType::FN_DECL && resolvedFn->fnDeclData.ctParams.length != 0;
     Node *polyResolvedFn = nullptr;
 
-    bool shouldAddContextParam;
-    if (resolvedFn->type != NodeType::FN_DECL) {
-        shouldAddContextParam = true;
-    }
-    else if (resolvedFn->fnDeclData.name != nullptr && !resolvedFn->fnDeclData.isExternal) {
-        auto initContextAtom = atomTable->insertStr("initContext");
-
-        if (resolvedFn->fnDeclData.name->type == NodeType::DOT) {
-            auto fnNameAtom = resolvedFn->fnDeclData.name->dotData.rhs->symbolData.atomId;
-            shouldAddContextParam = fnNameAtom != initContextAtom;
+    if (!noIppFlag) {
+        bool shouldAddContextParam = false;
+        if (resolvedFn->type != NodeType::FN_DECL) {
+            shouldAddContextParam = true;
         }
-        else if (resolvedFn->fnDeclData.name->type == NodeType::SYMBOL) {
-            auto fnNameAtom = resolvedFn->fnDeclData.name->symbolData.atomId;
-            shouldAddContextParam = fnNameAtom != semantic->parser->mainAtom && fnNameAtom != initContextAtom;
-        }
-    }
-    else {
-        shouldAddContextParam = true;
-    }
+        else if (resolvedFn->fnDeclData.name != nullptr && !resolvedFn->fnDeclData.isExternal) {
+            auto initContextAtom = atomTable->insertStr("initContext");
 
-    if (shouldAddContextParam) {
-        addContextParameterForCall(semantic, node);
+            if (resolvedFn->fnDeclData.name->type == NodeType::DOT) {
+                auto fnNameAtom = resolvedFn->fnDeclData.name->dotData.rhs->symbolData.atomId;
+                shouldAddContextParam = fnNameAtom != initContextAtom;
+            }
+            else if (resolvedFn->fnDeclData.name->type == NodeType::SYMBOL) {
+                auto fnNameAtom = resolvedFn->fnDeclData.name->symbolData.atomId;
+                shouldAddContextParam = fnNameAtom != semantic->parser->mainAtom && fnNameAtom != initContextAtom;
+            }
+        }
+        else if (resolvedFn->fnDeclData.name != nullptr && resolvedFn->fnDeclData.isExternal) {
+            shouldAddContextParam = false;
+        }
+        else {
+            shouldAddContextParam = true;
+        }
+
+        if (shouldAddContextParam) {
+            addContextParameterForCall(semantic, node);
+        }
     }
 
     if (isPoly) {
@@ -1777,27 +1825,27 @@ Node *findParam(Semantic *semantic, Node *node) {
     if (node->dotData.rhs->type == NodeType::INT_LITERAL) {
         foundParam = vector_at(structData.params, node->dotData.rhs->intLiteralData.value);
     }
-    else if (structData.isLiteral) {
-        auto debug2 = atomTable->backwardAtoms[node->dotData.rhs->symbolData.atomId];
+    else {
+        auto sizeSoFar = 0;
+        for (const auto &param : structData.params) {
+            auto paramSize = typeSize(param->paramData.type);
+
+            // alignment
+            if (sizeSoFar > 0 && paramSize > 0) {
+                sizeSoFar += sizeSoFar % paramSize;
+            }
+
+            param->localOffset = sizeSoFar;
+
+            sizeSoFar += paramSize;
+        }
 
         for (auto param : structData.params) {
             if (param->paramData.name != nullptr) {
-                auto debug1 = atomTable->backwardAtoms[param->paramData.name->symbolData.atomId];
-
                 if (param->paramData.name->symbolData.atomId == node->dotData.rhs->symbolData.atomId) {
                     foundParam = param;
                     break;
                 }
-            }
-        }
-    } else {
-        for (auto param : structData.params) {
-            auto f1 = atomTable->backwardAtoms[param->paramData.name->symbolData.atomId];
-            auto f2 = atomTable->backwardAtoms[node->dotData.rhs->symbolData.atomId];
-
-            if (param->paramData.name->symbolData.atomId == node->dotData.rhs->symbolData.atomId) {
-                foundParam = param;
-                break;
             }
         }
     }
@@ -1806,7 +1854,8 @@ Node *findParam(Semantic *semantic, Node *node) {
 
     if (foundParam != nullptr && resolve(node->dotData.lhs)->type == NodeType::STRUCT_LITERAL) {
         cpi_assert(foundParam->type == NodeType::DECL_PARAM);
-        auto foundValue = vector_at(resolve(node->dotData.lhs)->structLiteralData.params, foundParam->paramData.index)->paramData.value;
+        auto foundValue = vector_at(resolve(node->dotData.lhs)->structLiteralData.params,
+                                    (unsigned long) foundParam->paramData.index)->paramData.value;
         node->resolved = foundValue;
         node->dotData.resolved = foundValue;
     }
@@ -2802,6 +2851,9 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::DEFER: {
             resolveDefer(this, node);
+        } break;
+        case NodeType::ALIAS: {
+            resolveAlias(this, node);
         } break;
         case NodeType::END_SCOPE: break;
         default: cpi_assert(false);

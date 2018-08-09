@@ -15,6 +15,7 @@ using namespace std;
 extern unsigned long nodeId;
 extern unsigned long fnTableId;
 extern int debugFlag;
+extern int noIppFlag;
 
 const char *readFile(const char *fileName);
 
@@ -76,6 +77,7 @@ enum class NodeType {
     ISKIND = 42,
     DEFER = 43,
     END_SCOPE = 44,
+    ALIAS = 45,
 };
 
 enum class NodeTypekind {
@@ -120,8 +122,6 @@ enum class LexerTokenType : int32_t {
     AMP,
     DOT,
     COLON_EQ,
-    COLON_COLON_EQ,
-    COLON_COLON,
     COLON,
     EQ,
     COMMA,
@@ -176,6 +176,7 @@ enum class LexerTokenType : int32_t {
     HEAP,
     ISKIND,
     DEFER,
+    ALIAS
 };
 
 struct SourceInfo {
@@ -269,7 +270,6 @@ struct DeclData {
     Node *lhs;
     Node *type;
     Node *initialValue;
-    bool isConstant;
 };
 
 struct AssignData {
@@ -330,6 +330,7 @@ struct StructLiteralData {
 
 struct StringLiteralData {
     string *value;
+    Node *arrayLiteralRepresentation;
 };
 
 struct IfData {
@@ -382,6 +383,11 @@ struct ForData {
     vector_t<Node *> staticStmts;
 };
 
+struct AliasData {
+    Node *name;
+    Node *value;
+};
+
 struct IsKindData {
     Node *type;
     LexerTokenType tokenType;
@@ -422,6 +428,7 @@ public:
     Scope *scope = nullptr;
     Node *typeInfo = nullptr;
     Node *resolved = nullptr;
+    Node *bytecodeResolved = nullptr;
     NodeType type;
 
     vector_t<Node *> preStmts = vector_init<Node *>(10);
@@ -453,6 +460,7 @@ public:
         IsKindData isKindData;
         ModuleData moduleData;
         DeferData deferData;
+        AliasData aliasData;
     };
 
     Node *staticValue = nullptr;

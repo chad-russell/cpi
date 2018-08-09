@@ -59,6 +59,9 @@ Node::Node(SourceInfo srcInfo, NodeType type_, Scope *scope_) : Node() {
         case NodeType::END_SCOPE: {
             initEndScopeData(this);
         } break;
+        case NodeType::ALIAS: {
+            initAliasData(this);
+        }
         default: {}
     }
 }
@@ -96,6 +99,11 @@ void initDeferData(Node *node) {
 
 void initEndScopeData(Node *node) {
     node->sourceMapStatement = true;
+}
+
+void initAliasData(Node *node) {
+    node->aliasData.name = nullptr;
+    node->aliasData.value = nullptr;
 }
 
 void initArrayLiteralData(Node *node) {
@@ -162,7 +170,6 @@ void initDeclData(Node *node) {
     node->declData.lhs = nullptr;
     node->declData.type = nullptr;
     node->declData.initialValue = nullptr;
-    node->declData.isConstant = false;
 }
 
 void initParamData(Node *node) {

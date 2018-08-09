@@ -37,5 +37,6 @@ void initFnTypeData(Node *node);
 void initModuleData(Node *node);
 void initDeferData(Node *node);
 void initEndScopeData(Node *node);
+void initAliasData(Node *node);
 
 #endif // NODE_H

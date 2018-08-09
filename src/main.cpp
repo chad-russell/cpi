@@ -44,6 +44,7 @@ using namespace llvm;
 unsigned long nodeId;
 unsigned long fnTableId;
 int debugFlag;
+int noIppFlag;
 AtomTable *atomTable;
 vector_t<Node *> importedFileModules;
 
@@ -56,6 +57,7 @@ void printHelp() {
          << "==========="                                                                    << endl
          << "-- args --"                                                                     << endl
          << "==========="                                                                    << endl
+         << "--no-ipp                          Run without implicit context pointer"         << endl
          << "--print-asm   (-p):               Print assembly instructions"                  << endl
          << "--print-ast   (-a):               Print lowered AST"                            << endl
          << "--debug       (-d):               Start the program in debug mode"              << endl
@@ -94,6 +96,7 @@ InputType inputTypeFromExtension(const string &fileName) {
 int main(int argc, char **argv) {
     nodeId = 0;
     debugFlag = 0;
+    noIppFlag = 0;
 
     atomTable = new AtomTable();
     atomTable->atoms = hash_init<string, int64_t>(1000);
@@ -104,6 +107,7 @@ int main(int argc, char **argv) {
 
     // ./cpi [-o outputFile] [--print-asm] [--debug] inputFile
     static struct option longOptions[] = {
+            {"no-ipp",      no_argument,       nullptr,        'c'},
             {"print-asm",   no_argument,       &printAsmFlag,  'p'},
             {"print-ast",   no_argument,       &printAstFlag,  'a'},
             {"debug",       no_argument,       &debugFlag,     'd'},
@@ -120,7 +124,7 @@ int main(int argc, char **argv) {
     while (true) {
         int optionIndex;
 
-        auto c = getopt_long(argc, argv, "pdo:n:ih", longOptions, &optionIndex);
+        auto c = getopt_long(argc, argv, "pdo:c:n:ih", longOptions, &optionIndex);
         if (c == -1) { break; }
         switch (c) {
             case 0: {
@@ -131,6 +135,9 @@ int main(int argc, char **argv) {
             } break;
             case 'n': {
                 nTimes = atoi(optarg);
+            } break;
+            case 'c': {
+                noIppFlag = 1;
             } break;
             case 'i':
             case 'h':

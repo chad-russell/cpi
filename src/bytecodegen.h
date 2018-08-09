@@ -7,6 +7,11 @@
 #include "node.h"
 #include "assembler.h"
 
+struct Fixup {
+    int64_t instOffset;
+    Node *node;
+};
+
 class BytecodeGen {
 public:
     vector<unsigned char> instructions = {};
@@ -25,7 +30,7 @@ public:
 
     // for going back at the end and setting call/jump locations
     // I guess this is like a poor man's linker
-    hash_t<int64_t, Node *> *fixups;
+    vector_t<Fixup> fixups;
 
     void binopHelper(string instructionStr, Node *node, int32_t scale = 1);
 

@@ -460,6 +460,7 @@ bool hasNoLocalByDefault(Node *node) {
     switch (resolve(node)->type) {
         case NodeType::INT_LITERAL:
         case NodeType::FLOAT_LITERAL:
+        case NodeType::STRING_LITERAL:
         case NodeType::BOOLEAN_LITERAL:
         case NodeType::ADDRESS_OF:
         case NodeType::DEREF:
@@ -467,6 +468,7 @@ bool hasNoLocalByDefault(Node *node) {
         case NodeType::STRUCT_LITERAL:
         case NodeType::UNARY_NEG:
         case NodeType::CAST:
+        case NodeType::ALIAS:
             return true;
         default: return false;
     }

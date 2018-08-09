@@ -44,7 +44,7 @@ module sdl {
     }
 }
 
-fn main() {
+fn runGame() {
     winX: i32 = 100;
     winY: i32 = 200;
     sizeX: i32 = 300;
@@ -55,13 +55,15 @@ fn main() {
     renderer := sdl.SDL_CreateRenderer(window, cast(i32) -1, cast(i32) 0);
 
     sdl.SDL_RenderSetLogicalSize(renderer, sizeX, sizeY);
-    sdl.SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    sdl.SDL_SetRenderDrawColor(renderer, 0, 255, 50, 255);
 
     playerPos: sdl.SDL_Rect;
     playerPos.x = 20;
     playerPos.y = 20;
     playerPos.w = 50;
     playerPos.h = 20;
+
+    keydown := 0;
 
     loop := true;
     while loop
@@ -86,6 +88,8 @@ fn main() {
                 else if event.keysym.sym == sdl.SDLK_DOWN {
                     playerPos.y = playerPos.y + 10;
                 }
+
+                keydown = keydown + 1;
             }
 
             sdl.SDL_RenderClear(renderer);
@@ -96,5 +100,5 @@ fn main() {
         }
     }
 
-    return 0;
+    return keydown;
 }

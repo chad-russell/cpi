@@ -164,7 +164,9 @@ void Parser::addContextParameterForDecl(vector_t<Node *> &currentParams, Scope *
 }
 
 void Parser::parseRoot() {
-    addBasicImport();
+    if (!noIppFlag) {
+        addBasicImport();
+    }
 
     while (!lexer->isEmpty()) {
         // comment
@@ -210,10 +212,9 @@ Node *Parser::parseTopLevel() {
         return parseIf();
     }
 
-    // declaration/assignment combo
-    auto declAss = parseScopedStmt();
-    if (declAss != nullptr && declAss->type == NodeType::DECL && declAss->declData.isConstant) {
-        return declAss;
+    // alias
+    if (lexer->front.type == LexerTokenType::ALIAS) {
+        return parseAlias();
     }
 
     reportError("Expected top level declaration");
@@ -428,7 +429,9 @@ Node *Parser::parseFnDecl() {
     // so as long as it's not the main fn OR the initContext() fn, add `context: *basic.Context` as the first parameter
     auto initContextAtomId = atomTable->insertStr("initContext");
     if (decl->fnDeclData.name == nullptr || (decl->fnDeclData.name->symbolData.atomId != mainAtom && decl->fnDeclData.name->symbolData.atomId != initContextAtomId)) {
-        addContextParameterForDecl(decl->fnDeclData.params, scopes.top());
+        if (!noIppFlag) {
+            addContextParameterForDecl(decl->fnDeclData.params, scopes.top());
+        }
     }
 
     // put params in scope
@@ -448,7 +451,7 @@ Node *Parser::parseFnDecl() {
     auto savedStaticIfScope = this->staticIfScope;
     this->staticIfScope = scopes.top();
 
-    if (mainFn == decl) {
+    if (!noIppFlag && mainFn == decl) {
         initContext(decl);
     }
 
@@ -550,6 +553,22 @@ Node *Parser::parseDefer() {
 
     node->region = Region{lexer->srcInfo, saved, lexer->front.region.end};
     expect(LexerTokenType::RCURLY, "}");
+
+    return node;
+}
+
+Node *Parser::parseAlias() {
+    auto saved = lexer->front.region.start;
+    popFront();
+
+    auto node = new Node(lexer->srcInfo, NodeType::ALIAS, scopes.top());
+
+    node->aliasData.name = parseSymbol();
+    node->aliasData.value = parseRvalue();
+
+    node->region = Region{lexer->srcInfo, saved, node->aliasData.value->region.end};
+
+    scopeInsert(node->aliasData.name->symbolData.atomId, node);
 
     return node;
 }
@@ -667,6 +686,11 @@ Node *Parser::parseScopedStmt() {
         return parseDefer();
     }
 
+    // alias
+    if (lexer->front.type == LexerTokenType::ALIAS) {
+        return parseAlias();
+    }
+
     // declaration/assignment/combo
     auto saved = lexer->front.region.start;
     auto lvalue = parseLvalue();
@@ -680,11 +704,7 @@ Node *Parser::parseScopedStmt() {
     }
 
     // declaration
-    if (lexer->front.type == LexerTokenType::COLON || lexer->front.type == LexerTokenType::COLON_COLON) {
-        if (lexer->front.type == LexerTokenType::COLON_COLON) {
-            isConstant = true;
-        }
-
+    if (lexer->front.type == LexerTokenType::COLON) {
         // cannot declare anything but a symbol
         if (lvalue->type != NodeType::SYMBOL) {
             ostringstream s("invalid lhs for declaration: ");
@@ -715,7 +735,6 @@ Node *Parser::parseScopedStmt() {
         decl->declData.lhs = lvalue;
         decl->declData.initialValue = rvalue;
         decl->declData.type = type;
-        decl->declData.isConstant = isConstant;
 
         decl->region = {lexer->srcInfo, saved, last.region.end};
         decl->sourceMapStatement = true;
@@ -726,11 +745,7 @@ Node *Parser::parseScopedStmt() {
     }
 
     // declaration-assignment combo
-    if (lexer->front.type == LexerTokenType::COLON_EQ || lexer->front.type == LexerTokenType::COLON_COLON_EQ) {
-        if (lexer->front.type == LexerTokenType::COLON_COLON_EQ) {
-            isConstant = true;
-        }
-
+    if (lexer->front.type == LexerTokenType::COLON_EQ) {
         // cannot declaration-assign anything but a symbol
         if (lvalue->type != NodeType::SYMBOL) {
             ostringstream s("cannot assign to ");
@@ -750,7 +765,6 @@ Node *Parser::parseScopedStmt() {
 
         decl->declData.lhs = lvalue;
         decl->declData.initialValue = rvalue;
-        decl->declData.isConstant = isConstant;
 
         decl->region = {lexer->srcInfo, saved, last.region.end};
         decl->sourceMapStatement = true;
@@ -1179,7 +1193,10 @@ Node *Parser::parseType() {
             expect(LexerTokenType::LPAREN, "(");
 
             type->typeData.fnTypeData.params = parseDeclParams();
-            addContextParameterForDecl(type->typeData.fnTypeData.params, scopes.top());
+
+            if (!noIppFlag) {
+                addContextParameterForDecl(type->typeData.fnTypeData.params, scopes.top());
+            }
 
             expect(LexerTokenType::RPAREN, ")");
             type->typeData.fnTypeData.returnType = parseType();

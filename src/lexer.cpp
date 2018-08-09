@@ -143,8 +143,6 @@ void Lexer::popFront() {
     if (tryEat(&next, ">", LexerTokenType::GT)) { return; }
     if (tryEat(&next, "&", LexerTokenType::AMP)) { return; }
     if (tryEat(&next, ".", LexerTokenType::DOT)) { return; }
-    if (tryEat(&next, "::=", LexerTokenType::COLON_COLON_EQ)) { return; }
-    if (tryEat(&next, "::", LexerTokenType::COLON_COLON)) { return; }
     if (tryEat(&next, ":=", LexerTokenType::COLON_EQ)) { return; }
     if (tryEat(&next, ":", LexerTokenType::COLON)) { return; }
     if (tryEat(&next, "=", LexerTokenType::EQ)) { return; }
@@ -152,6 +150,7 @@ void Lexer::popFront() {
     if (tryEat(&next, "!", LexerTokenType::NOT)) { return; }
     if (tryEat(&next, "@", LexerTokenType::AT)) { return; }
     if (tryEat(&next, "|", LexerTokenType::VERTICAL_BAR)) { return; }
+    if (tryEatKeyword(&next, "alias", LexerTokenType::ALIAS)) { return; }
     if (tryEatKeyword(&next, "defer", LexerTokenType::DEFER)) { return; }
     if (tryEatKeyword(&next, "#run", LexerTokenType::RUN)) { return; }
     if (tryEatKeyword(&next, "and", LexerTokenType::AND)) { return; }
@@ -168,6 +167,7 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "i64", LexerTokenType::I64)) { return;}
     if (tryEatKeyword(&next, "f32", LexerTokenType::F32)) { return;}
     if (tryEatKeyword(&next, "f64", LexerTokenType::F64)) { return;}
+    if (tryEatKeyword(&next, "#iskind", LexerTokenType::ISKIND)) { return; }
     if (tryEatKeyword(&next, "#if", LexerTokenType::STATIC_IF)) { return; }
     if (tryEatKeyword(&next, "if", LexerTokenType::IF)) { return; }
     if (tryEatKeyword(&next, "while", LexerTokenType::WHILE)) { return; }
@@ -181,7 +181,6 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "Ast", LexerTokenType::EXPOSED_AST)) { return; }
     if (tryEatKeyword(&next, "rettypeof", LexerTokenType::RETTYPEOF)) { return; }
     if (tryEatKeyword(&next, "typeof", LexerTokenType::TYPEOF)) { return; }
-    if (tryEatKeyword(&next, "#iskind", LexerTokenType::ISKIND)) { return; }
     if (tryEatKeyword(&next, "sizeof", LexerTokenType::SIZEOF)) { return; }
     if (tryEatKeyword(&next, "#fieldsof", LexerTokenType::FIELDSOF)) { return; }
     if (tryEatKeyword(&next, "heap", LexerTokenType::HEAP)) { return; }
