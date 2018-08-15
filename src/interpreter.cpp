@@ -32,13 +32,7 @@ void printCurrentStmt(Interpreter *interp, bool withLineInfo = false) {
     printStmt(interp, interp->pc, withLineInfo);
 }
 
-void debugPrintVar(ostream &target, Interpreter *interp, int32_t bp, TypeData td, int64_t offset, vector<string> &extraLines);
-
-void debugPrintVar(Interpreter *interp, int32_t bp, TypeData td, int32_t offset, vector<string> &extraLines) {
-    debugPrintVar(cout, interp, bp, td, offset, extraLines);
-}
-
-void debugPrintVar(ostream &target, Interpreter *interp, int32_t bp, TypeData td, int64_t offset, vector<string> &extraLines) {
+void debugPrintVar(ostream &target, Interpreter *interp, TypeData td, int64_t offset, vector<string> &extraLines) {
     switch (td.kind) {
         case NodeTypekind::NONE: {
             target << "{}";
@@ -47,13 +41,22 @@ void debugPrintVar(ostream &target, Interpreter *interp, int32_t bp, TypeData td
             target << td.intTypeData;
         } break;
         case NodeTypekind::I8: {
-            target << interp->readFromStack<char>(offset);
+            auto p = (char *) offset;
+            if (p != nullptr) {
+                target << *p;
+            }
         } break;
         case NodeTypekind::I32: {
-            target << interp->readFromStack<int32_t>(offset);
+            auto p = (int32_t *) offset;
+            if (p != nullptr) {
+                target << *p;
+            }
         } break;
         case NodeTypekind::I64: {
-            target << interp->readFromStack<int64_t>(offset);
+            auto p = (int64_t *) offset;
+            if (p != nullptr) {
+                target << *p;
+            }
         } break;
         case NodeTypekind::FLOAT_LITERAL: {
             target << td.floatTypeData;
@@ -62,19 +65,28 @@ void debugPrintVar(ostream &target, Interpreter *interp, int32_t bp, TypeData td
             target << td.boolTypeData;
         } break;
         case NodeTypekind::BOOLEAN: {
-            target << (interp->readFromStack<int32_t>(offset) == 1 ? "true" : "false");
+            auto p = (int32_t *) offset;
+            if (p != nullptr) {
+                target << ((*p) == 1 ? "true" : "false");
+            }
         } break;
         case NodeTypekind::F32: {
-            target << interp->readFromStack<float>(offset);
+            auto p = (float *) offset;
+            if (p != nullptr) {
+                target << *p;
+            }
         } break;
         case NodeTypekind::F64: {
-            target << interp->readFromStack<double>(offset);
+            auto p = (double *) offset;
+            if (p != nullptr) {
+                target << *p;
+            }
         } break;
         case NodeTypekind::POINTER: {
             auto nvr = interp->nextVarReference;
             interp->nextVarReference += 1;
 
-            auto loadedOffset = interp->readFromStack<int64_t>(offset);
+            auto loadedOffset = *((int64_t *) offset);
             auto found = hash_get(interp->pointerRecursion, loadedOffset);
             if (found != nullptr) {
                 target << *found;
@@ -92,12 +104,12 @@ void debugPrintVar(ostream &target, Interpreter *interp, int32_t bp, TypeData td
                 extra << "nil";
             }
             else {
-                debugPrintVar(extra, interp, bp, resolve(td.pointerTypeData.underlyingType)->typeData, ((int64_t) interp->stack.data()) - loadedOffset, extraLines);
+                debugPrintVar(extra, interp, resolve(td.pointerTypeData.underlyingType)->typeData, loadedOffset, extraLines);
                 extraLines.push_back(extra.str());
             }
         } break;
         case NodeTypekind::FN: {
-            target << interp->readFromStack<int32_t>(offset) << " (todo(chad): look up the fn name)";
+            target << *((int32_t *) offset) << " (todo(chad): look up the fn name)";
         } break;
         case NodeTypekind::STRUCT: {
             if (td.structTypeData.isSecretlyEnum) {
@@ -106,7 +118,7 @@ void debugPrintVar(ostream &target, Interpreter *interp, int32_t bp, TypeData td
 
                 target << "#" << nvr;
 
-                auto tag = interp->readFromStack<int64_t>(offset);
+                auto tag = *((int64_t *) offset);
 
                 auto param = vector_at(td.structTypeData.params, (unsigned long) tag);
                 cpi_assert(param->type == NodeType::DECL_PARAM);
@@ -118,7 +130,7 @@ void debugPrintVar(ostream &target, Interpreter *interp, int32_t bp, TypeData td
                     extra << "tag:" << tag << " ";
                 }
                 extra << atomTable->backwardAtoms[param->paramData.name->symbolData.atomId] << ":";
-                debugPrintVar(extra, interp, bp, resolve(param->typeInfo)->typeData, offset + 8, extraLines);
+                debugPrintVar(extra, interp, resolve(param->typeInfo)->typeData, offset + 8, extraLines);
                 extra << "}";
 
                 extraLines.push_back(extra.str());
@@ -126,14 +138,19 @@ void debugPrintVar(ostream &target, Interpreter *interp, int32_t bp, TypeData td
             else if (td.structTypeData.isSecretlyArray) {
                 auto resolvedElementType = resolve(td.structTypeData.secretArrayElementType);
 
-                auto size = interp->readFromStack<int32_t>(offset + 8);
+                auto size = *((int64_t *) (offset + 8));
                 auto ts = typeSize(td.structTypeData.secretArrayElementType);
-                auto array_offset = bp + interp->readFromStack<int64_t>(offset);
+                auto array_offset = *((int64_t *) offset);
 
                 if (resolvedElementType->typeData.kind == NodeTypekind::I8) {
                     target << "\"";
-                    for (int32_t i = 0; i < size; i++) {
-                        target << interp->readFromStack<char>((int32_t) array_offset);
+                    for (auto i = 0; i < size; i++) {
+                        if ((int8_t *) array_offset != nullptr) {
+                            target << *((int8_t *) array_offset);
+                        }
+                        else {
+                            target << "0";
+                        }
                         array_offset += ts;
                     }
                     target << "\"";
@@ -149,10 +166,10 @@ void debugPrintVar(ostream &target, Interpreter *interp, int32_t bp, TypeData td
                     extra << "#" << nvr << ": ";
 
                     extra << "[";
-                    for (int32_t i = 0; i < size; i++) {
+                    for (auto i = 0; i < size; i++) {
                         extra << to_string(i) << ":";
 
-                        debugPrintVar(extra, interp, bp, resolve(td.structTypeData.secretArrayElementType)->typeData, (int32_t) array_offset, extraLines);
+                        debugPrintVar(extra, interp, resolve(td.structTypeData.secretArrayElementType)->typeData, array_offset, extraLines);
                         array_offset += ts;
 
                         if (i < size - 1) {
@@ -184,12 +201,21 @@ void debugPrintVar(ostream &target, Interpreter *interp, int32_t bp, TypeData td
                     }
                     extra << name << ":";
 
-                    debugPrintVar(extra, interp, bp, param->typeInfo->typeData, offset + sizeSoFar, extraLines);
+                    auto paramSize = typeSize(param->paramData.type);
+                    auto paramAlign = typeAlign(param->paramData.type);
+
+                    // alignment
+                    if (sizeSoFar > 0 && paramAlign > 0) {
+                        sizeSoFar += sizeSoFar % paramAlign;
+                    }
+
+                    debugPrintVar(extra, interp, resolve(param->typeInfo)->typeData, offset + sizeSoFar, extraLines);
                     if (idx < td.structTypeData.params.length - 1) {
                         extra << " ";
                     }
 
-                    sizeSoFar += typeSize(param->typeInfo);
+                    sizeSoFar += paramSize;
+
                     idx += 1;
                 }
                 extra << "}";
@@ -207,10 +233,57 @@ void debugPrintVar(Interpreter *interp, int32_t bp, Node *n) {
     auto resolvedTypeinfo = resolve(resolve(n)->typeInfo);
 
     vector<string> extra;
-    debugPrintVar(interp, bp, resolvedTypeinfo->typeData, bp + n->localOffset, extra);
+    debugPrintVar(cout, interp, resolvedTypeinfo->typeData, ((int64_t) interp->stack.data()) + bp + n->localOffset, extra);
     cout << endl;
     for (const auto &e : extra) {
         cout << e << endl;
+    }
+}
+
+void printVarsInScope(Interpreter *interp, Scope *scope, int32_t bp, bool isLast = false) {
+    for (auto i = 0; i < scope->symbols->bucket_count; i++) {
+        auto bucket = scope->symbols->buckets[i];
+        if (bucket != nullptr) {
+            if (bucket->value->isLocal || bucket->value->isBytecodeLocal) {
+                cout << atomTable->backwardAtoms[bucket->key] << ": ";
+                debugPrintVar(interp, bp, bucket->value);
+            }
+
+            while (bucket->next != nullptr) {
+                bucket = bucket->next;
+
+                if (bucket->value->isLocal || bucket->value->isBytecodeLocal) {
+                    cout << atomTable->backwardAtoms[bucket->key] << ": ";
+                    debugPrintVar(interp, bp, bucket->value);
+                }
+            }
+        }
+    }
+
+    if (scope->isFunctionScope) {
+        auto offset = -8;
+
+        for (auto i = 0; i < scope->fnScopeParams.length; i++) {
+            auto p = vector_at(scope->fnScopeParams, i);
+            assert(p->type == NodeType::DECL_PARAM);
+
+            cout << atomTable->backwardAtoms[p->paramData.name->symbolData.atomId] << ": ";
+
+            auto resolvedTypeinfo = resolve(p->paramData.type);
+            offset -= typeSize(resolvedTypeinfo);
+
+            vector<string> extra;
+            debugPrintVar(cout, interp, resolvedTypeinfo->typeData, ((int64_t) interp->stack.data()) + bp + p->localOffset, extra);
+            cout << endl;
+
+            for (const auto &e : extra) {
+                cout << e << endl;
+            }
+        }
+    }
+
+    if (!isLast) {
+        printVarsInScope(interp, scope->parent, bp, scope->isFunctionScope);
     }
 }
 
@@ -227,24 +300,7 @@ void printCurrentVars(Interpreter *interp, int32_t bp, uint32_t pc) {
                 node = vector_at(node->fnDeclData.body, 0);
             }
 
-            for (auto i = 0; i < node->scope->symbols->bucket_count; i++) {
-                auto bucket = node->scope->symbols->buckets[i];
-                if (bucket != nullptr) {
-                    if (bucket->value->isLocal || bucket->value->isBytecodeLocal) {
-                        cout << atomTable->backwardAtoms[bucket->key] << ": ";
-                        debugPrintVar(interp, bp, bucket->value);
-                    }
-
-                    while (bucket->next != nullptr) {
-                        bucket = bucket->next;
-
-                        if (bucket->value->isLocal || bucket->value->isBytecodeLocal) {
-                            cout << atomTable->backwardAtoms[bucket->key] << ": ";
-                            debugPrintVar(interp, bp, bucket->value);
-                        }
-                    }
-                }
-            }
+            printVarsInScope(interp, node->scope, bp);
         }
     }
 }
@@ -331,6 +387,7 @@ void Interpreter::interpret() {
                         // line 1: location
                         for (auto stmt : this->sourceMap.statements) {
                             if (stmt.instIndex == (unsigned long) pc) {
+                                cout << *stmt.node->region.srcInfo.fileName << endl;
                                 cout << stmt.startLine << endl;
                                 cout << stmt.startCol << endl;
                             }
@@ -403,6 +460,8 @@ void Interpreter::interpret() {
 //                    cout << m->debugString() << endl;
 
                     auto interp = new Interpreter();
+                    interp->bp = this->bp;
+                    interp->sp = this->bp;
                     interp->externalFnTable = gen->externalFnTable;
                     interp->instructions = gen->instructions;
                     interp->fnTable = gen->fnTable;
@@ -414,7 +473,7 @@ void Interpreter::interpret() {
                     interp->interpret();
 
                     // todo(chad): present the type of the answer appropriately -- don't just assume it's i64
-                    auto answer = interp->readFromStack<int64_t>(0);
+                    auto answer = interp->readFromStack<int32_t>(interp->bp);
                     cout << "answer: " << answer << endl;
                 } else if (line == "stmt") {
                     printCurrentStmt(this);
@@ -489,14 +548,8 @@ void interpretMalloc(Interpreter *interp) {
     auto numBytes = interp->read<int64_t>();
     auto storeOffset = interp->consume<int64_t>();
 
-//    cout << "allocating " << numBytes << " bytes...";
-
     auto allocated = malloc(static_cast<size_t>(numBytes));
-//    auto offset_from_stack = static_cast<int64_t>((int8_t *) allocated - (int8_t *) interp->stack.data());
-//    cout << " offset -- " << offset_from_stack << " ...";
     interp->copyToStack((int64_t) allocated, interp->bp + storeOffset);
-
-//    cout << " done!" << endl;
 }
 
 void interpretFree(Interpreter *interp) {
@@ -522,10 +575,14 @@ void interpretNop(Interpreter *interp) {
     // do nothing!
 }
 
-void interpretReserveGlobal(Interpreter *interp) {
-    auto numBytes = interp->consume<int32_t>();
-    interp->sp += numBytes;
-    interp->bp += numBytes;
+// not
+void interpretNot(Interpreter *interp) {
+    auto offset = interp->consume<int64_t>();
+
+    auto b = interp->readFromStack<int32_t>(offset + interp->bp);
+
+    auto ptr = (int32_t *) (interp->stack.data() + interp->bp + offset);
+    *ptr = !b;
 }
 
 // calli

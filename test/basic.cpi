@@ -1,9 +1,39 @@
 type Context struct {
-    id: i64
+    id: i64,
+    region: Region
 }
 
 fn initContext() *Context {
     c := cast(*Context) malloc(sizeof(Context));
+
     c.id = 0;
+
+    size := 128;
+    c.region.buf.count = size;
+    c.region.buf.data = cast(*i8) malloc(size * sizeof(i8));
+    c.region.current = c.region.buf.data;
+
     return c;
+}
+
+type Region struct {
+    buf: []i8,
+    current: *i8
+}
+
+fn heap(allocFn: fn(size: i64) *none, item: !T) {
+    storage := cast(*T) allocFn(sizeof(T));
+    ^storage = item;
+    return storage;
+}
+
+fn tmp(size: i64) *none {
+    if context.region.current + size >= context.region.buf.data + context.region.buf.count {
+        panic();
+    }
+
+    p := cast(*none) context.region.current;
+    context.region.current = context.region.current + size;
+
+    return p;
 }

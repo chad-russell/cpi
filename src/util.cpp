@@ -345,10 +345,11 @@ ostream &operator<<(ostream &os, Node *node) {
 //             cout << node->arrayLiteralData.structLiteralRepresentation;
         } break;
         case NodeType::RETURN: {
-            cout << "return " << node->retData.value << ";" << endl;
-        } break;
-        case NodeType::HEAPIFY: {
-            cout << "heap(" << node->nodeData << ")";
+            if (node->retData.value == nullptr) {
+                cout << "return;" << endl;
+            } else {
+                cout << "return " << node->retData.value << ";" << endl;
+            }
         } break;
         case NodeType::CAST: {
             cout << "cast(" << node->castData.type << ") " << node->castData.value;

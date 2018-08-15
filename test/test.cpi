@@ -1,5 +1,6 @@
-import "printing";
-import "buffer";
+#import "printing";
+#import "buffer";
+-- #import "test2";
 
 fn main() {
     f := fn() {
@@ -152,6 +153,9 @@ fn main() {
 
     printing.printMany({"fuckme: ", fuckme, "\n"});
 
+    -- assert(test2.a == 7);
+    -- assert(test2.bbb() == topLevel);
+
     return 0;
 }
 
@@ -184,7 +188,7 @@ fn testModule3() {
         }
     }
 
-    import foo.bar.baz;
+    #import foo.bar.baz;
     assert(a == 4);
 }
 
@@ -198,11 +202,11 @@ fn testModule2() {
     }
 
     if false {
-        import foo;
+        #import foo;
         return a;
     }
     else {
-        import bar;
+        #import bar;
         return a;
     }
 
@@ -452,7 +456,7 @@ fn id(t: !T) T {
 }
 
 fn idC(t: !T) {
-    printing.println(^context);
+    printing.println({id: context.id});
     return t;
 }
 

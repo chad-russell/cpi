@@ -419,6 +419,7 @@ const vector<string> AssemblyLexer::instructionStrings = {
     "FREE",
     "PUTS",
     "NOP",
+    "NOT",
 
     // literals
     "CONSTI8", "CONSTI16", "CONSTI32", "CONSTI64", "CONSTF32", "CONSTF64",
@@ -578,6 +579,11 @@ void MnemonicPrinter::step() {
         instructionString.append(inst);
         instructionString.append(" ");
         auto callPc = consume<int32_t>();
+        instructionString.append(to_string(callPc));
+    } else if (startsWith(&inst, "NOT")) {
+        instructionString.append(inst);
+        instructionString.append(" ");
+        auto callPc = consume<int64_t>();
         instructionString.append(to_string(callPc));
     } else if (startsWith(&inst, "MALLOC")) {
         instructionString.append(inst);

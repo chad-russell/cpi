@@ -160,7 +160,6 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "struct", LexerTokenType::STRUCT)) { return; }
     if (tryEatKeyword(&next, "enum", LexerTokenType::ENUM)) { return; }
     if (tryEatKeyword(&next, "return", LexerTokenType::RETURN)) { return; }
-    if (tryEatKeyword(&next, "string", LexerTokenType::STRING)) { return; }
     if (tryEatKeyword(&next, "bool", LexerTokenType::BOOLEAN)) { return; }
     if (tryEatKeyword(&next, "i8", LexerTokenType::I8)) { return;}
     if (tryEatKeyword(&next, "i32", LexerTokenType::I32)) { return;}
@@ -176,14 +175,13 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "false", LexerTokenType::FALSE_)) { return; }
     if (tryEatKeyword(&next, "nil", LexerTokenType::NIL)) { return; }
     if (tryEatKeyword(&next, "module", LexerTokenType::MODULE)) { return; }
-    if (tryEatKeyword(&next, "import", LexerTokenType::IMPORT)) { return; }
+    if (tryEatKeyword(&next, "#import", LexerTokenType::IMPORT)) { return; }
     if (tryEatKeyword(&next, "cast", LexerTokenType::CAST)) { return; }
     if (tryEatKeyword(&next, "Ast", LexerTokenType::EXPOSED_AST)) { return; }
-    if (tryEatKeyword(&next, "rettypeof", LexerTokenType::RETTYPEOF)) { return; }
+    if (tryEatKeyword(&next, "returntypeof", LexerTokenType::RETURNTYPEOF)) { return; }
     if (tryEatKeyword(&next, "typeof", LexerTokenType::TYPEOF)) { return; }
     if (tryEatKeyword(&next, "sizeof", LexerTokenType::SIZEOF)) { return; }
     if (tryEatKeyword(&next, "#fieldsof", LexerTokenType::FIELDSOF)) { return; }
-    if (tryEatKeyword(&next, "heap", LexerTokenType::HEAP)) { return; }
     if (tryEatKeyword(&next, "puts", LexerTokenType::PUTS)) { return; }
     if (tryEatKeyword(&next, "panic", LexerTokenType::PANIC)) { return; }
     if (tryEatKeyword(&next, "none", LexerTokenType::NONE)) { return; }
@@ -487,7 +485,7 @@ const vector<string> Lexer::lexerTokenTypeStrings = {
     "RUN",
     "EXPOSED_AST",
     "TYPEOF",
-    "RETTYPEOF",
+    "RETURNTYPEOF",
     "SIZEOF",
     "FIELDSOF",
     "PANIC",

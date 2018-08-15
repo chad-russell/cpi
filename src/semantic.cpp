@@ -32,6 +32,26 @@ void addContextParameterForCall(Semantic *semantic, Node *node) {
     node->fnCallData.params = newParams;
 }
 
+int32_t typeAlign(Node *type) {
+    auto resolved = resolve(type);
+    cpi_assert(resolved->type == NodeType::TYPE);
+
+    switch (resolved->typeData.kind) {
+        case NodeTypekind::STRUCT: {
+            return resolved->typeData.structTypeData.alignment;
+        }
+        case NodeTypekind::EXPOSED_AST: {
+            return typeAlign(resolved->staticValue);
+        }
+        default: {
+            return typeSize(resolved);
+        }
+    }
+
+    cpi_assert(false);
+    return 0;
+}
+
 int32_t typeSize(Node *type) {
     auto resolved = resolve(type);
     cpi_assert(resolved->type == NodeType::TYPE);
@@ -62,16 +82,18 @@ int32_t typeSize(Node *type) {
 
             auto total = 0;
             auto largest = 0;
+            auto largestAlign = 0;
 
             // todo(chad): this should be configurable based on the width specified by the user (if/when we allow that)
             auto tagSizeInBytes = 8;
 
             for (auto param : resolved->typeData.structTypeData.params) {
                 auto size = typeSize(param->paramData.type);
+                auto align = typeAlign(param->paramData.type);
 
                 // alignment
-                if (size > 0 && total % size > 0) {
-                    total += total % size;
+                if (align > 0 && total % align > 0) {
+                    total += total % align;
                 }
 
                 // if it's a union and we're not assigning to the 'tag' part, then the offset is the size of the tag
@@ -88,6 +110,9 @@ int32_t typeSize(Node *type) {
                 if (size > largest) {
                     largest = size;
                 }
+                if (align > largestAlign) {
+                    largestAlign = align;
+                }
             }
 
             if (resolved->typeData.structTypeData.isSecretlyEnum) {
@@ -95,9 +120,11 @@ int32_t typeSize(Node *type) {
             }
 
             // alignment
-            if (total > 0 && total % largest > 0) {
-                total += largest - (total % largest);
+            if (largestAlign > 0 && total % largestAlign > 0) {
+                total += largestAlign - (total % largestAlign);
             }
+
+            resolved->typeData.structTypeData.alignment = largestAlign;
 
             return total;
         }
@@ -222,19 +249,36 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
         return true;
     }
 
-    // coercion from integer literal to any integer is valid
+    // coercion from integer literal to any integer or float is valid
     // todo(chad): check for overflow?
     if (desired->typeData.kind == NodeTypekind::INT_LITERAL) {
         if (actual->typeData.kind == NodeTypekind::I8
             || actual->typeData.kind == NodeTypekind::I32
-            || actual->typeData.kind == NodeTypekind::I64) {
+            || actual->typeData.kind == NodeTypekind::I64
+            || actual->typeData.kind == NodeTypekind::F32
+            || actual->typeData.kind == NodeTypekind::F64) {
+
             desired->typeData.kind = actual->typeData.kind;
+
+            if (actual->typeData.kind == NodeTypekind::F32 || actual->typeData.kind == NodeTypekind::F64) {
+                desired->typeData.floatTypeData = (double) desired->typeData.intTypeData;
+            }
+
             return true;
         }
         else if (actual->typeData.kind == NodeTypekind::INT_LITERAL) {
             // if they're both literals then they become i64 by default
             desired->typeData.kind = NodeTypekind::I64;
             actual->typeData.kind = NodeTypekind::I64;
+            return true;
+        }
+        else if (actual->typeData.kind == NodeTypekind::FLOAT_LITERAL) {
+            // if they're both literals then they become i64 by default
+            desired->typeData.kind = NodeTypekind::F64;
+            actual->typeData.kind = NodeTypekind::F64;
+
+            actual->typeData.floatTypeData = (double) desired->typeData.intTypeData;
+
             return true;
         }
         return false;
@@ -246,6 +290,12 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
             actual->typeData.kind = desired->typeData.kind;
             return true;
         }
+        else if (desired->typeData.kind == NodeTypekind::F32 || desired->typeData.kind == NodeTypekind::F64) {
+            actual->typeData.kind = desired->typeData.kind;
+            actual->typeData.floatTypeData = desired->typeData.floatTypeData;
+            return true;
+        }
+
         return false;
     }
 
@@ -567,10 +617,19 @@ void resolveDefer(Semantic *semantic, Node *node) {
 }
 
 void resolveAlias(Semantic *semantic, Node *node) {
-    node->aliasData.value = constantize(semantic, node->aliasData.value);
-    semantic->resolveTypes(node->aliasData.value);
+    node->resolved = constantize(semantic, node->aliasData.value);
+    semantic->resolveTypes(node->resolved);
 
-    node->typeInfo = node->aliasData.value->typeInfo;
+    node->typeInfo = node->resolved->typeInfo;
+}
+
+void resolveUnaryNot(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->nodeData);
+    if (node->nodeData->typeInfo->typeData.kind != NodeTypekind::BOOLEAN && node->nodeData->typeInfo->typeData.kind != NodeTypekind::BOOLEAN_LITERAL) {
+        semantic->reportError({node, node->nodeData}, Error{node->region, "Can only do unary-not on a boolean"});
+    }
+
+    node->typeInfo = node->nodeData->typeInfo;
 }
 
 void resolveFnDecl(Semantic *semantic, Node *node) {
@@ -714,13 +773,18 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
     semantic->currentFnDecl = savedFnDecl;
 }
 
-void resolveRet(Semantic *semantic, Node *node) {
+void resolveReturn(Semantic *semantic, Node *node) {
     for (auto n : node->preStmts) {
         semantic->resolveTypes(n);
     }
 
-    semantic->resolveTypes(node->retData.value);
-    node->typeInfo = node->retData.value->typeInfo;
+    if (node->retData.value != nullptr) {
+        semantic->resolveTypes(node->retData.value);
+        node->typeInfo = node->retData.value->typeInfo;
+    }
+    else {
+        node->typeInfo = new Node(NodeTypekind::NONE);
+    }
 }
 
 void resolveFloatLiteral(Semantic *semantic, Node *node) {
@@ -742,22 +806,16 @@ void resolveBooleanLiteral(Semantic *semantic, Node *node) {
 }
 
 Node *constantize(Semantic *semantic, Node *node) {
-    if (node->type == NodeType::INT_LITERAL || node->type == NodeType::STRING_LITERAL || node->type == NodeType::FN_DECL) {
+    semantic->resolveTypes(node);
+    node = resolve(node);
+
+    if (node->typeInfo->typeData.kind == NodeTypekind::POINTER) {
+        semantic->reportError({node}, Error{node->region, "Pointers are not constant"});
         return node;
     }
 
-    if (node->type == NodeType::ARRAY_LITERAL) {
-        auto constNode = new Node(node->region.srcInfo, NodeType::ARRAY_LITERAL, node->scope);
-        constNode->region = node->region;
-
-        constNode->arrayLiteralData.elementType = node->arrayLiteralData.elementType;
-
-        for (auto e : node->arrayLiteralData.elements) {
-            vector_append(constNode->arrayLiteralData.elements, constantize(semantic, e));
-        }
-
-        semantic->resolveTypes(constNode);
-        return constNode;
+    if (node->type == NodeType::INT_LITERAL || node->type == NodeType::BOOLEAN_LITERAL || node->type == NodeType::FN_DECL) {
+        return node;
     }
 
     if (node->type == NodeType::STRUCT_LITERAL) {
@@ -963,7 +1021,6 @@ void resolveCast(Semantic *semantic, Node *node) {
 void resolveStringLiteral(Semantic *semantic, Node *node) {
     // typeInfo = []i8;
     node->typeInfo = makeArrayType(new Node(NodeTypekind::I8));
-    semantic->resolveTypes(node->typeInfo);
 
     // "hello" <==> {&{'h', 'e', 'l', 'l', 'o'}, 5};
     auto arrayLiteral = new Node(node->region.srcInfo, NodeType::STRUCT_LITERAL, node->scope);
@@ -983,10 +1040,37 @@ void resolveStringLiteral(Semantic *semantic, Node *node) {
         vector_append(charArrayLiteral->structLiteralData.params, wrapInValueParam(charNode, ""));
     }
 
-    // heapifiedCharArrayLiteral = heap({'h', 'e', 'l', 'l', 'o'})
-    auto heapifiedCharArrayLiteral = new Node(node->region);
-    heapifiedCharArrayLiteral->type = NodeType::HEAPIFY;
-    heapifiedCharArrayLiteral->nodeData = charArrayLiteral;
+    Node *heapifiedCharArrayLiteral = nullptr;
+    if (node->stringLiteralData.allocFn != nullptr) {
+        // heap(allocFn, {'h', 'e', 'l', 'l', 'o'})
+
+        semantic->resolveTypes(node->stringLiteralData.allocFn);
+        // todo(chad): check that the type is ok here
+
+        auto basicSym = new Node(node->region.srcInfo, NodeType::SYMBOL, node->scope);
+        basicSym->symbolData.atomId = atomTable->insertStr("basic");
+
+        auto heapFn = new Node(node->region.srcInfo, NodeType::SYMBOL, node->scope);
+        heapFn->symbolData.atomId = atomTable->insertStr("heap");
+
+        auto basicDotHeap = new Node(node->region.srcInfo, NodeType::DOT, node->scope);
+        basicDotHeap->dotData.lhs = basicSym;
+        basicDotHeap->dotData.rhs = heapFn;
+
+        heapifiedCharArrayLiteral = new Node(node->region.srcInfo, NodeType::FN_CALL, node->scope);
+        heapifiedCharArrayLiteral->fnCallData.fn = basicDotHeap;
+        heapifiedCharArrayLiteral->fnCallData.hasRuntimeParams = true;
+
+        vector_append(heapifiedCharArrayLiteral->fnCallData.params, wrapInValueParam(node->stringLiteralData.allocFn, nullptr));
+        vector_append(heapifiedCharArrayLiteral->fnCallData.params, wrapInValueParam(charArrayLiteral, nullptr));
+    }
+    else {
+        // {'h', 'e', 'l', 'l', 'o'}
+
+        heapifiedCharArrayLiteral = new Node(node->region);
+        heapifiedCharArrayLiteral->type = NodeType::ADDRESS_OF;
+        heapifiedCharArrayLiteral->nodeData = charArrayLiteral;
+    }
 
     semantic->addLocal(heapifiedCharArrayLiteral->nodeData);
 
@@ -1007,7 +1091,6 @@ void resolveStringLiteral(Semantic *semantic, Node *node) {
 
     arrayLiteral->typeInfo->typeData.structTypeData.secretArrayElementType = new Node(NodeTypekind::I8);
 
-//    node->resolved = arrayLiteral;
     node->stringLiteralData.arrayLiteralRepresentation = arrayLiteral;
 }
 
@@ -1225,8 +1308,9 @@ void resolveType(Semantic *semantic, Node *node) {
             for (auto param : node->typeData.structTypeData.params) {
                 semantic->resolveTypes(param);
                 auto size = typeSize(param->paramData.type);
+                auto align = typeAlign(param->paramData.type);
 
-                if (size > 0) { total += total % size; } // alignment
+                if (align > 0) { total += total % align; } // alignment
 
                 param->localOffset = total;
                 param->paramData.index = localIndex;
@@ -1287,6 +1371,9 @@ void rewritePipe(Semantic *semantic, Node *node) {
         fnCallNode->fnCallData.fn = resolvedRhs->fnCallData.fn;
         for (auto param : resolvedRhs->fnCallData.params) {
             vector_append(fnCallNode->fnCallData.params, param);
+        }
+        for (auto param : resolvedRhs->fnCallData.ctParams) {
+            vector_append(fnCallNode->fnCallData.ctParams, param);
         }
     }
     else {
@@ -1829,10 +1916,11 @@ Node *findParam(Semantic *semantic, Node *node) {
         auto sizeSoFar = 0;
         for (const auto &param : structData.params) {
             auto paramSize = typeSize(param->paramData.type);
+            auto paramAlign = typeAlign(param->paramData.type);
 
             // alignment
-            if (sizeSoFar > 0 && paramSize > 0) {
-                sizeSoFar += sizeSoFar % paramSize;
+            if (sizeSoFar > 0 && paramAlign > 0) {
+                sizeSoFar += sizeSoFar % paramAlign;
             }
 
             param->localOffset = sizeSoFar;
@@ -2037,7 +2125,7 @@ void resolveIf(Semantic *semantic, Node *node) {
         cpi_assert(node->ifData.condition->staticValue->type == NodeType::BOOLEAN_LITERAL);
         staticCondition = node->ifData.condition->staticValue->boolLiteralData.value;
     }
-    else if (resolvedTypeInfo->typeData.kind == NodeTypekind::BOOLEAN_LITERAL) {
+    else if (resolvedTypeInfo->typeData.kind == NodeTypekind::BOOLEAN_LITERAL && resolve(node->ifData.condition)->type == NodeType::DECL) {
         isStatic = true;
         staticCondition = resolvedTypeInfo->typeData.boolTypeData;
     }
@@ -2081,7 +2169,8 @@ void resolveWhile(Semantic *semantic, Node *node) {
 }
 
 void resolveUnaryNeg(Semantic *semantic, Node *node) {
-    semantic->resolveTypes(node->nodeData);
+    semantic->resolveTypes(node->unaryNegData.target);
+    semantic->resolveTypes(node->unaryNegData.rewritten);
     node->typeInfo = node->nodeData->typeInfo;
 }
 
@@ -2136,8 +2225,37 @@ void resolveArrayLiteral(Semantic *semantic, Node *node) {
         vector_append(elemsStruct->structLiteralData.params, wrapInValueParam(elem, ""));
     }
 
-    auto heapified = new Node(node->region.srcInfo, NodeType::HEAPIFY, node->scope);
-    heapified->nodeData = elemsStruct;
+    Node *heapified = nullptr;
+    if (node->arrayLiteralData.allocFn != nullptr) {
+        // heap(allocFn, elemsStruct)
+
+        semantic->resolveTypes(node->arrayLiteralData.allocFn);
+        // todo(chad): check that the type is ok here
+
+        auto basicSym = new Node(node->region.srcInfo, NodeType::SYMBOL, node->scope);
+        basicSym->symbolData.atomId = atomTable->insertStr("basic");
+
+        auto heapFn = new Node(node->region.srcInfo, NodeType::SYMBOL, node->scope);
+        heapFn->symbolData.atomId = atomTable->insertStr("heap");
+
+        auto basicDotHeap = new Node(node->region.srcInfo, NodeType::DOT, node->scope);
+        basicDotHeap->dotData.lhs = basicSym;
+        basicDotHeap->dotData.rhs = heapFn;
+
+        heapified = new Node(node->region.srcInfo, NodeType::FN_CALL, node->scope);
+        heapified->fnCallData.fn = basicDotHeap;
+        heapified->fnCallData.hasRuntimeParams = true;
+
+        vector_append(heapified->fnCallData.params, wrapInValueParam(node->arrayLiteralData.allocFn, nullptr));
+        vector_append(heapified->fnCallData.params, wrapInValueParam(elemsStruct, nullptr));
+    }
+    else {
+        // &elemsStruct
+
+        heapified = new Node(node->region.srcInfo, NodeType::ADDRESS_OF, node->scope);
+        heapified->nodeData = elemsStruct;
+    }
+
     semantic->addLocal(elemsStruct);
     semantic->addLocal(heapified);
 
@@ -2477,16 +2595,6 @@ void resolveTagCheck(Semantic *semantic, Node *node) {
     node->typeInfo = node->resolved->typeInfo;
 }
 
-void resolveHeapify(Semantic *semantic, Node *node) {
-    semantic->addLocal(node);
-
-    semantic->resolveTypes(node->nodeData);
-
-    auto pointerTypeInfo = new Node(NodeTypekind::POINTER);
-    pointerTypeInfo->typeData.pointerTypeData.underlyingType = node->nodeData->typeInfo;
-    node->typeInfo = pointerTypeInfo;
-}
-
 void resolvePuts(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->nodeData);
     auto resolvedType = resolve(node->nodeData->typeInfo);
@@ -2569,7 +2677,7 @@ void resolveTypeof(Semantic *semantic, Node *node) {
     node->staticValue = node->nodeData->typeInfo;
 }
 
-void resolveRetTypeof(Semantic *semantic, Node *node) {
+void resolveReturnTypeof(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->nodeData);
 
     node->typeInfo = new Node(NodeTypekind::EXPOSED_AST);
@@ -2733,7 +2841,7 @@ void Semantic::resolveTypes(Node *node) {
             resolveFnDecl(this, node);
         } break;
         case NodeType::RETURN: {
-            resolveRet(this, node);
+            resolveReturn(this, node);
         } break;
         case NodeType::INT_LITERAL: {
             resolveIntLiteral(this, node);
@@ -2789,8 +2897,8 @@ void Semantic::resolveTypes(Node *node) {
         case NodeType::TYPEOF: {
             resolveTypeof(this, node);
         } break;
-        case NodeType::RETTYPEOF: {
-            resolveRetTypeof(this, node);
+        case NodeType::RETURNTYPEOF: {
+            resolveReturnTypeof(this, node);
         } break;
         case NodeType::ISKIND: {
             resolveIsKind(this, node);
@@ -2837,9 +2945,6 @@ void Semantic::resolveTypes(Node *node) {
         case NodeType::TAGCHECK: {
             resolveTagCheck(this, node);
         } break;
-        case NodeType::HEAPIFY: {
-            resolveHeapify(this, node);
-        } break;
         case NodeType::PUTS: {
             resolvePuts(this, node);
         } break;
@@ -2854,6 +2959,9 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::ALIAS: {
             resolveAlias(this, node);
+        } break;
+        case NodeType::UNARY_NOT: {
+            resolveUnaryNot(this, node);
         } break;
         case NodeType::END_SCOPE: break;
         default: cpi_assert(false);

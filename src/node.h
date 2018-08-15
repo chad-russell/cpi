@@ -7,6 +7,7 @@
 #include "util.h"
 
 int32_t typeSize(Node *type);
+int32_t typeAlign(Node *type);
 
 ostream &operator<<(ostream &os, NodeType type);
 

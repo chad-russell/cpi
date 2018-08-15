@@ -15,7 +15,7 @@ fn printInt(t: !T) {
     b: []i8;
     b.data = cast(*i8) malloc(20 * sizeof(i8));
 
-    n := t;
+    n := cast(i64) t;
     idx : i32 = 0;
 
     while n > base {
@@ -25,7 +25,7 @@ fn printInt(t: !T) {
         idx = idx + 1;
     }
 
-    m := mod(n, base);
+    m := mod(cast(i64) n, base);
     n = n / base;
     b[idx] = table[m][0];
 
@@ -42,7 +42,7 @@ fn printHex(t: !T) {
     b: []i8;
     b.data = cast(*i8) malloc(20 * sizeof(i8));
 
-    n := t;
+    n := cast(i64) t;
     idx : i32 = 0;
 
     while n > base {

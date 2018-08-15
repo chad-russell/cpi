@@ -1,25 +1,29 @@
 TODO:
-    - more robustness for 'constantize'
-        - figure out what things can be constant and what things can't
-            - full list:
-                - int literals
-                - float literals
-                - bool literals
-                - string literals
-                - fn calls where the args/return type are constantizable
-                - struct literals whose members are all constantizable
-        - error printing when things aren't supported
+    - better specification of paths for imports
+        - path should always be relative to the main file, regardless of where the compiler was run from
 
-    - more robustness for compile-time parameters
-        - should only be allowed things which can be constantized
-        - figure out what 'Ast' does/should do, and if it should even be kept around... (hint - it shouldn't)
+    - specification of paths for lib linking
+        - path should always be relative to the main file, regardless of where the compiler was run from
+        - example:
+            - ```
+                #link "foo" {
+                    fn bar() i64;
+                    fn baz(i: i32) *none;
+                }
+            ```
+        - allow for link paths
+            - #linkPath "/usr/local/cpi/lib";
+            - allow from command line as well (?) (or possibly an environment variable?)
 
-    - 'heap' should either be removed or changed to utilize the context
-
-    - 'for' concept
-
-    - 'reader' functions, i.e. for reading literals?
-        - if we did this for strings we could maybe get rid of arrays entirely
+    - better interpreter debugging
+        - support for removing breakpoints
+        - when stops on a breakpoint, info should immediately appear instead of only when going to 'next'
+        - implement option to have memory as a rope structure -- infinite undo/redo of program execution state
+            - will need to re-work how this works considering malloc/free escape out of our sandbox
+                - might not be an issue once context is a thing, especially considering that anything calling out to C won't work either
+            - use this for step/continue backwards in vscode
+        - conditional breakpoints
+        - ctfe debugging
 
     - threading
         - for interpreter, should create another interpreter and add it to a list. Execution should round-robin over all interpreters in the list
@@ -51,25 +55,6 @@ TODO:
             - exit current thread
             - join thread with given id
 
-    - better specification of paths for imports
-        - path should always be relative to the main file, regardless of where the compiler was run from
-        - allow for import paths
-            - #importPath "/usr/local/cpi/imports";
-            - allow from command line as well (?) (or possibly an environment variable?)
-
-    - specification of paths for lib linking
-        - path should always be relative to the main file, regardless of where the compiler was run from
-        - example:
-            - ```
-                #link "foo" {
-                    fn bar() i64;
-                    fn baz(i: i32) *none;
-                }
-            ```
-        - allow for link paths
-            - #linkPath "/usr/local/cpi/lib";
-            - allow from command line as well (?) (or possibly an environment variable?)
-
     - mutexes
         - ```
             m: mutex; -- global. This should get initialized when the program starts
@@ -78,17 +63,12 @@ TODO:
             }
         ```
 
-    - better interpreter debugging
-        - fix all the broken stuff
-        - implement option to have memory as a rope structure -- infinite undo/redo of program execution state
-            - will need to re-work how this works considering malloc/free escape out of our sandbox
-                - might not be an issue once context is a thing, especially considering that anything calling out to C won't work either
-            - use this for step/continue backwards in vscode
-        - conditional breakpoints
-        - ctfe debugging
-
     - switch (on enum (tag))
         - only real benefit is that the compiler could warn you if you miss a case
+
+    - more robustness for compile-time parameters
+        - should only be allowed things which can be constantized
+        - figure out what 'Ast' does/should do, and if it should even be kept around...
 
     - how to make custom stretchy buffer that's also pretty
         - probably just get rid of `[]` syntax... instead of giving all types a way to

@@ -552,23 +552,35 @@ void LlvmGen::gen(Node *node) {
             allFns.push_back(F);
         } break;
         case NodeType::RETURN: {
-            gen(node->retData.value);
-            emitDebugLocation(this, node);
+            if (node->retData.value != nullptr) {
+                gen(node->retData.value);
+                emitDebugLocation(this, node);
 
-            auto rvalue = rvalueFor(node->retData.value);
+                auto rvalue = rvalueFor(node->retData.value);
 
-            auto retType = rvalue->getType();
-            auto realRetType = typeFor(currentFnDecl->fnDeclData.returnType);
+                auto retType = rvalue->getType();
+                auto realRetType = typeFor(currentFnDecl->fnDeclData.returnType);
 
-            // todo(chad): @Hack there doesn't seem to be another way to cast things...
-            auto realRet = builder.CreateAlloca(realRetType, nullptr, "realRet");
-            builder.CreateStore(rvalue, builder.CreateBitCast(realRet, retType->getPointerTo(0)));
+                // todo(chad): @Hack there doesn't seem to be another way to cast things...
+                auto realRet = builder.CreateAlloca(realRetType, nullptr, "realRet");
+                builder.CreateStore(rvalue, builder.CreateBitCast(realRet, retType->getPointerTo(0)));
 
-            builder.CreateRet(builder.CreateLoad(realRet));
+                builder.CreateRet(builder.CreateLoad(realRet));
+            } else {
+                builder.CreateRetVoid();
+            }
         } break;
         case NodeType::INT_LITERAL: {
             emitDebugLocation(this, node);
-            node->llvmData = llvm::ConstantInt::get(typeFor(node->typeInfo), (uint64_t) node->intLiteralData.value);
+
+            if (node->typeInfo->typeData.kind == NodeTypekind::FLOAT_LITERAL
+                || node->typeInfo->typeData.kind == NodeTypekind::F32
+                || node->typeInfo->typeData.kind == NodeTypekind::F64) {
+                node->llvmData = llvm::ConstantFP::get(typeFor(node->typeInfo), (float) node->intLiteralData.value);
+            }
+            else {
+                node->llvmData = llvm::ConstantInt::get(typeFor(node->typeInfo), (uint64_t) node->intLiteralData.value);
+            }
 
             if (node->isLocal) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
@@ -960,7 +972,7 @@ void LlvmGen::gen(Node *node) {
         } break;
         case NodeType::DOT: {
             if (node->resolved != nullptr) {
-                gen(node->resolved);
+                gen(resolve(node));
 
                 node->llvmData = node->resolved->llvmData;
                 break;
@@ -1259,56 +1271,31 @@ void LlvmGen::gen(Node *node) {
             node->isLocal = node->resolved->isLocal;
         } break;
         case NodeType::STRING_LITERAL: {
-            auto stringSize = node->stringLiteralData.value->size();
-
-//            auto constStr = builder.CreateGlobalString(*node->stringLiteralData.value);
-//            vector<llvm::Constant *> stringVec;
-//            for (unsigned int i = 0; i < stringSize; i++) {
-//                stringVec.push_back(builder.getInt8(static_cast<uint8_t>(node->stringLiteralData.value->at(i))));
-//            }
-
-//            auto constStr = llvm::ConstantArray::get(llvm::ArrayType::get(builder.getInt8PtrTy(), stringSize), stringVec);
-
-            llvm::Value *constStrPtr = builder.CreateCall(mallocFunc, {builder.getInt64(stringSize)});
-            llvm::Value *strWritePtr = constStrPtr;
-//            constStrPtr = builder.CreateBitCast(constStrPtr, constStr->getType()->getPointerTo(0));
-//            builder.CreateStore(constStr, constStrPtr);
-
-            for (unsigned int i = 0; i < stringSize; i++) {
-                builder.CreateStore(builder.getInt8(static_cast<uint8_t>(node->stringLiteralData.value->at(i))), strWritePtr);
-
-                if (i < stringSize - 1) {
-                    strWritePtr = builder.CreateGEP(strWritePtr, { builder.getInt32(1) });
-                }
-            }
-
-            auto structType = llvm::StructType::get(context, {builder.getInt8PtrTy(), builder.getInt64Ty()});
-            llvm::Value *stringStruct = llvm::ConstantStruct::get(structType,
-                                                                  {
-                                                                          llvm::ConstantPointerNull::get(builder.getInt8PtrTy()),
-                                                                          builder.getInt64(stringSize)
-                                                                  });
-            stringStruct = builder.CreateInsertValue(stringStruct, constStrPtr, 0);
-            node->llvmData = stringStruct;
+            gen(node->stringLiteralData.arrayLiteralRepresentation);
+            node->llvmData = node->stringLiteralData.arrayLiteralRepresentation->llvmData;
 
             if (node->isLocal) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
         } break;
         case NodeType::UNARY_NEG: {
-            gen(node->nodeData);
+            gen(node->unaryNegData.target);
 
             if (node->typeInfo->typeData.kind == NodeTypekind::INT_LITERAL
                 || node->typeInfo->typeData.kind == NodeTypekind::I32
                 || node->typeInfo->typeData.kind == NodeTypekind::I64) {
-                node->llvmData = builder.CreateNeg(rvalueFor(node->nodeData));
+                node->llvmData = builder.CreateNeg(rvalueFor(node->unaryNegData.target));
             } else if (node->typeInfo->typeData.kind == NodeTypekind::FLOAT_LITERAL
                        || node->typeInfo->typeData.kind == NodeTypekind::F32
                        || node->typeInfo->typeData.kind == NodeTypekind::F64) {
-                node->llvmData = builder.CreateFNeg(rvalueFor(node->nodeData));
+                node->llvmData = builder.CreateFNeg(rvalueFor(node->unaryNegData.target));
             } else {
                 cpi_assert(false);
             }
+        } break;
+        case NodeType::UNARY_NOT: {
+            gen(node->nodeData);
+            node->llvmData = builder.CreateNot(rvalueFor(node->nodeData));
         } break;
         case NodeType::MALLOC: {
             gen(node->nodeData);
@@ -1336,23 +1323,6 @@ void LlvmGen::gen(Node *node) {
                     gen(n);
                 }
             }
-        } break;
-        case NodeType::HEAPIFY: {
-            // gen the value and store it into it's slot
-            gen(node->nodeData);
-            store(rvalueFor(node->nodeData), static_cast<llvm::Value *>(node->nodeData->llvmLocal));
-
-            // call malloc with the correct size, store into it's local if necessary
-            auto sizeInBytes = module->getDataLayout().getTypeSizeInBits(typeFor(node->nodeData->typeInfo)) / 8;
-
-            auto mallocCall = builder.CreateCall(mallocFunc, { builder.getInt64(sizeInBytes) });
-            node->llvmData = mallocCall;
-            if (node->isLocal) {
-                store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
-            }
-
-            // store the value into the malloc
-            store(rvalueFor(node->nodeData), mallocCall);
         } break;
         case NodeType::PUTS: {
             gen(node->nodeData);

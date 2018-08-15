@@ -447,6 +447,7 @@ Node *Parser::parseFnDecl() {
 
     scopes.push(new Scope(scopes.top()));
     scopes.top()->isFunctionScope = true;
+    scopes.top()->fnScopeParams = decl->fnDeclData.params;
 
     auto savedStaticIfScope = this->staticIfScope;
     this->staticIfScope = scopes.top();
@@ -631,7 +632,7 @@ Node *Parser::parseScopedStmt() {
 
     // ret
     if (lexer->front.type == LexerTokenType::RETURN) {
-        return parseRet();
+        return parseReturn();
     }
 
     // fn decl
@@ -693,11 +694,14 @@ Node *Parser::parseScopedStmt() {
 
     // declaration/assignment/combo
     auto saved = lexer->front.region.start;
-    auto lvalue = parseLvalue();
+//    auto lvalue = parseLvalue();
+    auto lvalue = parseRvalue();
 
     bool isConstant = false;
 
-    if (lvalue->type == NodeType::FN_CALL || lvalue->type == NodeType::PANIC) {
+    if (lvalue->type == NodeType::FN_CALL
+        || lvalue->type == NodeType::PANIC
+        || (lvalue->type == NodeType::BINOP && lvalue->binopData.type == LexerTokenType::VERTICAL_BAR)) {
         lvalue->sourceMapStatement = true;
         expectSemicolon();
         return lvalue;
@@ -975,16 +979,22 @@ void Parser::possiblyInsertDeferreds(Node *node, bool isReturn) {
     }
 }
 
-Node *Parser::parseRet() {
+Node *Parser::parseReturn() {
     auto saved = lexer->front.region.start;
     expect(LexerTokenType::RETURN, "return");
 
     auto ret = new Node(lexer->srcInfo, NodeType::RETURN, scopes.top());
-    ret->retData.value = parseRvalue();
-    ret->region = {lexer->srcInfo, saved, ret->retData.value->region.end};
 
-    if (currentFnDecl) {
-        vector_append(currentFnDecl->fnDeclData.returns, ret);
+    if (lexer->front.type != LexerTokenType::SEMICOLON) {
+        ret->retData.value = parseRvalue();
+        ret->region = {lexer->srcInfo, saved, ret->retData.value->region.end};
+
+        if (currentFnDecl) {
+            vector_append(currentFnDecl->fnDeclData.returns, ret);
+        }
+    }
+    else {
+        ret->region = {lexer->srcInfo, saved, lexer->front.region.end};
     }
 
     expectSemicolon();
@@ -1091,6 +1101,22 @@ Node *Parser::parseLvalueHelper(Node *symbol, Location saved) {
     return dot;
 }
 
+Node *Parser::parsePanic() {
+    auto saved = lexer->front.region.start;
+
+    popFront();
+    auto panicNode = new Node(lexer->srcInfo, NodeType::PANIC, scopes.top());
+    expect(LexerTokenType::LPAREN, "(");
+
+    panicNode->sourceMapStatement = true;
+    expect(LexerTokenType::RPAREN, ")");
+
+    panicNode->region.start = saved;
+    panicNode->region.end = lexer->front.region.start;
+
+    return panicNode;
+}
+
 Node *Parser::parseLvalue() {
     auto saved = lexer->front.region.start;
 
@@ -1119,17 +1145,7 @@ Node *Parser::parseLvalue() {
             return parseLvalueHelper(symbol, saved);
         }
         case LexerTokenType::PANIC: {
-            popFront();
-            auto panicNode = new Node(lexer->srcInfo, NodeType::PANIC, scopes.top());
-            expect(LexerTokenType::LPAREN, "(");
-
-            panicNode->sourceMapStatement = true;
-            expect(LexerTokenType::RPAREN, ")");
-
-            panicNode->region.start = saved;
-            panicNode->region.end = lexer->front.region.start;
-
-            return panicNode;
+            return parsePanic();
         }
         default: {
             auto savedType = lexer->front.type;
@@ -1151,8 +1167,8 @@ Node *Parser::parseType() {
         return parseTypeof();
     }
 
-    if (saved.type == LexerTokenType::RETTYPEOF) {
-        return parseRetTypeof();
+    if (saved.type == LexerTokenType::RETURNTYPEOF) {
+        return parseReturnTypeof();
     }
 
     auto type = new Node(lexer->srcInfo, NodeType::TYPE, scopes.top());
@@ -1310,9 +1326,23 @@ Node *Parser::parseStructLiteral() {
 
 Node *Parser::parseArrayLiteral() {
     expect(LexerTokenType::LSQUARE, "[");
+
+    Node *allocFn = nullptr;
+    if (lexer->front.type != LexerTokenType::RSQUARE) {
+        allocFn = parseRvalue();
+    }
+
     expect(LexerTokenType::RSQUARE, "]");
 
+    if (lexer->front.type == LexerTokenType::DOUBLE_QUOTE) {
+        auto strLit = parseStringLiteral();
+        strLit->stringLiteralData.allocFn = allocFn;
+
+        return strLit;
+    }
+
     auto lit = new Node(lexer->srcInfo, NodeType::ARRAY_LITERAL, scopes.top());
+    lit->arrayLiteralData.allocFn = allocFn;
 
     if (lexer->front.type != LexerTokenType::LCURLY) {
         lit->arrayLiteralData.elementType = parseType();
@@ -1361,8 +1391,8 @@ Node *Parser::parseTypeof() {
     return type;
 }
 
-Node *Parser::parseRetTypeof() {
-    auto type = new Node(lexer->srcInfo, NodeType::RETTYPEOF, scopes.top());
+Node *Parser::parseReturnTypeof() {
+    auto type = new Node(lexer->srcInfo, NodeType::RETURNTYPEOF, scopes.top());
     type->region.start = lexer->front.region.start;
     popFront();
     expect(LexerTokenType::LPAREN, "(");
@@ -1370,24 +1400,6 @@ Node *Parser::parseRetTypeof() {
     type->region.end = lexer->front.region.end;
     expect(LexerTokenType::RPAREN, ")");
     return type;
-}
-
-Node *Parser::parseHeapify() {
-    auto h = new Node(lexer->srcInfo, NodeType::HEAPIFY, scopes.top());
-    h->region.start = lexer->front.region.start;
-    popFront();
-    expect(LexerTokenType::LPAREN, "(");
-    h->nodeData = parseRvalue();
-    h->region.end = lexer->front.region.end;
-    expect(LexerTokenType::RPAREN, ")");
-
-    // local for h because we need somewhere to store the pointer
-    addLocal(h);
-
-    // local for h->nodeData because we need to store the nodeData to the pointer
-    addLocal(h->nodeData);
-
-    return h;
 }
 
 Node *Parser::parseSizeof() {
@@ -1507,10 +1519,6 @@ Node *Parser::parseLvalueOrLiteral() {
         return parseType();
     }
 
-    if (lexer->front.type == LexerTokenType::HEAP) {
-        return parseHeapify();
-    }
-
     if (lexer->front.type == LexerTokenType::SIZEOF) {
         return parseSizeof();
     }
@@ -1548,10 +1556,21 @@ Node *Parser::parseLvalueOrLiteral() {
             auto target = parseRvalueSimple();
             symbol = new Node();
             symbol->type = NodeType::UNARY_NEG;
-            symbol->nodeData = target;
+            symbol->unaryNegData.target = target;
 
+            symbol->unaryNegData.rewritten = new Node(target->region.srcInfo, NodeType::BINOP, target->scope);
+            symbol->unaryNegData.rewritten->binopData.type = LexerTokenType::SUB;
+            symbol->unaryNegData.rewritten->binopData.lhs = new Node(target->region.srcInfo, NodeType::INT_LITERAL, target->scope);
+            symbol->unaryNegData.rewritten->binopData.lhs->intLiteralData.value = 0;
+            symbol->unaryNegData.rewritten->binopData.rhs = target;
+
+            addLocal(target);
+
+            symbol->region.srcInfo = target->region.srcInfo;
             symbol->region.start = saved;
             symbol->region.end = target->region.end;
+
+            symbol->unaryNegData.rewritten->region = symbol->region;
         }
     } else if (lexer->front.type == LexerTokenType::INT_LITERAL) {
         symbol = parseIntLiteral();
@@ -1587,6 +1606,8 @@ Node *Parser::parseLvalueOrLiteral() {
         symbol = parseArrayLiteral();
     } else if (lexer->front.type == LexerTokenType::FIELDSOF) {
         symbol = parseFieldsof();
+    } else if (lexer->front.type == LexerTokenType::PANIC) {
+        symbol = parsePanic();
     } else {
         symbol = parseSymbol();
     }
@@ -1626,6 +1647,19 @@ Node *Parser::parseRvalueSimple() {
 
         deref->region = Region{lexer->srcInfo, saved, deref->nodeData->region.end};
         return deref;
+    }
+
+    // !(rvalue_simple)
+    if (lexer->front.type == LexerTokenType::NOT) {
+        popFront();
+
+        auto _not = new Node(lexer->srcInfo, NodeType::UNARY_NOT, scopes.top());
+        _not->nodeData = parseRvalueSimple();
+
+        addLocal(_not->nodeData);
+
+        _not->region = Region{lexer->srcInfo, saved, _not->nodeData->region.end};
+        return _not;
     }
 
     // cast

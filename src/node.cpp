@@ -110,6 +110,7 @@ void initArrayLiteralData(Node *node) {
     node->arrayLiteralData.elementType = nullptr;
     node->arrayLiteralData.elements = vector_init<Node *>(8);
     node->arrayLiteralData.structLiteralRepresentation = nullptr;
+    node->arrayLiteralData.allocFn = nullptr;
 }
 
 void initCastData(Node *node) {
@@ -338,8 +339,8 @@ ostream &operator<<(ostream &os, NodeType type) {
         case NodeType::TYPEOF: {
             return os << "typeof";
         }
-        case NodeType::RETTYPEOF: {
-            return os << "rettypeof";
+        case NodeType::RETURNTYPEOF: {
+            return os << "returntypeof";
         }
         case NodeType::SIZEOF: {
             return os << "sizeof";

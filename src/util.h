@@ -63,7 +63,7 @@ enum class NodeType {
     PANIC = 28,
     RUN = 29,
     TYPEOF = 30,
-    RETTYPEOF = 31,
+    RETURNTYPEOF = 31,
     SIZEOF = 32,
     FIELDSOF = 33,
     ARRAY_INDEX = 34,
@@ -73,11 +73,10 @@ enum class NodeType {
     TAGCHECK = 38,
     ARRAY_LITERAL = 39,
     FOR = 40,
-    HEAPIFY = 41,
-    ISKIND = 42,
-    DEFER = 43,
-    END_SCOPE = 44,
-    ALIAS = 45,
+    ISKIND = 41,
+    DEFER = 42,
+    END_SCOPE = 43,
+    ALIAS = 44,
 };
 
 enum class NodeTypekind {
@@ -138,7 +137,6 @@ enum class LexerTokenType : int32_t {
     INT_LITERAL,
     FLOAT_LITERAL,
     RETURN,
-    STRING,
     BOOLEAN,
     I8,
     I32,
@@ -162,7 +160,7 @@ enum class LexerTokenType : int32_t {
     RUN,
     EXPOSED_AST,
     TYPEOF,
-    RETTYPEOF,
+    RETURNTYPEOF,
     SIZEOF,
     FIELDSOF,
     PANIC,
@@ -211,6 +209,7 @@ struct StructTypeData {
     Node *secretArrayElementType;
 
     bool isSecretlyEnum;
+    int32_t alignment;
 
     Node *coercedType;
 };
@@ -330,6 +329,7 @@ struct StructLiteralData {
 
 struct StringLiteralData {
     string *value;
+    Node *allocFn;
     Node *arrayLiteralRepresentation;
 };
 
@@ -369,6 +369,7 @@ struct ArrayLiteralData {
     Node *elementType;
     vector_t<Node *> elements;
     Node *structLiteralRepresentation;
+    Node *allocFn;
 };
 
 struct ForData {
@@ -386,6 +387,11 @@ struct ForData {
 struct AliasData {
     Node *name;
     Node *value;
+};
+
+struct UnaryNegData {
+    Node *target;
+    Node *rewritten;
 };
 
 struct IsKindData {
@@ -408,12 +414,14 @@ public:
     Scope *parent = nullptr;
 
     // for deferred
-    bool isFunctionScope = false;
     vector_t<Node *> deferredStmts = vector_init<Node *>(4);
     bool insertedDeferredStmts = false;
 
     vector_t<Node *> staticIfs = vector_init<Node *>(4);
     bool addedStaticIfs = false;
+
+    bool isFunctionScope = false;
+    vector_t<Node *> fnScopeParams;
 
     // methods
     explicit Scope(Scope *parent);
@@ -461,6 +469,7 @@ public:
         ModuleData moduleData;
         DeferData deferData;
         AliasData aliasData;
+        UnaryNegData unaryNegData;
     };
 
     Node *staticValue = nullptr;

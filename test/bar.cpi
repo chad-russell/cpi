@@ -1,5 +1,0 @@
-import "foo";
-
-a ::= 7;
-
-fn bbb() { return 3; }

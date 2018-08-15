@@ -1,11 +1,12 @@
 module sdl {
-    SDL_INIT_EVERYTHING :: i32 = 29233;
-    SDL_QUIT :: i32 = 256;
-    SDL_KEYDOWN :: i32 = 768;
-    SDLK_RIGHT :: i32 = 1073741903;
-    SDLK_LEFT :: i32 = 1073741904;
-    SDLK_UP :: i32 = 1073741906;
-    SDLK_DOWN :: i32 = 1073741905;
+    -- todo(chad): @Hack we need aliases with proper type specifications...
+    alias SDL_INIT_EVERYTHING cast(i32) 29233
+    alias SDL_QUIT cast(i32) 256
+    alias SDL_KEYDOWN cast(i32) 768
+    alias SDLK_RIGHT cast(i32) 1073741903
+    alias SDLK_LEFT cast(i32) 1073741904
+    alias SDLK_UP cast(i32) 1073741906
+    alias SDLK_DOWN cast(i32) 1073741905
 
     fn SDL_Init(flags: i32) i32
     fn SDL_CreateWindow(name: *i8, x: i32, y: i32, w: i32, h: i32, flags: i32) *none
@@ -93,12 +94,16 @@ fn runGame() {
             }
 
             sdl.SDL_RenderClear(renderer);
-            sdl.SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
+            sdl.SDL_SetRenderDrawColor(renderer, 100, 140, 255, 255);
             sdl.SDL_RenderFillRect(renderer, &playerPos);
-            sdl.SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+            sdl.SDL_SetRenderDrawColor(renderer, 155, 225, 155, 255);
             sdl.SDL_RenderPresent(renderer);
         }
     }
 
     return keydown;
+}
+
+fn main() {
+    return runGame();
 }

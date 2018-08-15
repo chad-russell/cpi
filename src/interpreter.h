@@ -67,7 +67,7 @@ void interpretMalloc(Interpreter *interp);
 void interpretFree(Interpreter *interp);
 void interpretPuts(Interpreter *interp);
 void interpretNop(Interpreter *interp);
-void interpretReserveGlobal(Interpreter *interp);
+void interpretNot(Interpreter *interp);
 
 class Interpreter {
 public:
@@ -117,228 +117,228 @@ public:
         this->fnTable = hash_init<uint32_t, uint64_t>(100);
 
         table = {
-            interpretMathAdd<int8_t>,
-            interpretMathSub<int8_t>,
-            interpretMathMul<int8_t>,
-            interpretMathDiv<uint8_t>,
-            interpretMathDiv<int8_t>,
-            interpretMathMod<uint8_t>,
-            interpretMathMod<int8_t>,
-            interpretCmpEq<int8_t>,
-            interpretCmpNeq<int8_t>,
-            interpretCmpGt<uint8_t>,
-            interpretCmpGt<int8_t>,
-            interpretCmpGte<uint8_t>,
-            interpretCmpGte<int8_t>,
-            interpretCmpLt<uint8_t>,
-            interpretCmpLt<int8_t>,
-            interpretCmpLte<uint8_t>,
-            interpretCmpLte<int8_t>,
-            interpretMathAdd<int16_t>,
-            interpretMathSub<int16_t>,
-            interpretMathMul<int16_t>,
-            interpretMathDiv<uint16_t>,
-            interpretMathDiv<int16_t>,
-            interpretMathMod<uint16_t>,
-            interpretMathMod<int16_t>,
-            interpretCmpEq<int16_t>,
-            interpretCmpNeq<int16_t>,
-            interpretCmpGt<uint16_t>,
-            interpretCmpGt<int16_t>,
-            interpretCmpGte<uint16_t>,
-            interpretCmpGte<int16_t>,
-            interpretCmpLt<uint16_t>,
-            interpretCmpLt<int16_t>,
-            interpretCmpLte<uint16_t>,
-            interpretCmpLte<int16_t>,
-            interpretMathAdd<int32_t>,
-            interpretMathSub<int32_t>,
-            interpretMathMul<int32_t>,
-            interpretMathDiv<uint32_t>,
-            interpretMathDiv<int32_t>,
-            interpretMathMod<uint32_t>,
-            interpretMathMod<int32_t>,
-            interpretCmpEq<int32_t>,
-            interpretCmpNeq<int32_t>,
-            interpretCmpGt<uint32_t>,
-            interpretCmpGt<int32_t>,
-            interpretCmpGte<uint32_t>,
-            interpretCmpGte<int32_t>,
-            interpretCmpLt<uint32_t>,
-            interpretCmpLt<int32_t>,
-            interpretCmpLte<uint32_t>,
-            interpretCmpLte<int32_t>,
-            interpretMathAdd<int64_t>,
-            interpretMathAddSI64,
-            interpretMathSub<int64_t>,
-            interpretMathMul<int64_t>,
-            interpretMathDiv<uint64_t>,
-            interpretMathDiv<int64_t>,
-            interpretMathMod<uint64_t>,
-            interpretMathMod<int64_t>,
-            interpretCmpEq<int64_t>,
-            interpretCmpNeq<int64_t>,
-            interpretCmpGt<uint64_t>,
-            interpretCmpGt<int64_t>,
-            interpretCmpGte<uint64_t>,
-            interpretCmpGte<int64_t>,
-            interpretCmpLt<uint64_t>,
-            interpretCmpLt<int64_t>,
-            interpretCmpLte<uint64_t>,
-            interpretCmpLte<int64_t>,
-            interpretMathAdd<float>,
-            interpretMathSub<float>,
-            interpretMathMul<float>,
-            interpretMathDiv<float>,
-            interpretMathMod<float>,
-            interpretCmpEq<float>,
-            interpretCmpNeq<float>,
-            interpretCmpLt<float>,
-            interpretCmpLte<float>,
-            interpretCmpGt<float>,
-            interpretCmpGte<float>,
-            interpretMathAdd<double>,
-            interpretMathSub<double>,
-            interpretMathMul<double>,
-            interpretMathDiv<double>,
-            interpretMathMod<double>,
-            interpretCmpEq<double>,
-            interpretCmpNeq<double>,
-            interpretCmpLt<double>,
-            interpretCmpLte<double>,
-            interpretCmpGt<double>,
-            interpretCmpGte<double>,
-            interpretMathBitwiseOr<8, int8_t>,
-            interpretMathBitwiseOr<16, int16_t>,
-            interpretMathBitwiseOr<32, int32_t>,
-            interpretMathBitwiseOr<64, int64_t>,
-            interpretMathBitwiseAnd<8, int8_t>, 
-            interpretMathBitwiseAnd<16, int16_t>,
-            interpretMathBitwiseAnd<32, int32_t>,
-            interpretMathBitwiseAnd<64, int64_t>,
-            interpretMathBitwiseXor<8, int8_t>, 
-            interpretMathBitwiseXor<16, int16_t>,
-            interpretMathBitwiseXor<32, int32_t>,
-            interpretMathBitwiseXor<64, int64_t>,
-            interpretStoreConst,
-            interpretStore,
-            interpretBumpSP,
-            interpretJumpIf,
-            interpretJump,
-            interpretCalli,
-            interpretCalle,
-            interpretCall,
-            interpretReturn,
-            interpretExit,
-            interpretPanic,
-            interpretMalloc,
-            interpretFree,
-            interpretPuts,
-            interpretNop,
-            interpretReserveGlobal};
-  }
+                interpretMathAdd<int8_t>,
+                interpretMathSub<int8_t>,
+                interpretMathMul<int8_t>,
+                interpretMathDiv<uint8_t>,
+                interpretMathDiv<int8_t>,
+                interpretMathMod<uint8_t>,
+                interpretMathMod<int8_t>,
+                interpretCmpEq<int8_t>,
+                interpretCmpNeq<int8_t>,
+                interpretCmpGt<uint8_t>,
+                interpretCmpGt<int8_t>,
+                interpretCmpGte<uint8_t>,
+                interpretCmpGte<int8_t>,
+                interpretCmpLt<uint8_t>,
+                interpretCmpLt<int8_t>,
+                interpretCmpLte<uint8_t>,
+                interpretCmpLte<int8_t>,
+                interpretMathAdd<int16_t>,
+                interpretMathSub<int16_t>,
+                interpretMathMul<int16_t>,
+                interpretMathDiv<uint16_t>,
+                interpretMathDiv<int16_t>,
+                interpretMathMod<uint16_t>,
+                interpretMathMod<int16_t>,
+                interpretCmpEq<int16_t>,
+                interpretCmpNeq<int16_t>,
+                interpretCmpGt<uint16_t>,
+                interpretCmpGt<int16_t>,
+                interpretCmpGte<uint16_t>,
+                interpretCmpGte<int16_t>,
+                interpretCmpLt<uint16_t>,
+                interpretCmpLt<int16_t>,
+                interpretCmpLte<uint16_t>,
+                interpretCmpLte<int16_t>,
+                interpretMathAdd<int32_t>,
+                interpretMathSub<int32_t>,
+                interpretMathMul<int32_t>,
+                interpretMathDiv<uint32_t>,
+                interpretMathDiv<int32_t>,
+                interpretMathMod<uint32_t>,
+                interpretMathMod<int32_t>,
+                interpretCmpEq<int32_t>,
+                interpretCmpNeq<int32_t>,
+                interpretCmpGt<uint32_t>,
+                interpretCmpGt<int32_t>,
+                interpretCmpGte<uint32_t>,
+                interpretCmpGte<int32_t>,
+                interpretCmpLt<uint32_t>,
+                interpretCmpLt<int32_t>,
+                interpretCmpLte<uint32_t>,
+                interpretCmpLte<int32_t>,
+                interpretMathAdd<int64_t>,
+                interpretMathAddSI64,
+                interpretMathSub<int64_t>,
+                interpretMathMul<int64_t>,
+                interpretMathDiv<uint64_t>,
+                interpretMathDiv<int64_t>,
+                interpretMathMod<uint64_t>,
+                interpretMathMod<int64_t>,
+                interpretCmpEq<int64_t>,
+                interpretCmpNeq<int64_t>,
+                interpretCmpGt<uint64_t>,
+                interpretCmpGt<int64_t>,
+                interpretCmpGte<uint64_t>,
+                interpretCmpGte<int64_t>,
+                interpretCmpLt<uint64_t>,
+                interpretCmpLt<int64_t>,
+                interpretCmpLte<uint64_t>,
+                interpretCmpLte<int64_t>,
+                interpretMathAdd<float>,
+                interpretMathSub<float>,
+                interpretMathMul<float>,
+                interpretMathDiv<float>,
+                interpretMathMod<float>,
+                interpretCmpEq<float>,
+                interpretCmpNeq<float>,
+                interpretCmpLt<float>,
+                interpretCmpLte<float>,
+                interpretCmpGt<float>,
+                interpretCmpGte<float>,
+                interpretMathAdd<double>,
+                interpretMathSub<double>,
+                interpretMathMul<double>,
+                interpretMathDiv<double>,
+                interpretMathMod<double>,
+                interpretCmpEq<double>,
+                interpretCmpNeq<double>,
+                interpretCmpLt<double>,
+                interpretCmpLte<double>,
+                interpretCmpGt<double>,
+                interpretCmpGte<double>,
+                interpretMathBitwiseOr<8, int8_t>,
+                interpretMathBitwiseOr<16, int16_t>,
+                interpretMathBitwiseOr<32, int32_t>,
+                interpretMathBitwiseOr<64, int64_t>,
+                interpretMathBitwiseAnd<8, int8_t>,
+                interpretMathBitwiseAnd<16, int16_t>,
+                interpretMathBitwiseAnd<32, int32_t>,
+                interpretMathBitwiseAnd<64, int64_t>,
+                interpretMathBitwiseXor<8, int8_t>,
+                interpretMathBitwiseXor<16, int16_t>,
+                interpretMathBitwiseXor<32, int32_t>,
+                interpretMathBitwiseXor<64, int64_t>,
+                interpretStoreConst,
+                interpretStore,
+                interpretBumpSP,
+                interpretJumpIf,
+                interpretJump,
+                interpretCalli,
+                interpretCalle,
+                interpretCall,
+                interpretReturn,
+                interpretExit,
+                interpretPanic,
+                interpretMalloc,
+                interpretFree,
+                interpretPuts,
+                interpretNop,
+                interpretNot};
+    }
 
     void interpret();
     void callIndex(int64_t index);
 
     void dumpStack();
 
-  template <typename T>
-  void copyToStack(T t, int64_t offset) {
-      memcpy(&stack[offset], &t, sizeof(T));
-  }
+    template <typename T>
+    void copyToStack(T t, int64_t offset) {
+        memcpy(&stack[offset], &t, sizeof(T));
+    }
 
-  template <typename T>
-  void pushToStack(T t) {
-      copyToStack(t, sp);
-      sp += sizeof(T);
-  }
+    template <typename T>
+    void pushToStack(T t) {
+        copyToStack(t, sp);
+        sp += sizeof(T);
+    }
 
-  template <typename T>
-  inline T readFromStack(int64_t offset) {
-      return bytesTo<T>(stack, offset);
-  }
+    template <typename T>
+    inline T readFromStack(int64_t offset) {
+        return bytesTo<T>(stack, offset);
+    }
 
-  template <typename T>
-  inline T consume() {
-      auto value = bytesTo<T>(instructions, pc);
-      pc += sizeof(T);
-      return value;
-  }
+    template <typename T>
+    inline T consume() {
+        auto value = bytesTo<T>(instructions, pc);
+        pc += sizeof(T);
+        return value;
+    }
 
-  template <typename T>
-  T read() {
-      auto inst = static_cast<Instruction>(instructions[pc]);
+    template <typename T>
+    T read() {
+        auto inst = static_cast<Instruction>(instructions[pc]);
 
-      // RELCONST
-      if (inst == Instruction::RELCONSTI32 || inst == Instruction::RELCONSTI64) {
-          pc += 1;
-          auto consumed = consume<T>();
-          consumed += static_cast<T>(bp);
-          return consumed;
-      }
+        // RELCONST
+        if (inst == Instruction::RELCONSTI32 || inst == Instruction::RELCONSTI64) {
+            pc += 1;
+            auto consumed = consume<T>();
+            consumed += static_cast<T>(bp);
+            return consumed;
+        }
 
-      // REL
-      if (inst == Instruction::RELI8 || inst == Instruction::RELI16
-          || inst == Instruction::RELI32 || inst == Instruction::RELI64
-          || inst == Instruction::RELF32 || inst == Instruction::RELF64) {
-          pc += 1;
-          auto consumed = consume<int64_t>();
-          return readFromStack<T>(consumed + bp);
-      }
+        // REL
+        if (inst == Instruction::RELI8 || inst == Instruction::RELI16
+            || inst == Instruction::RELI32 || inst == Instruction::RELI64
+            || inst == Instruction::RELF32 || inst == Instruction::RELF64) {
+            pc += 1;
+            auto consumed = consume<int64_t>();
+            return readFromStack<T>(consumed + bp);
+        }
 
-      // CONST
-      if (inst == Instruction::CONSTI8 || inst == Instruction::CONSTI16
-          || inst == Instruction::CONSTI32 || inst == Instruction::CONSTI64
-          || inst == Instruction::CONSTF32 || inst == Instruction::CONSTF64) {
-          pc += 1;
-          return consume<T>();
-      }
+        // CONST
+        if (inst == Instruction::CONSTI8 || inst == Instruction::CONSTI16
+            || inst == Instruction::CONSTI32 || inst == Instruction::CONSTI64
+            || inst == Instruction::CONSTF32 || inst == Instruction::CONSTF64) {
+            pc += 1;
+            return consume<T>();
+        }
 
-      if (inst == Instruction::I64) {
-          pc += 1;
-          auto consumed = consume<int64_t>();
-          auto read = readFromStack<int64_t>(consumed + bp);
-          auto stackData = (int64_t) stack.data();
-          auto offsetRead = read - stackData;
-          return offsetRead;
-      }
+        if (inst == Instruction::I64) {
+            pc += 1;
+            auto consumed = consume<int64_t>();
+            auto read = readFromStack<int64_t>(consumed + bp);
+            auto stackData = (int64_t) stack.data();
+            auto offsetRead = read - stackData;
+            return offsetRead;
+        }
 
-      cpi_assert(false && "unrecognized inst for read<T>");
-      return {};
-  }
+        cpi_assert(false && "unrecognized inst for read<T>");
+        return {};
+    }
 
-  auto readBits8() {
-      return read<int8_t>();
-  }
+    auto readBits8() {
+        return read<int8_t>();
+    }
 
-  auto readBits16() {
-      return read<int16_t>();
-  }
+    auto readBits16() {
+        return read<int16_t>();
+    }
 
-  auto readBits32() {
-      return read<int32_t>();
-  }
+    auto readBits32() {
+        return read<int32_t>();
+    }
 
-  auto readBits64() {
-      return read<int64_t>();
-  }
+    auto readBits64() {
+        return read<int64_t>();
+    }
 
-  template<int32_t bits, typename T>
-  T readBits() {
-      if (bits == 8) {
-          return static_cast<T>(readBits8());
-      }
-      if (bits == 16) {
-          return static_cast<T>(readBits16());
-      }
-      if (bits == 32) {
-          return static_cast<T>(readBits32());
-      }
-      if (bits == 64) {
-          return static_cast<T>(readBits64());
-      }
-  }
+    template<int32_t bits, typename T>
+    T readBits() {
+        if (bits == 8) {
+            return static_cast<T>(readBits8());
+        }
+        if (bits == 16) {
+            return static_cast<T>(readBits16());
+        }
+        if (bits == 32) {
+            return static_cast<T>(readBits32());
+        }
+        if (bits == 64) {
+            return static_cast<T>(readBits64());
+        }
+    }
 };
 
 template <typename T>
