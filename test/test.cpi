@@ -155,7 +155,15 @@ fn main() {
     assert(test2.a == 7);
     assert(test2.test.test2.test.test2.bbb() == test2.test.topLevel);
 
+    assert(context.id == 0);
+    incrementContextId();
+    assert(context.id == 1);
+
     return 0;
+}
+
+fn incrementContextId() {
+    context.id = context.id + 1;
 }
 
 fn testPipe() {

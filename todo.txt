@@ -1,8 +1,4 @@
 TODO:
-    - allow for import paths, specified in $CPI_IMPORT environment variable
-
-    -
-
     - better interpreter debugging
         - support for removing breakpoints
         - when stops on a breakpoint, info should immediately appear instead of only when going to 'next'
@@ -12,6 +8,11 @@ TODO:
             - use this for step/continue backwards in vscode
         - conditional breakpoints
         - ctfe debugging
+
+    - switch (on enum (tag))
+        - only real benefit is that the compiler could warn you if you miss a case
+
+    - test the shit out of it
 
     - threading
         - for interpreter, should create another interpreter and add it to a list. Execution should round-robin over all interpreters in the list
@@ -50,9 +51,6 @@ TODO:
                 -- do stuff. Should lock at the beginning and unlock at the end
             }
         ```
-
-    - switch (on enum (tag))
-        - only real benefit is that the compiler could warn you if you miss a case
 
     - more robustness for compile-time parameters
         - should only be allowed things which can be constantized
