@@ -1510,8 +1510,6 @@ Node *Parser::parsePuts() {
     expect(LexerTokenType::RPAREN, ")");
     expectSemicolon();
 
-    addLocal(value->nodeData);
-
     return value;
 }
 

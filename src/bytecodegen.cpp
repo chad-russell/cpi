@@ -999,11 +999,13 @@ void BytecodeGen::gen(Node *node) {
         case NodeType::PUTS: {
             gen(node->nodeData);
 
-            cpi_assert(node->nodeData->isLocal || node->nodeData->isBytecodeLocal);
-            storeValue(node->nodeData, node->nodeData->localOffset);
+            auto resolvedNodeData = resolve(node->nodeData);
+            cpi_assert(resolvedNodeData->isLocal || resolvedNodeData->isBytecodeLocal);
+
+            storeValue(resolvedNodeData, resolvedNodeData->localOffset);
             append(instructions, Instruction::PUTS);
             append(instructions, Instruction::RELCONSTI64);
-            append(instructions, toBytes(node->nodeData->localOffset));
+            append(instructions, toBytes(resolvedNodeData->localOffset));
         } break;
         case NodeType::FIELDSOF: {
             gen(node->resolved);

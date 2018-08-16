@@ -826,8 +826,17 @@ Node *constantize(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node);
     node = resolve(node);
 
-    if (node->typeInfo->typeData.kind == NodeTypekind::POINTER) {
-        semantic->reportError({node}, Error{node->region, "Pointers are not constant"});
+    if (node->type == NodeType::TYPE) {
+        return node;
+    }
+
+    auto typeKind = resolve(node->typeInfo)->typeData.kind;
+    if (typeKind == NodeTypekind::POINTER
+        || typeKind == NodeTypekind::STRUCT
+        || typeKind == NodeTypekind::FN
+        || typeKind == NodeTypekind::SYMBOL
+        || typeKind == NodeTypekind::DOT) {
+        semantic->reportError({node}, Error{node->region, "type is not constant"});
         return node;
     }
 
@@ -947,7 +956,7 @@ void resolveArrayIndex(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->arrayIndexData.target);
     semantic->resolveTypes(node->arrayIndexData.indexValue);
 
-    auto resolvedTargetTypeInfo = resolve(node->arrayIndexData.target->typeInfo);
+    auto resolvedTargetTypeInfo = resolve(resolve(node->arrayIndexData.target)->typeInfo);
 
     switch (resolve(node->arrayIndexData.indexValue->typeInfo)->typeData.kind) {
         case NodeTypekind::INT_LITERAL:
@@ -1117,7 +1126,7 @@ void resolveNilLiteral(Semantic *semantic, Node *node) {
 }
 
 void resolveSymbol(Semantic *semantic, Node *node) {
-    node->resolved = node->scope->find(node->symbolData.atomId);
+    node->resolved = resolve(node->scope->find(node->symbolData.atomId));
 
     if (node->resolved == nullptr) {
         ostringstream s("");
@@ -1125,12 +1134,6 @@ void resolveSymbol(Semantic *semantic, Node *node) {
         semantic->reportError({node}, Error{node->region, s.str()});
         return;
     }
-
-//    cpi_assert(node->resolved->type == NodeType::DECL
-//           || node->resolved->type == NodeType::FN_DECL
-//           || node->resolved->type == NodeType::DECL_PARAM
-//           || node->resolved->type == NodeType::INT_LITERAL
-//           || node->resolved->type == NodeType::TYPE);
 
     semantic->resolveTypes(node->resolved);
     node->typeInfo = node->resolved->typeInfo;
@@ -1613,15 +1616,27 @@ void resolveFnCall(Semantic *semantic, Node *node) {
         auto ctDeclParams = resolvedFn->fnDeclData.ctParams;
         auto ctGivenParams = node->fnCallData.ctParams;
 
+        cpi_assert(ctDeclParams.length == ctGivenParams.length);
+
         // Make sure the ctDeclParams resolve to their compile-time values
         for (unsigned long i = 0; i < ctGivenParams.length; i++) {
             const auto& ctParam = vector_at(ctGivenParams, i);
+            const auto& ctDeclParam = vector_at(ctDeclParams, i);
 
+            Node *ctValue;
             if (ctParam->type == NodeType::VALUE_PARAM) {
-                auto ctValue = ctParam->paramData.value;
-                vector_at(ctDeclParams, i)->staticValue = resolve(ctValue);
+                ctValue = ctParam->paramData.value;
             } else {
-                vector_at(ctDeclParams, i)->staticValue = resolve(ctParam);
+                ctValue = ctParam;
+            }
+            ctValue = resolve(ctValue);
+
+            auto declParamType = resolve(ctDeclParam->paramData.type);
+            if (declParamType != nullptr && declParamType->typeData.kind == NodeTypekind::EXPOSED_AST) {
+                ctDeclParam->staticValue = ctValue;
+            }
+            else {
+                ctDeclParam->staticValue = constantize(semantic, ctValue);
             }
         }
     }
@@ -2614,7 +2629,10 @@ void resolveTagCheck(Semantic *semantic, Node *node) {
 
 void resolvePuts(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->nodeData);
-    auto resolvedType = resolve(node->nodeData->typeInfo);
+    auto resolvedType = resolve(resolve(node->nodeData)->typeInfo);
+
+    semantic->addLocal(resolve(node->nodeData));
+
     if (resolvedType->typeData.kind == NodeTypekind::STRUCT
         && resolvedType->typeData.structTypeData.isSecretlyArray
         && resolvedType->typeData.structTypeData.secretArrayElementType->typeData.kind == NodeTypekind::I8) {
