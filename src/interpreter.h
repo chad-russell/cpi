@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <stack>
+#include <dlfcn.h>
 
 #include "assembler.h"
 
@@ -99,14 +100,15 @@ public:
     bool continuing = false;
 
     vector_t<Node *> externalFnTable;
+    vector_t<void *> libs;
 
     // used for stepping 'over' functions (as opposed to normal step which goes 'into')
     uint16_t depth = 0;
     int32_t overDepth = (2 << 15) + 1;
 
-    Interpreter(): Interpreter(1024 * 64) {}
+    Interpreter(vector_t<string *> externalLibs): Interpreter(1024 * 64, externalLibs) {}
 
-    Interpreter(int32_t stackSize_) {
+    Interpreter(int32_t stackSize_, vector_t<string *> externalLibs) {
         this->stackSize = stackSize_;
 
         stack.reserve((unsigned long) stackSize);
@@ -236,6 +238,28 @@ public:
                 interpretPuts,
                 interpretNop,
                 interpretNot};
+
+        libs = vector_init<void *>(10);
+        for (auto lib : externalLibs) {
+            auto path = realpath(string("/usr/local/lib/" + *lib + ".dylib").c_str(), nullptr);
+            if (path == nullptr) {
+                path = realpath(string("/usr/lib/" + *lib + ".dylib").c_str(), nullptr);
+            }
+            if (path == nullptr) {
+                path = realpath(string("./" + *lib + ".dylib").c_str(), nullptr);
+            }
+            if (path == nullptr) {
+                path = realpath(string(*lib + ".dylib").c_str(), nullptr);
+            }
+
+            void *libhandle = dlopen(path, RTLD_LAZY);
+            if (!libhandle) {
+                fprintf(stderr, "dlopen error: %s\n", dlerror());
+                exit(1);
+            }
+
+            vector_append(libs, libhandle);
+        }
     }
 
     void interpret();

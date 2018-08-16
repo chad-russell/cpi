@@ -130,7 +130,8 @@ void initIfData(Node *node) {
     node->ifData.elseStmts = vector_init<Node *>(8);
 
     node->ifData.isStatic = false;
-    node->ifData.staticIfScope = nullptr;
+    node->ifData.ifScope = nullptr;
+    node->ifData.elseScope = nullptr;
     node->ifData.trueImports = vector_init<Node *>(8);
     node->ifData.falseImports = vector_init<Node *>(8);
 }

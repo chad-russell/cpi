@@ -30,12 +30,16 @@ bool isSpecial(char c) {
            || c == ';';
 }
 
-Lexer::Lexer(Lexer *lexer, Node *node) {
-    this->srcInfo = lexer->srcInfo;
+Lexer::Lexer(SourceInfo srcInfo, Node *node) {
+    this->srcInfo = srcInfo;
     this->lastLoc = node->region.start;
     this->loc = node->region.start;
     this->popFront();
     this->popFront();
+}
+
+Lexer::Lexer(Lexer *lexer, Node *node) {
+    Lexer(lexer->srcInfo, node);
 }
 
 Lexer::Lexer(string fileName, bool isFile) {
@@ -151,6 +155,7 @@ void Lexer::popFront() {
     if (tryEat(&next, "@", LexerTokenType::AT)) { return; }
     if (tryEat(&next, "|", LexerTokenType::VERTICAL_BAR)) { return; }
     if (tryEatKeyword(&next, "alias", LexerTokenType::ALIAS)) { return; }
+    if (tryEatKeyword(&next, "#link", LexerTokenType::LINK)) { return; }
     if (tryEatKeyword(&next, "defer", LexerTokenType::DEFER)) { return; }
     if (tryEatKeyword(&next, "#run", LexerTokenType::RUN)) { return; }
     if (tryEatKeyword(&next, "and", LexerTokenType::AND)) { return; }

@@ -1,6 +1,5 @@
 #import "printing";
 #import "buffer";
--- #import "test2";
 
 fn main() {
     f := fn() {
@@ -153,8 +152,8 @@ fn main() {
 
     printing.printMany({"fuckme: ", fuckme, "\n"});
 
-    -- assert(test2.a == 7);
-    -- assert(test2.bbb() == topLevel);
+    assert(test2.a == 7);
+    assert(test2.test.test2.test.test2.bbb() == test2.test.topLevel);
 
     return 0;
 }
@@ -235,7 +234,6 @@ fn testModule() {
 fn testPrinting() {
     e: enum {x: i32, y: bool} = { y: false };
     printing.printWithSpaces({123, "string", false, []{1, 2, 3}, {x: 3, y: &8767}, e});
-
     puts("\n\n");
 }
 
@@ -948,6 +946,7 @@ fn testAnySimple1() {
 fn someCheck() { return true; }
 
 #if someCheck() {
+    #import "test2";
+
     alias topLevel id(123)
 }
-

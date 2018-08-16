@@ -1,19 +1,7 @@
 TODO:
-    - better specification of paths for imports
-        - path should always be relative to the main file, regardless of where the compiler was run from
+    - allow for import paths, specified in $CPI_IMPORT environment variable
 
-    - specification of paths for lib linking
-        - path should always be relative to the main file, regardless of where the compiler was run from
-        - example:
-            - ```
-                #link "foo" {
-                    fn bar() i64;
-                    fn baz(i: i32) *none;
-                }
-            ```
-        - allow for link paths
-            - #linkPath "/usr/local/cpi/lib";
-            - allow from command line as well (?) (or possibly an environment variable?)
+    -
 
     - better interpreter debugging
         - support for removing breakpoints
@@ -69,8 +57,3 @@ TODO:
     - more robustness for compile-time parameters
         - should only be allowed things which can be constantized
         - figure out what 'Ast' does/should do, and if it should even be kept around...
-
-    - how to make custom stretchy buffer that's also pretty
-        - probably just get rid of `[]` syntax... instead of giving all types a way to
-            access to special syntax, can just have less special syntax
-        - a := buf!(i32)(10); a|append(3); return a|at(1);

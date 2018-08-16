@@ -60,6 +60,7 @@ struct Parser {
     Node *createInitContextCall(Scope *scope);
     void initContext(Node *decl);
     void addBasicImport();
+    Node *addImport(string importName);
     void addContextParameterForDecl(vector_t<Node *> &currentParams, Scope *scope);
 
     void parseRoot();
@@ -103,6 +104,7 @@ struct Parser {
     Node *buildDots(stack<Node *> rvalues);
     Node *parseDefer();
     Node *parseAlias();
+    Node *parseLink();
 };
 
 #endif // PARSER_H

@@ -1,4 +1,6 @@
 module sdl {
+    #link "libsdl2";
+
     -- todo(chad): @Hack we need aliases with proper type specifications...
     alias SDL_INIT_EVERYTHING cast(i32) 29233
     alias SDL_QUIT cast(i32) 256
@@ -102,8 +104,4 @@ fn runGame() {
     }
 
     return keydown;
-}
-
-fn main() {
-    return runGame();
 }

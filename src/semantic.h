@@ -9,10 +9,12 @@ public:
     bool lvalueAssignmentContext = false;
     Node *currentFnDecl = nullptr;
 
+    vector_t<string *> linkLibs;
+
     Lexer *lexer = nullptr;
     Parser *parser = nullptr;
 
-    void addStaticIfs(Scope *target);
+    void addStaticIfs(Scope *target, Scope *importInto = nullptr);
     void addImports(vector_t<Node *> imports, Scope *target);
 
     Node *deepCopyScopedStmt(Node *node, Scope *scope);

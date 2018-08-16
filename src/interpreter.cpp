@@ -459,7 +459,7 @@ void Interpreter::interpret() {
 //                    m->fnTable = gen->fnTable;
 //                    cout << m->debugString() << endl;
 
-                    auto interp = new Interpreter();
+                    auto interp = new Interpreter(semantic->linkLibs);
                     interp->bp = this->bp;
                     interp->sp = this->bp;
                     interp->externalFnTable = gen->externalFnTable;
@@ -634,21 +634,21 @@ void interpretCalle(Interpreter *interp) {
     auto originalCallNode = vector_at(interp->externalFnTable, (unsigned long) fnTableIndex);
     assert(originalCallNode != nullptr);
 
-    void *libhandle = dlopen("/usr/local/lib/libsdl2.dylib", RTLD_LAZY);
-//    void *libhandle = dlopen("/Users/chadrussell/Projects/cpi/test/libfoo.dylib", RTLD_LAZY);
-    if (!libhandle) {
-        fprintf(stderr, "dlopen error: %s\n", dlerror());
-        exit(1);
-    }
-
     auto originalFn = resolve(originalCallNode->fnCallData.fn);
     assert(originalFn->type == NodeType::FN_DECL);
     auto fnName = atomTable->backwardAtoms[originalFn->fnDeclData.name->symbolData.atomId];
 
-    void* add_fn = dlsym(libhandle, fnName.c_str());
-    char* err = dlerror();
-    if (err) {
-        fprintf(stderr, "dlsym failed: %s\n", err);
+    void *found_fn = nullptr;
+    for (auto handle : interp->libs) {
+        found_fn = dlsym(handle, fnName.c_str());
+        char* err = dlerror();
+        if (!err) {
+            break;
+        }
+    }
+
+    if (found_fn == nullptr) {
+        cout << "Fatal error: could not find external function " << fnName << endl;
         exit(1);
     }
 
@@ -680,7 +680,7 @@ void interpretCalle(Interpreter *interp) {
 
     // call function copying return value bits to return slot
     // todo(chad): according to ffi this *must* be at least an int32_t unless the return type is void. So we'll need to deal with return types smaller than that
-    ffi_call(&cif, FFI_FN(add_fn), &interp->stack[interp->sp + 8], values);
+    ffi_call(&cif, FFI_FN(found_fn), &interp->stack[interp->sp + 8], values);
     auto debugSlot = &interp->stack[interp->sp + 8];
 
     free(ffiArgs);

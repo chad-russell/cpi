@@ -77,6 +77,7 @@ enum class NodeType {
     DEFER = 42,
     END_SCOPE = 43,
     ALIAS = 44,
+    LINK = 45,
 };
 
 enum class NodeTypekind {
@@ -171,10 +172,10 @@ enum class LexerTokenType : int32_t {
     TAGCHECK,
     FOR,
     STATIC_FOR,
-    HEAP,
     ISKIND,
     DEFER,
-    ALIAS
+    ALIAS,
+    LINK,
 };
 
 struct SourceInfo {
@@ -339,7 +340,8 @@ struct IfData {
     vector_t<Node *> elseStmts;
 
     bool isStatic;
-    Scope *staticIfScope;
+    Scope *ifScope;
+    Scope *elseScope;
     vector_t<Node *> trueImports;
     vector_t<Node *> falseImports;
 };
@@ -402,10 +404,15 @@ struct IsKindData {
 struct ModuleData {
     Node *name;
     vector_t<Node *> stmts;
+    int64_t fullImportAtomId;
 };
 
 struct DeferData {
     vector_t<Node *> stmts;
+};
+
+struct LinkData {
+    string *name;
 };
 
 class Scope {
@@ -470,6 +477,7 @@ public:
         DeferData deferData;
         AliasData aliasData;
         UnaryNegData unaryNegData;
+        LinkData linkData;
     };
 
     Node *staticValue = nullptr;

@@ -156,7 +156,15 @@ int main(int argc, char **argv) {
     auto inputFile = string(realpath(argv[optind], nullptr));
     auto inputType = inputTypeFromExtension(inputFile);
 
-    auto interp = new Interpreter();
+    unsigned long lastSlash = 0;
+    for (unsigned long i = 0; i < inputFile.length(); i++) {
+        if (inputFile[i] == '/') {
+            lastSlash =  i;
+        }
+    }
+    auto compilerCurrentDir = realpath(inputFile.substr(0, lastSlash).c_str(), nullptr);
+    chdir(compilerCurrentDir);
+
     Semantic *semantic;
 
     vector<unsigned char> instructions;
@@ -183,6 +191,8 @@ int main(int argc, char **argv) {
         out.close();
     }
 
+    Interpreter *interp;
+
     if (inputType == InputType::CPI) {
         auto lexer = new Lexer(inputFile, true);
         parser = new Parser(lexer);
@@ -190,6 +200,7 @@ int main(int argc, char **argv) {
         auto fileModule = new Node(lexer->srcInfo, NodeType::MODULE, parser->scopes.top());
         vector_append(importedFileModules, fileModule);
         fileModule->moduleData.name = new Node(lexer->srcInfo, NodeType::SYMBOL, parser->scopes.top());
+        fileModule->moduleData.fullImportAtomId = atomTable->insertStr(inputFile);
         auto f = inputFile.substr(0, inputFile.length() - 4);
         fileModule->moduleData.name->symbolData.atomId = atomTable->insertStr(f);
         fileModule->moduleData.stmts = parser->allTopLevel;
@@ -223,6 +234,7 @@ int main(int argc, char **argv) {
             }
             gen->fixup();
 
+            interp = new Interpreter(semantic->linkLibs);
             interp->instructions = gen->instructions;
             interp->fnTable = gen->fnTable;
             interp->sourceMap = gen->sourceMap;
@@ -231,19 +243,6 @@ int main(int argc, char **argv) {
             instructions = gen->instructions;
             fnTable = gen->fnTable;
         }
-    }
-    else if (inputType == InputType::CAS) {
-        auto assemblyLexer = new AssemblyLexer(inputFile);
-        while (!assemblyLexer->empty()) {
-            assemblyLexer->popFront();
-        }
-
-        interp->instructions = assemblyLexer->instructions;
-        interp->fnTable = assemblyLexer->fnTable;
-        interp->sourceMap = assemblyLexer->sourceMap;
-
-        instructions = assemblyLexer->instructions;
-        fnTable = assemblyLexer->fnTable;
     }
     else {
         ifstream t(inputFile);

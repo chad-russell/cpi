@@ -519,7 +519,10 @@ void addAllFromScopeToScope(Semantic *semantic, Scope *from, Scope *to) {
                 s << "redeclaration of symbol '" << atomTable->backwardAtoms[bucket->key] << "', from import";
                 semantic->reportError({}, Error{(*found)->region, s.str()});
             }
-            hash_insert(to->symbols, bucket->key, node);
+
+            if (node->type == NodeType::ALIAS || node->type == NodeType::MODULE) {
+                hash_insert(to->symbols, bucket->key, node);
+            }
 
             while (bucket->next != nullptr) {
                 bucket = bucket->next;
@@ -530,29 +533,39 @@ void addAllFromScopeToScope(Semantic *semantic, Scope *from, Scope *to) {
                     s << "redeclaration of symbol '" << atomTable->backwardAtoms[bucket->key] << "', from import";
                     semantic->reportError({}, Error{(*found)->region, s.str()});
                 }
-                hash_insert(to->symbols, bucket->key, node);
+
+                if (node->type == NodeType::ALIAS || node->type == NodeType::MODULE) {
+                    hash_insert(to->symbols, bucket->key, node);
+                }
             }
         }
     }
 }
 
-void Semantic::addStaticIfs(Scope *targetScope) {
+void Semantic::addStaticIfs(Scope *targetScope, Scope *importInto) {
     if (targetScope->addedStaticIfs) {
         return;
     }
     targetScope->addedStaticIfs = true;
 
     for (auto ifStmt : targetScope->staticIfs) {
+        Scope *ii = importInto;
+        if (ii == nullptr) {
+            ii = ifStmt->scope;
+        }
+
         this->resolveTypes(ifStmt->ifData.condition);
         ifStmt->ifData.condition->staticValue = constantize(this, ifStmt->ifData.condition);
 
-        if (ifStmt->ifData.condition->staticValue->type == NodeType::BOOLEAN_LITERAL) {
-            if (ifStmt->ifData.condition->staticValue->boolLiteralData.value && ifStmt->ifData.stmts.length > 0) {
-                addAllFromScopeToScope(this, vector_at(ifStmt->ifData.stmts, 0)->scope, ifStmt->scope);
-            }
-            else if (!ifStmt->ifData.condition->staticValue->boolLiteralData.value && ifStmt->ifData.elseStmts.length > 0) {
-                addAllFromScopeToScope(this, vector_at(ifStmt->ifData.elseStmts, 0)->scope, ifStmt->scope);
-            }
+        cpi_assert(ifStmt->ifData.condition->staticValue->type == NodeType::BOOLEAN_LITERAL);
+
+        if (ifStmt->ifData.condition->staticValue->boolLiteralData.value && ifStmt->ifData.stmts.length > 0) {
+            addAllFromScopeToScope(this, ifStmt->ifData.ifScope, ii);
+            addStaticIfs(ifStmt->ifData.ifScope, ifStmt->scope);
+        }
+        else if (!ifStmt->ifData.condition->staticValue->boolLiteralData.value && ifStmt->ifData.elseStmts.length > 0) {
+            addAllFromScopeToScope(this, ifStmt->ifData.elseScope, ii);
+            addStaticIfs(ifStmt->ifData.elseScope, ifStmt->scope);
         }
     }
 }
@@ -630,6 +643,10 @@ void resolveUnaryNot(Semantic *semantic, Node *node) {
     }
 
     node->typeInfo = node->nodeData->typeInfo;
+}
+
+void resolveLink(Semantic *semantic, Node *node) {
+    vector_append(semantic->linkLibs, node->linkData.name);
 }
 
 void resolveFnDecl(Semantic *semantic, Node *node) {
@@ -878,7 +895,7 @@ Node *constantize(Semantic *semantic, Node *node) {
         g->bytecode = {};
     }
 
-    auto interp = new Interpreter();
+    auto interp = new Interpreter(semantic->linkLibs);
     interp->instructions = gen->instructions;
     interp->fnTable = gen->fnTable;
     interp->sourceMap = gen->sourceMap;
@@ -1480,7 +1497,7 @@ Node *Semantic::deepCopyScopedStmt(Node *node, Scope *scope) {
 }
 
 Node *Semantic::deepCopyRvalue(Node *node, Scope *scope) {
-    auto copyingLexer = new Lexer(lexer, node);
+    auto copyingLexer = new Lexer(node->region.srcInfo, node);
 
     auto copyingParser = new Parser(copyingLexer);
     copyingParser->isCopying = true;
@@ -2644,7 +2661,7 @@ void resolveRun(Semantic *semantic, Node *node) {
     }
     gen->fixup();
 
-    auto interp = new Interpreter();
+    auto interp = new Interpreter(semantic->linkLibs);
     interp->instructions = gen->instructions;
     interp->fnTable = gen->fnTable;
     interp->sourceMap = gen->sourceMap;
@@ -2962,6 +2979,9 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::UNARY_NOT: {
             resolveUnaryNot(this, node);
+        } break;
+        case NodeType::LINK: {
+            resolveLink(this, node);
         } break;
         case NodeType::END_SCOPE: break;
         default: cpi_assert(false);

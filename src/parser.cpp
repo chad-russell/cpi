@@ -108,34 +108,72 @@ void Parser::initContext(Node *decl) {
     vector_append(decl->fnDeclData.body, contextDecl);
 }
 
-// todo(chad): remove code duplication here -- this is very similar to parseImport...
-void Parser::addBasicImport() {
-    auto importNode = new Node(this->lexer->srcInfo, NodeType::IMPORT, scopes.top());
-    auto path = realpath("basic.cpi", nullptr);
-    cpi_assert(path != nullptr);
-    auto found = false;
-    auto importAtomId = atomTable->insertStr("basic");
-    for (auto i : importedFileModules) {
-        auto iName = atomTable->backwardAtoms[i->moduleData.name->symbolData.atomId].c_str();
-        if (strcmp(iName, "basic") == 0) {
-            found = true;
-            scopeInsert(importAtomId, i);
-            importNode->nodeData = i;
+Node *Parser::addImport(string importName) {
+    auto concatPath = importName + ".cpi";
+
+    auto rpath = realpath(concatPath.c_str(), nullptr);
+    if (rpath == nullptr) {
+        auto home = strdup(getenv("HOME"));
+        rpath = realpath(string(strcat(home, "/.cpi/lib/") + concatPath).c_str(), nullptr);
+    }
+    auto path = string(rpath);
+
+    unsigned long lastSlash = 0;
+    unsigned long lastDot = 0;
+    for (unsigned long i = 0; i < path.length(); i++) {
+        if (path[i] == '/') {
+            lastSlash =  i;
+        }
+        if (path[i] == '.') {
+            lastDot = i;
         }
     }
+    auto defaultImportName = path.substr(lastSlash + 1, lastDot - (lastSlash + 1));
+
+    auto found = false;
+
+    auto importAtomId = atomTable->insertStr(defaultImportName);
+    if (lexer->front.type == LexerTokenType::COLON) {
+        popFront(); // :
+        importAtomId = parseSymbol()->symbolData.atomId;
+    }
+
+    for (auto i : importedFileModules) {
+        auto iName = atomTable->backwardAtoms[i->moduleData.fullImportAtomId].c_str();
+        if (strcmp(iName, path.c_str()) == 0) {
+            scopeInsert(importAtomId, i);
+
+            return i;
+        }
+    }
+
     if (!found) {
         auto lexer = new Lexer(path, true);
         auto parser = new Parser(lexer);
+
         auto fileModule = new Node(lexer->srcInfo, NodeType::MODULE, nullptr);
         fileModule->moduleData.name = new Node(lexer->srcInfo, NodeType::SYMBOL, parser->scopes.top());
-        fileModule->moduleData.name->symbolData.atomId = atomTable->insertStr("basic");
+        fileModule->moduleData.name->symbolData.atomId = atomTable->insertStr(importName);
+        fileModule->moduleData.fullImportAtomId = atomTable->insertStr(path);
         vector_append(importedFileModules, fileModule);
+
         fileModule->scope = parser->scopes.top();
         parser->parseRoot();
+
         fileModule->moduleData.stmts = parser->allTopLevel;
+
         scopeInsert(importAtomId, fileModule);
-        importNode->nodeData = fileModule;
+
+        return fileModule;
     }
+
+    return nullptr;
+}
+
+void Parser::addBasicImport() {
+    auto importNode = new Node(this->lexer->srcInfo, NodeType::IMPORT, scopes.top());
+    importNode->nodeData = addImport("basic");
+
     vector_append(*this->imports, importNode);
     vector_append(allTopLevel, importNode);
 }
@@ -215,6 +253,11 @@ Node *Parser::parseTopLevel() {
     // alias
     if (lexer->front.type == LexerTokenType::ALIAS) {
         return parseAlias();
+    }
+
+    // link
+    if (lexer->front.type == LexerTokenType::LINK) {
+        return parseLink();
     }
 
     reportError("Expected top level declaration");
@@ -484,46 +527,7 @@ Node *Parser::parseImport() {
     if (this->lexer->front.type == LexerTokenType::DOUBLE_QUOTE) {
         auto importName = parseStringLiteral();
 
-        auto concatPath = *importName->stringLiteralData.value + ".cpi";
-        auto path = realpath(concatPath.c_str(), nullptr);
-
-        cpi_assert(path != nullptr);
-        auto found = false;
-
-        auto importAtomId = atomTable->insertStr(*importName->stringLiteralData.value);
-        if (lexer->front.type == LexerTokenType::COLON) {
-            popFront(); // :
-            importAtomId = parseSymbol()->symbolData.atomId;
-        }
-
-        for (auto i : importedFileModules) {
-            auto iName = atomTable->backwardAtoms[i->moduleData.name->symbolData.atomId].c_str();
-            if (strcmp(iName, importName->stringLiteralData.value->c_str()) == 0) {
-                found = true;
-                scopeInsert(importAtomId, i);
-
-                importNode->nodeData = i;
-            }
-        }
-
-        if (!found) {
-            auto lexer = new Lexer(path, true);
-            auto parser = new Parser(lexer);
-
-            auto fileModule = new Node(lexer->srcInfo, NodeType::MODULE, nullptr);
-            fileModule->moduleData.name = new Node(lexer->srcInfo, NodeType::SYMBOL, parser->scopes.top());
-            fileModule->moduleData.name->symbolData.atomId = atomTable->insertStr(*importName->stringLiteralData.value);
-            vector_append(importedFileModules, fileModule);
-
-            fileModule->scope = parser->scopes.top();
-            parser->parseRoot();
-
-            fileModule->moduleData.stmts = parser->allTopLevel;
-
-            scopeInsert(importAtomId, fileModule);
-
-            importNode->nodeData = fileModule;
-        }
+        importNode->nodeData = addImport(*importName->stringLiteralData.value);
     }
     else {
         importNode->nodeData = parseLvalue();
@@ -570,6 +574,21 @@ Node *Parser::parseAlias() {
     node->region = Region{lexer->srcInfo, saved, node->aliasData.value->region.end};
 
     scopeInsert(node->aliasData.name->symbolData.atomId, node);
+
+    return node;
+}
+
+Node *Parser::parseLink() {
+    auto saved = lexer->front.region.start;
+    popFront();
+
+    auto node = new Node(lexer->srcInfo, NodeType::LINK, scopes.top());
+
+    auto name = parseStringLiteral();
+    node->linkData.name = name->stringLiteralData.value;
+    expectSemicolon();
+
+    node->region = Region{lexer->srcInfo, saved, name->region.end};
 
     return node;
 }
@@ -690,6 +709,11 @@ Node *Parser::parseScopedStmt() {
     // alias
     if (lexer->front.type == LexerTokenType::ALIAS) {
         return parseAlias();
+    }
+
+    // link
+    if (lexer->front.type == LexerTokenType::LINK) {
+        return parseLink();
     }
 
     // declaration/assignment/combo
@@ -821,16 +845,18 @@ Node *Parser::parseIf() {
     if_->ifData.condition = parseRvalue();
     if_->ifData.condition->sourceMapStatement = true;
     if_->ifData.isStatic = isStatic;
-    if_->ifData.staticIfScope = staticIfScope;
     if_->sourceMapStatement = true;
     if_->ifData.condition->sourceMapStatement = true;
 
+    scopes.push(new Scope(scopes.top()));
+    if_->ifData.ifScope = scopes.top();
+
+    auto savedStaticIfScope = this->staticIfScope;
     auto savedImports = this->imports;
     if (isStatic) {
         this->imports = &if_->ifData.trueImports;
+        this->staticIfScope = scopes.top();
     }
-
-    scopes.push(new Scope(scopes.top()));
 
     expect(LexerTokenType::LCURLY, "{");
     while (lexer->front.type != LexerTokenType::RCURLY) {
@@ -846,35 +872,50 @@ Node *Parser::parseIf() {
 
     scopes.pop();
 
+    if (isStatic) {
+        this->staticIfScope = savedStaticIfScope;
+    }
+
     if (lexer->front.type == LexerTokenType::ELSE) {
         popFront();
 
         scopes.push(new Scope(scopes.top()));
-
-        if (lexer->front.type == LexerTokenType::IF || lexer->front.type == LexerTokenType::STATIC_IF) {
-            vector_append(if_->ifData.elseStmts, parseIf());
-            scopes.pop();
-            return if_;
-        }
+        if_->ifData.elseScope = scopes.top();
 
         if (isStatic) {
             this->imports = &if_->ifData.falseImports;
+            this->staticIfScope = scopes.top();
         }
 
-        expect(LexerTokenType::LCURLY, "{");
+        auto isElseIf = lexer->front.type == LexerTokenType::IF || lexer->front.type == LexerTokenType::STATIC_IF;
 
-        while (lexer->front.type != LexerTokenType::RCURLY) {
-            auto scopedStmt = parseScopedStmt();
-            if (scopedStmt != nullptr) {
-                vector_append(if_->ifData.elseStmts, scopedStmt);
+        if (isElseIf) {
+            auto elseIf = parseIf();
+            vector_append(if_->ifData.elseStmts, elseIf);
+            if_->region.end = elseIf->region.end;
+        }
+        else {
+            expect(LexerTokenType::LCURLY, "{");
+            while (lexer->front.type != LexerTokenType::RCURLY) {
+                auto scopedStmt = parseScopedStmt();
+                if (scopedStmt != nullptr) {
+                    vector_append(if_->ifData.elseStmts, scopedStmt);
+                }
             }
         }
+
         appendEndScope(if_->ifData.elseStmts);
 
         scopes.pop();
 
-        if_->region.end = lexer->front.region.end;
-        expect(LexerTokenType::RCURLY, "}");
+        if (isStatic) {
+            this->staticIfScope = savedStaticIfScope;
+        }
+
+        if (!isElseIf) {
+            if_->region.end = lexer->front.region.end;
+            expect(LexerTokenType::RCURLY, "}");
+        }
     }
 
     if (isStatic) {
