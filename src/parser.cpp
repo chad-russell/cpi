@@ -2,7 +2,6 @@
 #include <stdlib.h>
 
 #include "parser.h"
-#include "semantic.h"
 
 Parser::Parser(Lexer *lexer_) {
     lexer = lexer_;
