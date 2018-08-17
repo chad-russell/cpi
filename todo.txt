@@ -1,4 +1,7 @@
 TODO:
+    - fix 'alias' to look like a declaration again (so types can be specified)
+        - question: does there need to be an 'alias' which just aliases an Ast node? What would be the compelling use case?
+
     - better interpreter debugging
         - support for removing breakpoints
         - when stops on a breakpoint, info should immediately appear instead of only when going to 'next'
@@ -51,7 +54,3 @@ TODO:
                 -- do stuff. Should lock at the beginning and unlock at the end
             }
         ```
-
-    - more robustness for compile-time parameters
-        - should only be allowed things which can be constantized
-        - figure out what 'Ast' does/should do, and if it should even be kept around...

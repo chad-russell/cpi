@@ -249,14 +249,15 @@ Node *Parser::parseTopLevel() {
         return parseIf();
     }
 
-    // alias
-    if (lexer->front.type == LexerTokenType::ALIAS) {
-        return parseAlias();
-    }
-
     // link
     if (lexer->front.type == LexerTokenType::LINK) {
         return parseLink();
+    }
+
+    // alias
+    auto ss = parseScopedStmt();
+    if (ss->type == NodeType::ALIAS) {
+        return ss;
     }
 
     reportError("Expected top level declaration");
@@ -561,22 +562,6 @@ Node *Parser::parseDefer() {
     return node;
 }
 
-Node *Parser::parseAlias() {
-    auto saved = lexer->front.region.start;
-    popFront();
-
-    auto node = new Node(lexer->srcInfo, NodeType::ALIAS, scopes.top());
-
-    node->aliasData.name = parseSymbol();
-    node->aliasData.value = parseRvalue();
-
-    node->region = Region{lexer->srcInfo, saved, node->aliasData.value->region.end};
-
-    scopeInsert(node->aliasData.name->symbolData.atomId, node);
-
-    return node;
-}
-
 Node *Parser::parseLink() {
     auto saved = lexer->front.region.start;
     popFront();
@@ -616,6 +601,9 @@ Node *Parser::parseModuleDecl() {
     moduleDecl->moduleData.name = parseSymbol();
     scopeInsert(moduleDecl->moduleData.name->symbolData.atomId, moduleDecl);
 
+    auto savedCurrentFnDecl = this->currentFnDecl;
+    this->currentFnDecl = nullptr;
+
     scopes.push(new Scope(scopes.top()));
     moduleDecl->scope = scopes.top();
 
@@ -629,6 +617,8 @@ Node *Parser::parseModuleDecl() {
     moduleDecl->region = Region{lexer->srcInfo, saved, lexer->front.region.end};
 
     expect(LexerTokenType::RCURLY, "}");
+
+    this->currentFnDecl = savedCurrentFnDecl;
 
     return moduleDecl;
 }
@@ -705,11 +695,6 @@ Node *Parser::parseScopedStmt() {
         return parseDefer();
     }
 
-    // alias
-    if (lexer->front.type == LexerTokenType::ALIAS) {
-        return parseAlias();
-    }
-
     // link
     if (lexer->front.type == LexerTokenType::LINK) {
         return parseLink();
@@ -717,10 +702,7 @@ Node *Parser::parseScopedStmt() {
 
     // declaration/assignment/combo
     auto saved = lexer->front.region.start;
-//    auto lvalue = parseLvalue();
     auto lvalue = parseRvalue();
-
-    bool isConstant = false;
 
     if (lvalue->type == NodeType::FN_CALL
         || lvalue->type == NodeType::PANIC
@@ -729,6 +711,8 @@ Node *Parser::parseScopedStmt() {
         expectSemicolon();
         return lvalue;
     }
+
+    bool isConstant = this->currentFnDecl == nullptr;
 
     // declaration
     if (lexer->front.type == LexerTokenType::COLON) {
@@ -757,6 +741,9 @@ Node *Parser::parseScopedStmt() {
 
         if (!isConstant) {
             addLocal(decl);
+        }
+        else {
+            decl->type = NodeType::ALIAS;
         }
 
         decl->declData.lhs = lvalue;
@@ -788,6 +775,9 @@ Node *Parser::parseScopedStmt() {
 
         if (!isConstant) {
             addLocal(decl);
+        }
+        else {
+            decl->type = NodeType::ALIAS;
         }
 
         decl->declData.lhs = lvalue;

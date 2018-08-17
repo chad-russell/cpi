@@ -409,7 +409,13 @@ llvm::DIType *diTypeFor(LlvmGen *gen, Node *type) {
 }
 
 void LlvmGen::gen(Node *node) {
-    if (node->llvmGen) { return; }
+    if (node->llvmGen && !forcing
+        && node->type != NodeType::STRING_LITERAL
+        && node->type != NodeType::ARRAY_LITERAL
+        && node->type != NodeType::STRUCT_LITERAL) {
+        return;
+    }
+
     node->llvmGen = true;
 
     for (auto stmt : node->preStmts) {
@@ -1127,6 +1133,9 @@ void LlvmGen::gen(Node *node) {
             builder.CreateCall(panicFunc, { builder.CreateGlobalStringPtr("assertion failed!!!") });
         } break;
         case NodeType::STRUCT_LITERAL: {
+            auto savedForcing = this->forcing;
+            this->forcing = true;
+
             if (node->typeInfo->typeData.structTypeData.coercedType != nullptr && node->typeInfo->typeData.structTypeData.coercedType->typeData.structTypeData.isSecretlyEnum) {
                 // we need to store the tag and the value.
                 auto tagIndex = vector_at(node->typeInfo->typeData.structTypeData.params, 0)->paramData.index;
@@ -1198,8 +1207,13 @@ void LlvmGen::gen(Node *node) {
                     store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
                 }
             }
+
+            this->forcing = savedForcing;
         } break;
         case NodeType::ARRAY_LITERAL: {
+            auto savedForcing = this->forcing;
+            this->forcing = true;
+
             gen(node->arrayLiteralData.structLiteralRepresentation);
 
             node->llvmData = node->arrayLiteralData.structLiteralRepresentation->llvmData;
@@ -1208,6 +1222,8 @@ void LlvmGen::gen(Node *node) {
             if (node->isLocal) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
+
+            this->forcing = savedForcing;
         } break;
         case NodeType::CAST: {
             auto resolvedValue = resolve(node->castData.value);
@@ -1271,12 +1287,17 @@ void LlvmGen::gen(Node *node) {
             node->isLocal = node->resolved->isLocal;
         } break;
         case NodeType::STRING_LITERAL: {
+            auto savedForcing = this->forcing;
+            this->forcing = true;
+
             gen(node->stringLiteralData.arrayLiteralRepresentation);
             node->llvmData = node->stringLiteralData.arrayLiteralRepresentation->llvmData;
 
             if (node->isLocal) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
+
+            this->forcing = savedForcing;
         } break;
         case NodeType::UNARY_NEG: {
             gen(node->unaryNegData.target);
@@ -1353,9 +1374,9 @@ void LlvmGen::gen(Node *node) {
             }
         } break;
         case NodeType::ALIAS: {
-            gen(node->aliasData.value);
+            gen(node->declData.initialValue);
 
-            node->llvmData = node->aliasData.value->llvmData;
+            node->llvmData = node->declData.initialValue->llvmData;
         } break;
         case NodeType::DEFER:
         case NodeType::END_SCOPE:

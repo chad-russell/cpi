@@ -186,11 +186,11 @@ fn testDefer() {
 
 fn testModule3() {
     module foo {
-        alias a 2
+        a := 2;
         module bar {
-            alias a 3
+            a := 3;
             module baz {
-                alias a 4
+                a := 4;
             }
         }
     }
@@ -201,11 +201,11 @@ fn testModule3() {
 
 fn testModule2() {
     module foo {
-        alias a 3
+        a := 3;
     }
 
     module bar {
-        alias a 5
+        a := 5;
     }
 
     if false {
@@ -466,7 +466,7 @@ fn idC(t: !T) {
     return t;
 }
 
-alias fuckme idC(3)
+fuckme := idC(3);
 
 fn deref_ct(t: !T) {
     return ^t;
@@ -956,5 +956,5 @@ fn someCheck() { return true; }
 #if someCheck() {
     #import "test2";
 
-    alias topLevel id(123)
+    topLevel := id(123);
 }

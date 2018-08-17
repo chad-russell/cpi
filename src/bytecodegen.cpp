@@ -225,8 +225,13 @@ void BytecodeGen::gen(Node *node) {
         return;
     }
 
-    if (node->gen) {
+    if (node->gen && !forcing) {
         return;
+    }
+
+    // when forcing, don't run the risk of adding double bytecode
+    if (forcing) {
+        node->bytecode = {};
     }
 
     node->gen = true;
@@ -1018,8 +1023,8 @@ void BytecodeGen::gen(Node *node) {
             append(instructions, Instruction::NOP);
         } break;
         case NodeType::ALIAS: {
-            gen(node->aliasData.value);
-            node->bytecode = node->aliasData.value->bytecode;
+            gen(node->declData.initialValue);
+            node->bytecode = node->declData.initialValue->bytecode;
         } break;
         case NodeType::STRING_LITERAL:
         case NodeType::MODULE:
@@ -1157,6 +1162,9 @@ void BytecodeGen::storeValue(Node *node, int64_t offset) {
             append(instructions, toBytes32(typeSize(node->typeInfo)));
         } break;
         case NodeType::STRUCT_LITERAL: {
+            auto savedForcing = this->forcing;
+            this->forcing = true;
+
             if (node->typeInfo->typeData.structTypeData.coercedType != nullptr
                 && node->typeInfo->typeData.structTypeData.coercedType->typeData.structTypeData.isSecretlyEnum) {
                 // we need to store the tag and the value.
@@ -1180,6 +1188,7 @@ void BytecodeGen::storeValue(Node *node, int64_t offset) {
             }
             else {
                 auto sizeSoFar = 0;
+
                 for (const auto &param : node->structLiteralData.params) {
                     gen(param->paramData.value);
                 }
@@ -1198,6 +1207,8 @@ void BytecodeGen::storeValue(Node *node, int64_t offset) {
                     sizeSoFar += paramSize;
                 }
             }
+
+            this->forcing = savedForcing;
         } break;
         case NodeType::ARRAY_LITERAL: {
             storeValue(node->arrayLiteralData.structLiteralRepresentation, offset);
@@ -1216,7 +1227,7 @@ void BytecodeGen::storeValue(Node *node, int64_t offset) {
             append(instructions, node->bytecode);
         } break;
         case NodeType::ALIAS: {
-            storeValue(node->aliasData.value, offset);
+            storeValue(node->declData.initialValue, offset);
         } break;
         default:
             cpi_assert(false);

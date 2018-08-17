@@ -103,7 +103,6 @@ struct Parser {
     Node *parseArrayIndex();
     Node *buildDots(stack<Node *> rvalues);
     Node *parseDefer();
-    Node *parseAlias();
     Node *parseLink();
 };
 

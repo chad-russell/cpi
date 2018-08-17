@@ -1,5 +1,5 @@
 #import "test";
 
-alias a 7
+a := 7;
 
 fn bbb() { return test.topLevel; }

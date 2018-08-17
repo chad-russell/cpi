@@ -154,7 +154,6 @@ void Lexer::popFront() {
     if (tryEat(&next, "!", LexerTokenType::NOT)) { return; }
     if (tryEat(&next, "@", LexerTokenType::AT)) { return; }
     if (tryEat(&next, "|", LexerTokenType::VERTICAL_BAR)) { return; }
-    if (tryEatKeyword(&next, "alias", LexerTokenType::ALIAS)) { return; }
     if (tryEatKeyword(&next, "#link", LexerTokenType::LINK)) { return; }
     if (tryEatKeyword(&next, "defer", LexerTokenType::DEFER)) { return; }
     if (tryEatKeyword(&next, "#run", LexerTokenType::RUN)) { return; }

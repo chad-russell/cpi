@@ -40,9 +40,6 @@ int32_t typeAlign(Node *type) {
         case NodeTypekind::STRUCT: {
             return resolved->typeData.structTypeData.alignment;
         }
-        case NodeTypekind::EXPOSED_AST: {
-            return typeAlign(resolved->staticValue);
-        }
         default: {
             return typeSize(resolved);
         }
@@ -127,9 +124,6 @@ int32_t typeSize(Node *type) {
             resolved->typeData.structTypeData.alignment = largestAlign;
 
             return total;
-        }
-        case NodeTypekind::EXPOSED_AST: {
-            return typeSize(resolved->staticValue);
         }
     }
 
@@ -627,13 +621,6 @@ void resolveDefer(Semantic *semantic, Node *node) {
     for (auto stmt : node->deferData.stmts) {
         semantic->resolveTypes(stmt);
     }
-}
-
-void resolveAlias(Semantic *semantic, Node *node) {
-    node->resolved = constantize(semantic, node->aliasData.value);
-    semantic->resolveTypes(node->resolved);
-
-    node->typeInfo = node->resolved->typeInfo;
 }
 
 void resolveUnaryNot(Semantic *semantic, Node *node) {
@@ -1301,6 +1288,13 @@ void resolveDecl(Semantic *semantic, Node *node) {
     }
 }
 
+void resolveAlias(Semantic *semantic, Node *node) {
+    resolveDecl(semantic, node);
+    node->resolved = constantize(semantic, resolve(node->declData.initialValue));
+    semantic->resolveTypes(node->resolved);
+    node->typeInfo = node->resolved->typeInfo;
+}
+
 void resolveType(Semantic *semantic, Node *node) {
     switch (node->typeData.kind) {
         case NodeTypekind::NONE:
@@ -1507,6 +1501,7 @@ Node *Semantic::deepCopyRvalue(Node *node, Scope *scope) {
     copyingParser->scopes.pop();
     copyingParser->scopes.push(scope);
     copyingParser->currentFnDecl = currentFnDecl;
+
     return copyingParser->parseRvalue();
 }
 
@@ -1643,7 +1638,7 @@ void resolveFnCall(Semantic *semantic, Node *node) {
 
     // un-assign runtime params
     if (node->fnCallData.hasRuntimeParams) {
-        vector_t<Node *> declParams = vector_init<Node *>(10);
+        vector_t<Node *> declParams;
 
         if (isPoly) {
             cpi_assert(resolvedFn->type == NodeType::FN_DECL);

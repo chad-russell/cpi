@@ -174,7 +174,6 @@ enum class LexerTokenType : int32_t {
     STATIC_FOR,
     ISKIND,
     DEFER,
-    ALIAS,
     LINK,
 };
 
@@ -386,11 +385,6 @@ struct ForData {
     vector_t<Node *> staticStmts;
 };
 
-struct AliasData {
-    Node *name;
-    Node *value;
-};
-
 struct UnaryNegData {
     Node *target;
     Node *rewritten;
@@ -475,7 +469,6 @@ public:
         IsKindData isKindData;
         ModuleData moduleData;
         DeferData deferData;
-        AliasData aliasData;
         UnaryNegData unaryNegData;
         LinkData linkData;
     };

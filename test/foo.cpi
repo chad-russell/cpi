@@ -1,16 +1,7 @@
-fn foo( sep: Ast )(times: i32) {
-    i := 0;
-    while i < times {
-        puts(sep);
-        puts("\n");
-
-        sep[0] = "o"[0];
-        
-        i = i + 1;
-    }
+fn main() {
+    return topLevel;
 }
 
-fn main() {
-    foo!("bar")(3);
-    return 0;
+#if true {
+    topLevel := 123;
 }

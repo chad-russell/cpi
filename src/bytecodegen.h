@@ -27,6 +27,7 @@ public:
     vector_t<Node *> externalFnTable = vector_init<Node *>(8);
 
     bool isMainFn;
+    bool forcing = false;
 
     // for going back at the end and setting call/jump locations
     // I guess this is like a poor man's linker
