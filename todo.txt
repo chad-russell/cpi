@@ -1,6 +1,5 @@
 TODO:
-    - fix 'alias' to look like a declaration again (so types can be specified)
-        - question: does there need to be an 'alias' which just aliases an Ast node? What would be the compelling use case?
+    - functions defined in the same
 
     - better interpreter debugging
         - support for removing breakpoints

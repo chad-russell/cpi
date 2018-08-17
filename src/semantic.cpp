@@ -1376,6 +1376,11 @@ void rewritePipe(Semantic *semantic, Node *node) {
     fnCallNode->fnCallData.hasRuntimeParams = true;
     vector_append(fnCallNode->fnCallData.params, wrapInValueParam(resolvedLhs, nullptr));
 
+    if (resolvedRhs->type == NodeType::DOT) {
+        semantic->resolveTypes(resolvedRhs);
+        resolvedRhs = resolve(resolvedRhs);
+    }
+
     if (resolvedRhs->type == NodeType::SYMBOL || resolvedRhs->type == NodeType::FN_DECL) {
         // rhs is symbol or fn
         fnCallNode->fnCallData.fn = resolvedRhs;

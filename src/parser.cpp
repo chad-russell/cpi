@@ -1684,7 +1684,7 @@ Node *Parser::parseRvalueSimple() {
         auto _not = new Node(lexer->srcInfo, NodeType::UNARY_NOT, scopes.top());
         _not->nodeData = parseRvalueSimple();
 
-        addLocal(_not->nodeData);
+        addLocal(_not);
 
         _not->region = Region{lexer->srcInfo, saved, _not->nodeData->region.end};
         return _not;

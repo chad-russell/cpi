@@ -1316,7 +1316,13 @@ void LlvmGen::gen(Node *node) {
         } break;
         case NodeType::UNARY_NOT: {
             gen(node->nodeData);
+
+            if (node->nodeData->isLocal) {
+                store((llvm::Value *) node->nodeData->llvmData, (llvm::Value *) node->nodeData->llvmLocal);
+            }
+
             node->llvmData = builder.CreateNot(rvalueFor(node->nodeData));
+            store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
         } break;
         case NodeType::MALLOC: {
             gen(node->nodeData);

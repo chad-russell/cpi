@@ -901,10 +901,24 @@ void BytecodeGen::gen(Node *node) {
         case NodeType::WHILE: {
             auto jumpBackToInst = instructions.size();
 
-            gen(node->whileData.condition);
+            auto resolvedCondition = resolve(node->whileData.condition);
+            gen(resolvedCondition);
+
+            if (resolvedCondition->isLocal || resolvedCondition->isBytecodeLocal) {
+                storeValue(resolvedCondition, resolvedCondition->localOffset);
+            }
 
             append(instructions, Instruction::JUMPIF);
-            append(instructions, node->whileData.condition->bytecode);
+            if (resolvedCondition->isLocal || resolvedCondition->isBytecodeLocal) {
+                cpi_assert(resolvedCondition->isLocal || resolvedCondition->isBytecodeLocal);
+
+                append(instructions, Instruction::RELI64);
+                append(instructions, toBytes(resolvedCondition->localOffset));
+            }
+            else {
+                cpi_assert(!resolvedCondition->bytecode.empty());
+                append(instructions, resolvedCondition->bytecode);
+            }
 
             append(instructions, Instruction::CONSTI32);
             auto trueBranchOverwrite = instructions.size();
@@ -945,13 +959,15 @@ void BytecodeGen::gen(Node *node) {
         case NodeType::UNARY_NOT: {
             gen(node->nodeData);
 
-            storeValue(node->nodeData, node->nodeData->localOffset);
+            if (node->nodeData->isLocal) {
+                storeValue(node->nodeData, node->nodeData->localOffset);
+            }
+            storeValue(node->nodeData, node->localOffset);
 
             append(instructions, Instruction::NOT);
-            append(instructions, toBytes(node->nodeData->localOffset));
+            append(instructions, toBytes(node->localOffset));
 
             node->isBytecodeLocal = true;
-            node->localOffset = node->nodeData->localOffset;
         } break;
         case NodeType::MALLOC: {
             gen(node->nodeData);
