@@ -179,6 +179,7 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "false", LexerTokenType::FALSE_)) { return; }
     if (tryEatKeyword(&next, "nil", LexerTokenType::NIL)) { return; }
     if (tryEatKeyword(&next, "module", LexerTokenType::MODULE)) { return; }
+    if (tryEatKeyword(&next, "scope", LexerTokenType::SCOPE)) { return; }
     if (tryEatKeyword(&next, "#import", LexerTokenType::IMPORT)) { return; }
     if (tryEatKeyword(&next, "cast", LexerTokenType::CAST)) { return; }
     if (tryEatKeyword(&next, "Ast", LexerTokenType::EXPOSED_AST)) { return; }
@@ -483,6 +484,7 @@ const vector<string> Lexer::lexerTokenTypeStrings = {
     "NOT",
     "NIL",
     "MODULE",
+    "SCOPE",
     "IMPORT",
     "CAST",
     "SEMICOLON",

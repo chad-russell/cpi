@@ -1388,6 +1388,7 @@ void LlvmGen::gen(Node *node) {
         case NodeType::END_SCOPE:
         case NodeType::IMPORT:
         case NodeType::LINK:
+        case NodeType::SCOPE:
         case NodeType::MODULE: {
             // nothing to do
         } break;

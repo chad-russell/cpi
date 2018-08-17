@@ -78,6 +78,7 @@ enum class NodeType {
     END_SCOPE = 43,
     ALIAS = 44,
     LINK = 45,
+    SCOPE = 46,
 };
 
 enum class NodeTypekind {
@@ -155,6 +156,7 @@ enum class LexerTokenType : int32_t {
     NOT,
     NIL,
     MODULE,
+    SCOPE,
     IMPORT,
     CAST,
     SEMICOLON,
@@ -224,6 +226,7 @@ struct SymbolTypeData {
 
 struct TypeData {
     NodeTypekind kind;
+    Node *name;
 
     union {
         FnTypeData fnTypeData;
@@ -401,6 +404,12 @@ struct ModuleData {
     int64_t fullImportAtomId;
 };
 
+struct ScopeData {
+    Node *targetType;
+    vector_t<Node *> stmts;
+    Scope *scope;
+};
+
 struct DeferData {
     vector_t<Node *> stmts;
 };
@@ -422,7 +431,9 @@ public:
     bool addedStaticIfs = false;
 
     bool isFunctionScope = false;
-    vector_t<Node *> fnScopeParams;
+    vector_t<Node *> fnScopeParams = vector_init<Node *>(4);
+
+    vector_t<Node *> typeScopes = vector_init<Node *>(4);
 
     // methods
     explicit Scope(Scope *parent);
@@ -471,6 +482,7 @@ public:
         DeferData deferData;
         UnaryNegData unaryNegData;
         LinkData linkData;
+        ScopeData scopeData;
     };
 
     Node *staticValue = nullptr;

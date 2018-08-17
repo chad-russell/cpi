@@ -71,6 +71,7 @@ struct Parser {
     Node *parseImport();
     Node *parseTypeDecl();
     Node *parseModuleDecl();
+    Node *parseScopeDecl();
     Node *parseSymbol();
     Node *parseScopedStmt();
     Node *parseIf();

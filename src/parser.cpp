@@ -239,6 +239,11 @@ Node *Parser::parseTopLevel() {
         return parseModuleDecl();
     }
 
+    // scope
+    if (lexer->front.type == LexerTokenType::SCOPE) {
+        return parseScopeDecl();
+    }
+
     // import
     if (lexer->front.type == LexerTokenType::IMPORT) {
         return parseImport();
@@ -587,6 +592,8 @@ Node *Parser::parseTypeDecl() {
     auto typeDecl = parseType();
     scopeInsert(typeName->symbolData.atomId, typeDecl);
 
+    typeDecl->typeData.name = typeName;
+
     typeDecl->region = Region{lexer->srcInfo, saved, typeDecl->region.end};
 
     return typeDecl;
@@ -621,6 +628,37 @@ Node *Parser::parseModuleDecl() {
     this->currentFnDecl = savedCurrentFnDecl;
 
     return moduleDecl;
+}
+
+Node *Parser::parseScopeDecl() {
+    auto saved = lexer->front.region.start;
+
+    expect(LexerTokenType::SCOPE, "scope");
+
+    auto scopeDecl = new Node(lexer->srcInfo, NodeType::SCOPE, scopes.top());
+    scopeDecl->scopeData.targetType = parseLvalueOrLiteral();
+
+    auto savedCurrentFnDecl = this->currentFnDecl;
+    this->currentFnDecl = nullptr;
+
+    scopeDecl->scope = scopes.top();
+    scopes.push(new Scope(scopes.top()));
+    scopeDecl->scopeData.scope = scopes.top();
+
+    expect(LexerTokenType::LCURLY, "{");
+
+    while (lexer->front.type != LexerTokenType::RCURLY) {
+        vector_append(scopeDecl->moduleData.stmts, parseTopLevel());
+    }
+    scopes.pop();
+
+    scopeDecl->region = Region{lexer->srcInfo, saved, lexer->front.region.end};
+
+    expect(LexerTokenType::RCURLY, "}");
+
+    this->currentFnDecl = savedCurrentFnDecl;
+
+    return scopeDecl;
 }
 
 Node *Parser::parseSymbol() {
@@ -1927,9 +1965,6 @@ Node *Parser::parseFnCall() {
     }
 
     call->region.end = last.region.end;
-
-    // todo(chad): why do we need this??
-    addLocal(call);
 
     return call;
 }

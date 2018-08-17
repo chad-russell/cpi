@@ -1,40 +1,38 @@
-#import "printing";
+#import "printing": p;
 
-fn iter(T := typeof(t[0]))(t: []T) {
-    type iterator struct {
-        empty := t.count == 0,
-        front: T,
-        arr := t,
-        index := 0
-    }
+module foo {
+    type F struct { x: i64, y: i64 }
 
-    it: iterator;
-    if !it.empty {
-        it.front = t[0];
+    scope F {
+        fn getX(f: F) {
+            p.print("foo: ");
+            return f.x;
+        }
     }
-    return it;
 }
 
-fn popFront(it: !T) {
-    it.index = it.index + 1;
-    it.empty = it.index >= it.arr.count;
+module bar {
+    type B struct { x: i32, y: i32 }
+}
 
-    if !it.empty {
-        it.front = it.arr[it.index];
+scope bar.B {
+    #import bar;
+
+    fn getX(b: B) {
+        p.print("bar: ");
+        return b.x;
     }
 }
 
 fn main() {
-    a := []{1, 2, 3, 4, 5};
+    #import foo;
+    f: F = {3, 6};
+    -- f|getX|p.println;
+    p.println(getX(f));
 
-    -- for e, it: a { e|printing.println; }
-
-    it := a|iter;
-    while !it.empty {
-        e := it.front;
-        e|printing.println;
-        &it|popFront;
-    }
+    b: bar.B = {4, 7};
+    b|getX|p.println;
 
     return 0;
 }
+

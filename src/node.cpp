@@ -53,6 +53,9 @@ Node::Node(SourceInfo srcInfo, NodeType type_, Scope *scope_) : Node() {
         case NodeType::MODULE: {
             initModuleData(this);
         } break;
+        case NodeType::SCOPE: {
+            initScopeData(this);
+        } break;
         case NodeType::DEFER: {
             initDeferData(this);
         } break;
@@ -87,6 +90,11 @@ void initForData(Node *node) {
 
 void initModuleData(Node *node) {
     node->moduleData.name = nullptr;
+    node->moduleData.stmts = vector_init<Node *>(8);
+}
+
+void initScopeData(Node *node) {
+    node->scopeData.targetType = nullptr;
     node->moduleData.stmts = vector_init<Node *>(8);
 }
 

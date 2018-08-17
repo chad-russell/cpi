@@ -36,6 +36,7 @@ void initFnDeclData(Node *node);
 void initStructTypeData(Node *node);
 void initFnTypeData(Node *node);
 void initModuleData(Node *node);
+void initScopeData(Node *node);
 void initDeferData(Node *node);
 void initEndScopeData(Node *node);
 

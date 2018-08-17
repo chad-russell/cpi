@@ -1,5 +1,43 @@
 #import "test";
+#import "printing";
 
 a := 7;
 
 fn bbb() { return test.topLevel; }
+
+fn iter(T := typeof(t[0]))(t: []T) {
+    type iterator struct {
+        empty := t.count == 0,
+        front: T,
+        arr := t,
+        index := 0
+    }
+
+    it: iterator;
+    if !it.empty {
+        it.front = t[0];
+    }
+    return it;
+}
+
+fn popFront(it: !T) {
+    it.index = it.index + 1;
+    it.empty = it.index >= it.arr.count;
+
+    if !it.empty {
+        it.front = it.arr[it.index];
+    }
+}
+
+fn testIteration() {
+    a := []{1, 2, 3, 4, 5};
+
+    -- for e, it: a { e|printing.println; }
+
+    it := a|iter;
+    while !it.empty {
+        e := it.front;
+        e|printing.println;
+        &it|popFront;
+    }
+}

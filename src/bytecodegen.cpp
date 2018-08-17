@@ -1045,6 +1045,7 @@ void BytecodeGen::gen(Node *node) {
         case NodeType::STRING_LITERAL:
         case NodeType::MODULE:
         case NodeType::DEFER:
+        case NodeType::SCOPE:
         case NodeType::LINK:
         case NodeType::IMPORT: {
             // nothing to do!
@@ -1145,7 +1146,9 @@ void BytecodeGen::storeValue(Node *node, int64_t offset) {
         case NodeType::BINOP:
         case NodeType::UNARY_NOT:
         case NodeType::DECL: {
-            if (node->staticValue != nullptr) {
+            auto resolved = resolve(node);
+
+            if (resolved != node) {
                 storeValue(node->staticValue, offset);
             }
             else {

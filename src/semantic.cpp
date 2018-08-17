@@ -221,6 +221,13 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
     cpi_assert(desired->type == NodeType::TYPE);
     cpi_assert(actual->type == NodeType::TYPE);
 
+    // if we are comparing two named types and they don't have the same names, then false
+    if (desired->typeData.name != nullptr
+        && actual->typeData.name != nullptr
+        && desired->typeData.name->symbolData.atomId != actual->typeData.name->symbolData.atomId) {
+        return false;
+    }
+
     // if we're dealing with an EXPOSED_AST with a static value, then simply propagate that
     if (actual->typeData.kind == NodeTypekind::EXPOSED_AST && actual->staticValue != nullptr) {
         actual = actual->staticValue;
@@ -502,7 +509,7 @@ Node *defaultValueFor(Semantic *semantic, Node *type) {
 }
 
 // todo(chad): this is SLOW! probably should keep an extra linear list
-void addAllFromScopeToScope(Semantic *semantic, Scope *from, Scope *to) {
+void addAllFromScopeToScope(Semantic *semantic, Scope *from, Scope *to, bool forStaticIf) {
     for (auto i = 0; i < from->symbols->bucket_count; i++) {
         auto bucket = from->symbols->buckets[i];
         if (bucket != nullptr) {
@@ -514,7 +521,11 @@ void addAllFromScopeToScope(Semantic *semantic, Scope *from, Scope *to) {
                 semantic->reportError({}, Error{(*found)->region, s.str()});
             }
 
-            if (node->type == NodeType::ALIAS || node->type == NodeType::MODULE) {
+            if (!forStaticIf
+                || node->type == NodeType::ALIAS
+                || node->type == NodeType::MODULE
+                || node->type == NodeType::TYPE
+                || node->type == NodeType::FN_DECL) {
                 hash_insert(to->symbols, bucket->key, node);
             }
 
@@ -528,11 +539,19 @@ void addAllFromScopeToScope(Semantic *semantic, Scope *from, Scope *to) {
                     semantic->reportError({}, Error{(*found)->region, s.str()});
                 }
 
-                if (node->type == NodeType::ALIAS || node->type == NodeType::MODULE) {
+                if (!forStaticIf
+                    || node->type == NodeType::ALIAS
+                    || node->type == NodeType::MODULE
+                    || node->type == NodeType::TYPE
+                    || node->type == NodeType::FN_DECL) {
                     hash_insert(to->symbols, bucket->key, node);
                 }
             }
         }
+    }
+
+    for (auto ts : from->typeScopes) {
+        vector_append(to->typeScopes, ts);
     }
 }
 
@@ -554,11 +573,11 @@ void Semantic::addStaticIfs(Scope *targetScope, Scope *importInto) {
         cpi_assert(ifStmt->ifData.condition->staticValue->type == NodeType::BOOLEAN_LITERAL);
 
         if (ifStmt->ifData.condition->staticValue->boolLiteralData.value && ifStmt->ifData.stmts.length > 0) {
-            addAllFromScopeToScope(this, ifStmt->ifData.ifScope, ii);
+            addAllFromScopeToScope(this, ifStmt->ifData.ifScope, ii, true);
             addStaticIfs(ifStmt->ifData.ifScope, ifStmt->scope);
         }
         else if (!ifStmt->ifData.condition->staticValue->boolLiteralData.value && ifStmt->ifData.elseStmts.length > 0) {
-            addAllFromScopeToScope(this, ifStmt->ifData.elseScope, ii);
+            addAllFromScopeToScope(this, ifStmt->ifData.elseScope, ii, true);
             addStaticIfs(ifStmt->ifData.elseScope, ifStmt->scope);
         }
     }
@@ -572,7 +591,7 @@ void Semantic::addImports(vector_t<Node *> imports, Scope *target) {
 
         // todo(chad): this might be a @HACK, a better way would be to stop using nodeData for imports and keep track directly of whether it's a file import or not.
         if (import->nodeData->type != NodeType::MODULE) {
-            addAllFromScopeToScope(this, importTarget->scope, target ? target : import->scope);
+            addAllFromScopeToScope(this, importTarget->scope, target ? target : import->scope, false);
         }
     }
 }
@@ -634,6 +653,12 @@ void resolveUnaryNot(Semantic *semantic, Node *node) {
 
 void resolveLink(Semantic *semantic, Node *node) {
     vector_append(semantic->linkLibs, node->linkData.name);
+}
+
+void resolveScope(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->scopeData.targetType);
+
+    vector_append(node->scope->typeScopes, node);
 }
 
 void resolveFnDecl(Semantic *semantic, Node *node) {
@@ -1510,12 +1535,60 @@ Node *Semantic::deepCopyRvalue(Node *node, Scope *scope) {
     return copyingParser->parseRvalue();
 }
 
+Node *resolveSymbolWithScopeType(Semantic *semantic, Node *fnSymbol, Node *firstParam) {
+    semantic->resolveTypes(firstParam);
+    auto resolvedScopeType = resolve(firstParam->typeInfo);
+
+    auto scope = fnSymbol->scope;
+    while (scope != nullptr) {
+        for (auto ts : scope->typeScopes) {
+            auto resolvedTarget = resolve(ts->scopeData.targetType);
+
+            if (typesMatch(resolvedTarget, resolvedScopeType, semantic)) {
+//            if (resolvedTarget == resolvedScopeType) {
+                auto found = ts->scopeData.scope->find(fnSymbol->symbolData.atomId);
+                if (found != nullptr) {
+                    return found;
+                }
+            }
+        }
+        scope = scope->parent;
+    }
+
+    return nullptr;
+}
+
 void resolveFnCall(Semantic *semantic, Node *node) {
     node->sourceMapStatement = true;
     semantic->addLocal(node);
 
-    semantic->resolveTypes(node->fnCallData.fn);
-    auto resolvedFn = resolve(node->fnCallData.fn);
+    Node *resolvedFn = nullptr;
+
+    // if the fn is a symbol and there's at least 1 runtime param
+    if (resolvedFn == nullptr && node->fnCallData.fn->type == NodeType::SYMBOL && node->fnCallData.params.length > 0) {
+        // try to find it normally
+        resolvedFn = resolve(node->scope->find(node->fnCallData.fn->symbolData.atomId));
+
+        // if that fails, look in it's scope
+        if (resolvedFn == nullptr) {
+            resolvedFn = resolveSymbolWithScopeType(semantic, node->fnCallData.fn, vector_at(node->fnCallData.params, 0));
+            if (resolvedFn != nullptr) {
+                node->fnCallData.fn->resolved = resolvedFn;
+            }
+        }
+        else {
+            node->fnCallData.fn->resolved = resolvedFn;
+        }
+    }
+
+    // if we haven't found anything, then just do the normal thing
+    if (resolvedFn == nullptr) {
+        resolvedFn = node->fnCallData.fn;
+    }
+
+    semantic->resolveTypes(resolvedFn);
+    resolvedFn = resolve(resolvedFn);
+
     auto isPoly = resolvedFn->type == NodeType::FN_DECL && resolvedFn->fnDeclData.ctParams.length != 0;
     Node *polyResolvedFn = nullptr;
 
@@ -3000,6 +3073,9 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::LINK: {
             resolveLink(this, node);
+        } break;
+        case NodeType::SCOPE: {
+            resolveScope(this, node);
         } break;
         case NodeType::END_SCOPE: break;
         default: cpi_assert(false);
