@@ -8,13 +8,6 @@
 fn toDouble(n: i32) f64
 fn toInt(n: f64) i32
 fn i32ToI64(n: i32) i64
-fn printDouble(n: f64) none
-
-fn c_main() i32
-fn c_initSdl(tctx: *TextContext) none
-fn c_loadFonts(tctx: *TextContext) none
-fn c_initCairo(tctx: *TextContext) none
-fn c_drawText(tctx: *TextContext) none
 
 module cairo {
     #link "libcairo";
@@ -43,7 +36,7 @@ module cairo {
     fn cairo_create(surface: *Surface) *Context
     fn cairo_set_source_rgba(context: *Context, r: f64, g: f64, b: f64, a: f64) none
     fn cairo_set_font_face(context: *Context, face: *FontFace) none
-    fn cairo_set_font_size(context: *Context, ptSize: i32) none
+    fn cairo_set_font_size(context: *Context, ptSize: f64) none
     fn cairo_surface_destroy(surface: *Surface) none
     fn cairo_destroy(context: *Context) none
     fn cairo_font_face_destroy(face: *FontFace) none
@@ -137,13 +130,13 @@ type TextContext struct {
 }
 
 fn loadFonts(tctx: *TextContext) {
-    -- tctx.font = "/System/Library/Fonts/Apple Color Emoji.ttc"|io.cstr;
+    tctx.font = "/System/Library/Fonts/Apple Color Emoji.ttc"|io.cstr;
     -- tctx.font = "/Users/chadrussell/Projects/text/Noto-unhinted/NotoColorEmoji.ttf"|io.cstr;
-    -- tctx.text = "🙈 🇹🇩"|io.cstr;
+    tctx.text = "🙈 🇹🇩"|io.cstr;
 
     -- tctx.font = "/Users/chadrussell/Library/Fonts/Roboto-Light.ttf"|io.cstr;
-    tctx.font = "/Library/Fonts/Inconsolata.otf"|io.cstr;
-    tctx.text = ":)"|io.cstr;
+    -- tctx.font = "/Library/Fonts/Inconsolata.otf"|io.cstr;
+    -- tctx.text = ":)"|io.cstr;
 
     -- For CAIRO, load using FreeType
     ftLibrary: ft.Library;
@@ -164,7 +157,7 @@ fn loadFonts(tctx: *TextContext) {
     hb.hb_font_set_scale(tctx.hbFont, FONT_SIZE * 64, FONT_SIZE * 64);
 }
 
-fn initCairo(tctx: *TextContext) {
+fn initCairo1(tctx: *TextContext) {
     sdlRenderFlags: i32 = 6;
     tctx.sdlRenderer = sdl.SDL_CreateRenderer(tctx.sdlWindow, -1, sdlRenderFlags);
 
@@ -208,7 +201,7 @@ fn initCairo(tctx: *TextContext) {
     tctx.cairoContext = cairo.cairo_create(tctx.cairoSurface);
     cairo.cairo_set_source_rgba(tctx.cairoContext, 0.0, 0.0, 0.0, 1.0);
     cairo.cairo_set_font_face(tctx.cairoContext, tctx.cairoFont);
-    cairo.cairo_set_font_size(tctx.cairoContext, FONT_SIZE);
+    cairo.cairo_set_font_size(tctx.cairoContext, toDouble(FONT_SIZE));
 }
 
 fn drawText(tctx: *TextContext) {
@@ -305,41 +298,36 @@ fn initSdl(tctx: *TextContext) {
     tctx.sdlWindow = window;
 }
 
-fn main() {
-    return c_main();
-
-    tctx: TextContext;
-    tctx.done = false;
-
-    c_initSdl(&tctx);
-
-    c_loadFonts(&tctx);
-    c_initCairo(&tctx);
-
-    while !tctx.done {
-        -- Quit app on close event
-        event: sdl.KeyboardEvent;
-        while sdl.SDL_PollEvent(&event) != 0 {
-            if event._type == sdl.QUIT {
-                tctx.done = true;
-            }
-            else if event._type == sdl.KEYDOWN {
-                -- tctx.text = [basic.tmp]"foo";
-            }
-
-            c_drawText(&tctx);
-        }
-    }
-
-    -- Free stuff
+fn freeStuff(tctx: *TextContext) {
     mem.free(tctx.cairoGlyphs);
     cairo.cairo_surface_destroy(tctx.cairoSurface);
     cairo.cairo_destroy(tctx.cairoContext);
     cairo.cairo_font_face_destroy(tctx.cairoFont);
     hb.hb_font_destroy(tctx.hbFont);
     sdl.SDL_FreeSurface(tctx.sdlSurface);
-
     sdl.SDL_Quit();
+}
+
+fn main() {
+    tctx: TextContext;
+    tctx.done = false;
+
+    initSdl(&tctx);
+
+    loadFonts(&tctx);
+    initCairo1(&tctx);
+
+    while !tctx.done {
+        event: sdl.KeyboardEvent;
+
+        while sdl.SDL_PollEvent(&event) != 0 {
+            if event._type == sdl.QUIT {
+                tctx.done = true;
+            }
+
+            drawText(&tctx);
+        }
+    }
 
     return 0;
 }
