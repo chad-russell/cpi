@@ -79,14 +79,26 @@ bool Lexer::tryEat(LexerToken *token, string pre, LexerTokenType type) {
     return 0;
 }
 
+bool isNumericDigit(char c, bool isParsingHex, bool isParsingBin) {
+    if (isParsingHex) {
+        return isdigit(c) || c == '_' || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+    }
+    else if (isParsingBin) {
+        return c == '0' || c == '1' || c == '_';
+    }
+    else {
+        return isdigit(c) || c == '_';
+    }
+}
+
 bool Lexer::tryEatKeyword(LexerToken *token, string pre, LexerTokenType type) {
     if (prefixKeyword(pre)) {
         token->type = type;
-        popFrontFinalize(pre.length(), *token);
-        return 1;
+        popFrontFinalize((int) pre.length(), *token);
+        return true;
     }
 
-    return 0;
+    return false;
 }
 
 void Lexer::popFront() {
@@ -166,6 +178,7 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "return", LexerTokenType::RETURN)) { return; }
     if (tryEatKeyword(&next, "bool", LexerTokenType::BOOLEAN)) { return; }
     if (tryEatKeyword(&next, "i8", LexerTokenType::I8)) { return;}
+    if (tryEatKeyword(&next, "i16", LexerTokenType::I16)) { return;}
     if (tryEatKeyword(&next, "i32", LexerTokenType::I32)) { return;}
     if (tryEatKeyword(&next, "i64", LexerTokenType::I64)) { return;}
     if (tryEatKeyword(&next, "f32", LexerTokenType::F32)) { return;}
@@ -179,7 +192,7 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "false", LexerTokenType::FALSE_)) { return; }
     if (tryEatKeyword(&next, "nil", LexerTokenType::NIL)) { return; }
     if (tryEatKeyword(&next, "module", LexerTokenType::MODULE)) { return; }
-    if (tryEatKeyword(&next, "scope", LexerTokenType::SCOPE)) { return; }
+    if (tryEatKeyword(&next, "impl", LexerTokenType::SCOPE)) { return; }
     if (tryEatKeyword(&next, "#import", LexerTokenType::IMPORT)) { return; }
     if (tryEatKeyword(&next, "cast", LexerTokenType::CAST)) { return; }
     if (tryEatKeyword(&next, "Ast", LexerTokenType::EXPOSED_AST)) { return; }
@@ -190,8 +203,6 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "puts", LexerTokenType::PUTS)) { return; }
     if (tryEatKeyword(&next, "panic", LexerTokenType::PANIC)) { return; }
     if (tryEatKeyword(&next, "none", LexerTokenType::NONE)) { return; }
-    if (tryEatKeyword(&next, "malloc", LexerTokenType::MALLOC)) { return; }
-    if (tryEatKeyword(&next, "free", LexerTokenType::FREE)) { return; }
     if (tryEatKeyword(&next, "tagcheck", LexerTokenType::TAGCHECK)) { return; }
     if (tryEatKeyword(&next, "for", LexerTokenType::FOR)) { return; }
     if (tryEatKeyword(&next, "#for", LexerTokenType::STATIC_FOR)) { return; }
@@ -310,7 +321,7 @@ void Lexer::popFront() {
     }
     if (parsingInt || parsingHex || parsingBin) {
         next.type = LexerTokenType::INT_LITERAL;
-        while (isdigit(srcInfo.source->at(loc.byteIndex)) || srcInfo.source->at(loc.byteIndex) == '_') {
+        while (isNumericDigit(srcInfo.source->at(loc.byteIndex), parsingHex, parsingBin)) {
             eat();
 
             if (loc.byteIndex >= srcInfo.source->size()) {
@@ -470,6 +481,7 @@ const vector<string> Lexer::lexerTokenTypeStrings = {
     "STRING",
     "BOOLEAN",
     "I8",
+    "I16",
     "I32",
     "I64",
     "F32",
@@ -496,8 +508,6 @@ const vector<string> Lexer::lexerTokenTypeStrings = {
     "FIELDSOF",
     "PANIC",
     "NONE",
-    "MALLOC",
-    "FREE",
     "PUTS",
     "TAGCHECK",
 };

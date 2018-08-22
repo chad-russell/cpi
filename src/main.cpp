@@ -211,7 +211,7 @@ int main(int argc, char **argv) {
         semantic->lexer = lexer;
         semantic->parser = parser;
         semantic->addStaticIfs(parser->scopes.top());
-        semantic->addImports(*parser->imports, nullptr);
+        semantic->addImports(*parser->imports, *parser->scopeDecls);
 
         // todo(chad): only need to loop through all top level if this is imported. Otherwise just do the main fn
         for (auto tl : parser->allTopLevel) {
@@ -319,6 +319,9 @@ int main(int argc, char **argv) {
             case NodeTypekind::I8: {
                 cout << "(i8) " << interp->readFromStack<int8_t>(0) << endl;
             } break;
+            case NodeTypekind::I16: {
+                cout << "(i16) " << interp->readFromStack<int16_t>(0) << endl;
+            } break;
             case NodeTypekind::I32: {
                 cout << "(i32) " << interp->readFromStack<int32_t>(0) << endl;
             } break;
@@ -412,7 +415,7 @@ int main(int argc, char **argv) {
             system("/usr/local/Cellar/llvm/5.0.1/bin/llc --filetype=obj ./output.bc");
 
             ostringstream command;
-            command << "clang -O0 -o " << outputFileName;
+            command << "clang -O0 -L . -o " << outputFileName;
             for (auto link : semantic->linkLibs) {
                 // substr(3) to strip "lib" from the prefix
                 command << " -l" << link->substr(3);

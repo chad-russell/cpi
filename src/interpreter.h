@@ -64,8 +64,6 @@ void interpretStore(Interpreter *interp);
 void interpretStoreConst(Interpreter *interp);
 void interpretExit(Interpreter *interp);
 void interpretPanic(Interpreter *interp);
-void interpretMalloc(Interpreter *interp);
-void interpretFree(Interpreter *interp);
 void interpretPuts(Interpreter *interp);
 void interpretNop(Interpreter *interp);
 void interpretNot(Interpreter *interp);
@@ -106,7 +104,7 @@ public:
     uint16_t depth = 0;
     int32_t overDepth = (2 << 15) + 1;
 
-    Interpreter(vector_t<string *> externalLibs): Interpreter(1024 * 64, externalLibs) {}
+    Interpreter(vector_t<string *> externalLibs): Interpreter(2048 * 64, externalLibs) {}
 
     Interpreter(int32_t stackSize_, vector_t<string *> externalLibs) {
         this->stackSize = stackSize_;
@@ -233,8 +231,6 @@ public:
                 interpretReturn,
                 interpretExit,
                 interpretPanic,
-                interpretMalloc,
-                interpretFree,
                 interpretPuts,
                 interpretNop,
                 interpretNot};

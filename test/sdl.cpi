@@ -1,49 +1,120 @@
-module sdl {
-    #link "libsdl2";
+#link "libsdl2";
 
-    SDL_INIT_EVERYTHING: i32 = 29233;
-    SDL_QUIT: i32 = 256;
-    SDL_KEYDOWN: i32 = 768;
-    SDLK_RIGHT: i32 = 1073741903;
-    SDLK_LEFT: i32 = 1073741904;
-    SDLK_UP: i32 = 1073741906;
-    SDLK_DOWN: i32 = 1073741905;
+INIT_EVERYTHING: i32 = 29233;
+INIT_VIDEO: i32 = 20;
+QUIT: i32 = 256;
+KEYDOWN: i32 = 768;
+K_RIGHT: i32 = 1073741903;
+K_LEFT: i32 = 1073741904;
+K_UP: i32 = 1073741906;
+K_DOWN: i32 = 1073741905;
+WINDOWPOS_UNDEFINED: i32 = 536805376;
+WINDOW_SHOWN: i32 = 0x00000004;
+WINDOW_ALLOW_HIGHDPI: i32 = 0x00002000;
 
-    fn SDL_Init(flags: i32) i32
-    fn SDL_CreateWindow(name: *i8, x: i32, y: i32, w: i32, h: i32, flags: i32) *none
-    fn SDL_CreateRenderer(window: *none, index: i32, flags: i32) *none
-    fn SDL_RenderSetLogicalSize(renderer: *none, width: i32, height: i32) none
-    fn SDL_SetRenderDrawColor(renderer: *none, r: i8, g: i8, b: i8, a: i8) none
-    fn SDL_PollEvent(event: *SDL_KeyboardEvent) i32
-    fn SDL_RenderClear(renderer: *none) none
-    fn SDL_RenderFillRect(renderer: *none, playerPos: *SDL_Rect) none
-    fn SDL_RenderPresent(renderer: *none) none
+fn SDL_Init(flags: i32) i32
+fn SDL_CreateWindow(name: *i8, x: i32, y: i32, w: i32, h: i32, flags: i32) *Window
+fn SDL_CreateRenderer(window: *Window, index: i32, flags: i32) *Renderer
+fn SDL_RenderSetLogicalSize(renderer: *Renderer, width: i32, height: i32) none
+fn SDL_SetRenderDrawColor(renderer: *Renderer, r: i8, g: i8, b: i8, a: i8) none
+fn SDL_PollEvent(event: *KeyboardEvent) i32
+fn SDL_RenderClear(renderer: *Renderer) none
+fn SDL_RenderFillRect(renderer: *Renderer, playerPos: *Rect) none
+fn SDL_RenderPresent(renderer: *Renderer) none
+fn SDL_GetWindowSize(window: *Window, windowWidth: *i32, windowHeight: *i32) none
+fn SDL_GetRendererOutputSize(renderer: *Renderer, rendererWidth: *i32, rendererHeight: *i32) none
+fn SDL_CreateRGBSurface(flags: i32, width: i32, height: i32, depth: i32, Rmask: i32, Gmask: i32, Bmask: i32, Amask: i32) *Surface
+fn SDL_Quit() none
+fn SDL_FreeSurface(surface: *Surface) none
+fn SDL_FillRect(surface: *Surface, rect: *Rect, color: i32) i32
+fn SDL_MapRGB(format: *PixelFormat, r: i8, g: i8, b: i8) i32
+fn SDL_CreateTextureFromSurface(renderer: *Renderer, surface: *Surface) *Texture
+fn SDL_RenderCopy(renderer: *Renderer, texture: *Texture, srcRect: *Rect, dstRect: *Rect) i32
 
-    type SDL_Rect struct {
-        x: i32,
-        y: i32,
-        w: i32,
-        h: i32
-    }
+type Window none
+type Renderer none
+type BlitMap none
+type Texture none
 
-    type SDL_KeyboardEvent struct {
-        _type: i32,
-        timetamp: i32,
-        windowId: i32,
-        state: i8,
-        repeat: i8,
-        padding2: i8,
-        padding3: i8,
-        keysym: SDL_Keysym
-    }
+type Color struct {
+    r: i8,
+    g: i8,
+    b: i8,
+    a: i8,
+}
 
-    type SDL_Keysym struct {
-        scancode: i32,
-        sym: i32,
-        mod1: i8,
-        mod2: i8,
-        unused: i32
-    }
+type Palette struct {
+    ncolors: i32,
+    colors: *Color,
+    version: i32,
+    refcount: i32
+}
+
+type Pallette struct {
+    ncolors: i32,
+    colors: *Color,
+    version: i32,
+    refcount: i32
+}
+
+type PixelFormat struct {
+    format: i32,
+    pallette: *Palette,
+    BitsPerPixel: i8,
+    BytesPerPixel: i8,
+    padding: i16,
+    Rmask: i32,
+    Gmask: i32,
+    Bmask: i32,
+    Amask: i32,
+    Rloss: i8,
+    Gloss: i8,
+    Bloss: i8,
+    Aloss: i8,
+    Rshift: i8,
+    Gshift: i8,
+    Bshift: i8,
+    Ashift: i8,
+    refcount: i32,
+    next: *PixelFormat
+}
+
+type Rect struct {
+    x: i32, y: i32,
+    w: i32, h: i32
+}
+
+type Surface struct {
+    flags: i32,
+    format: *PixelFormat,
+    w: i32, h: i32,
+    pitch: i32,
+    pixels: *none,
+    userdata: *none,
+    locked: i32,
+    lockData: *none,
+    clipRect: Rect,
+    map: *BlitMap,
+    refcount: i32
+}
+
+type KeyboardEvent struct {
+    _type: i32,
+    timetamp: i32,
+    windowId: i32,
+    state: i8,
+    repeat: i8,
+    padding2: i8,
+    padding3: i8,
+    keysym: Keysym
+}
+
+type Keysym struct {
+    scancode: i32,
+    sym: i32,
+    mod1: i8,
+    mod2: i8,
+    unused: i32
 }
 
 fn runGame() {
@@ -52,14 +123,14 @@ fn runGame() {
     sizeX: i32 = 300;
     sizeY: i32 = 400;
 
-    sdl.SDL_Init(sdl.SDL_INIT_EVERYTHING);
-    window := sdl.SDL_CreateWindow(cast(*i8) "foo\0".data, winX, winY, sizeX, sizeY, cast(i32) 0);
-    renderer := sdl.SDL_CreateRenderer(window, cast(i32) -1, cast(i32) 0);
+    SDL_Init(INIT_EVERYTHING);
+    window := SDL_CreateWindow(cast(*i8) "foo\0".data, winX, winY, sizeX, sizeY, cast(i32) 0);
+    renderer := SDL_CreateRenderer(window, cast(i32) -1, cast(i32) 0);
 
-    sdl.SDL_RenderSetLogicalSize(renderer, sizeX, sizeY);
-    sdl.SDL_SetRenderDrawColor(renderer, 0, 255, 50, 255);
+    SDL_RenderSetLogicalSize(renderer, sizeX, sizeY);
+    SDL_SetRenderDrawColor(renderer, 0, 255, 50, 255);
 
-    playerPos: sdl.SDL_Rect;
+    playerPos: Rect;
     playerPos.x = 20;
     playerPos.y = 20;
     playerPos.w = 50;
@@ -70,35 +141,35 @@ fn runGame() {
     loop := true;
     while loop
     {
-        event: sdl.SDL_KeyboardEvent;
-        while sdl.SDL_PollEvent(&event) != 0
+        event: KeyboardEvent;
+        while SDL_PollEvent(&event) != 0
         {
-            if event._type == sdl.SDL_QUIT {
+            if event._type == QUIT {
                 loop = false;
             }
-            else if event._type == sdl.SDL_KEYDOWN
+            else if event._type == KEYDOWN
             {
-                if event.keysym.sym == sdl.SDLK_RIGHT {
+                if event.keysym.sym == K_RIGHT {
                     playerPos.x = playerPos.x + 10;
                 }
-                else if event.keysym.sym == sdl.SDLK_LEFT {
+                else if event.keysym.sym == K_LEFT {
                     playerPos.x = playerPos.x - 10;
                 }
-                else if event.keysym.sym == sdl.SDLK_UP {
+                else if event.keysym.sym == K_UP {
                     playerPos.y = playerPos.y - 10;
                 }
-                else if event.keysym.sym == sdl.SDLK_DOWN {
+                else if event.keysym.sym == K_DOWN {
                     playerPos.y = playerPos.y + 10;
                 }
 
                 keydown = keydown + 1;
             }
 
-            sdl.SDL_RenderClear(renderer);
-            sdl.SDL_SetRenderDrawColor(renderer, 100, 140, 255, 255);
-            sdl.SDL_RenderFillRect(renderer, &playerPos);
-            sdl.SDL_SetRenderDrawColor(renderer, 155, 225, 155, 255);
-            sdl.SDL_RenderPresent(renderer);
+            SDL_RenderClear(renderer);
+            SDL_SetRenderDrawColor(renderer, 100, 140, 255, 255);
+            SDL_RenderFillRect(renderer, &playerPos);
+            SDL_SetRenderDrawColor(renderer, 155, 225, 155, 255);
+            SDL_RenderPresent(renderer);
         }
     }
 

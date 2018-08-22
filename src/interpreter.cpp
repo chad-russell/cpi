@@ -46,6 +46,12 @@ void debugPrintVar(ostream &target, Interpreter *interp, TypeData td, int64_t of
                 target << *p;
             }
         } break;
+        case NodeTypekind::I16: {
+            auto p = (int16_t *) offset;
+            if (p != nullptr) {
+                target << *p;
+            }
+        } break;
         case NodeTypekind::I32: {
             auto p = (int32_t *) offset;
             if (p != nullptr) {
@@ -424,7 +430,7 @@ void Interpreter::interpret() {
                     semantic->lexer = evalLexer;
                     semantic->parser = evalParser;
                     semantic->addStaticIfs(evalParser->scopes.top());
-                    semantic->addImports(*evalParser->imports, nullptr);
+                    semantic->addImports(*evalParser->imports, *evalParser->scopeDecls);
                     semantic->currentFnDecl = evalFnDecl;
 
                     auto wrappedRet = new Node(parsed->region.srcInfo, NodeType::RETURN, parsed->scope);
@@ -544,20 +550,6 @@ void interpretPanic(Interpreter *interp) {
     exit(0);
 }
 
-void interpretMalloc(Interpreter *interp) {
-    auto numBytes = interp->read<int64_t>();
-    auto storeOffset = interp->consume<int64_t>();
-
-    auto allocated = malloc(static_cast<size_t>(numBytes));
-    interp->copyToStack((int64_t) allocated, interp->bp + storeOffset);
-}
-
-void interpretFree(Interpreter *interp) {
-    auto offset_from_stack = interp->read<int64_t>();
-    auto ptr_to_free = (int8_t *) offset_from_stack;
-    free(ptr_to_free);
-}
-
 // puts
 void interpretPuts(Interpreter *interp) {
     auto offset_from_stack = interp->read<int64_t>();
@@ -602,7 +594,10 @@ ffi_type *ffiTypeFor(Node *type) {
     switch (type->typeData.kind) {
         case NodeTypekind::NONE: return &ffi_type_void;
         case NodeTypekind::I8: return &ffi_type_sint8;
-        case NodeTypekind::I32: return &ffi_type_sint32;
+        case NodeTypekind::I16: return &ffi_type_sint16;
+        case NodeTypekind::BOOLEAN:
+        case NodeTypekind::I32:
+            return &ffi_type_sint32;
         case NodeTypekind::I64: return &ffi_type_sint64;
         case NodeTypekind::F32: return &ffi_type_float;
         case NodeTypekind::F64: return &ffi_type_double;
@@ -680,8 +675,8 @@ void interpretCalle(Interpreter *interp) {
 
     // call function copying return value bits to return slot
     // todo(chad): according to ffi this *must* be at least an int32_t unless the return type is void. So we'll need to deal with return types smaller than that
-    ffi_call(&cif, FFI_FN(found_fn), &interp->stack[interp->sp + 8], values);
-    auto debugSlot = &interp->stack[interp->sp + 8];
+    auto storeInto = &interp->stack[interp->sp + 8];
+    ffi_call(&cif, FFI_FN(found_fn), storeInto, values);
 
     free(ffiArgs);
     free(values);

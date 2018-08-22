@@ -106,6 +106,12 @@ void initEndScopeData(Node *node) {
     node->sourceMapStatement = true;
 }
 
+void initImportData(Node *node) {
+    node->importData.isFile = false;
+    node->importData.target = nullptr;
+    node->importData.alias = nullptr;
+}
+
 void initArrayLiteralData(Node *node) {
     node->arrayLiteralData.elementType = nullptr;
     node->arrayLiteralData.elements = vector_init<Node *>(8);
@@ -134,6 +140,8 @@ void initIfData(Node *node) {
     node->ifData.elseScope = nullptr;
     node->ifData.trueImports = vector_init<Node *>(8);
     node->ifData.falseImports = vector_init<Node *>(8);
+    node->ifData.trueScopeDecls = vector_init<Node *>(8);
+    node->ifData.falseScopeDecls = vector_init<Node *>(8);
 }
 
 void initStructLiteralData(Node *node) {
@@ -357,12 +365,6 @@ ostream &operator<<(ostream &os, NodeType type) {
         }
         case NodeType::UNARY_NEG: {
             return os << "unary neg";
-        }
-        case NodeType::MALLOC: {
-            return os << "malloc";
-        }
-        case NodeType::FREE: {
-            return os << "free";
         }
         case NodeType::TAGCHECK: {
             return os << "tagcheck";

@@ -1,0 +1,42 @@
+fn drawFractal() {
+    #import "printing": p;
+    #import "buffer";
+
+    shades := " .-:;+=xX$& ";
+    limit := shades.count - 1;
+
+    row := 0.0;
+    while row < 24.0 {
+        defer { row = row + 1.0; }
+
+        buf := buffer.make!(i8)(64);
+        defer {
+            #import "mem";
+            mem.free(buf.buf.data);
+        }
+
+        r := row / 12.0 - 1.0;
+        line := "";
+
+        col := 0.0;
+        while col < 80.0 {
+            defer { col = col + 1.0; }
+
+            c := col / 30.0 - 2;
+            x := 0.0;
+            y := 0.0;
+            i := 0;
+
+            while i < limit and x * x + y * y < 4.0 {
+                tmp := x * x - y * y + c;
+                y = 2.0 * x * y + r;
+                x = tmp;
+                i = i + 1;
+            }
+
+            &buf|buffer.append(shades[i]);
+        }
+
+        buf.buf | p.println;
+    }
+}

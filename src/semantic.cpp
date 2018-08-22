@@ -58,6 +58,8 @@ int32_t typeSize(Node *type) {
             return 0;
         case NodeTypekind::I8:
             return 1;
+        case NodeTypekind::I16:
+            return 2;
         case NodeTypekind::BOOLEAN:
         case NodeTypekind::BOOLEAN_LITERAL:
         case NodeTypekind::I32:
@@ -254,6 +256,7 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
     // todo(chad): check for overflow?
     if (desired->typeData.kind == NodeTypekind::INT_LITERAL) {
         if (actual->typeData.kind == NodeTypekind::I8
+            || actual->typeData.kind == NodeTypekind::I16
             || actual->typeData.kind == NodeTypekind::I32
             || actual->typeData.kind == NodeTypekind::I64
             || actual->typeData.kind == NodeTypekind::F32
@@ -286,6 +289,7 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
     }
     if (actual->typeData.kind == NodeTypekind::INT_LITERAL) {
         if (desired->typeData.kind == NodeTypekind::I8
+            || desired->typeData.kind == NodeTypekind::I16
             || desired->typeData.kind == NodeTypekind::I32
             || desired->typeData.kind == NodeTypekind::I64) {
             actual->typeData.kind = desired->typeData.kind;
@@ -412,6 +416,13 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
 
     if (actual->typeData.kind == NodeTypekind::POINTER) {
         if (desired->typeData.kind == NodeTypekind::POINTER) {
+            if (actual->typeData.pointerTypeData.underlyingType->typeData.kind == NodeTypekind::NONE) {
+                return true;
+            }
+            if (desired->typeData.pointerTypeData.underlyingType->typeData.kind == NodeTypekind::NONE) {
+                return true;
+            }
+
             return typesMatch(actual->typeData.pointerTypeData.underlyingType, desired->typeData.pointerTypeData.underlyingType, semantic);
         }
 
@@ -430,6 +441,7 @@ Node *defaultValueFor(Semantic *semantic, Node *type) {
     switch (type->typeData.kind) {
         case NodeTypekind::INT_LITERAL:
         case NodeTypekind::I8:
+        case NodeTypekind::I16:
         case NodeTypekind::I32:
         case NodeTypekind::I64: {
             auto def = new Node();
@@ -573,26 +585,42 @@ void Semantic::addStaticIfs(Scope *targetScope, Scope *importInto) {
         cpi_assert(ifStmt->ifData.condition->staticValue->type == NodeType::BOOLEAN_LITERAL);
 
         if (ifStmt->ifData.condition->staticValue->boolLiteralData.value && ifStmt->ifData.stmts.length > 0) {
+            addImports(ifStmt->ifData.trueImports, ifStmt->ifData.trueScopeDecls);
+
             addAllFromScopeToScope(this, ifStmt->ifData.ifScope, ii, true);
             addStaticIfs(ifStmt->ifData.ifScope, ifStmt->scope);
         }
         else if (!ifStmt->ifData.condition->staticValue->boolLiteralData.value && ifStmt->ifData.elseStmts.length > 0) {
+            addImports(ifStmt->ifData.falseImports, ifStmt->ifData.falseScopeDecls);
+
             addAllFromScopeToScope(this, ifStmt->ifData.elseScope, ii, true);
             addStaticIfs(ifStmt->ifData.elseScope, ifStmt->scope);
         }
     }
 }
 
-void Semantic::addImports(vector_t<Node *> imports, Scope *target) {
+void Semantic::addImports(vector_t<Node *> imports, vector_t<Node *> scopeDecls) {
     for (auto import : imports) {
-        this->resolveTypes(import);
-        auto importTarget = resolve(import->nodeData);
+        auto importTarget = resolve(import->importData.target);
+
+        if (importTarget == nullptr) {
+            reportError({import}, Error{import->region, "Unable to locate import"});
+            return;
+        }
+
+        if (importTarget->type != NodeType::MODULE) {
+            this->resolveTypes(importTarget);
+        }
+        importTarget = resolve(importTarget);
         cpi_assert(importTarget->type == NodeType::MODULE);
 
-        // todo(chad): this might be a @HACK, a better way would be to stop using nodeData for imports and keep track directly of whether it's a file import or not.
-        if (import->nodeData->type != NodeType::MODULE) {
-            addAllFromScopeToScope(this, importTarget->scope, target ? target : import->scope, false);
+        if (!import->importData.isFile) {
+            addAllFromScopeToScope(this, importTarget->scope, import->scope, false);
         }
+    }
+
+    for (auto scope : scopeDecls) {
+        this->resolveTypes(scope);
     }
 }
 
@@ -633,7 +661,7 @@ void resolveModule(Semantic *semantic, Node *node) {
 }
 
 void resolveImport(Semantic *semantic, Node *node) {
-     semantic->resolveTypes(node->nodeData);
+    semantic->resolveTypes(node->importData.target);
 }
 
 void resolveDefer(Semantic *semantic, Node *node) {
@@ -1329,6 +1357,7 @@ void resolveType(Semantic *semantic, Node *node) {
         case NodeTypekind::INT_LITERAL:
         case NodeTypekind::FLOAT_LITERAL:
         case NodeTypekind::I8:
+        case NodeTypekind::I16:
         case NodeTypekind::I32:
         case NodeTypekind::I64:
         case NodeTypekind::F32:
@@ -1535,17 +1564,19 @@ Node *Semantic::deepCopyRvalue(Node *node, Scope *scope) {
     return copyingParser->parseRvalue();
 }
 
-Node *resolveSymbolWithScopeType(Semantic *semantic, Node *fnSymbol, Node *firstParam) {
+Node *resolveSymbolWithScopeType(Semantic *semantic, Node *fnSymbol, Node *firstParam, Scope *scope) {
     semantic->resolveTypes(firstParam);
-    auto resolvedScopeType = resolve(firstParam->typeInfo);
 
-    auto scope = fnSymbol->scope;
+    auto resolvedScopeType = resolve(firstParam->typeInfo);
+    while (resolvedScopeType->typeData.kind == NodeTypekind::POINTER) {
+        resolvedScopeType = resolve(resolvedScopeType->typeData.pointerTypeData.underlyingType);
+    }
+
     while (scope != nullptr) {
         for (auto ts : scope->typeScopes) {
             auto resolvedTarget = resolve(ts->scopeData.targetType);
 
             if (typesMatch(resolvedTarget, resolvedScopeType, semantic)) {
-//            if (resolvedTarget == resolvedScopeType) {
                 auto found = ts->scopeData.scope->find(fnSymbol->symbolData.atomId);
                 if (found != nullptr) {
                     return found;
@@ -1568,16 +1599,31 @@ void resolveFnCall(Semantic *semantic, Node *node) {
     if (resolvedFn == nullptr && node->fnCallData.fn->type == NodeType::SYMBOL && node->fnCallData.params.length > 0) {
         // try to find it normally
         resolvedFn = resolve(node->scope->find(node->fnCallData.fn->symbolData.atomId));
+        if (resolvedFn != nullptr) {
+            node->fnCallData.fn->resolved = resolvedFn;
+        }
 
-        // if that fails, look in it's scope
+        auto firstParam = vector_at(node->fnCallData.params, 0);
+
+        // if that fails, look in any scopes that we can find
         if (resolvedFn == nullptr) {
-            resolvedFn = resolveSymbolWithScopeType(semantic, node->fnCallData.fn, vector_at(node->fnCallData.params, 0));
+            resolvedFn = resolveSymbolWithScopeType(semantic, node->fnCallData.fn, firstParam, node->fnCallData.fn->scope);
             if (resolvedFn != nullptr) {
                 node->fnCallData.fn->resolved = resolvedFn;
             }
         }
-        else {
-            node->fnCallData.fn->resolved = resolvedFn;
+
+        // if that fails, look in any scopes in the scope where the type was defined
+        if (resolvedFn == nullptr) {
+            auto fpType = resolve(firstParam->typeInfo);
+            while (fpType->typeData.kind == NodeTypekind::POINTER) {
+                fpType = resolve(fpType->typeData.pointerTypeData.underlyingType);
+            }
+
+            resolvedFn = resolveSymbolWithScopeType(semantic, node->fnCallData.fn, firstParam, fpType->scope);
+            if (resolvedFn != nullptr) {
+                node->fnCallData.fn->resolved = resolvedFn;
+            }
         }
     }
 
@@ -1974,7 +2020,12 @@ void resolveValueParam(Semantic *semantic, Node *node) {
 void resolveDeref(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->nodeData);
     auto pointerType = resolve(node->nodeData->typeInfo);
-    cpi_assert(pointerType->typeData.kind == NodeTypekind::POINTER);
+
+    if (pointerType->typeData.kind != NodeTypekind::POINTER) {
+        semantic->reportError({node}, Error{node->region, "Cannot dereference a non-pointer"});
+        return;
+    }
+
     node->typeInfo = pointerType->typeData.pointerTypeData.underlyingType;
 }
 
@@ -2100,6 +2151,11 @@ void createTagCheck(Semantic *semantic, Node *node) {
 void resolveModuleDot(Semantic *semantic, Node *node) {
     auto found = resolve(node->dotData.lhs)->scope->find(node->dotData.rhs->symbolData.atomId);
     semantic->resolveTypes(found);
+
+    if (found == nullptr) {
+        semantic->reportError({node, found}, Error{node->region, "Could not resolved dot"});
+        return;
+    }
 
     node->resolved = found;
     node->typeInfo = found->typeInfo;
@@ -2277,23 +2333,6 @@ void resolveUnaryNeg(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->unaryNegData.target);
     semantic->resolveTypes(node->unaryNegData.rewritten);
     node->typeInfo = node->nodeData->typeInfo;
-}
-
-void resolveMalloc(Semantic *semantic, Node *node) {
-    semantic->resolveTypes(node->nodeData);
-    if (node->nodeData->typeInfo->typeData.kind != NodeTypekind::I64) {
-        semantic->reportError({node, node->nodeData}, Error{node->nodeData->region, "Expected i64"});
-    }
-
-    node->typeInfo = new Node(NodeTypekind::POINTER);
-    node->typeInfo->typeData.pointerTypeData.underlyingType = new Node(NodeTypekind::NONE);
-}
-
-void resolveFree(Semantic *semantic, Node *node) {
-    semantic->resolveTypes(node->nodeData);
-    if (node->nodeData->typeInfo->typeData.kind != NodeTypekind::POINTER) {
-        semantic->reportError({node, node->nodeData}, Error{node->nodeData->region, "Expected a pointer"});
-    }
 }
 
 void resolveArrayLiteral(Semantic *semantic, Node *node) {
@@ -2708,7 +2747,7 @@ void resolvePuts(Semantic *semantic, Node *node) {
 
     if (resolvedType->typeData.kind == NodeTypekind::STRUCT
         && resolvedType->typeData.structTypeData.isSecretlyArray
-        && resolvedType->typeData.structTypeData.secretArrayElementType->typeData.kind == NodeTypekind::I8) {
+        && resolve(resolvedType->typeData.structTypeData.secretArrayElementType)->typeData.kind == NodeTypekind::I8) {
         return;
     }
 
@@ -2808,6 +2847,9 @@ void resolveIsKind(Semantic *semantic, Node *node) {
         } break;
         case NodeTypekind::I8: {
             matches = node->isKindData.tokenType == LexerTokenType::I8;
+        } break;
+        case NodeTypekind::I16: {
+            matches = node->isKindData.tokenType == LexerTokenType::I16;
         } break;
         case NodeTypekind::I32: {
             matches = node->isKindData.tokenType == LexerTokenType::I32;
@@ -3037,12 +3079,6 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::UNARY_NEG: {
             resolveUnaryNeg(this, node);
-        } break;
-        case NodeType::MALLOC: {
-            resolveMalloc(this, node);
-        } break;
-        case NodeType::FREE: {
-            resolveFree(this, node);
         } break;
         case NodeType::ARRAY_LITERAL: {
             resolveArrayLiteral(this, node);

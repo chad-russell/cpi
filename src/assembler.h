@@ -49,8 +49,6 @@ enum class TokenType : unsigned char {
     RET, 
     EXIT,
     PANIC,
-    MALLOC,
-    FREE,
     PUTS,
     NOP,
 
@@ -109,8 +107,6 @@ enum class Instruction : unsigned char {
     RET, 
     EXIT,
     PANIC,
-    MALLOC,
-    FREE,
     PUTS,
     NOP,
     NOT,

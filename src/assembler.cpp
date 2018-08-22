@@ -113,8 +113,6 @@ int AssemblyLexer::getArgCount(TokenType tt) {
         || tt == TokenType::STORE
         || tt == TokenType::JUMPIF) {
         return 3;
-    } else if (tt == TokenType::MALLOC) {
-        return 2;
     } else if (startsWith(&ttName, "CONST")
                || startsWith(&ttName, "REL")
                || startsWith(&ttName, "I")
@@ -125,7 +123,6 @@ int AssemblyLexer::getArgCount(TokenType tt) {
                || tt == TokenType::CALLI
                || tt == TokenType::CALLE
                || tt == TokenType::STORECONST
-               || tt == TokenType::FREE
                || tt == TokenType::PUTS) {
         return 1;
     } else if (tt == TokenType::RET
@@ -354,8 +351,6 @@ const vector<string> AssemblyLexer::tokenTypeStrings = {
     "EXIT",
     "PANIC",
     "NONE",
-    "MALLOC",
-    "FREE",
     "PUTS",
     "TAGCHECK",
     "NOP",
@@ -415,8 +410,6 @@ const vector<string> AssemblyLexer::instructionStrings = {
     "RET", 
     "EXIT",
     "PANIC",
-    "MALLOC",
-    "FREE",
     "PUTS",
     "NOP",
     "NOT",
@@ -585,14 +578,7 @@ void MnemonicPrinter::step() {
         instructionString.append(" ");
         auto callPc = consume<int64_t>();
         instructionString.append(to_string(callPc));
-    } else if (startsWith(&inst, "MALLOC")) {
-        instructionString.append(inst);
-        instructionString.append(" ");
-        readTypeAndInt();
-        instructionString.append(" ");
-        auto storageOffset = consume<int64_t>();
-        instructionString.append(to_string(storageOffset));
-    } else if (startsWith(&inst, "FREE") || startsWith(&inst, "PUTS")) {
+    } else if (startsWith(&inst, "PUTS")) {
         instructionString.append(inst);
         instructionString.append(" ");
         readTypeAndInt();

@@ -67,8 +67,6 @@ enum class NodeType {
     SIZEOF = 32,
     FIELDSOF = 33,
     ARRAY_INDEX = 34,
-    MALLOC = 35,
-    FREE = 36,
     PUTS = 37,
     TAGCHECK = 38,
     ARRAY_LITERAL = 39,
@@ -85,6 +83,7 @@ enum class NodeTypekind {
     NONE,
     INT_LITERAL,
     I8,
+    I16,
     I32,
     I64,
     FLOAT_LITERAL,
@@ -141,6 +140,7 @@ enum class LexerTokenType : int32_t {
     RETURN,
     BOOLEAN,
     I8,
+    I16,
     I32,
     I64,
     F32,
@@ -168,8 +168,6 @@ enum class LexerTokenType : int32_t {
     FIELDSOF,
     PANIC,
     NONE,
-    MALLOC,
-    FREE,
     PUTS,
     TAGCHECK,
     FOR,
@@ -344,8 +342,12 @@ struct IfData {
     bool isStatic;
     Scope *ifScope;
     Scope *elseScope;
+
     vector_t<Node *> trueImports;
     vector_t<Node *> falseImports;
+
+    vector_t<Node *> trueScopeDecls;
+    vector_t<Node *> falseScopeDecls;
 };
 
 struct WhileData {
@@ -408,6 +410,12 @@ struct ScopeData {
     Node *targetType;
     vector_t<Node *> stmts;
     Scope *scope;
+};
+
+struct ImportData {
+    bool isFile;
+    Node *target;
+    Node *alias;
 };
 
 struct DeferData {
@@ -483,6 +491,7 @@ public:
         UnaryNegData unaryNegData;
         LinkData linkData;
         ScopeData scopeData;
+        ImportData importData;
     };
 
     Node *staticValue = nullptr;

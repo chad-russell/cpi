@@ -39,6 +39,7 @@ struct Parser {
     int64_t mainAtom;
 
     vector_t<Node *> *imports;
+    vector_t<Node *> *scopeDecls;
 
     Scope *staticIfScope = nullptr;
 
@@ -60,7 +61,7 @@ struct Parser {
     Node *createInitContextCall(Scope *scope);
     void initContext(Node *decl);
     void addBasicImport();
-    Node *addImport(string importName);
+    Node *addImport(string importName, Node *alias);
     void addContextParameterForDecl(vector_t<Node *> &currentParams, Scope *scope);
 
     void parseRoot();
@@ -90,9 +91,7 @@ struct Parser {
     Node *parseIsKind();
     Node *parseFieldsof();
     Node *parsePuts();
-    Node *parseMalloc();
     Node *parseTagCheck();
-    Node *parseFree();
     Node *parseLvalueOrLiteral();
     Node *parseRvalueSimple();
     Node *parseRvalue();

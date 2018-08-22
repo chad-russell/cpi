@@ -8,8 +8,13 @@ Parser::Parser(Lexer *lexer_) {
     last = lexer->front;
 
     mainAtom = atomTable->insertStr("main");
+
     imports = (vector_t<Node *> *) malloc(sizeof(vector_t<Node *>));
     *imports = vector_init<Node *>(16);
+
+    scopeDecls = (vector_t<Node *> *) malloc(sizeof(vector_t<Node *>));
+    *scopeDecls = vector_init<Node *>(8);
+
     allTopLevel = vector_init<Node *>(256);
 
     scopes.push(new Scope(nullptr));
@@ -107,7 +112,7 @@ void Parser::initContext(Node *decl) {
     vector_append(decl->fnDeclData.body, contextDecl);
 }
 
-Node *Parser::addImport(string importName) {
+Node *Parser::addImport(string importName, Node *alias) {
     auto concatPath = importName + ".cpi";
 
     auto rpath = realpath(concatPath.c_str(), nullptr);
@@ -115,6 +120,11 @@ Node *Parser::addImport(string importName) {
         auto home = strdup(getenv("HOME"));
         rpath = realpath(string(strcat(home, "/.cpi/lib/") + concatPath).c_str(), nullptr);
     }
+    if (rpath == nullptr) {
+        // this doesn't exist. Might not be an issue (that's for semantic to decide), but definitely don't continue
+        return nullptr;
+    }
+
     auto path = string(rpath);
 
     unsigned long lastSlash = 0;
@@ -132,9 +142,8 @@ Node *Parser::addImport(string importName) {
     auto found = false;
 
     auto importAtomId = atomTable->insertStr(defaultImportName);
-    if (lexer->front.type == LexerTokenType::COLON) {
-        popFront(); // :
-        importAtomId = parseSymbol()->symbolData.atomId;
+    if (alias != nullptr) {
+        importAtomId = alias->symbolData.atomId;
     }
 
     for (auto i : importedFileModules) {
@@ -171,7 +180,8 @@ Node *Parser::addImport(string importName) {
 
 void Parser::addBasicImport() {
     auto importNode = new Node(this->lexer->srcInfo, NodeType::IMPORT, scopes.top());
-    importNode->nodeData = addImport("basic");
+    importNode->importData.isFile = true;
+    importNode->importData.target = addImport("basic", nullptr);
 
     vector_append(*this->imports, importNode);
     vector_append(allTopLevel, importNode);
@@ -532,10 +542,17 @@ Node *Parser::parseImport() {
     if (this->lexer->front.type == LexerTokenType::DOUBLE_QUOTE) {
         auto importName = parseStringLiteral();
 
-        importNode->nodeData = addImport(*importName->stringLiteralData.value);
+        if (lexer->front.type == LexerTokenType::COLON) {
+            popFront(); // :
+            importNode->importData.alias = parseSymbol();
+        }
+
+        importNode->importData.isFile = true;
+        importNode->importData.target = addImport(*importName->stringLiteralData.value, importNode->importData.alias);
     }
     else {
-        importNode->nodeData = parseLvalue();
+        importNode->importData.isFile = false;
+        importNode->importData.target = parseLvalue();
     }
 
     expectSemicolon();
@@ -593,8 +610,8 @@ Node *Parser::parseTypeDecl() {
     scopeInsert(typeName->symbolData.atomId, typeDecl);
 
     typeDecl->typeData.name = typeName;
-
     typeDecl->region = Region{lexer->srcInfo, saved, typeDecl->region.end};
+    typeDecl->scope = scopes.top();
 
     return typeDecl;
 }
@@ -633,22 +650,23 @@ Node *Parser::parseModuleDecl() {
 Node *Parser::parseScopeDecl() {
     auto saved = lexer->front.region.start;
 
-    expect(LexerTokenType::SCOPE, "scope");
+    expect(LexerTokenType::SCOPE, "impl");
 
     auto scopeDecl = new Node(lexer->srcInfo, NodeType::SCOPE, scopes.top());
-    scopeDecl->scopeData.targetType = parseLvalueOrLiteral();
+    scopeDecl->scopeData.targetType = parseType();
+
+    scopeDecl->scope = scopes.top();
 
     auto savedCurrentFnDecl = this->currentFnDecl;
     this->currentFnDecl = nullptr;
 
-    scopeDecl->scope = scopes.top();
     scopes.push(new Scope(scopes.top()));
     scopeDecl->scopeData.scope = scopes.top();
 
     expect(LexerTokenType::LCURLY, "{");
 
     while (lexer->front.type != LexerTokenType::RCURLY) {
-        vector_append(scopeDecl->moduleData.stmts, parseTopLevel());
+        vector_append(scopeDecl->scopeData.stmts, parseTopLevel());
     }
     scopes.pop();
 
@@ -657,6 +675,11 @@ Node *Parser::parseScopeDecl() {
     expect(LexerTokenType::RCURLY, "}");
 
     this->currentFnDecl = savedCurrentFnDecl;
+
+    // if we're at top level, OR if we're in a function with no ctParams
+    if (currentFnDecl == nullptr || this->isCopying) {
+        vector_append(*this->scopeDecls, scopeDecl);
+    }
 
     return scopeDecl;
 }
@@ -701,13 +724,6 @@ Node *Parser::parseScopedStmt() {
         return parseWhile();
     }
 
-    // free
-    if (lexer->front.type == LexerTokenType::FREE) {
-        auto freeStmt = parseFree();
-        expectSemicolon();
-        return freeStmt;
-    }
-
     // puts
     if (lexer->front.type == LexerTokenType::PUTS) {
         return parsePuts();
@@ -726,6 +742,11 @@ Node *Parser::parseScopedStmt() {
     // import
     if (lexer->front.type == LexerTokenType::IMPORT) {
         return parseImport();
+    }
+
+    // scope
+    if (lexer->front.type == LexerTokenType::SCOPE) {
+        return parseScopeDecl();
     }
 
     // defer
@@ -880,8 +901,11 @@ Node *Parser::parseIf() {
 
     auto savedStaticIfScope = this->staticIfScope;
     auto savedImports = this->imports;
+    auto savedScopeDecls = this->scopeDecls;
+
     if (isStatic) {
         this->imports = &if_->ifData.trueImports;
+        this->scopeDecls = &if_->ifData.trueScopeDecls;
         this->staticIfScope = scopes.top();
     }
 
@@ -911,6 +935,7 @@ Node *Parser::parseIf() {
 
         if (isStatic) {
             this->imports = &if_->ifData.falseImports;
+            this->scopeDecls = &if_->ifData.falseScopeDecls;
             this->staticIfScope = scopes.top();
         }
 
@@ -948,6 +973,7 @@ Node *Parser::parseIf() {
     if (isStatic) {
         vector_append(this->staticIfScope->staticIfs, if_);
         this->imports = savedImports;
+        this->scopeDecls = savedScopeDecls;
     }
 
     return if_;
@@ -1251,6 +1277,10 @@ Node *Parser::parseType() {
             popFront();
             type->typeData.kind = NodeTypekind::I8;
         } break;
+        case LexerTokenType::I16: {
+            popFront();
+            type->typeData.kind = NodeTypekind::I16;
+        } break;
         case LexerTokenType::I32: {
             popFront();
             type->typeData.kind = NodeTypekind::I32;
@@ -1490,6 +1520,7 @@ Node *Parser::parseIsKind() {
     expect(LexerTokenType::COMMA, ",");
 
     if (lexer->front.type == LexerTokenType::I8
+        || lexer->front.type == LexerTokenType::I16
         || lexer->front.type == LexerTokenType::I32
         || lexer->front.type == LexerTokenType::I64
         || lexer->front.type == LexerTokenType::F32
@@ -1541,17 +1572,6 @@ Node *Parser::parsePuts() {
     return value;
 }
 
-Node *Parser::parseMalloc() {
-    auto mal = new Node(lexer->srcInfo, NodeType::MALLOC, scopes.top());
-    mal->region.start = lexer->front.region.start;
-    popFront();
-    expect(LexerTokenType::LPAREN, "(");
-    mal->nodeData = parseRvalue();
-    mal->region.end = lexer->front.region.end;
-    expect(LexerTokenType::RPAREN, ")");
-    return mal;
-}
-
 Node *Parser::parseTagCheck() {
     auto check = new Node(lexer->srcInfo, NodeType::TAGCHECK, scopes.top());
     check->region.start = lexer->front.region.start;
@@ -1563,34 +1583,20 @@ Node *Parser::parseTagCheck() {
     return check;
 }
 
-Node *Parser::parseFree() {
-    auto type = new Node(lexer->srcInfo, NodeType::FREE, scopes.top());
-    type->region.start = lexer->front.region.start;
-    popFront();
-    expect(LexerTokenType::LPAREN, "(");
-    type->nodeData = parseRvalue();
-    type->region.end = lexer->front.region.end;
-    expect(LexerTokenType::RPAREN, ")");
-    return type;
-}
-
 Node *Parser::parseLvalueOrLiteral() {
     // comment
     while (lexer->front.type == LexerTokenType::COMMENT) {
         popFront();
     }
 
-    if (lexer->front.type == LexerTokenType::I32 || lexer->front.type == LexerTokenType::I64 || lexer->front.type == LexerTokenType::I8
+    if (lexer->front.type == LexerTokenType::I8 || lexer->front.type == LexerTokenType::I16
+        || lexer->front.type == LexerTokenType::I32 || lexer->front.type == LexerTokenType::I64
         || lexer->front.type == LexerTokenType::F32 || lexer->front.type == LexerTokenType::F64) {
         return parseType();
     }
 
     if (lexer->front.type == LexerTokenType::SIZEOF) {
         return parseSizeof();
-    }
-
-    if (lexer->front.type == LexerTokenType::MALLOC) {
-        return parseMalloc();
     }
 
     if (lexer->front.type == LexerTokenType::TAGCHECK) {
@@ -1865,7 +1871,9 @@ Node *Parser::parseStringLiteral() {
             s << node->region.srcInfo.source->at(i);
         }
     }
+
     node->stringLiteralData.value = new string(s.str());
+    node->stringLiteralData.allocFn = nullptr;
 
     return node;
 }
