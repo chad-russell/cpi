@@ -109,7 +109,7 @@ module ft {
 
 WIDTH: i32 = 200;
 HEIGHT: i32 = 100;
-FONT_SIZE: i32 = 18;
+FONT_SIZE: i32 = 36;
 
 type TextContext struct {
     hbFont: *hb.Font,
@@ -130,7 +130,7 @@ type TextContext struct {
 }
 
 fn loadFonts(tctx: *TextContext) {
-    tctx.font = "/System/Library/Fonts/Apple Color Emoji.ttc"|io.cstr;
+    -- tctx.font = "/System/Library/Fonts/Apple Color Emoji.ttc"|io.cstr;
     -- tctx.font = "/Users/chadrussell/Projects/text/Noto-unhinted/NotoColorEmoji.ttf"|io.cstr;
     tctx.text = "🙈 🇹🇩"|io.cstr;
 
