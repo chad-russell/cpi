@@ -6,13 +6,9 @@
 #import "harfbuzz": hb;
 #import "freetype": ft;
 
-#link "libfoo";
-fn toDouble(n: i32) f64
-fn toInt(n: f64) i32
-
 WIDTH: i32 = 800;
 HEIGHT: i32 = 350;
-FONT_SIZE: i32 = 72;
+FONT_SIZE: i32 = 20;
 
 type TextContext struct {
     hbFont: *hb.Font,
@@ -41,8 +37,8 @@ fn loadFonts(tctx: *TextContext) {
     -- tctx.text = buf.from("🙈 🇹🇩");
 
     -- tctx.font = "/Users/chadrussell/Library/Fonts/Roboto-Light.ttf";
-    -- tctx.font = "/Library/Fonts/Inconsolata.otf";
-    tctx.font = "/Users/chadrussell/Projects/text/JFWilwod.ttf";
+    tctx.font = "/Library/Fonts/Inconsolata.otf";
+    -- tctx.font = "/Users/chadrussell/Projects/text/JFWilwod.ttf";
     tctx.text = buf.from("hello");
 
     -- For CAIRO, load using FreeType
@@ -104,17 +100,17 @@ fn initCairo1(tctx: *TextContext) {
     cairoY_Multiplier := rendererHeight / windowHeight;
 
     -- Scale cairo to use screen resolution
-    cairo.cairo_surface_set_device_scale(tctx.cairoSurface, toDouble(cairoX_Multiplier), toDouble(cairoY_Multiplier));
+    cairo.cairo_surface_set_device_scale(tctx.cairoSurface, cast(f64) cairoX_Multiplier, cast(f64) cairoY_Multiplier);
 
     -- Get Cairo context from Cairo surface
     tctx.cairoContext = cairo.cairo_create(tctx.cairoSurface);
     cairo.cairo_set_source_rgba(tctx.cairoContext, 0.0, 0.0, 0.0, 1.0);
     cairo.cairo_set_font_face(tctx.cairoContext, tctx.cairoFont);
-    cairo.cairo_set_font_size(tctx.cairoContext, toDouble(FONT_SIZE));
+    cairo.cairo_set_font_size(tctx.cairoContext, cast(f64) FONT_SIZE);
 }
 
 fn drawText(tctx: *TextContext) {
-    -- Create  HarfBuzz buffer
+    -- Reset HarfBuzz buffer
     hb.hb_buffer_reset(tctx.hbBuffer);
 
     -- Set buffer to LTR direction, common script and default language
@@ -131,26 +127,20 @@ fn drawText(tctx: *TextContext) {
     glyphInfo := hb.hb_buffer_get_glyph_infos(tctx.hbBuffer, nil);
     glyphPos := hb.hb_buffer_get_glyph_positions(tctx.hbBuffer, nil);
 
-    stringWidthInPixels := 0.0;
-    i := 0;
-    while i < cast(i64) glyphCount {
-        stringWidthInPixels = stringWidthInPixels + toDouble((glyphPos + i).xAdvance) / 64.0;
-        i = i + 1;
-    }
-
     -- Shape glyph for Cairo
     tctx.cairoGlyphs = cairo.cairo_glyph_allocate(glyphCount);
+    defer { cairo.cairo_glyph_free(tctx.cairoGlyphs); }
 
     x: i32 = 0;
     y: i32 = 0;
 
-    i = 0;
+    i := 0;
     while i < cast(i64) glyphCount {
         (tctx.cairoGlyphs + i).index = cast(i64) (glyphInfo + i).codepoint;
-        (tctx.cairoGlyphs + i).x = toDouble(x) + toDouble((glyphPos + i).xOffset) / 64.0;
-        (tctx.cairoGlyphs + i).y = -(toDouble(y) + toDouble((glyphPos + i).yOffset) / 64.0);
-        x = x + toInt(toDouble((glyphPos + i).xAdvance) / 64.0);
-        y = y + toInt(toDouble((glyphPos + i).yAdvance) / 64.0);
+        (tctx.cairoGlyphs + i).x = cast(f64) x + cast(f64) (glyphPos + i).xOffset / 64.0;
+        (tctx.cairoGlyphs + i).y = -(cast(f64) y + cast(f64) (glyphPos + i).yOffset / 64.0);
+        x = x + cast(i32) (cast(f64) (glyphPos + i).xAdvance / 64.0);
+        y = y + cast(i32) (cast(f64) (glyphPos + i).yAdvance / 64.0);
 
         i = i + 1;
     }
@@ -160,8 +150,7 @@ fn drawText(tctx: *TextContext) {
     while i < cast(i64) glyphCount {
         ithCairoGlyph := tctx.cairoGlyphs + i;
 
-        ithCairoGlyph.x = ithCairoGlyph.x + toDouble(WIDTH) / 2 - stringWidthInPixels / 2;
-        ithCairoGlyph.y = ithCairoGlyph.y + toDouble(HEIGHT) / 2;
+        ithCairoGlyph.y = ithCairoGlyph.y + (cast(f64) HEIGHT) / 2;
 
         i = i + 1;
     }

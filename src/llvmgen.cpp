@@ -1058,37 +1058,56 @@ void LlvmGen::gen(Node *node) {
             auto toType = resolve(node->castData.type);
             auto fromType = resolve(resolvedValue->typeInfo);
 
-            if (node->castData.isCastFromArrayToDataPtr) {
-                auto arrayStruct = rvalueFor(resolvedValue);
+            if (isNumericType(fromType) && isNumericType(toType)) {
+                auto llvmFromValue = rvalueFor(resolvedValue);
+                llvm::Type *llvmToType;
 
-                node->llvmData = builder.CreateExtractValue(arrayStruct, 0);
-                node->llvmLocal = nullptr;
-                node->isLocal = false;
-            }
-            else if ((fromType->typeData.kind == NodeTypekind::INT_LITERAL || fromType->typeData.kind == NodeTypekind::F32)
-                     && toType->typeData.kind == NodeTypekind::F64) {
-                node->llvmData = builder.CreateFPCast(rvalueFor(resolvedValue), builder.getDoubleTy());
-            }
-            else if ((fromType->typeData.kind == NodeTypekind::INT_LITERAL || fromType->typeData.kind == NodeTypekind::F64)
-                     && toType->typeData.kind == NodeTypekind::F32) {
-                // todo(chad): warn about losing information here
-                node->llvmData = builder.CreateFPCast(rvalueFor(resolvedValue), builder.getFloatTy());
-            }
-            else if ((fromType->typeData.kind == NodeTypekind::INT_LITERAL || fromType->typeData.kind == NodeTypekind::I32)
-                     && toType->typeData.kind == NodeTypekind::I64) {
-                node->llvmData = builder.CreateIntCast(rvalueFor(resolvedValue), builder.getInt64Ty(), true);
-            }
-            else if ((fromType->typeData.kind == NodeTypekind::INT_LITERAL || fromType->typeData.kind == NodeTypekind::I32)
-                     && toType->typeData.kind == NodeTypekind::I32) {
-                // todo(chad): warn about losing information here
-                node->llvmData = builder.CreateIntCast(rvalueFor(resolvedValue), builder.getInt32Ty(), true);
+                switch (toType->typeData.kind) {
+                    case NodeTypekind::I8: {
+                        llvmToType = builder.getInt8Ty();
+                    } break;
+                    case NodeTypekind::I16: {
+                        llvmToType = builder.getInt16Ty();
+                    } break;
+                    case NodeTypekind::I32: {
+                        llvmToType = builder.getInt32Ty();
+                    } break;
+                    case NodeTypekind::INT_LITERAL:
+                    case NodeTypekind::I64: {
+                        llvmToType = builder.getInt64Ty();
+                    } break;
+                    case NodeTypekind::FLOAT_LITERAL:
+                    case NodeTypekind::F32: {
+                        llvmToType = builder.getFloatTy();
+                    } break;
+                    case NodeTypekind::F64: {
+                        llvmToType = builder.getDoubleTy();
+                    } break;
+                    default: cpi_assert(false);
+                }
+
+                if (isFloatType(fromType)) {
+                    if (isFloatType(toType)) {
+                        node->llvmData = builder.CreateFPCast(llvmFromValue, llvmToType);
+                    }
+                    else {
+                        node->llvmData = builder.CreateFPToSI(llvmFromValue, llvmToType);
+                    }
+                }
+                else {
+                    if (isFloatType(toType)) {
+                        node->llvmData = builder.CreateSIToFP(llvmFromValue, llvmToType);
+                    }
+                    else {
+                        node->llvmData = builder.CreateIntCast(llvmFromValue, llvmToType, true);
+                    }
+                }
             }
             else if (fromType->typeData.kind == NodeTypekind::POINTER && toType->typeData.kind == NodeTypekind::I64) {
                 // ptr to int
                 node->llvmData = builder.CreatePtrToInt(rvalueFor(resolvedValue), typeFor(node->castData.type));
             }
             else {
-//                node->llvmData = (llvm::Value *) resolvedValue->llvmData;
                 node->llvmData = rvalueFor(resolvedValue);
                 if (node->llvmData && resolve(node->castData.type)->typeData.kind == NodeTypekind::POINTER) {
                     node->llvmData = builder.CreateBitCast(rvalueFor(resolvedValue), typeFor(node->castData.type));

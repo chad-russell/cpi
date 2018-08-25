@@ -30,27 +30,6 @@ Node *bytecodeResolve(Node *n) {
     return resolved;
 }
 
-bool isNumericType(Node *type) {
-    if (type == nullptr || type->type != NodeType::TYPE) {
-        return false;
-    }
-
-    switch (type->typeData.kind) {
-        case NodeTypekind::INT_LITERAL:
-        case NodeTypekind::I8:
-        case NodeTypekind::I16:
-        case NodeTypekind::I32:
-        case NodeTypekind::I64:
-        case NodeTypekind::FLOAT_LITERAL:
-        case NodeTypekind::F32:
-        case NodeTypekind::F64:
-            return true;
-        default: return false;
-    }
-
-    return false;
-}
-
 void BytecodeGen::binopHelper(string instructionStr, Node *node, int32_t scale) {
     string bytecodeStr;
 

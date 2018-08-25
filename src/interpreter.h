@@ -388,6 +388,12 @@ void interpretConvertFrom(void *fromAddr, void *toAddr, NodeTypekind toType) {
         case NodeTypekind::I64: {
             interpretConvertFromTo<T, int64_t>(fromAddr, toAddr);
         } break;
+        case NodeTypekind::F32: {
+            interpretConvertFromTo<T, float>(fromAddr, toAddr);
+        } break;
+        case NodeTypekind::F64: {
+            interpretConvertFromTo<T, double>(fromAddr, toAddr);
+        } break;
         default: cpi_assert(false);
     }
 }

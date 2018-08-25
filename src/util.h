@@ -358,9 +358,6 @@ struct WhileData {
 struct CastData {
     Node *type;
     Node *value;
-
-    // @Hack??
-    bool isCastFromArrayToDataPtr;
 };
 
 struct RetData {
@@ -658,6 +655,9 @@ struct SourceMap {
     SourceInfo sourceInfo = {};
     vector<SourceMapStatement> statements = {};
 };
+
+bool isFloatType(Node *type);
+bool isNumericType(Node *type);
 
 /////////////
 //  ATOMS  //

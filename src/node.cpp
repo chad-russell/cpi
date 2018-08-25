@@ -122,7 +122,6 @@ void initArrayLiteralData(Node *node) {
 void initCastData(Node *node) {
     node->castData.type = nullptr;
     node->castData.value = nullptr;
-    node->castData.isCastFromArrayToDataPtr = false;
 }
 
 void initWhileData(Node *node) {

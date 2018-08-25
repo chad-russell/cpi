@@ -1,11 +1,15 @@
 TODO:
-    - converting between integer types
+    - unsigned integer types
+
+    - best way of specifying generic types (returntype/typeof hacks are a little janky)
 
     - float literals in aliases
 
     - +=, -=, *=, /=
 
     - bitwise and/or/xor/etc (and shifting?)
+
+    - autocast
 
     - do static array sizes make sense?
         - [5]i32

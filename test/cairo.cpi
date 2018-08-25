@@ -31,5 +31,6 @@ fn cairo_surface_destroy(surface: *Surface) none
 fn cairo_destroy(context: *Context) none
 fn cairo_font_face_destroy(face: *FontFace) none
 fn cairo_glyph_allocate(glyphCount: i32) *Glyph
+fn cairo_glyph_free(glyphs: *Glyph) none
 fn cairo_show_glyphs(cr: *Context, glyphs: *Glyph, numGlyphs: i32) none
 fn cairo_set_source_rgb(cr: *Context, r: f64, g: f64, b: f64) none

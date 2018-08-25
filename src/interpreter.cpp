@@ -337,9 +337,6 @@ void Interpreter::interpret() {
             continuing = false;
             overDepth = (2 << 15) + 1;
 
-//            printCurrentStmt(this);
-//            cout << "> ";
-
             lastValidPc = pc;
 
             string line;
@@ -526,7 +523,6 @@ void Interpreter::interpret() {
                     cout << "unrecognized command" << endl;
                 }
 
-//                cout << "> ";
                 getline(cin, line);
             }
         }
@@ -598,6 +594,13 @@ void interpretConvert(Interpreter *interp) {
         case NodeTypekind::INT_LITERAL: // todo(chad): why are there still INT_LITERAL types at this point?
         case NodeTypekind::I64: {
             interpretConvertFrom<int64_t>(fromAddr, toAddr, toType);
+        } break;
+        case NodeTypekind::FLOAT_LITERAL:
+        case NodeTypekind::F32: {
+            interpretConvertFrom<float>(fromAddr, toAddr, toType);
+        } break;
+        case NodeTypekind::F64: {
+            interpretConvertFrom<double>(fromAddr, toAddr, toType);
         } break;
         default: cpi_assert(false);
     }

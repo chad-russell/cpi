@@ -1,20 +1,36 @@
+#import "io";
+
+impl []i8 {
+    fn print(s: []i8) {
+        io.printMany({"String: ", s, "\n"});
+    }
+}
+
+impl i64 {
+    fn print(s: i64) {
+        io.printMany({"i64: ", s, "\n"});
+    }
+}
+
+impl i64 {
+    fn print(s: i64) {
+        io.printMany({"FUCK: ", s, "\n"});
+    }
+}
+
+fn (i: i64) print() {
+    io.printMany({"i64: ", this, "\n"});
+}
+
 fn main() {
-    #import "textedit";
-    textedit.example();
+    -- #import "textedit";
+    -- textedit.example();
 
-    -- type Foo struct {
-        -- x: *none
-    -- }
+    s1 := "foo";
+    print(s1);
 
-    -- #import "io";
-    -- #import "mem";
-
-    -- f: Foo;
-
-    -- f.x = mem.malloc(1);
-    -- io.println(f.x);
-
-    -- io.println(cast(*i8) f.x);
+    s2 := 123;
+    print(s2);
 
     return 0;
 }
