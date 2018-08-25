@@ -39,7 +39,6 @@ struct Parser {
     int64_t mainAtom;
 
     vector_t<Node *> *imports;
-    vector_t<Node *> *scopeDecls;
 
     Scope *staticIfScope = nullptr;
 
@@ -69,10 +68,10 @@ struct Parser {
     vector_t<Node *> parseDeclParams();
     vector_t<Node *> parseValueParams();
     Node *parseFnDecl();
+    Node *parseImplFnDecl();
     Node *parseImport();
     Node *parseTypeDecl();
     Node *parseModuleDecl();
-    Node *parseScopeDecl();
     Node *parseSymbol();
     Node *parseScopedStmt();
     Node *parseIf();

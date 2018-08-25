@@ -1064,7 +1064,6 @@ void BytecodeGen::gen(Node *node) {
         case NodeType::STRING_LITERAL:
         case NodeType::MODULE:
         case NodeType::DEFER:
-        case NodeType::SCOPE:
         case NodeType::LINK:
         case NodeType::IMPORT: {
             // nothing to do!

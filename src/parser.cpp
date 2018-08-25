@@ -12,9 +12,6 @@ Parser::Parser(Lexer *lexer_) {
     imports = (vector_t<Node *> *) malloc(sizeof(vector_t<Node *>));
     *imports = vector_init<Node *>(16);
 
-    scopeDecls = (vector_t<Node *> *) malloc(sizeof(vector_t<Node *>));
-    *scopeDecls = vector_init<Node *>(8);
-
     allTopLevel = vector_init<Node *>(256);
 
     scopes.push(new Scope(nullptr));
@@ -239,6 +236,11 @@ Node *Parser::parseTopLevel() {
         return parseFnDecl();
     }
 
+    // impl fn decl
+    if (lexer->front.type == LexerTokenType::IMPL) {
+        return parseImplFnDecl();
+    }
+
     // type definition
     if (lexer->front.type == LexerTokenType::TYPE) {
         return parseTypeDecl();
@@ -247,11 +249,6 @@ Node *Parser::parseTopLevel() {
     // module declaration
     if (lexer->front.type == LexerTokenType::MODULE) {
         return parseModuleDecl();
-    }
-
-    // scope
-    if (lexer->front.type == LexerTokenType::SCOPE) {
-        return parseScopeDecl();
     }
 
     // import
@@ -533,6 +530,18 @@ Node *Parser::parseFnDecl() {
     return decl;
 }
 
+Node *Parser::parseImplFnDecl() {
+    expect(LexerTokenType::IMPL, "#impl");
+
+    this->isCopying = true; // todo(chad): @Hack to keep from inserting the symbol into scope
+    auto fnDecl = parseFnDecl();
+    this->isCopying = false;
+
+    fnDecl->fnDeclData.isImpl = true;
+
+    return fnDecl;
+}
+
 Node *Parser::parseImport() {
     auto saved = lexer->front.region.start;
     expect(LexerTokenType::IMPORT, "import");
@@ -612,6 +621,7 @@ Node *Parser::parseTypeDecl() {
     typeDecl->typeData.name = typeName;
     typeDecl->region = Region{lexer->srcInfo, saved, typeDecl->region.end};
     typeDecl->scope = scopes.top();
+    typeDecl->typeData.scopedFns = vector_init<Node *>(4);
 
     return typeDecl;
 }
@@ -647,43 +657,6 @@ Node *Parser::parseModuleDecl() {
     return moduleDecl;
 }
 
-Node *Parser::parseScopeDecl() {
-    auto saved = lexer->front.region.start;
-
-    expect(LexerTokenType::SCOPE, "impl");
-
-    auto scopeDecl = new Node(lexer->srcInfo, NodeType::SCOPE, scopes.top());
-    scopeDecl->scopeData.targetType = parseType();
-
-    scopeDecl->scope = scopes.top();
-
-    auto savedCurrentFnDecl = this->currentFnDecl;
-    this->currentFnDecl = nullptr;
-
-    scopes.push(new Scope(scopes.top()));
-    scopeDecl->scopeData.scope = scopes.top();
-
-    expect(LexerTokenType::LCURLY, "{");
-
-    while (lexer->front.type != LexerTokenType::RCURLY) {
-        vector_append(scopeDecl->scopeData.stmts, parseTopLevel());
-    }
-    scopes.pop();
-
-    scopeDecl->region = Region{lexer->srcInfo, saved, lexer->front.region.end};
-
-    expect(LexerTokenType::RCURLY, "}");
-
-    this->currentFnDecl = savedCurrentFnDecl;
-
-    // if we're at top level, OR if we're in a function with no ctParams
-    if (currentFnDecl == nullptr || this->isCopying) {
-        vector_append(*this->scopeDecls, scopeDecl);
-    }
-
-    return scopeDecl;
-}
-
 Node *Parser::parseSymbol() {
     LexerToken front = expect(LexerTokenType::SYMBOL, "identifier");
     auto sym = new Node(lexer->srcInfo, NodeType::SYMBOL, scopes.top());
@@ -707,6 +680,11 @@ Node *Parser::parseScopedStmt() {
     // fn decl
     if (lexer->front.type == LexerTokenType::FN) {
         return parseFnDecl();
+    }
+
+    // impl fn decl
+    if (lexer->front.type == LexerTokenType::IMPL) {
+        return parseImplFnDecl();
     }
 
     // type definition
@@ -742,11 +720,6 @@ Node *Parser::parseScopedStmt() {
     // import
     if (lexer->front.type == LexerTokenType::IMPORT) {
         return parseImport();
-    }
-
-    // scope
-    if (lexer->front.type == LexerTokenType::SCOPE) {
-        return parseScopeDecl();
     }
 
     // defer
@@ -901,11 +874,9 @@ Node *Parser::parseIf() {
 
     auto savedStaticIfScope = this->staticIfScope;
     auto savedImports = this->imports;
-    auto savedScopeDecls = this->scopeDecls;
 
     if (isStatic) {
         this->imports = &if_->ifData.trueImports;
-        this->scopeDecls = &if_->ifData.trueScopeDecls;
         this->staticIfScope = scopes.top();
     }
 
@@ -935,7 +906,6 @@ Node *Parser::parseIf() {
 
         if (isStatic) {
             this->imports = &if_->ifData.falseImports;
-            this->scopeDecls = &if_->ifData.falseScopeDecls;
             this->staticIfScope = scopes.top();
         }
 
@@ -973,7 +943,6 @@ Node *Parser::parseIf() {
     if (isStatic) {
         vector_append(this->staticIfScope->staticIfs, if_);
         this->imports = savedImports;
-        this->scopeDecls = savedScopeDecls;
     }
 
     return if_;

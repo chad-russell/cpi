@@ -53,15 +53,15 @@ Node::Node(SourceInfo srcInfo, NodeType type_, Scope *scope_) : Node() {
         case NodeType::MODULE: {
             initModuleData(this);
         } break;
-        case NodeType::SCOPE: {
-            initScopeData(this);
-        } break;
         case NodeType::DEFER: {
             initDeferData(this);
         } break;
         case NodeType::END_SCOPE: {
             initEndScopeData(this);
         } break;
+        case NodeType::TYPE: {
+            initTypeData(this);
+        }
         default: {}
     }
 }
@@ -93,11 +93,6 @@ void initModuleData(Node *node) {
     node->moduleData.stmts = vector_init<Node *>(8);
 }
 
-void initScopeData(Node *node) {
-    node->scopeData.targetType = nullptr;
-    node->moduleData.stmts = vector_init<Node *>(8);
-}
-
 void initDeferData(Node *node) {
     node->deferData.stmts = vector_init<Node *>(8);
 }
@@ -106,10 +101,9 @@ void initEndScopeData(Node *node) {
     node->sourceMapStatement = true;
 }
 
-void initImportData(Node *node) {
-    node->importData.isFile = false;
-    node->importData.target = nullptr;
-    node->importData.alias = nullptr;
+void initTypeData(Node *node) {
+    node->typeData.scopedFns = vector_init<Node *>(4);
+    node->typeData.name = nullptr;
 }
 
 void initArrayLiteralData(Node *node) {
@@ -139,8 +133,6 @@ void initIfData(Node *node) {
     node->ifData.elseScope = nullptr;
     node->ifData.trueImports = vector_init<Node *>(8);
     node->ifData.falseImports = vector_init<Node *>(8);
-    node->ifData.trueScopeDecls = vector_init<Node *>(8);
-    node->ifData.falseScopeDecls = vector_init<Node *>(8);
 }
 
 void initStructLiteralData(Node *node) {
@@ -203,6 +195,7 @@ void initFnDeclData(Node *node) {
     node->fnDeclData.isLiteral = false;
     node->fnDeclData.isExternal = false;
     node->fnDeclData.tableIndex = 0;
+    node->fnDeclData.isImpl = false;
 }
 
 void initStructTypeData(Node *node) {

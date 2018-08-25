@@ -172,6 +172,7 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "and", LexerTokenType::AND)) { return; }
     if (tryEatKeyword(&next, "or", LexerTokenType::OR)) { return; }
     if (tryEatKeyword(&next, "fn", LexerTokenType::FN)) { return; }
+    if (tryEatKeyword(&next, "#impl", LexerTokenType::IMPL)) { return; }
     if (tryEatKeyword(&next, "type", LexerTokenType::TYPE)) { return; }
     if (tryEatKeyword(&next, "struct", LexerTokenType::STRUCT)) { return; }
     if (tryEatKeyword(&next, "enum", LexerTokenType::ENUM)) { return; }
@@ -192,7 +193,6 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "false", LexerTokenType::FALSE_)) { return; }
     if (tryEatKeyword(&next, "nil", LexerTokenType::NIL)) { return; }
     if (tryEatKeyword(&next, "module", LexerTokenType::MODULE)) { return; }
-    if (tryEatKeyword(&next, "impl", LexerTokenType::SCOPE)) { return; }
     if (tryEatKeyword(&next, "#import", LexerTokenType::IMPORT)) { return; }
     if (tryEatKeyword(&next, "cast", LexerTokenType::CAST)) { return; }
     if (tryEatKeyword(&next, "Ast", LexerTokenType::EXPOSED_AST)) { return; }

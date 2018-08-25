@@ -580,10 +580,6 @@ void addAllFromScopeToScope(Semantic *semantic, Scope *from, Scope *to, bool for
             }
         }
     }
-
-    for (auto ts : from->typeScopes) {
-        vector_append(to->typeScopes, ts);
-    }
 }
 
 void Semantic::addStaticIfs(Scope *targetScope, Scope *importInto) {
@@ -604,13 +600,13 @@ void Semantic::addStaticIfs(Scope *targetScope, Scope *importInto) {
         cpi_assert(ifStmt->ifData.condition->staticValue->type == NodeType::BOOLEAN_LITERAL);
 
         if (ifStmt->ifData.condition->staticValue->boolLiteralData.value && ifStmt->ifData.stmts.length > 0) {
-            addImports(ifStmt->ifData.trueImports, ifStmt->ifData.trueScopeDecls);
+            addImports(ifStmt->ifData.trueImports);
 
             addAllFromScopeToScope(this, ifStmt->ifData.ifScope, ii, true);
             addStaticIfs(ifStmt->ifData.ifScope, ifStmt->scope);
         }
         else if (!ifStmt->ifData.condition->staticValue->boolLiteralData.value && ifStmt->ifData.elseStmts.length > 0) {
-            addImports(ifStmt->ifData.falseImports, ifStmt->ifData.falseScopeDecls);
+            addImports(ifStmt->ifData.falseImports);
 
             addAllFromScopeToScope(this, ifStmt->ifData.elseScope, ii, true);
             addStaticIfs(ifStmt->ifData.elseScope, ifStmt->scope);
@@ -618,7 +614,7 @@ void Semantic::addStaticIfs(Scope *targetScope, Scope *importInto) {
     }
 }
 
-void Semantic::addImports(vector_t<Node *> imports, vector_t<Node *> scopeDecls) {
+void Semantic::addImports(vector_t<Node *> imports) {
     for (auto import : imports) {
         auto importTarget = resolve(import->importData.target);
 
@@ -636,10 +632,6 @@ void Semantic::addImports(vector_t<Node *> imports, vector_t<Node *> scopeDecls)
         if (!import->importData.isFile) {
             addAllFromScopeToScope(this, importTarget->scope, import->scope, false);
         }
-    }
-
-    for (auto scope : scopeDecls) {
-        this->resolveTypes(scope);
     }
 }
 
@@ -700,12 +692,6 @@ void resolveUnaryNot(Semantic *semantic, Node *node) {
 
 void resolveLink(Semantic *semantic, Node *node) {
     vector_append(semantic->linkLibs, node->linkData.name);
-}
-
-void resolveScope(Semantic *semantic, Node *node) {
-    semantic->resolveTypes(node->scopeData.targetType);
-
-    vector_append(node->scope->typeScopes, node);
 }
 
 void resolveFnDecl(Semantic *semantic, Node *node) {
@@ -844,6 +830,15 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
         // we push the params onto the stack in reverse order
         paramOffset -= typeSize(declParam->typeInfo);
         declParam->localOffset = paramOffset;
+    }
+
+    if (node->fnDeclData.isImpl) {
+        // todo(chad): check fn is named
+        // todo(chad): check fn is not external
+        // todo(chad): check fn has at least one param
+        // todo(chad): check first param is not polymorphic
+        auto firstParamType = resolve(vector_at(node->fnDeclData.params, 0)->typeInfo);
+        vector_append(firstParamType->typeData.scopedFns, node);
     }
 
     semantic->currentFnDecl = savedFnDecl;
@@ -1585,7 +1580,7 @@ Node *Semantic::deepCopyRvalue(Node *node, Scope *scope) {
     return copyingParser->parseRvalue();
 }
 
-Node *resolveSymbolWithScopeType(Semantic *semantic, Node *fnSymbol, Node *firstParam, Scope *scope) {
+Node *resolveSymbolWithScopeType(Semantic *semantic, int64_t atom, Node *firstParam) {
     semantic->resolveTypes(firstParam);
 
     auto resolvedScopeType = resolve(firstParam->typeInfo);
@@ -1593,18 +1588,10 @@ Node *resolveSymbolWithScopeType(Semantic *semantic, Node *fnSymbol, Node *first
         resolvedScopeType = resolve(resolvedScopeType->typeData.pointerTypeData.underlyingType);
     }
 
-    while (scope != nullptr) {
-        for (auto ts : scope->typeScopes) {
-            auto resolvedTarget = resolve(ts->scopeData.targetType);
-
-            if (typesMatch(resolvedTarget, resolvedScopeType, semantic)) {
-                auto found = ts->scopeData.scope->find(fnSymbol->symbolData.atomId);
-                if (found != nullptr) {
-                    return found;
-                }
-            }
+    for (auto scope : resolvedScopeType->typeData.scopedFns) {
+        if (scope->fnDeclData.name->symbolData.atomId == atom) {
+            return scope;
         }
-        scope = scope->parent;
     }
 
     return nullptr;
@@ -1618,30 +1605,11 @@ void resolveFnCall(Semantic *semantic, Node *node) {
 
     // if the fn is a symbol and there's at least 1 runtime param
     if (resolvedFn == nullptr && node->fnCallData.fn->type == NodeType::SYMBOL && node->fnCallData.params.length > 0) {
-        // try to find it normally
-        resolvedFn = resolve(node->scope->find(node->fnCallData.fn->symbolData.atomId));
-        if (resolvedFn != nullptr) {
-            node->fnCallData.fn->resolved = resolvedFn;
-        }
-
         auto firstParam = vector_at(node->fnCallData.params, 0);
 
-        // if that fails, look in any scopes that we can find
+        // look in the scope of the type
         if (resolvedFn == nullptr) {
-            resolvedFn = resolveSymbolWithScopeType(semantic, node->fnCallData.fn, firstParam, node->fnCallData.fn->scope);
-            if (resolvedFn != nullptr) {
-                node->fnCallData.fn->resolved = resolvedFn;
-            }
-        }
-
-        // if that fails, look in any scopes in the scope where the type was defined
-        if (resolvedFn == nullptr) {
-            auto fpType = resolve(firstParam->typeInfo);
-            while (fpType->typeData.kind == NodeTypekind::POINTER) {
-                fpType = resolve(fpType->typeData.pointerTypeData.underlyingType);
-            }
-
-            resolvedFn = resolveSymbolWithScopeType(semantic, node->fnCallData.fn, firstParam, fpType->scope);
+            resolvedFn = resolveSymbolWithScopeType(semantic, node->fnCallData.fn->symbolData.atomId, firstParam);
             if (resolvedFn != nullptr) {
                 node->fnCallData.fn->resolved = resolvedFn;
             }
@@ -3135,9 +3103,6 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::LINK: {
             resolveLink(this, node);
-        } break;
-        case NodeType::SCOPE: {
-            resolveScope(this, node);
         } break;
         case NodeType::END_SCOPE: break;
         default: cpi_assert(false);

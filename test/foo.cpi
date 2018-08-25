@@ -1,36 +1,29 @@
-#import "io";
+-- type Foo i64
 
-impl []i8 {
-    fn print(s: []i8) {
-        io.printMany({"String: ", s, "\n"});
-    }
-}
+-- #impl
+-- fn print(foo: Foo) {
+    -- puts("foo!\n");
+-- }
 
-impl i64 {
-    fn print(s: i64) {
-        io.printMany({"i64: ", s, "\n"});
-    }
-}
+-- type Bar i64
 
-impl i64 {
-    fn print(s: i64) {
-        io.printMany({"FUCK: ", s, "\n"});
-    }
-}
+-- #impl
+-- fn print(bar: Bar) {
+    -- puts("bar!\n");
+-- }
 
-fn (i: i64) print() {
-    io.printMany({"i64: ", this, "\n"});
+fn print(t: !T) {
+    puts("something else!\n");
 }
 
 fn main() {
-    -- #import "textedit";
-    -- textedit.example();
+    -- f: Foo = 3;
+    -- print(f);
 
-    s1 := "foo";
-    print(s1);
+    -- b: Bar = 8;
+    -- print(b);
 
-    s2 := 123;
-    print(s2);
+    print(56);
 
     return 0;
 }

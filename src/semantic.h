@@ -15,7 +15,7 @@ public:
     Parser *parser = nullptr;
 
     void addStaticIfs(Scope *target, Scope *importInto = nullptr);
-    void addImports(vector_t<Node *> imports, vector_t<Node *> scopeDecls);
+    void addImports(vector_t<Node *> imports);
 
     Node *deepCopyScopedStmt(Node *node, Scope *scope);
     Node *deepCopyRvalue(Node *node, Scope *scope);

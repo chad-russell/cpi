@@ -76,7 +76,6 @@ enum class NodeType {
     END_SCOPE = 43,
     ALIAS = 44,
     LINK = 45,
-    SCOPE = 46,
 };
 
 enum class NodeTypekind: int32_t {
@@ -156,7 +155,6 @@ enum class LexerTokenType : int32_t {
     NOT,
     NIL,
     MODULE,
-    SCOPE,
     IMPORT,
     CAST,
     SEMICOLON,
@@ -175,6 +173,7 @@ enum class LexerTokenType : int32_t {
     ISKIND,
     DEFER,
     LINK,
+    IMPL,
 };
 
 struct SourceInfo {
@@ -226,6 +225,8 @@ struct TypeData {
     NodeTypekind kind;
     Node *name;
 
+    vector_t<Node *> scopedFns;
+
     union {
         FnTypeData fnTypeData;
         StructTypeData structTypeData;
@@ -264,6 +265,7 @@ struct FnDeclData {
     bool isExternal;
     uint32_t tableIndex;
     bool cameFromPolymorph;
+    bool isImpl;
 };
 
 struct DeclData {
@@ -345,9 +347,6 @@ struct IfData {
 
     vector_t<Node *> trueImports;
     vector_t<Node *> falseImports;
-
-    vector_t<Node *> trueScopeDecls;
-    vector_t<Node *> falseScopeDecls;
 };
 
 struct WhileData {
@@ -438,8 +437,6 @@ public:
     bool isFunctionScope = false;
     vector_t<Node *> fnScopeParams = vector_init<Node *>(4);
 
-    vector_t<Node *> typeScopes = vector_init<Node *>(4);
-
     // methods
     explicit Scope(Scope *parent);
     Node *find(int64_t atomId);
@@ -487,7 +484,6 @@ public:
         DeferData deferData;
         UnaryNegData unaryNegData;
         LinkData linkData;
-        ScopeData scopeData;
         ImportData importData;
     };
 
