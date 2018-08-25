@@ -2,6 +2,12 @@
 #import "buffer";
 
 fn main() {
+    runAllTests();
+    
+    return 0;
+}
+
+fn runAllTests() {
     f := fn() {
         return fn() {
             return foo;
@@ -155,15 +161,13 @@ fn main() {
     assert(test2.a == 7);
     assert(test2.test.test2.test.test2.bbb() == test2.test.topLevel);
 
+    testIteration(cast(I64) 5);
+    io.println("--------");
+    testIteration(cast(String) "foo");
+
     assert(context.id == 0);
     incrementContextId();
     assert(context.id == 1);
-
-    testIteration(5);
-    io.println("--------");
-    testIteration("foo");
-
-    return 0;
 }
 
 fn incrementContextId() {
@@ -971,30 +975,16 @@ fn someCheck() { return true; }
     topLevel := id(123);
 }
 
-impl i64 {
-    type iterator struct {
-        empty: bool,
-        front: i64,
-        until: i64
-    }
-
-    fn iter(i: i64) iterator {
-        return {
-            empty: i == 0,
-            front: 0,
-            until: i
-        };
-    }
-
-    impl iterator {
-        fn popFront(i: *iterator) {
-            i.front = i.front + 1;
-            if i.front >= i.until { i.empty = true; }
-        }
+fn testIteration(t: !T) {
+    it := t|iter;
+    while !it.empty {
+        io.println(it.front);
+        &it|popFront;
     }
 }
 
-impl []i8 {
+type String []i8
+#impl fn iter(s: String) {
     type iterator struct {
         empty: bool,
         front: i8 = 0,
@@ -1003,37 +993,48 @@ impl []i8 {
         until: i64
     }
 
-    fn iter(i: []i8) {
-        it: iterator = {
-            empty: i.count == 0,
-            target: i,
-            index: 0,
-            until: i.count
-        };
-        if !it.empty {
-            it.front = it.target[0];
+    #impl fn popFront(it: *iterator) {
+        it.index = it.index + 1;
+        if it.index >= it.until {
+            it.empty = true;
         }
-
-        return it;
-    }
-
-    impl iterator {
-        fn popFront(it: *iterator) {
-            it.index = it.index + 1;
-            if it.index >= it.until {
-                it.empty = true;
-            }
-            else {
-                it.front = it.target[it.index];
-            }
+        else {
+            it.front = it.target[it.index];
         }
     }
+
+    it: iterator = {
+        empty: s.count == 0,
+        target: s,
+        index: 0,
+        until: s.count
+    };
+    if !it.empty {
+        it.front = it.target[0];
+    }
+
+    return it;
 }
 
-fn testIteration(t: !T) {
-    it := t|iter;
-    while !it.empty {
-        io.println(it.front);
-        &it|popFront;
+type I64 i64
+#impl fn iter(i: I64) {
+    type iterator struct {
+        empty: bool,
+        front: i64,
+        until: i64
     }
+
+    #impl fn popFront(i: *iterator) {
+        i.front = i.front + 1;
+        if i.front >= i.until { i.empty = true; }
+    }
+
+    s: iterator = {
+        empty: i == 0,
+        front: 0,
+        until: i
+    };
+
+    return s;
 }
+

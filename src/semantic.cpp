@@ -600,13 +600,13 @@ void Semantic::addStaticIfs(Scope *targetScope, Scope *importInto) {
         cpi_assert(ifStmt->ifData.condition->staticValue->type == NodeType::BOOLEAN_LITERAL);
 
         if (ifStmt->ifData.condition->staticValue->boolLiteralData.value && ifStmt->ifData.stmts.length > 0) {
-            addImports(ifStmt->ifData.trueImports);
+            addImports(ifStmt->ifData.trueImports, ifStmt->ifData.trueImpls);
 
             addAllFromScopeToScope(this, ifStmt->ifData.ifScope, ii, true);
             addStaticIfs(ifStmt->ifData.ifScope, ifStmt->scope);
         }
         else if (!ifStmt->ifData.condition->staticValue->boolLiteralData.value && ifStmt->ifData.elseStmts.length > 0) {
-            addImports(ifStmt->ifData.falseImports);
+            addImports(ifStmt->ifData.falseImports, ifStmt->ifData.falseImpls);
 
             addAllFromScopeToScope(this, ifStmt->ifData.elseScope, ii, true);
             addStaticIfs(ifStmt->ifData.elseScope, ifStmt->scope);
@@ -614,7 +614,7 @@ void Semantic::addStaticIfs(Scope *targetScope, Scope *importInto) {
     }
 }
 
-void Semantic::addImports(vector_t<Node *> imports) {
+void Semantic::addImports(vector_t<Node *> imports, vector_t<Node *> impls) {
     for (auto import : imports) {
         auto importTarget = resolve(import->importData.target);
 
@@ -632,6 +632,10 @@ void Semantic::addImports(vector_t<Node *> imports) {
         if (!import->importData.isFile) {
             addAllFromScopeToScope(this, importTarget->scope, import->scope, false);
         }
+    }
+
+    for (auto impl: impls) {
+        resolveTypes(impl);
     }
 }
 
@@ -837,8 +841,11 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
         // todo(chad): check fn is not external
         // todo(chad): check fn has at least one param
         // todo(chad): check first param is not polymorphic
-        auto firstParamType = resolve(vector_at(node->fnDeclData.params, 0)->typeInfo);
-        vector_append(firstParamType->typeData.scopedFns, node);
+        auto firstParamType = resolve(vector_at(node->fnDeclData.params, noIppFlag ? 0 : 1)->typeInfo);
+        while (firstParamType->typeData.kind == NodeTypekind::POINTER) {
+            firstParamType = resolve(firstParamType->typeData.pointerTypeData.underlyingType);
+        }
+        vector_append(*firstParamType->typeData.scopedFns, node);
     }
 
     semantic->currentFnDecl = savedFnDecl;
@@ -1497,6 +1504,7 @@ void resolveBinop(Semantic *semantic, Node *node) {
         auto newLocalStorage = new Node(node->region);
         newLocalStorage->type = NodeType::TYPE;
         newLocalStorage->typeInfo = resolvedLhsType;
+        initTypeData(newLocalStorage);
 
         semantic->addLocal(newLocalStorage);
     }
@@ -1504,6 +1512,7 @@ void resolveBinop(Semantic *semantic, Node *node) {
         auto newLocalStorage = new Node(node->region);
         newLocalStorage->type = NodeType::TYPE;
         newLocalStorage->typeInfo = resolvedRhsType;
+        initTypeData(newLocalStorage);
 
         semantic->addLocal(newLocalStorage);
     }
@@ -1588,7 +1597,7 @@ Node *resolveSymbolWithScopeType(Semantic *semantic, int64_t atom, Node *firstPa
         resolvedScopeType = resolve(resolvedScopeType->typeData.pointerTypeData.underlyingType);
     }
 
-    for (auto scope : resolvedScopeType->typeData.scopedFns) {
+    for (auto scope : *resolvedScopeType->typeData.scopedFns) {
         if (scope->fnDeclData.name->symbolData.atomId == atom) {
             return scope;
         }
@@ -1603,16 +1612,14 @@ void resolveFnCall(Semantic *semantic, Node *node) {
 
     Node *resolvedFn = nullptr;
 
-    // if the fn is a symbol and there's at least 1 runtime param
-    if (resolvedFn == nullptr && node->fnCallData.fn->type == NodeType::SYMBOL && node->fnCallData.params.length > 0) {
-        auto firstParam = vector_at(node->fnCallData.params, 0);
+    // if the fn is a symbol and there's at least 1 runtime param, look in the scope of the type to find the fn
+    unsigned long firstParamIndex = 0;
+    if (resolvedFn == nullptr && node->fnCallData.fn->type == NodeType::SYMBOL && node->fnCallData.params.length > firstParamIndex) {
+        auto firstParam = vector_at(node->fnCallData.params, firstParamIndex);
 
-        // look in the scope of the type
-        if (resolvedFn == nullptr) {
-            resolvedFn = resolveSymbolWithScopeType(semantic, node->fnCallData.fn->symbolData.atomId, firstParam);
-            if (resolvedFn != nullptr) {
-                node->fnCallData.fn->resolved = resolvedFn;
-            }
+        resolvedFn = resolveSymbolWithScopeType(semantic, node->fnCallData.fn->symbolData.atomId, firstParam);
+        if (resolvedFn != nullptr) {
+            node->fnCallData.fn->resolved = resolvedFn;
         }
     }
 
@@ -1684,6 +1691,7 @@ void resolveFnCall(Semantic *semantic, Node *node) {
 
         auto encounteredError = assignParams(semantic, node, declParams, node->fnCallData.params);
         for (auto p : node->fnCallData.params) {
+            p->semantic = false;
             semantic->resolveTypes(p);
         }
 
@@ -2005,6 +2013,7 @@ void resolveDeclParam(Semantic *semantic, Node *node) {
 
 void resolveValueParam(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->paramData.value);
+    node->paramData.type = node->paramData.value->typeInfo;
     node->typeInfo = node->paramData.value->typeInfo;
 }
 
@@ -2144,7 +2153,7 @@ void resolveModuleDot(Semantic *semantic, Node *node) {
     semantic->resolveTypes(found);
 
     if (found == nullptr) {
-        semantic->reportError({node, found}, Error{node->region, "Could not resolved dot"});
+        semantic->reportError({node, found}, Error{node->region, "Could not resolve dot"});
         return;
     }
 

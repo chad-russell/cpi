@@ -12,6 +12,9 @@ Parser::Parser(Lexer *lexer_) {
     imports = (vector_t<Node *> *) malloc(sizeof(vector_t<Node *>));
     *imports = vector_init<Node *>(16);
 
+    impls = (vector_t<Node *> *) malloc(sizeof(vector_t<Node *>));
+    *impls = vector_init<Node *>(16);
+
     allTopLevel = vector_init<Node *>(256);
 
     scopes.push(new Scope(nullptr));
@@ -539,6 +542,8 @@ Node *Parser::parseImplFnDecl() {
 
     fnDecl->fnDeclData.isImpl = true;
 
+    vector_append(*this->impls, fnDecl);
+
     return fnDecl;
 }
 
@@ -616,12 +621,12 @@ Node *Parser::parseTypeDecl() {
     auto typeName = parseSymbol();
 
     auto typeDecl = parseType();
+    initTypeData(typeDecl);
     scopeInsert(typeName->symbolData.atomId, typeDecl);
 
     typeDecl->typeData.name = typeName;
     typeDecl->region = Region{lexer->srcInfo, saved, typeDecl->region.end};
     typeDecl->scope = scopes.top();
-    typeDecl->typeData.scopedFns = vector_init<Node *>(4);
 
     return typeDecl;
 }
@@ -874,9 +879,11 @@ Node *Parser::parseIf() {
 
     auto savedStaticIfScope = this->staticIfScope;
     auto savedImports = this->imports;
+    auto savedImpls = this->impls;
 
     if (isStatic) {
         this->imports = &if_->ifData.trueImports;
+        this->impls = &if_->ifData.trueImpls;
         this->staticIfScope = scopes.top();
     }
 
@@ -906,6 +913,7 @@ Node *Parser::parseIf() {
 
         if (isStatic) {
             this->imports = &if_->ifData.falseImports;
+            this->impls = &if_->ifData.falseImpls;
             this->staticIfScope = scopes.top();
         }
 
@@ -943,6 +951,7 @@ Node *Parser::parseIf() {
     if (isStatic) {
         vector_append(this->staticIfScope->staticIfs, if_);
         this->imports = savedImports;
+        this->impls = savedImpls;
     }
 
     return if_;

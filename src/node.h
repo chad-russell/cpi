@@ -39,5 +39,6 @@ void initModuleData(Node *node);
 void initDeferData(Node *node);
 void initEndScopeData(Node *node);
 void initTypeData(Node *node);
+void initImportData(Node *node);
 
 #endif // NODE_H

@@ -225,7 +225,7 @@ struct TypeData {
     NodeTypekind kind;
     Node *name;
 
-    vector_t<Node *> scopedFns;
+    vector_t<Node *> *scopedFns;
 
     union {
         FnTypeData fnTypeData;
@@ -347,6 +347,9 @@ struct IfData {
 
     vector_t<Node *> trueImports;
     vector_t<Node *> falseImports;
+
+    vector_t<Node *> trueImpls;
+    vector_t<Node *> falseImpls;
 };
 
 struct WhileData {

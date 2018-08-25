@@ -39,6 +39,7 @@ struct Parser {
     int64_t mainAtom;
 
     vector_t<Node *> *imports;
+    vector_t<Node *> *impls;
 
     Scope *staticIfScope = nullptr;
 

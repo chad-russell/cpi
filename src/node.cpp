@@ -61,7 +61,10 @@ Node::Node(SourceInfo srcInfo, NodeType type_, Scope *scope_) : Node() {
         } break;
         case NodeType::TYPE: {
             initTypeData(this);
-        }
+        } break;
+        case NodeType::IMPORT: {
+            initImportData(this);
+        } break;
         default: {}
     }
 }
@@ -69,6 +72,8 @@ Node::Node(SourceInfo srcInfo, NodeType type_, Scope *scope_) : Node() {
 Node::Node(NodeTypekind typekind) : Node() {
     type = NodeType::TYPE;
     typeData.kind = typekind;
+
+    initTypeData(this);
 }
 
 Node::Node(Region r) {
@@ -101,8 +106,15 @@ void initEndScopeData(Node *node) {
     node->sourceMapStatement = true;
 }
 
+void initImportData(Node *node) {
+    node->importData.isFile = false;
+    node->importData.target = nullptr;
+    node->importData.alias = nullptr;
+}
+
 void initTypeData(Node *node) {
-    node->typeData.scopedFns = vector_init<Node *>(4);
+    node->typeData.scopedFns = (vector_t<Node *> *) malloc(sizeof(vector_t<Node *>));
+    *node->typeData.scopedFns = vector_init<Node *>(4);
     node->typeData.name = nullptr;
 }
 
@@ -133,6 +145,8 @@ void initIfData(Node *node) {
     node->ifData.elseScope = nullptr;
     node->ifData.trueImports = vector_init<Node *>(8);
     node->ifData.falseImports = vector_init<Node *>(8);
+    node->ifData.trueImpls = vector_init<Node *>(8);
+    node->ifData.falseImpls = vector_init<Node *>(8);
 }
 
 void initStructLiteralData(Node *node) {

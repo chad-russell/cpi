@@ -1,29 +1,12 @@
--- type Foo i64
+type I64 i64
 
--- #impl
--- fn print(foo: Foo) {
-    -- puts("foo!\n");
--- }
-
--- type Bar i64
-
--- #impl
--- fn print(bar: Bar) {
-    -- puts("bar!\n");
--- }
-
-fn print(t: !T) {
-    puts("something else!\n");
+#impl fn iter(i: I64) {
+    return 5;
 }
 
 fn main() {
-    -- f: Foo = 3;
-    -- print(f);
-
-    -- b: Bar = 8;
-    -- print(b);
-
-    print(56);
+    a := iter(cast(I64) 5);
 
     return 0;
 }
+
