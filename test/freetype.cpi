@@ -1,0 +1,7 @@
+#link "libfreetype";
+
+type Library *none
+type Face *none
+
+fn FT_Init_FreeType(library: *Library) i32
+fn FT_New_Face(library: Library, filePath: *i8, faceIndex: i64, face: *Face) i32

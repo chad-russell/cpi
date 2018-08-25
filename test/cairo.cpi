@@ -1,0 +1,35 @@
+#link "libcairo";
+
+#import "freetype": ft;
+
+FORMAT_INVALID: i32   = -1;
+FORMAT_ARGB32: i32    = 0;
+FORMAT_RGB24: i32     = 1;
+FORMAT_A8: i32        = 2;
+FORMAT_A1: i32        = 3;
+FORMAT_RGB16_565: i32 = 4;
+FORMAT_RGB30: i32     = 5;
+
+type FontFace none
+type Surface none
+type Context none
+
+type Glyph struct {
+    index: i64,
+    x: f64,
+    y: f64
+}
+
+fn cairo_ft_font_face_create_for_ft_face(face: ft.Face, loadFlags: i32) *FontFace
+fn cairo_image_surface_create_for_data(data: *i8, format: i32, width: i32, height: i32, stride: i32) *Surface
+fn cairo_surface_set_device_scale(surface: *Surface, xScale: f64, yScale: f64) none
+fn cairo_create(surface: *Surface) *Context
+fn cairo_set_source_rgba(context: *Context, r: f64, g: f64, b: f64, a: f64) none
+fn cairo_set_font_face(context: *Context, face: *FontFace) none
+fn cairo_set_font_size(context: *Context, ptSize: f64) none
+fn cairo_surface_destroy(surface: *Surface) none
+fn cairo_destroy(context: *Context) none
+fn cairo_font_face_destroy(face: *FontFace) none
+fn cairo_glyph_allocate(glyphCount: i32) *Glyph
+fn cairo_show_glyphs(cr: *Context, glyphs: *Glyph, numGlyphs: i32) none
+fn cairo_set_source_rgb(cr: *Context, r: f64, g: f64, b: f64) none

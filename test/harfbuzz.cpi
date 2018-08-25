@@ -1,0 +1,51 @@
+#link "libharfbuzz";
+
+type Blob none
+type Font none
+type Face none
+type Buffer none
+type Language *none
+
+type Feature struct {
+    tag: i32,
+    value: i32,
+    start: i32,
+    end: i32,
+}
+
+type GlyphInfo struct {
+    codepoint: i32,
+    mask: i32,
+    cluster: i32,
+    var1: i32,
+    var2: i32
+}
+
+type GlyphPosition struct {
+    xAdvance: i32,
+    yAdvance: i32,
+    xOffset: i32,
+    yOffset: i32,
+    var: i32
+}
+
+HB_DIRECTION_LTR: i32 = 4;
+HB_SCRIPT_COMMON: i32 = 1517910393;
+
+fn hb_blob_create_from_file(fileName: *i8) *Blob
+fn hb_face_create(blob: *Blob, index: i32) *Face
+fn hb_font_create(face: *Face) *Font
+fn hb_ot_font_set_funcs(font: *Font) none
+fn hb_font_set_scale(font: *Font, xScale: i32, yScale: i32) none
+fn hb_font_destroy(font: *Font) none
+fn hb_buffer_create() *Buffer
+fn hb_buffer_set_direction(buf: *Buffer, direction: i32) none
+fn hb_buffer_set_script(buf: *Buffer, script: i32) none
+fn hb_buffer_set_language(buf: *Buffer, language: Language) none
+fn hb_language_get_default() Language
+fn hb_buffer_add_utf8(buffer: *Buffer, text: *i8, textLength: i32, itemOffset: i32, itemLength: i32) none
+fn hb_shape(font: *Font, buffer: *Buffer, features: *Feature, numFeatures: i32) none
+fn hb_buffer_get_length(buf: *Buffer) i32
+fn hb_buffer_get_glyph_infos(buf: *Buffer, length: *i32) *GlyphInfo
+fn hb_buffer_get_glyph_positions(buf: *Buffer, length: *i32) *GlyphPosition
+fn hb_buffer_reset(buf: *Buffer) none
