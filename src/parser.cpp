@@ -1746,8 +1746,11 @@ Node *Parser::parseRvalueSimple() {
         expect(LexerTokenType::RPAREN, ")");
 
         cast->castData.value = parseRvalueSimple();
+        addLocal(cast->castData.value);
 
         cast->region.end = cast->castData.value->region.end;
+
+        addLocal(cast);
 
         return cast;
     }

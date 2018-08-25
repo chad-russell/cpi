@@ -30,6 +30,27 @@ Node *bytecodeResolve(Node *n) {
     return resolved;
 }
 
+bool isNumericType(Node *type) {
+    if (type == nullptr || type->type != NodeType::TYPE) {
+        return false;
+    }
+
+    switch (type->typeData.kind) {
+        case NodeTypekind::INT_LITERAL:
+        case NodeTypekind::I8:
+        case NodeTypekind::I16:
+        case NodeTypekind::I32:
+        case NodeTypekind::I64:
+        case NodeTypekind::FLOAT_LITERAL:
+        case NodeTypekind::F32:
+        case NodeTypekind::F64:
+            return true;
+        default: return false;
+    }
+
+    return false;
+}
+
 void BytecodeGen::binopHelper(string instructionStr, Node *node, int32_t scale) {
     string bytecodeStr;
 
@@ -966,7 +987,35 @@ void BytecodeGen::gen(Node *node) {
         case NodeType::CAST: {
             gen(node->castData.value);
 
-            node->bytecodeResolved = bytecodeResolve(node->castData.value);
+            storeValue(node->castData.value, node->castData.value->localOffset);
+
+            auto fromType = resolve(resolve(node->castData.value)->typeInfo);
+            auto toType = resolve(node->castData.type);
+
+            // handle numeric conversions
+            if (isNumericType(fromType)
+                && isNumericType(toType)
+                && fromType->typeData.kind != toType->typeData.kind) {
+                append(instructions, Instruction::CONVERT);
+
+                append(instructions, toBytes32(fromType->typeData.kind));
+                append(instructions, toBytes(node->castData.value->localOffset));
+
+                append(instructions, toBytes32(toType->typeData.kind));
+                append(instructions, toBytes(node->localOffset));
+            }
+            else {
+                // copy the bytes from the value's localOffset to the node's localOffset
+                append(instructions, Instruction::STORE);
+
+                append(instructions, Instruction::RELCONSTI64);
+                append(instructions, toBytes(node->localOffset));
+
+                append(instructions, Instruction::RELCONSTI64);
+                append(instructions, toBytes(node->castData.value->localOffset));
+
+                append(instructions, toBytes32(typeSize(node->castData.type)));
+            }
         } break;
         case NodeType::UNARY_NEG: {
             gen(node->unaryNegData.rewritten);
@@ -1136,6 +1185,7 @@ void BytecodeGen::storeValue(Node *node, int64_t offset) {
         case NodeType::FN_CALL:
         case NodeType::BINOP:
         case NodeType::UNARY_NOT:
+        case NodeType::CAST:
         case NodeType::DECL: {
             auto resolved = resolve(node);
 
@@ -1225,9 +1275,6 @@ void BytecodeGen::storeValue(Node *node, int64_t offset) {
             storeValue(node->stringLiteralData.arrayLiteralRepresentation, offset);
 
             this->forcing = savedForcing;
-        } break;
-        case NodeType::CAST: {
-            storeValue(node->castData.value, offset);
         } break;
         case NodeType::UNARY_NEG: {
             storeValue(node->unaryNegData.rewritten, offset);

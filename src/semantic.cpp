@@ -7,6 +7,28 @@
 #include <memory>
 #include <utility>
 
+Node * makeTypeConcrete(Node *typeInfo) {
+    auto resolved = resolve(typeInfo);
+    if (resolved == nullptr) {
+        return nullptr;
+    }
+
+    if (resolved->type != NodeType::TYPE) {
+        return typeInfo;
+    }
+
+    auto kind = resolved->typeData.kind;
+
+    if (kind == NodeTypekind::INT_LITERAL) {
+        typeInfo->typeData.kind = NodeTypekind::I64;
+    }
+    else if (kind == NodeTypekind::FLOAT_LITERAL) {
+        typeInfo->typeData.kind = NodeTypekind::F64;
+    }
+
+    return typeInfo;
+}
+
 void addContextParameterForCall(Semantic *semantic, Node *node) {
     auto newParams = vector_init<Node *>(node->fnCallData.params.length + 1);
 
@@ -240,14 +262,12 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
 
     // coercion from boolean to boolean literal or vice versa is valid
     if (desired->typeData.kind == NodeTypekind::BOOLEAN && actual->typeData.kind == NodeTypekind::BOOLEAN_LITERAL) {
-        desired->typeData.kind = actual->typeData.kind;
-        desired->typeData.boolTypeData = actual->typeData.boolTypeData;
+        desired->typeData = actual->typeData;
 
         return true;
     }
     if (actual->typeData.kind == NodeTypekind::BOOLEAN && desired->typeData.kind == NodeTypekind::BOOLEAN_LITERAL) {
-        actual->typeData.kind = desired->typeData.kind;
-        actual->typeData.boolTypeData = desired->typeData.boolTypeData;
+        actual->typeData = desired->typeData;
 
         return true;
     }
@@ -262,7 +282,7 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
             || actual->typeData.kind == NodeTypekind::F32
             || actual->typeData.kind == NodeTypekind::F64) {
 
-            desired->typeData.kind = actual->typeData.kind;
+            desired->typeData = actual->typeData;
 
             if (actual->typeData.kind == NodeTypekind::F32 || actual->typeData.kind == NodeTypekind::F64) {
                 desired->typeData.floatTypeData = (double) desired->typeData.intTypeData;
@@ -292,12 +312,11 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
             || desired->typeData.kind == NodeTypekind::I16
             || desired->typeData.kind == NodeTypekind::I32
             || desired->typeData.kind == NodeTypekind::I64) {
-            actual->typeData.kind = desired->typeData.kind;
+            actual->typeData = desired->typeData;
             return true;
         }
         else if (desired->typeData.kind == NodeTypekind::F32 || desired->typeData.kind == NodeTypekind::F64) {
-            actual->typeData.kind = desired->typeData.kind;
-            actual->typeData.floatTypeData = desired->typeData.floatTypeData;
+            actual->typeData = desired->typeData;
             return true;
         }
 
@@ -308,7 +327,7 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
     // todo(chad): check for overflow?
     if (desired->typeData.kind == NodeTypekind::FLOAT_LITERAL) {
         if (actual->typeData.kind == NodeTypekind::F32 || actual->typeData.kind == NodeTypekind::F64) {
-            desired->typeData.kind = actual->typeData.kind;
+            desired->typeData = actual->typeData;
             return true;
         }
         else if (actual->typeData.kind == NodeTypekind::FLOAT_LITERAL) {
@@ -321,7 +340,7 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
     }
     if (actual->typeData.kind == NodeTypekind::FLOAT_LITERAL) {
         if (desired->typeData.kind == NodeTypekind::F32 || desired->typeData.kind == NodeTypekind::F64) {
-            actual->typeData.kind = desired->typeData.kind;
+            actual->typeData = desired->typeData;
             return true;
         }
         return false;
@@ -1048,15 +1067,19 @@ void resolveArrayIndex(Semantic *semantic, Node *node) {
 
     node->typeInfo = resolvedTargetTypeInfo->typeData.structTypeData.secretArrayElementType;
 
-    // a[i] <==> ^((cast(*i32) a) + i), for example (if typeof(a) is []i32)
+    // a[i] <==> ^(a.data + i)
+    auto dataSym = new Node();
+    dataSym->scope = node->dotData.lhs->scope;
+    dataSym->type = NodeType::SYMBOL;
+    dataSym->symbolData.atomId = atomTable->insertStr("data");
 
-    auto aCasted = new Node(node->region);
-    aCasted->type = NodeType::CAST;
-    initCastData(aCasted);
-    aCasted->castData.isCastFromArrayToDataPtr = true;
-    aCasted->castData.type = new Node(NodeTypekind::POINTER);
-    aCasted->castData.type->typeData.pointerTypeData.underlyingType = node->typeInfo;
-    aCasted->castData.value = node->arrayIndexData.target;
+    auto aCasted = new Node();
+    aCasted->scope = node->scope;
+    aCasted->type = NodeType::DOT;
+    initDotData(aCasted);
+    aCasted->dotData.lhs = node->arrayIndexData.target;
+    aCasted->dotData.rhs = dataSym;
+    semantic->resolveTypes(aCasted);
 
     auto add = new Node(node->region.srcInfo, NodeType::BINOP, node->scope);
     add->binopData.type = LexerTokenType::ADD;
@@ -1313,7 +1336,7 @@ void resolveDecl(Semantic *semantic, Node *node) {
     if (shouldCheckTypeMatch && !typesMatch(node->declData.type, node->declData.initialValue->typeInfo, semantic)) {
         ostringstream s("");
         s << "Type mismatch! wanted " << node->declData.type->typeData
-          << ", got " << node->declData.initialValue->typeInfo->typeData;
+          << ", got " << resolve(node->declData.initialValue->typeInfo)->typeData;
         semantic->reportError({node, node->declData.initialValue, node->declData.type},
                               Error{node->region, s.str()});
     }
@@ -1329,7 +1352,7 @@ void resolveDecl(Semantic *semantic, Node *node) {
     }
 
     auto resolvedDeclDataType = resolve(node->declData.type);
-    node->typeInfo = node->declData.type;
+    node->typeInfo = makeTypeConcrete(node->declData.type);
 
     if (node->declData.initialValue == nullptr) {
         return;
@@ -1492,7 +1515,6 @@ void resolveBinop(Semantic *semantic, Node *node) {
 
     if (resolvedLhsType->typeData.kind == NodeTypekind::POINTER
         && (resolvedRhsType->typeData.kind == NodeTypekind::INT_LITERAL
-            || resolvedRhsType->typeData.kind == NodeTypekind::I32
             || resolvedRhsType->typeData.kind == NodeTypekind::I64)) {
         node->typeInfo = resolvedLhsType;
         node->binopData.rhsScale = typeSize(resolvedLhsType->typeData.pointerTypeData.underlyingType);
@@ -1501,7 +1523,6 @@ void resolveBinop(Semantic *semantic, Node *node) {
 
     if (resolvedRhsType->typeData.kind == NodeTypekind::POINTER
         && (resolvedLhsType->typeData.kind == NodeTypekind::INT_LITERAL
-            || resolvedLhsType->typeData.kind == NodeTypekind::I32
             || resolvedLhsType->typeData.kind == NodeTypekind::I64)) {
         node->typeInfo = resolvedRhsType;
         node->binopData.rhsScale = typeSize(resolvedRhsType->typeData.pointerTypeData.underlyingType);
@@ -2010,6 +2031,8 @@ void resolveDeclParam(Semantic *semantic, Node *node) {
 
         maybeStructDefault(semantic, node->paramData.value, resolve(node->paramData.type));
     }
+
+    makeTypeConcrete(node->typeInfo);
 }
 
 void resolveValueParam(Semantic *semantic, Node *node) {
@@ -2418,6 +2441,9 @@ void resolveArrayLiteral(Semantic *semantic, Node *node) {
     auto castedHeapified = new Node(node->region.srcInfo, NodeType::CAST, node->scope);
     castedHeapified->castData.type = pointerToTypeOfElem;
     castedHeapified->castData.value = heapified;
+
+    semantic->addLocal(castedHeapified);
+    semantic->addLocal(heapified);
 
     auto countNode = new Node(node->region.srcInfo, NodeType::INT_LITERAL, node->scope);
     countNode->intLiteralData.value = static_cast<int64_t>(elemsStruct->structLiteralData.params.length);

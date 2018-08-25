@@ -1,11 +1,11 @@
-#import "printing": p;
+#import "io";
 #import "gl";
 
 fn makeWindow() {
     window: gl.Window;
 
     if !gl.glfwInit() {
-        p.println("Failed to init GLFW.");
+        io.println("Failed to init GLFW.");
         panic();
     }
 
@@ -15,7 +15,7 @@ fn makeWindow() {
 
     window = gl.glfwCreateWindow(1000, 600, "cpi-gl\0".data);
     if window == cast(gl.Window) nil {
-        p.println("Failed to create window.");
+        io.println("Failed to create window.");
         gl.glfwTerminate();
         panic();
     }

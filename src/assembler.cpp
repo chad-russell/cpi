@@ -413,6 +413,7 @@ const vector<string> AssemblyLexer::instructionStrings = {
     "PUTS",
     "NOP",
     "NOT",
+    "CONVERT",
 
     // literals
     "CONSTI8", "CONSTI16", "CONSTI32", "CONSTI64", "CONSTF32", "CONSTF64",
@@ -578,6 +579,15 @@ void MnemonicPrinter::step() {
         instructionString.append(" ");
         auto callPc = consume<int64_t>();
         instructionString.append(to_string(callPc));
+    } else if (startsWith(&inst, "CONVERT")) {
+        instructionString.append(inst);
+        instructionString.append(" ");
+        auto fromType = consume<int32_t>();
+        instructionString.append(to_string(fromType));
+        readTypeAndInt();
+        auto toType = consume<int32_t>();
+        instructionString.append(to_string(toType));
+        readTypeAndInt();
     } else if (startsWith(&inst, "PUTS")) {
         instructionString.append(inst);
         instructionString.append(" ");

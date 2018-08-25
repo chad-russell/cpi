@@ -67,6 +67,7 @@ void interpretPanic(Interpreter *interp);
 void interpretPuts(Interpreter *interp);
 void interpretNop(Interpreter *interp);
 void interpretNot(Interpreter *interp);
+void interpretConvert(Interpreter *interp);
 
 class Interpreter {
 public:
@@ -233,7 +234,8 @@ public:
                 interpretPanic,
                 interpretPuts,
                 interpretNop,
-                interpretNot};
+                interpretNot,
+                interpretConvert};
 
         libs = vector_init<void *>(10);
         for (auto lib : externalLibs) {
@@ -360,6 +362,35 @@ public:
         }
     }
 };
+
+template<typename FROM, typename TO>
+void interpretConvertFromTo(void *fromAddr, void *toAddr) {
+    FROM from = *((FROM *) fromAddr);
+
+    auto to = (TO) from;
+
+    auto *castedToAddr = (TO *) toAddr;
+    *castedToAddr = to;
+}
+
+template<typename T>
+void interpretConvertFrom(void *fromAddr, void *toAddr, NodeTypekind toType) {
+    switch (toType) {
+        case NodeTypekind::I8: {
+            interpretConvertFromTo<T, int8_t>(fromAddr, toAddr);
+        } break;
+        case NodeTypekind::I16: {
+            interpretConvertFromTo<T, int16_t>(fromAddr, toAddr);
+        } break;
+        case NodeTypekind::I32: {
+            interpretConvertFromTo<T, int32_t>(fromAddr, toAddr);
+        } break;
+        case NodeTypekind::I64: {
+            interpretConvertFromTo<T, int64_t>(fromAddr, toAddr);
+        } break;
+        default: cpi_assert(false);
+    }
+}
 
 template <typename T>
 void interpretMathAdd(Interpreter *interp) {

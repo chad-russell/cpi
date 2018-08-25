@@ -110,6 +110,7 @@ enum class Instruction : unsigned char {
     PUTS,
     NOP,
     NOT,
+    CONVERT,
 
     // literals
     CONSTI8, CONSTI16, CONSTI32, CONSTI64, CONSTF32, CONSTF64,

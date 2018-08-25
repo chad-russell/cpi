@@ -79,24 +79,24 @@ enum class NodeType {
     SCOPE = 46,
 };
 
-enum class NodeTypekind {
-    NONE,
-    INT_LITERAL,
-    I8,
-    I16,
-    I32,
-    I64,
-    FLOAT_LITERAL,
-    F32,
-    F64,
-    FN,
-    BOOLEAN_LITERAL,
-    BOOLEAN,
-    STRUCT,
-    SYMBOL,
-    POINTER,
-    EXPOSED_AST,
-    DOT,
+enum class NodeTypekind: int32_t {
+    NONE = 0,
+    INT_LITERAL = 1,
+    I8 = 2,
+    I16 = 3,
+    I32 = 4,
+    I64 = 5,
+    FLOAT_LITERAL = 6,
+    F32 = 7,
+    F64 = 8,
+    FN = 9,
+    BOOLEAN_LITERAL = 10,
+    BOOLEAN = 11,
+    STRUCT = 12,
+    SYMBOL = 13,
+    POINTER = 14,
+    EXPOSED_AST = 15,
+    DOT = 16,
 };
 
 enum class LexerTokenType : int32_t {

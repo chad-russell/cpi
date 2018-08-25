@@ -1,4 +1,4 @@
-#import "printing": p;
+#import "io";
 #import "mem";
 
 -- todo(chad): this should be built-in to the compiler
@@ -112,7 +112,7 @@ fn test() {
     hashInsert(&h, "barrrrrr", 5);
     hashInsert(&h, "carrrrrr", 13);
 
-    p.printMany({
+    io.printMany({
         "bar is: ", ^hashGet(&h, "barrrrrr"), "\n",
         "car is: ", ^hashGet(&h, "carrrrrr"), "\n",
     });

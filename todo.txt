@@ -5,8 +5,7 @@ TODO:
 
     - +=, -=, *=, /=
 
-    - bitwise and/or/xor
-        - shifting (?)
+    - bitwise and/or/xor/etc (and shifting?)
 
     - do static array sizes make sense?
         - [5]i32

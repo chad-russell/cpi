@@ -1,5 +1,5 @@
 fn drawFractal() {
-    #import "printing": p;
+    #import "io";
     #import "buffer";
 
     shades := " .-:;+=xX$& ";
@@ -37,6 +37,6 @@ fn drawFractal() {
             &buf|buffer.append(shades[i]);
         }
 
-        buf.buf | p.println;
+        buf.buf | io.println;
     }
 }

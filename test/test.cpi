@@ -1,4 +1,4 @@
-#import "printing";
+#import "io";
 #import "buffer";
 
 fn main() {
@@ -86,7 +86,7 @@ fn main() {
 
     assert(stupid_sqrt(9) == 3);
 
-    assert(id!(i32)(3) == 3);
+    assert(id!(i32)(cast(i32) 3) == 3);
 
     p: pair;
     p.x = 8;
@@ -150,7 +150,7 @@ fn main() {
 
     testPipe();
 
-    printing.printMany({"fuckme: ", fuckme, "\n"});
+    io.printMany({"fuckme: ", fuckme, "\n"});
 
     assert(test2.a == 7);
     assert(test2.test.test2.test.test2.bbb() == test2.test.topLevel);
@@ -160,7 +160,7 @@ fn main() {
     assert(context.id == 1);
 
     testIteration(5);
-    printing.println("--------");
+    io.println("--------");
     testIteration("foo");
 
     return 0;
@@ -245,7 +245,7 @@ fn testModule() {
 
 fn testPrinting() {
     e: enum {x: i32, y: bool} = { y: false };
-    printing.printWithSpaces({123, "string", false, []{1, 2, 3}, {x: 3, y: &8767}, e});
+    io.printWithSpaces({123, "string", false, []{1, 2, 3}, {x: 3, y: &8767}, e});
     puts("\n\n");
 }
 
@@ -474,7 +474,7 @@ fn id(t: !T) T {
 }
 
 fn idC(t: !T) {
-    printing.println({id: context.id});
+    io.println({id: context.id});
     return t;
 }
 
@@ -1033,7 +1033,7 @@ impl []i8 {
 fn testIteration(t: !T) {
     it := t|iter;
     while !it.empty {
-        printing.println(it.front);
+        io.println(it.front);
         &it|popFront;
     }
 }

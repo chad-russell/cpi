@@ -577,6 +577,32 @@ void interpretNot(Interpreter *interp) {
     *ptr = !b;
 }
 
+// convert
+void interpretConvert(Interpreter *interp) {
+    auto fromType = (NodeTypekind) interp->consume<int32_t>();
+    auto fromAddr = (interp->stack.data() + interp->bp + interp->consume<int64_t>());
+
+    auto toType = (NodeTypekind) interp->consume<int32_t>();
+    auto toAddr = (interp->stack.data() + interp->bp + interp->consume<int64_t>());
+
+    switch (fromType) {
+        case NodeTypekind::I8: {
+            interpretConvertFrom<int8_t>(fromAddr, toAddr, toType);
+        } break;
+        case NodeTypekind::I16: {
+            interpretConvertFrom<int16_t>(fromAddr, toAddr, toType);
+        } break;
+        case NodeTypekind::I32: {
+            interpretConvertFrom<int32_t>(fromAddr, toAddr, toType);
+        } break;
+        case NodeTypekind::INT_LITERAL: // todo(chad): why are there still INT_LITERAL types at this point?
+        case NodeTypekind::I64: {
+            interpretConvertFrom<int64_t>(fromAddr, toAddr, toType);
+        } break;
+        default: cpi_assert(false);
+    }
+}
+
 // calli
 void interpretCalli(Interpreter *interp) {
     auto fnTableIndex = interp->read<int64_t>();
