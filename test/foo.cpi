@@ -1,12 +1,7 @@
-type I64 i64
-
-#impl fn iter(i: I64) {
-    return 5;
-}
-
 fn main() {
-    a := iter(cast(I64) 5);
+    a := 3;
+    a -= 4;
 
-    return 0;
+    return a;
 }
 

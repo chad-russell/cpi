@@ -743,7 +743,7 @@ Node *Parser::parseScopedStmt() {
 
     if (lvalue->type == NodeType::FN_CALL
         || lvalue->type == NodeType::PANIC
-        || (lvalue->type == NodeType::BINOP && lvalue->binopData.type == LexerTokenType::VERTICAL_BAR)) {
+        || lvalue->type == NodeType::BINOP) {
         lvalue->sourceMapStatement = true;
         expectSemicolon();
         return lvalue;

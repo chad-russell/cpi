@@ -500,6 +500,12 @@ void LlvmGen::gen(Node *node) {
             node->isLocal = node->paramData.value->isLocal;
         } break;
         case NodeType::BINOP: {
+            auto resolved = resolve(node);
+            if (resolved != node) {
+                gen(resolved);
+                return;
+            }
+
             if (node->binopData.type == LexerTokenType::VERTICAL_BAR) {
                 gen(node->resolved);
             }

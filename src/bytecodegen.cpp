@@ -500,6 +500,12 @@ void BytecodeGen::gen(Node *node) {
             node->localOffset = resolved->localOffset;
         } break;
         case NodeType::BINOP: {
+            auto resolved = resolve(node);
+            if (resolved != node) {
+                gen(resolved);
+                return;
+            }
+
             if (node->binopData.type == LexerTokenType::VERTICAL_BAR) {
                 gen(bytecodeResolve(node));
             }

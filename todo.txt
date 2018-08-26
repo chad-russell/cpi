@@ -1,11 +1,11 @@
 TODO:
-    - unsigned integer types
+    - +=, -=, *=, /=
 
-    - best way of specifying generic types (returntype/typeof hacks are a little janky)
+    - unsigned integer types
 
     - float literals in aliases
 
-    - +=, -=, *=, /=
+    - best way of specifying generic types (returntype/typeof hacks are a little janky)
 
     - bitwise and/or/xor/etc (and shifting?)
 

@@ -1485,9 +1485,52 @@ void rewritePipe(Semantic *semantic, Node *node) {
     node->typeInfo = fnCallNode->typeInfo;
 }
 
+void rewriteMathEQ(Semantic *semantic, Node *node) {
+    LexerTokenType binopType;
+    switch (node->binopData.type) {
+        case LexerTokenType::ADDEQ: {
+            binopType = LexerTokenType::ADD;
+        } break;
+        case LexerTokenType::SUBEQ: {
+            binopType = LexerTokenType::SUB;
+        } break;
+        case LexerTokenType::MULEQ: {
+            binopType = LexerTokenType::MUL;
+        } break;
+        case LexerTokenType::DIVEQ: {
+            binopType = LexerTokenType::DIV;
+        } break;
+        default: cpi_assert(false);
+    }
+
+    auto binop = new Node(node->region.srcInfo, NodeType::BINOP, node->scope);
+    binop->region = node->region;
+    binop->binopData.type = binopType;
+    binop->binopData.lhs = node->binopData.lhs;
+    binop->binopData.rhs = node->binopData.rhs;
+    semantic->addLocal(binop);
+    semantic->resolveTypes(binop);
+
+    auto assign = new Node(node->region.srcInfo, NodeType::ASSIGN, node->scope);
+    assign->region = node->region;
+    assign->assignData.lhs = node->binopData.lhs;
+    assign->assignData.rhs = binop;
+    semantic->resolveTypes(assign);
+
+    node->resolved = assign;
+}
+
 void resolveBinop(Semantic *semantic, Node *node) {
     if (node->binopData.type == LexerTokenType::VERTICAL_BAR) {
         rewritePipe(semantic, node);
+        return;
+    }
+
+    if (node->binopData.type == LexerTokenType::ADDEQ
+        || node->binopData.type == LexerTokenType::SUBEQ
+        || node->binopData.type == LexerTokenType::MULEQ
+        || node->binopData.type == LexerTokenType::DIVEQ) {
+        rewriteMathEQ(semantic, node);
         return;
     }
 
@@ -2616,8 +2659,6 @@ void resolveFor(Semantic *semantic, Node *node) {
 
     // indexDecl + 1
     auto incrementIndexBinop = new Node(node->region.srcInfo, NodeType::BINOP, node->scope);
-    incrementIndexBinop->type = NodeType::BINOP;
-    initBinopData(incrementIndexBinop);
     incrementIndexBinop->binopData.type = LexerTokenType::ADD;
     incrementIndexBinop->binopData.lhs = index;
     incrementIndexBinop->binopData.rhs = one;

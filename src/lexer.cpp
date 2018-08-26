@@ -145,11 +145,15 @@ void Lexer::popFront() {
     if (tryEat(&next, ")", LexerTokenType::RPAREN)) { return; }
     if (tryEat(&next, "[", LexerTokenType::LSQUARE)) { return; }
     if (tryEat(&next, "]", LexerTokenType::RSQUARE)) { return; }
+    if (tryEat(&next, "-=", LexerTokenType::SUBEQ)) { return; }
+    if (tryEat(&next, "+=", LexerTokenType::ADDEQ)) { return; }
+    if (tryEat(&next, "*=", LexerTokenType::MULEQ)) { return; }
+    if (tryEat(&next, "/=", LexerTokenType::DIVEQ)) { return; }
     if (tryEat(&next, "-", LexerTokenType::SUB)) { return; }
     if (tryEat(&next, "+", LexerTokenType::ADD)) { return; }
     if (tryEat(&next, "*", LexerTokenType::MUL)) { return; }
-    if (tryEat(&next, "^", LexerTokenType::DEREF)) { return; }
     if (tryEat(&next, "/", LexerTokenType::DIV)) { return; }
+    if (tryEat(&next, "^", LexerTokenType::DEREF)) { return; }
     if (tryEat(&next, "==", LexerTokenType::EQ_EQ)) { return; }
     if (tryEat(&next, "!=", LexerTokenType::NE)) { return; }
     if (tryEat(&next, "<=", LexerTokenType::LE)) { return; }
@@ -518,6 +522,10 @@ ostream &operator<<(ostream &os, LexerTokenType tokenType) {
 
 bool isBinop(LexerTokenType type) {
     return isBooleanBinop(type)
+           || type == LexerTokenType::ADDEQ
+           || type == LexerTokenType::SUBEQ
+           || type == LexerTokenType::MULEQ
+           || type == LexerTokenType::DIVEQ
            || type == LexerTokenType::ADD
            || type == LexerTokenType::SUB
            || type == LexerTokenType::MUL
