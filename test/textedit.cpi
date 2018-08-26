@@ -142,7 +142,7 @@ fn drawText(tctx: *TextContext) {
         x = x + cast(i32) (cast(f64) (glyphPos + i).xAdvance / 64.0);
         y = y + cast(i32) (cast(f64) (glyphPos + i).yAdvance / 64.0);
 
-        i = i + 1;
+        i += 1;
     }
 
     -- Move glyph to be on window middle
@@ -152,7 +152,7 @@ fn drawText(tctx: *TextContext) {
 
         ithCairoGlyph.y = ithCairoGlyph.y + (cast(f64) HEIGHT) / 2;
 
-        i = i + 1;
+        i += 1;
     }
 
     -- Fill background in white

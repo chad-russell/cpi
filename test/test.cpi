@@ -171,7 +171,7 @@ fn runAllTests() {
 }
 
 fn incrementContextId() {
-    context.id = context.id + 1;
+    context.id += 1;
 }
 
 fn testPipe() {
@@ -187,7 +187,7 @@ fn testPipe() {
 fn testDefer() {
     a := 3;
     defer {
-        a = a + 1;
+        a += 1;
     }
     return a;
 }
@@ -376,7 +376,7 @@ fn testMalloc() {
 fn testWhile1() {
     a := 3;
     while a != 10 {
-        a = a + 1;
+        a += 1;
     }
     assert(a == 10);
 }
@@ -994,7 +994,7 @@ type String []i8
     }
 
     #impl fn popFront(it: *iterator) {
-        it.index = it.index + 1;
+        it.index += 1;
         if it.index >= it.until {
             it.empty = true;
         }
@@ -1025,7 +1025,7 @@ type I64 i64
     }
 
     #impl fn popFront(i: *iterator) {
-        i.front = i.front + 1;
+        i.front += 1;
         if i.front >= i.until { i.empty = true; }
     }
 

@@ -150,19 +150,19 @@ fn runGame() {
             else if event._type == KEYDOWN
             {
                 if event.keysym.sym == K_RIGHT {
-                    playerPos.x = playerPos.x + 10;
+                    playerPos.x += 10;
                 }
                 else if event.keysym.sym == K_LEFT {
-                    playerPos.x = playerPos.x - 10;
+                    playerPos.x -= 10;
                 }
                 else if event.keysym.sym == K_UP {
-                    playerPos.y = playerPos.y - 10;
+                    playerPos.y -= 10;
                 }
                 else if event.keysym.sym == K_DOWN {
-                    playerPos.y = playerPos.y + 10;
+                    playerPos.y += 10;
                 }
 
-                keydown = keydown + 1;
+                keydown += 1;
             }
 
             SDL_RenderClear(renderer);

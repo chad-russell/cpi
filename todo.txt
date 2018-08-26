@@ -31,8 +31,6 @@ TODO:
     - switch (on enum (tag))
         - only real benefit is that the compiler could warn you if you miss a case
 
-    - test the shit out of it
-
     - threading
         - for interpreter, should create another interpreter and add it to a list. Execution should round-robin over all interpreters in the list
         - for llvm version, can utilize pthread routines

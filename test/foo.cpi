@@ -1,5 +1,7 @@
 fn main() {
-    a : i16 = 8;
-    b := 1;
-    return a ~shr cast(i16) b;
+    #import "textedit";
+    #import "sdl";
+
+    -- textedit.example();
+    sdl.runGame();
 }

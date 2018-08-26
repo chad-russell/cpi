@@ -41,7 +41,7 @@ impl str {
         i := 0;
         while i < str1.count {
             if str1[i] != str2[i] { return false; }
-            i = i + 1;
+            i += 1;
         }
 
         return true;
@@ -72,7 +72,7 @@ fn hashInsert(ht: !T, key: !KeyType, value: !ValueType) {
         bucket.value = value;
 
         lastBucket.next = bucket;
-        ht.size = ht.size + 1;
+        ht.size += 1;
     }
     else {
         bucket := mem.alloc!(typeof(^ht.buckets[0]))();
@@ -80,7 +80,7 @@ fn hashInsert(ht: !T, key: !KeyType, value: !ValueType) {
         bucket.value = value;
 
         ht.buckets[hash] = bucket;
-        ht.size = ht.size + 1;
+        ht.size += 1;
     }
 
     return {};
