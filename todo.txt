@@ -1,24 +1,22 @@
 TODO:
-    - +=, -=, *=, /=
-
-    - unsigned integer types
-
-    - float literals in aliases
-
-    - best way of specifying generic types (returntype/typeof hacks are a little janky)
-
-    - bitwise and/or/xor/etc (and shifting?)
-
     - autocast
+
+    - disallow modifying aliases (i.e. any kind of lvalue assignment)
+
+    - character literals
+
+    - something for c-style enums?
+        - like a way to specify that our enum has no value
 
     - do static array sizes make sense?
         - [5]i32
 
     - way to specify foreign function names different from given name
-        - would require attributes
         - ```
-            @foreign("init") fn glfwInit() bool
+            #foreign("init") fn glfwInit() bool
         ```
+
+    - best way of specifying generic types (returntype/typeof hacks are maybe a little janky)
 
     - better interpreter debugging
         - support for removing breakpoints

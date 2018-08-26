@@ -60,21 +60,25 @@ void BytecodeGen::binopHelper(string instructionStr, Node *node, int32_t scale) 
 
     string toAppend;
     switch (kind) {
+        case NodeTypekind::U8:
         case NodeTypekind::I8: {
             toAppend = "I8";
             bytecodeStr = "RELI8";
         } break;
+        case NodeTypekind::U16:
         case NodeTypekind::I16: {
             toAppend = "I16";
             bytecodeStr = "RELI16";
         } break;
         case NodeTypekind::BOOLEAN:
         case NodeTypekind::BOOLEAN_LITERAL:
+        case NodeTypekind::U32:
         case NodeTypekind::I32: {
             toAppend = "I32";
             bytecodeStr = "RELI32";
         } break;
         case NodeTypekind::POINTER:
+        case NodeTypekind::U64:
         case NodeTypekind::I64: {
             toAppend = "I64";
             bytecodeStr = "RELI64";
@@ -304,23 +308,27 @@ void BytecodeGen::gen(Node *node) {
         } break;
         case NodeType::INT_LITERAL: {
             switch (node->typeInfo->typeData.kind) {
+                case NodeTypekind::U8:
                 case NodeTypekind::I8: {
                     append(node->bytecode, Instruction::CONSTI8);
                     auto litData = static_cast<int8_t>(node->intLiteralData.value);
                     append(node->bytecode, toBytes(litData));
                 } break;
+                case NodeTypekind::U16:
                 case NodeTypekind::I16: {
                     append(node->bytecode, Instruction::CONSTI16);
                     auto litData = static_cast<int16_t>(node->intLiteralData.value);
                     append(node->bytecode, toBytes(litData));
                 } break;
+                case NodeTypekind::U32:
                 case NodeTypekind::I32: {
                     append(node->bytecode, Instruction::CONSTI32);
                     auto litData = static_cast<int32_t>(node->intLiteralData.value);
                     append(node->bytecode, toBytes(litData));
                 } break;
-                case NodeTypekind::INT_LITERAL:
-                case NodeTypekind::I64: {
+                case NodeTypekind::U64:
+                case NodeTypekind::I64:
+                case NodeTypekind::INT_LITERAL: {
                     append(node->bytecode, Instruction::CONSTI64);
                     auto litData = node->intLiteralData.value;
                     append(node->bytecode, toBytes(litData));
@@ -460,22 +468,26 @@ void BytecodeGen::gen(Node *node) {
                         append(node->bytecode, toBytes(localOffset));
                     }
                 } break;
+                case NodeTypekind::U8:
                 case NodeTypekind::I8: {
                     append(node->bytecode, Instruction::RELI8);
                     append(node->bytecode, toBytes(localOffset));
                 } break;
+                case NodeTypekind::U16:
                 case NodeTypekind::I16: {
                     append(node->bytecode, Instruction::RELI64);
                     append(node->bytecode, toBytes(localOffset));
                 } break;
                 case NodeTypekind::BOOLEAN_LITERAL:
                 case NodeTypekind::BOOLEAN:
+                case NodeTypekind::U32:
                 case NodeTypekind::I32: {
                     append(node->bytecode, Instruction::RELI64);
                     append(node->bytecode, toBytes(localOffset));
                 } break;
                 case NodeTypekind::POINTER:
                 case NodeTypekind::INT_LITERAL:
+                case NodeTypekind::U64:
                 case NodeTypekind::I64: {
                     append(node->bytecode, Instruction::RELI64);
                     append(node->bytecode, toBytes(localOffset));
@@ -718,6 +730,49 @@ void BytecodeGen::gen(Node *node) {
                         else {
                             binopHelper("SGE", node);
                         }
+                    } break;
+                    case LexerTokenType::MOD: {
+                        if (isFloat) {
+                            binopHelper("REM", node);
+                        }
+                        else {
+                            binopHelper("SREM", node);
+                        }
+                    } break;
+                    case LexerTokenType::BITAND: {
+                        append(instructions, Instruction::BITAND);
+                        append(instructions, toBytes32(typeSize(node->binopData.lhs->typeInfo)));
+                        append(instructions, toBytes(node->binopData.lhsTemporary->localOffset));
+                        append(instructions, toBytes(node->binopData.rhsTemporary->localOffset));
+                        append(instructions, toBytes(node->localOffset));
+                    } break;
+                    case LexerTokenType::BITOR: {
+                        append(instructions, Instruction::BITOR);
+                        append(instructions, toBytes32(typeSize(node->binopData.lhs->typeInfo)));
+                        append(instructions, toBytes(node->binopData.lhsTemporary->localOffset));
+                        append(instructions, toBytes(node->binopData.rhsTemporary->localOffset));
+                        append(instructions, toBytes(node->localOffset));
+                    } break;
+                    case LexerTokenType::BITXOR: {
+                        append(instructions, Instruction::BITXOR);
+                        append(instructions, toBytes32(typeSize(node->binopData.lhs->typeInfo)));
+                        append(instructions, toBytes(node->binopData.lhsTemporary->localOffset));
+                        append(instructions, toBytes(node->binopData.rhsTemporary->localOffset));
+                        append(instructions, toBytes(node->localOffset));
+                    } break;
+                    case LexerTokenType::BITSHL: {
+                        append(instructions, Instruction::BITSHL);
+                        append(instructions, toBytes32(typeSize(node->binopData.lhs->typeInfo)));
+                        append(instructions, toBytes(node->binopData.lhsTemporary->localOffset));
+                        append(instructions, toBytes(node->binopData.rhsTemporary->localOffset));
+                        append(instructions, toBytes(node->localOffset));
+                    } break;
+                    case LexerTokenType::BITSHR: {
+                        append(instructions, Instruction::BITSHR);
+                        append(instructions, toBytes32(typeSize(node->binopData.lhs->typeInfo)));
+                        append(instructions, toBytes(node->binopData.lhsTemporary->localOffset));
+                        append(instructions, toBytes(node->binopData.rhsTemporary->localOffset));
+                        append(instructions, toBytes(node->localOffset));
                     } break;
                     default:
                         cpi_assert(false);
@@ -1018,6 +1073,20 @@ void BytecodeGen::gen(Node *node) {
 
             node->isBytecodeLocal = true;
         } break;
+        case NodeType::UNARY_BITNOT: {
+            gen(node->nodeData);
+
+            if (node->nodeData->isLocal) {
+                storeValue(node->nodeData, node->nodeData->localOffset);
+            }
+            storeValue(node->nodeData, node->localOffset);
+
+            append(instructions, Instruction::BITNOT);
+            append(instructions, toBytes(typeSize(node->typeInfo)));
+            append(instructions, toBytes(node->localOffset));
+
+            node->isBytecodeLocal = true;
+        } break;
         case NodeType::ARRAY_LITERAL: {
             // nothing to do here! wait until we actually need to store it somewhere
         } break;
@@ -1169,6 +1238,7 @@ void BytecodeGen::storeValue(Node *node, int64_t offset) {
         case NodeType::FN_CALL:
         case NodeType::BINOP:
         case NodeType::UNARY_NOT:
+        case NodeType::UNARY_BITNOT:
         case NodeType::CAST:
         case NodeType::DECL: {
             auto resolved = resolve(node);

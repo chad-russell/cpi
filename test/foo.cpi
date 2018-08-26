@@ -1,7 +1,5 @@
 fn main() {
-    a := 3;
-    a -= 4;
-
-    return a;
+    a : i16 = 8;
+    b := 1;
+    return a ~shr cast(i16) b;
 }
-

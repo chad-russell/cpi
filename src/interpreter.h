@@ -26,15 +26,6 @@ void interpretMathDiv(Interpreter *interp);
 template <typename T>
 void interpretMathMod(Interpreter *interp);
 
-template <int32_t bits, typename T>
-void interpretMathBitwiseAnd(Interpreter *interp);
-
-template <int32_t bits, typename T>
-void interpretMathBitwiseOr(Interpreter *interp);
-
-template <int32_t bits, typename T>
-void interpretMathBitwiseXor(Interpreter *interp);
-
 template <typename T>
 void interpretCmpEq(Interpreter *interp);
 
@@ -67,7 +58,13 @@ void interpretPanic(Interpreter *interp);
 void interpretPuts(Interpreter *interp);
 void interpretNop(Interpreter *interp);
 void interpretNot(Interpreter *interp);
+void interpretBitNot(Interpreter *interp);
 void interpretConvert(Interpreter *interp);
+void interpretMathBitwiseAnd(Interpreter *interp);
+void interpretMathBitwiseOr(Interpreter *interp);
+void interpretMathBitwiseXor(Interpreter *interp);
+void interpretMathBitwiseShl(Interpreter *interp);
+void interpretMathBitwiseshr(Interpreter *interp);
 
 class Interpreter {
 public:
@@ -191,7 +188,6 @@ public:
                 interpretMathSub<float>,
                 interpretMathMul<float>,
                 interpretMathDiv<float>,
-                interpretMathMod<float>,
                 interpretCmpEq<float>,
                 interpretCmpNeq<float>,
                 interpretCmpLt<float>,
@@ -202,25 +198,17 @@ public:
                 interpretMathSub<double>,
                 interpretMathMul<double>,
                 interpretMathDiv<double>,
-                interpretMathMod<double>,
                 interpretCmpEq<double>,
                 interpretCmpNeq<double>,
                 interpretCmpLt<double>,
                 interpretCmpLte<double>,
                 interpretCmpGt<double>,
                 interpretCmpGte<double>,
-                interpretMathBitwiseOr<8, int8_t>,
-                interpretMathBitwiseOr<16, int16_t>,
-                interpretMathBitwiseOr<32, int32_t>,
-                interpretMathBitwiseOr<64, int64_t>,
-                interpretMathBitwiseAnd<8, int8_t>,
-                interpretMathBitwiseAnd<16, int16_t>,
-                interpretMathBitwiseAnd<32, int32_t>,
-                interpretMathBitwiseAnd<64, int64_t>,
-                interpretMathBitwiseXor<8, int8_t>,
-                interpretMathBitwiseXor<16, int16_t>,
-                interpretMathBitwiseXor<32, int32_t>,
-                interpretMathBitwiseXor<64, int64_t>,
+                interpretMathBitwiseAnd,
+                interpretMathBitwiseOr,
+                interpretMathBitwiseXor,
+                interpretMathBitwiseShl,
+                interpretMathBitwiseshr,
                 interpretStoreConst,
                 interpretStore,
                 interpretBumpSP,
@@ -235,6 +223,7 @@ public:
                 interpretPuts,
                 interpretNop,
                 interpretNot,
+                interpretBitNot,
                 interpretConvert};
 
         libs = vector_init<void *>(10);
@@ -436,39 +425,9 @@ void interpretMathDiv(Interpreter *interp) {
 
 template <typename T>
 void interpretMathMod(Interpreter *interp) {
-    cpi_assert(false && "todo(chad)");
-
-//    auto a = interp->read<T>();
-//    auto b = interp->read<T>();
-//    auto result = a % b;
-//    auto storeOffset = interp->consume<int64_t>();
-//    interp->copyToStack(result, interp->bp + storeOffset);
-}
-
-// bitwise binary operation
-template <int32_t bits, typename T>
-void interpretMathBitwiseOr(Interpreter *interp) {
-    auto a = interp->readBits<bits, T>();
-    auto b = interp->readBits<bits, T>();
-    auto result = a | b;
-    auto storeOffset = interp->consume<int64_t>();
-    interp->copyToStack(result, interp->bp + storeOffset);
-}
-
-template <int32_t bits, typename T>
-void interpretMathBitwiseAnd(Interpreter *interp) {
-    auto a = interp->readBits<bits, T>();
-    auto b = interp->readBits<bits, T>();
-    auto result = a & b;
-    auto storeOffset = interp->consume<int64_t>();
-    interp->copyToStack(result, interp->bp + storeOffset);
-}
-
-template <int32_t bits, typename T>
-void interpretMathBitwiseXor(Interpreter *interp) {
-    auto a = interp->readBits<bits, T>();
-    auto b = interp->readBits<bits, T>();
-    auto result = a ^ b;
+    auto a = interp->read<T>();
+    auto b = interp->read<T>();
+    auto result = a % b;
     auto storeOffset = interp->consume<int64_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }

@@ -339,6 +339,9 @@ ostream &operator<<(ostream &os, NodeType type) {
         case NodeType::UNARY_NOT: {
             return os << "unary not";
         }
+        case NodeType::UNARY_BITNOT: {
+            return os << "unary bitnot";
+        }
         case NodeType::MODULE: {
             return os << "module";
         }

@@ -1251,17 +1251,33 @@ Node *Parser::parseType() {
             popFront();
             type->typeData.kind = NodeTypekind::BOOLEAN;
         } break;
+        case LexerTokenType::U8: {
+            popFront();
+            type->typeData.kind = NodeTypekind::U8;
+        } break;
         case LexerTokenType::I8: {
             popFront();
             type->typeData.kind = NodeTypekind::I8;
+        } break;
+        case LexerTokenType::U16: {
+            popFront();
+            type->typeData.kind = NodeTypekind::U16;
         } break;
         case LexerTokenType::I16: {
             popFront();
             type->typeData.kind = NodeTypekind::I16;
         } break;
+        case LexerTokenType::U32: {
+            popFront();
+            type->typeData.kind = NodeTypekind::U32;
+        } break;
         case LexerTokenType::I32: {
             popFront();
             type->typeData.kind = NodeTypekind::I32;
+        } break;
+        case LexerTokenType::U64: {
+            popFront();
+            type->typeData.kind = NodeTypekind::U64;
         } break;
         case LexerTokenType::I64: {
             popFront();
@@ -1699,6 +1715,19 @@ Node *Parser::parseRvalueSimple() {
         return deref;
     }
 
+    // ~!(rvalue_simple)
+    if (lexer->front.type == LexerTokenType::BITNOT) {
+        popFront();
+
+        auto _not = new Node(lexer->srcInfo, NodeType::UNARY_BITNOT, scopes.top());
+        _not->nodeData = parseRvalueSimple();
+
+        addLocal(_not);
+
+        _not->region = Region{lexer->srcInfo, saved, _not->nodeData->region.end};
+        return _not;
+    }
+
     // !(rvalue_simple)
     if (lexer->front.type == LexerTokenType::NOT) {
         popFront();
@@ -1861,8 +1890,8 @@ Node *Parser::parseStringLiteral() {
 
 int8_t Parser::operatorPrecedence(LexerTokenType type) {
     switch (type) {
-        case LexerTokenType::OR:
         case LexerTokenType::AND:
+        case LexerTokenType::OR:
             return 1;
 
         case LexerTokenType::EQ_EQ:
@@ -1871,6 +1900,12 @@ int8_t Parser::operatorPrecedence(LexerTokenType type) {
         case LexerTokenType::GE:
         case LexerTokenType::LT:
         case LexerTokenType::GT:
+        case LexerTokenType::BITAND:
+        case LexerTokenType::BITOR:
+        case LexerTokenType::BITXOR:
+        case LexerTokenType::BITSHL:
+        case LexerTokenType::BITSHR:
+        case LexerTokenType::MOD:
             return 2;
 
         case LexerTokenType::SUB:

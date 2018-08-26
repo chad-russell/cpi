@@ -111,16 +111,20 @@ llvm::Type *LlvmGen::typeFor(Node *node) {
         case NodeTypekind::BOOLEAN_LITERAL: {
             return builder.getInt1Ty();
         }
+        case NodeTypekind::U8:
         case NodeTypekind::I8: {
             return builder.getInt8Ty();
         }
+        case NodeTypekind::U16:
         case NodeTypekind::I16: {
             return builder.getInt16Ty();
         }
+        case NodeTypekind::U32:
         case NodeTypekind::I32: {
             return builder.getInt32Ty();
         }
         case NodeTypekind::INT_LITERAL:
+        case NodeTypekind::U64:
         case NodeTypekind::I64: {
             return builder.getInt64Ty();
         }
@@ -239,7 +243,7 @@ llvm::Value *LlvmGen::rvalueFor(Node *node) {
 }
 
 void LlvmGen::gen(Node *node) {
-    if (node->llvmGen && !forcing
+    if (node->llvmGen
         && node->type != NodeType::STRING_LITERAL
         && node->type != NodeType::ARRAY_LITERAL
         && node->type != NodeType::STRUCT_LITERAL) {
@@ -664,6 +668,18 @@ void LlvmGen::gen(Node *node) {
                             case LexerTokenType::NE: {
                                 value = builder.CreateFCmpONE(lhsValue, rhsValue);
                             } break;
+                            case LexerTokenType::BITAND: {
+                                value = builder.CreateAnd(lhsValue, rhsValue);
+                            } break;
+                            case LexerTokenType::BITOR: {
+                                value = builder.CreateOr(lhsValue, rhsValue);
+                            } break;
+                            case LexerTokenType::BITXOR: {
+                                value = builder.CreateXor(lhsValue, rhsValue);
+                            } break;
+                            case LexerTokenType::MOD: {
+                                value = builder.CreateFRem(lhsValue, rhsValue);
+                            } break;
                             default: cpi_assert(false);
                         }
                     }
@@ -698,6 +714,24 @@ void LlvmGen::gen(Node *node) {
                             } break;
                             case LexerTokenType::LE: {
                                 value = builder.CreateICmpSLE(lhsValue, rhsValue);
+                            } break;
+                            case LexerTokenType::BITAND: {
+                                value = builder.CreateAnd(lhsValue, rhsValue);
+                            } break;
+                            case LexerTokenType::BITOR: {
+                                value = builder.CreateOr(lhsValue, rhsValue);
+                            } break;
+                            case LexerTokenType::BITXOR: {
+                                value = builder.CreateXor(lhsValue, rhsValue);
+                            } break;
+                            case LexerTokenType::BITSHL: {
+                                value = builder.CreateShl(lhsValue, rhsValue);
+                            } break;
+                            case LexerTokenType::BITSHR: {
+                                value = builder.CreateAShr(lhsValue, rhsValue);
+                            } break;
+                            case LexerTokenType::MOD: {
+                                value = builder.CreateSRem(lhsValue, rhsValue);
                             } break;
                             default: cpi_assert(false);
                         }
@@ -1069,16 +1103,20 @@ void LlvmGen::gen(Node *node) {
                 llvm::Type *llvmToType;
 
                 switch (toType->typeData.kind) {
+                    case NodeTypekind::U8:
                     case NodeTypekind::I8: {
                         llvmToType = builder.getInt8Ty();
                     } break;
+                    case NodeTypekind::U16:
                     case NodeTypekind::I16: {
                         llvmToType = builder.getInt16Ty();
                     } break;
+                    case NodeTypekind::U32:
                     case NodeTypekind::I32: {
                         llvmToType = builder.getInt32Ty();
                     } break;
                     case NodeTypekind::INT_LITERAL:
+                    case NodeTypekind::U64:
                     case NodeTypekind::I64: {
                         llvmToType = builder.getInt64Ty();
                     } break;
@@ -1136,17 +1174,12 @@ void LlvmGen::gen(Node *node) {
             node->isLocal = node->resolved->isLocal;
         } break;
         case NodeType::STRING_LITERAL: {
-//            auto savedForcing = this->forcing;
-//            this->forcing = true;
-
             gen(node->stringLiteralData.arrayLiteralRepresentation);
             node->llvmData = node->stringLiteralData.arrayLiteralRepresentation->llvmData;
 
             if (node->isLocal) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
-
-//            this->forcing = savedForcing;
         } break;
         case NodeType::UNARY_NEG: {
             gen(node->unaryNegData.target);
@@ -1166,13 +1199,19 @@ void LlvmGen::gen(Node *node) {
             }
         } break;
         case NodeType::UNARY_NOT: {
-            gen(node->nodeData);
+            auto notData = resolve(node->nodeData);
 
-            if (node->nodeData->isLocal) {
-                store((llvm::Value *) node->nodeData->llvmData, (llvm::Value *) node->nodeData->llvmLocal);
-            }
+            gen(notData);
 
-            node->llvmData = builder.CreateNot(rvalueFor(node->nodeData));
+            node->llvmData = builder.CreateNot(rvalueFor(notData));
+            store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
+        } break;
+        case NodeType::UNARY_BITNOT: {
+            auto notData = resolve(node->nodeData);
+
+            gen(notData);
+
+            node->llvmData = builder.CreateNot(rvalueFor(notData));
             store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
         } break;
         case NodeType::SIZEOF: {

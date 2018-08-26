@@ -573,6 +573,178 @@ void interpretNot(Interpreter *interp) {
     *ptr = !b;
 }
 
+// bitnot
+void interpretBitNot(Interpreter *interp) {
+    auto bytes = interp->consume<int32_t>();
+    auto offset = interp->consume<int64_t>();
+
+    auto ptr = (char *) (interp->stack.data() + interp->bp + offset);
+    for (auto i = 0; i < bytes; i++) {
+        *ptr = ~*ptr;
+        ptr += 1;
+    }
+}
+
+// bitwise and
+void interpretMathBitwiseAnd(Interpreter *interp) {
+    auto bytes = interp->consume<int32_t>();
+
+    auto currentOffset = (char *) interp->stack.data() + interp->bp;
+    auto a = currentOffset + interp->consume<int64_t>();
+    auto b = currentOffset + interp->consume<int64_t>();
+
+    auto result = (char *) calloc((size_t) bytes, sizeof(char));
+
+    for (int32_t i = 0; i < bytes; i++) {
+        result[i] = a[i] & b[i];
+    }
+
+    auto storeOffset = interp->consume<int64_t>();
+    memcpy(currentOffset + storeOffset, result, bytes * sizeof(char));
+}
+
+// bitwise or
+void interpretMathBitwiseOr(Interpreter *interp) {
+    auto bytes = interp->consume<int32_t>();
+
+    auto currentOffset = (char *) interp->stack.data() + interp->bp;
+    auto a = currentOffset + interp->consume<int64_t>();
+    auto b = currentOffset + interp->consume<int64_t>();
+
+    auto result = (char *) calloc((size_t) bytes, sizeof(char));
+
+    for (int32_t i = 0; i < bytes; i++) {
+        result[i] = a[i] | b[i];
+    }
+
+    auto storeOffset = interp->consume<int64_t>();
+    memcpy(currentOffset + storeOffset, result, bytes * sizeof(char));
+}
+
+// bitwise xor
+void interpretMathBitwiseXor(Interpreter *interp) {
+    auto bytes = interp->consume<int32_t>();
+
+    auto currentOffset = (char *) interp->stack.data() + interp->bp;
+    auto a = currentOffset + interp->consume<int64_t>();
+    auto b = currentOffset + interp->consume<int64_t>();
+
+    auto result = (char *) calloc((size_t) bytes, sizeof(char));
+
+    for (int32_t i = 0; i < bytes; i++) {
+        result[i] = a[i] ^ b[i];
+    }
+
+    auto storeOffset = interp->consume<int64_t>();
+    memcpy(currentOffset + storeOffset, result, bytes * sizeof(char));
+}
+
+// bitwise shift left
+void interpretMathBitwiseShl(Interpreter *interp) {
+    auto bytes = interp->consume<int32_t>();
+
+    if (bytes == 1) {
+        auto currentOffset = (char *) interp->stack.data() + interp->bp;
+        auto a = currentOffset + interp->consume<int64_t>();
+        auto b = currentOffset + interp->consume<int64_t>();
+
+        auto result = *((int8_t *) a) << *((int64_t *) b);
+
+        auto storeOffset = interp->consume<int64_t>();
+
+        memcpy(currentOffset + storeOffset, &result, bytes * sizeof(char));
+    }
+    else if (bytes == 2) {
+        auto currentOffset = (char *) interp->stack.data() + interp->bp;
+        auto a = currentOffset + interp->consume<int64_t>();
+        auto b = currentOffset + interp->consume<int64_t>();
+
+        auto result = *((int16_t *) a) << *((int64_t *) b);
+
+        auto storeOffset = interp->consume<int64_t>();
+
+        memcpy(currentOffset + storeOffset, &result, bytes * sizeof(char));
+    }
+    else if (bytes == 4) {
+        auto currentOffset = (char *) interp->stack.data() + interp->bp;
+        auto a = currentOffset + interp->consume<int64_t>();
+        auto b = currentOffset + interp->consume<int64_t>();
+
+        auto result = *((int32_t *) a) << *((int64_t *) b);
+
+        auto storeOffset = interp->consume<int64_t>();
+
+        memcpy(currentOffset + storeOffset, &result, bytes * sizeof(char));
+    }
+    else if (bytes == 8) {
+        auto currentOffset = (char *) interp->stack.data() + interp->bp;
+        auto a = currentOffset + interp->consume<int64_t>();
+        auto b = currentOffset + interp->consume<int64_t>();
+
+        auto result = *((int64_t *) a) << *((int64_t *) b);
+
+        auto storeOffset = interp->consume<int64_t>();
+
+        memcpy(currentOffset + storeOffset, &result, bytes * sizeof(char));
+    }
+    else {
+        cpi_assert(false);
+    }
+}
+
+// bitwise logical shift right
+void interpretMathBitwiseshr(Interpreter *interp) {
+    auto bytes = interp->consume<int32_t>();
+
+    if (bytes == 1) {
+        auto currentOffset = (char *) interp->stack.data() + interp->bp;
+        auto a = currentOffset + interp->consume<int64_t>();
+        auto b = currentOffset + interp->consume<int64_t>();
+
+        auto result = *((int8_t *) a) >> *((int64_t *) b);
+
+        auto storeOffset = interp->consume<int64_t>();
+
+        memcpy(currentOffset + storeOffset, &result, bytes * sizeof(char));
+    }
+    else if (bytes == 2) {
+        auto currentOffset = (char *) interp->stack.data() + interp->bp;
+        auto a = currentOffset + interp->consume<int64_t>();
+        auto b = currentOffset + interp->consume<int64_t>();
+
+        auto result = *((int16_t *) a) >> *((int64_t *) b);
+
+        auto storeOffset = interp->consume<int64_t>();
+
+        memcpy(currentOffset + storeOffset, &result, bytes * sizeof(char));
+    }
+    else if (bytes == 4) {
+        auto currentOffset = (char *) interp->stack.data() + interp->bp;
+        auto a = currentOffset + interp->consume<int64_t>();
+        auto b = currentOffset + interp->consume<int64_t>();
+
+        auto result = *((int32_t *) a) >> *((int64_t *) b);
+
+        auto storeOffset = interp->consume<int64_t>();
+
+        memcpy(currentOffset + storeOffset, &result, bytes * sizeof(char));
+    }
+    else if (bytes == 8) {
+        auto currentOffset = (char *) interp->stack.data() + interp->bp;
+        auto a = currentOffset + interp->consume<int64_t>();
+        auto b = currentOffset + interp->consume<int64_t>();
+
+        auto result = *((int64_t *) a) >> *((int64_t *) b);
+
+        auto storeOffset = interp->consume<int64_t>();
+
+        memcpy(currentOffset + storeOffset, &result, bytes * sizeof(char));
+    }
+    else {
+        cpi_assert(false);
+    }
+}
+
 // convert
 void interpretConvert(Interpreter *interp) {
     auto fromType = (NodeTypekind) interp->consume<int32_t>();

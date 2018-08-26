@@ -78,12 +78,15 @@ int32_t typeSize(Node *type) {
     switch (resolved->typeData.kind) {
         case NodeTypekind::NONE:
             return 0;
+        case NodeTypekind::U8:
         case NodeTypekind::I8:
             return 1;
+        case NodeTypekind::U16:
         case NodeTypekind::I16:
             return 2;
         case NodeTypekind::BOOLEAN:
         case NodeTypekind::BOOLEAN_LITERAL:
+        case NodeTypekind::U32:
         case NodeTypekind::I32:
         case NodeTypekind::FLOAT_LITERAL:
         case NodeTypekind::F32:
@@ -91,6 +94,7 @@ int32_t typeSize(Node *type) {
             return 4;
         case NodeTypekind::POINTER:
         case NodeTypekind::INT_LITERAL:
+        case NodeTypekind::U64:
         case NodeTypekind::I64:
         case NodeTypekind::F64:
             return 8;
@@ -275,9 +279,13 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
     // coercion from integer literal to any integer or float is valid
     // todo(chad): check for overflow?
     if (desired->typeData.kind == NodeTypekind::INT_LITERAL) {
-        if (actual->typeData.kind == NodeTypekind::I8
+        if (actual->typeData.kind == NodeTypekind::U8
+            || actual->typeData.kind == NodeTypekind::I8
+            || actual->typeData.kind == NodeTypekind::U16
             || actual->typeData.kind == NodeTypekind::I16
+            || actual->typeData.kind == NodeTypekind::U32
             || actual->typeData.kind == NodeTypekind::I32
+            || actual->typeData.kind == NodeTypekind::U64
             || actual->typeData.kind == NodeTypekind::I64
             || actual->typeData.kind == NodeTypekind::F32
             || actual->typeData.kind == NodeTypekind::F64) {
@@ -308,9 +316,13 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
         return false;
     }
     if (actual->typeData.kind == NodeTypekind::INT_LITERAL) {
-        if (desired->typeData.kind == NodeTypekind::I8
+        if (desired->typeData.kind == NodeTypekind::U8
+            || desired->typeData.kind == NodeTypekind::I8
+            || desired->typeData.kind == NodeTypekind::U16
             || desired->typeData.kind == NodeTypekind::I16
+            || desired->typeData.kind == NodeTypekind::U32
             || desired->typeData.kind == NodeTypekind::I32
+            || desired->typeData.kind == NodeTypekind::U64
             || desired->typeData.kind == NodeTypekind::I64) {
             actual->typeData = desired->typeData;
             return true;
@@ -694,6 +706,12 @@ void resolveUnaryNot(Semantic *semantic, Node *node) {
     node->typeInfo = node->nodeData->typeInfo;
 }
 
+void resolveUnaryBitNot(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->nodeData);
+
+    node->typeInfo = node->nodeData->typeInfo;
+}
+
 void resolveLink(Semantic *semantic, Node *node) {
     vector_append(semantic->linkLibs, node->linkData.name);
 }
@@ -891,9 +909,15 @@ Node *constantize(Semantic *semantic, Node *node) {
         return node;
     }
 
-    auto typeKind = resolve(node->typeInfo)->typeData.kind;
+    auto resolvedTypeInfo = resolve(node->typeInfo);
+    auto typeKind = resolvedTypeInfo->typeData.kind;
+
+    auto isStringLiteral = resolvedTypeInfo->typeData.kind == NodeTypekind::STRUCT
+                           && resolvedTypeInfo->typeData.structTypeData.isSecretlyArray
+                           && resolvedTypeInfo->typeData.structTypeData.secretArrayElementType->typeData.kind == NodeTypekind::I8;
+
     if (typeKind == NodeTypekind::POINTER
-        || typeKind == NodeTypekind::STRUCT
+        || (typeKind == NodeTypekind::STRUCT && !isStringLiteral)
         || typeKind == NodeTypekind::FN
         || typeKind == NodeTypekind::SYMBOL
         || typeKind == NodeTypekind::DOT) {
@@ -982,27 +1006,61 @@ Node *constantize(Semantic *semantic, Node *node) {
 
     interp->interpret();
 
-    auto resolvedTypeInfo = resolve(copied->typeInfo);
-    auto isStringLiteral = resolvedTypeInfo->typeData.kind == NodeTypekind::STRUCT
-                           && resolvedTypeInfo->typeData.structTypeData.isSecretlyArray
-                           && resolvedTypeInfo->typeData.structTypeData.secretArrayElementType->typeData.kind == NodeTypekind::I8;
-
-    auto isBoolean = (resolvedTypeInfo->typeData.kind == NodeTypekind::BOOLEAN || resolvedTypeInfo->typeData.kind == NodeTypekind::BOOLEAN_LITERAL);
-
-    auto staticValue = interp->readFromStack<int64_t>(copied->localOffset);
-
+    resolvedTypeInfo = resolve(copied->typeInfo);
     auto staticNode = new Node();
-    if (isBoolean) {
+
+    if (isStringLiteral) {
+        staticNode->type = NodeType::STRING_LITERAL;
+
+        auto count = interp->readFromStack<int32_t>(copied->localOffset + 8);
+        auto ptr = (char *) interp->readFromStack<int64_t>(copied->localOffset);
+
+        ostringstream buf("");
+        for (auto i = 0; i < count; i++) {
+            buf << *ptr;
+            ptr += 1;
+        }
+
+        auto stringValue = buf.str();
+
+        staticNode->type = NodeType::STRING_LITERAL;
+        staticNode->stringLiteralData.allocFn = nullptr; // todo(chad): check that there is no allocFn assigned
+        staticNode->stringLiteralData.value = new string(stringValue);
+    }
+    if (resolvedTypeInfo->typeData.kind == NodeTypekind::BOOLEAN_LITERAL || resolvedTypeInfo->typeData.kind == NodeTypekind::BOOLEAN) {
+        auto staticValue = interp->readFromStack<int32_t>(copied->localOffset);
         staticNode->type = NodeType::BOOLEAN_LITERAL;
         staticNode->boolLiteralData.value = staticValue != 0;
     }
-    else if (isStringLiteral) {
-        staticNode->type = NodeType::STRING_LITERAL;
-        // todo(chad): set read memory and set staticNode->stringLiteralData.value
-    }
-    else {
+    else if (resolvedTypeInfo->typeData.kind == NodeTypekind::U8 || resolvedTypeInfo->typeData.kind == NodeTypekind::I8) {
+        auto staticValue = interp->readFromStack<int8_t>(copied->localOffset);
         staticNode->type = NodeType::INT_LITERAL;
         staticNode->intLiteralData.value = staticValue;
+    }
+    else if (resolvedTypeInfo->typeData.kind == NodeTypekind::U16 || resolvedTypeInfo->typeData.kind == NodeTypekind::I16) {
+        auto staticValue = interp->readFromStack<int16_t>(copied->localOffset);
+        staticNode->type = NodeType::INT_LITERAL;
+        staticNode->intLiteralData.value = staticValue;
+    }
+    else if (resolvedTypeInfo->typeData.kind == NodeTypekind::U32 || resolvedTypeInfo->typeData.kind == NodeTypekind::I32) {
+        auto staticValue = interp->readFromStack<int32_t>(copied->localOffset);
+        staticNode->type = NodeType::INT_LITERAL;
+        staticNode->intLiteralData.value = staticValue;
+    }
+    else if (resolvedTypeInfo->typeData.kind == NodeTypekind::U64 || resolvedTypeInfo->typeData.kind == NodeTypekind::I64) {
+        auto staticValue = interp->readFromStack<int64_t>(copied->localOffset);
+        staticNode->type = NodeType::INT_LITERAL;
+        staticNode->intLiteralData.value = staticValue;
+    }
+    else if (resolvedTypeInfo->typeData.kind == NodeTypekind::FLOAT_LITERAL || resolvedTypeInfo->typeData.kind == NodeTypekind::F32) {
+        auto staticValue = interp->readFromStack<float>(copied->localOffset);
+        staticNode->type = NodeType::FLOAT_LITERAL;
+        staticNode->floatLiteralData.value = staticValue;
+    }
+    else if (resolvedTypeInfo->typeData.kind == NodeTypekind::F64) {
+        auto staticValue = interp->readFromStack<float>(copied->localOffset);
+        staticNode->type = NodeType::FLOAT_LITERAL;
+        staticNode->floatLiteralData.value = staticValue;
     }
 
     semantic->resolveTypes(staticNode);
@@ -2889,14 +2947,26 @@ void resolveIsKind(Semantic *semantic, Node *node) {
         case NodeTypekind::NONE: {
             matches = node->isKindData.tokenType == LexerTokenType::NONE;
         } break;
+        case NodeTypekind::U8: {
+            matches = node->isKindData.tokenType == LexerTokenType::U8;
+        } break;
         case NodeTypekind::I8: {
             matches = node->isKindData.tokenType == LexerTokenType::I8;
+        } break;
+        case NodeTypekind::U16: {
+            matches = node->isKindData.tokenType == LexerTokenType::U16;
         } break;
         case NodeTypekind::I16: {
             matches = node->isKindData.tokenType == LexerTokenType::I16;
         } break;
+        case NodeTypekind::U32: {
+            matches = node->isKindData.tokenType == LexerTokenType::U32;
+        } break;
         case NodeTypekind::I32: {
             matches = node->isKindData.tokenType == LexerTokenType::I32;
+        } break;
+        case NodeTypekind::U64: {
+            matches = node->isKindData.tokenType == LexerTokenType::U64;
         } break;
         case NodeTypekind::INT_LITERAL:
         case NodeTypekind::I64: {
@@ -3020,7 +3090,9 @@ void resolveFieldsof(Semantic *semantic, Node *node) {
 void Semantic::resolveTypes(Node *node) {
     if (node == nullptr) { return; }
 
-    if (node->semantic) { return; }
+    if (node->semantic && node->type != NodeType::STRING_LITERAL) {
+        return;
+    }
     node->semantic = true;
 
     for (auto stmt : node->preStmts) {
@@ -3150,6 +3222,9 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::UNARY_NOT: {
             resolveUnaryNot(this, node);
+        } break;
+        case NodeType::UNARY_BITNOT: {
+            resolveUnaryBitNot(this, node);
         } break;
         case NodeType::LINK: {
             resolveLink(this, node);

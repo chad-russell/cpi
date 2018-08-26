@@ -167,14 +167,21 @@ void Lexer::popFront() {
     if (tryEat(&next, ":", LexerTokenType::COLON)) { return; }
     if (tryEat(&next, "=", LexerTokenType::EQ)) { return; }
     if (tryEat(&next, ",", LexerTokenType::COMMA)) { return; }
+    if (tryEat(&next, "~!", LexerTokenType::BITNOT)) { return; }
     if (tryEat(&next, "!", LexerTokenType::NOT)) { return; }
     if (tryEat(&next, "@", LexerTokenType::AT)) { return; }
     if (tryEat(&next, "|", LexerTokenType::VERTICAL_BAR)) { return; }
     if (tryEatKeyword(&next, "#link", LexerTokenType::LINK)) { return; }
     if (tryEatKeyword(&next, "defer", LexerTokenType::DEFER)) { return; }
     if (tryEatKeyword(&next, "#run", LexerTokenType::RUN)) { return; }
+    if (tryEatKeyword(&next, "~and", LexerTokenType::BITAND)) { return; }
     if (tryEatKeyword(&next, "and", LexerTokenType::AND)) { return; }
+    if (tryEatKeyword(&next, "~or", LexerTokenType::BITOR)) { return; }
     if (tryEatKeyword(&next, "or", LexerTokenType::OR)) { return; }
+    if (tryEatKeyword(&next, "~xor", LexerTokenType::BITXOR)) { return; }
+    if (tryEatKeyword(&next, "~shl", LexerTokenType::BITSHL)) { return; }
+    if (tryEatKeyword(&next, "~shr", LexerTokenType::BITSHR)) { return; }
+    if (tryEatKeyword(&next, "mod", LexerTokenType::MOD)) { return; }
     if (tryEatKeyword(&next, "fn", LexerTokenType::FN)) { return; }
     if (tryEatKeyword(&next, "#impl", LexerTokenType::IMPL)) { return; }
     if (tryEatKeyword(&next, "type", LexerTokenType::TYPE)) { return; }
@@ -182,9 +189,13 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "enum", LexerTokenType::ENUM)) { return; }
     if (tryEatKeyword(&next, "return", LexerTokenType::RETURN)) { return; }
     if (tryEatKeyword(&next, "bool", LexerTokenType::BOOLEAN)) { return; }
+    if (tryEatKeyword(&next, "u8", LexerTokenType::U8)) { return;}
     if (tryEatKeyword(&next, "i8", LexerTokenType::I8)) { return;}
+    if (tryEatKeyword(&next, "u16", LexerTokenType::U16)) { return;}
     if (tryEatKeyword(&next, "i16", LexerTokenType::I16)) { return;}
+    if (tryEatKeyword(&next, "u32", LexerTokenType::U32)) { return;}
     if (tryEatKeyword(&next, "i32", LexerTokenType::I32)) { return;}
+    if (tryEatKeyword(&next, "u64", LexerTokenType::U64)) { return;}
     if (tryEatKeyword(&next, "i64", LexerTokenType::I64)) { return;}
     if (tryEatKeyword(&next, "f32", LexerTokenType::F32)) { return;}
     if (tryEatKeyword(&next, "f64", LexerTokenType::F64)) { return;}
@@ -496,8 +507,11 @@ const vector<string> Lexer::lexerTokenTypeStrings = {
     "TRUE_",
     "FALSE_",
     "AND",
+    "BITAND",
     "OR",
+    "BITOR",
     "NOT",
+    "BITNOT",
     "NIL",
     "MODULE",
     "SCOPE",
@@ -530,7 +544,13 @@ bool isBinop(LexerTokenType type) {
            || type == LexerTokenType::SUB
            || type == LexerTokenType::MUL
            || type == LexerTokenType::DIV
-           || type == LexerTokenType::VERTICAL_BAR;
+           || type == LexerTokenType::VERTICAL_BAR
+           || type == LexerTokenType::MOD
+           || type == LexerTokenType::BITAND
+           || type == LexerTokenType::BITOR
+           || type == LexerTokenType::BITXOR
+           || type == LexerTokenType::BITSHL
+           || type == LexerTokenType::BITSHR;
 }
 
 bool isBooleanBinop(LexerTokenType type) {

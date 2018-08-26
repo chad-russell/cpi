@@ -313,17 +313,30 @@ int main(int argc, char **argv) {
         cpi_assert(mainReturnType->type == NodeType::TYPE);
 
         switch (mainReturnType->typeData.kind) {
+            case NodeTypekind::BOOLEAN_LITERAL:
             case NodeTypekind::BOOLEAN: {
-                cout << "(bool) " << interp->readFromStack<int32_t>(0) << endl;
+                cout << "(bool) " << (interp->readFromStack<int32_t>(0) ? "true" : "false") << endl;
+            } break;
+            case NodeTypekind::U8: {
+                cout << "(u8) " << interp->readFromStack<uint8_t>(0) << endl;
             } break;
             case NodeTypekind::I8: {
                 cout << "(i8) " << interp->readFromStack<int8_t>(0) << endl;
             } break;
+            case NodeTypekind::U16: {
+                cout << "(u16) " << interp->readFromStack<uint16_t>(0) << endl;
+            } break;
             case NodeTypekind::I16: {
                 cout << "(i16) " << interp->readFromStack<int16_t>(0) << endl;
             } break;
+            case NodeTypekind::U32: {
+                cout << "(u32) " << interp->readFromStack<uint32_t>(0) << endl;
+            } break;
             case NodeTypekind::I32: {
                 cout << "(i32) " << interp->readFromStack<int32_t>(0) << endl;
+            } break;
+            case NodeTypekind::U64: {
+                cout << "(u64) " << interp->readFromStack<uint64_t>(0) << endl;
             } break;
             case NodeTypekind::INT_LITERAL:
             case NodeTypekind::I64: {

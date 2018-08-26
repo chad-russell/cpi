@@ -27,15 +27,15 @@ enum class TokenType : unsigned char {
     EQI64, NEQI64, UGTI64, SGTI64, UGEI64, SGEI64, ULTI64, SLTI64, ULEI64, SLEI64,
 
     // F32 math
-    ADDF32, SUBF32, MULF32, DIVF32, REMF32,
+    ADDF32, SUBF32, MULF32, DIVF32,
     EQF32, NEQF32, LTF32, LEF32, GTF32, GEF32,
 
     // F64 math
-    ADDF64, SUBF64, MULF64, DIVF64, REMF64,
+    ADDF64, SUBF64, MULF64, DIVF64,
     EQF64, NEQF64, LTF64, LEF64, GTF64, GEF64,
 
     // bitwise math
-    AND8, AND16, AND32, AND64, OR8, OR16, OR32, OR64, XOR8, XOR16, XOR32, XOR64,
+    BITAND, BITOR, BITXOR, BITSHL, BITSHR,
 
     // general instructions
     STORECONST,
@@ -85,15 +85,15 @@ enum class Instruction : unsigned char {
     EQI64, NEQI64, UGTI64, SGTI64, UGEI64, SGEI64, ULTI64, SLTI64, ULEI64, SLEI64,
 
     // F32 math
-    ADDF32, SUBF32, MULF32, DIVF32, REMF32,
+    ADDF32, SUBF32, MULF32, DIVF32,
     EQF32, NEQF32, LTF32, LEF32, GTF32, GEF32,
 
     // F64 math
-    ADDF64, SUBF64, MULF64, DIVF64, REMF64,
+    ADDF64, SUBF64, MULF64, DIVF64,
     EQF64, NEQF64, LTF64, LEF64, GTF64, GEF64,
 
     // bitwise math
-    AND8, AND16, AND32, AND64, OR8, OR16, OR32, OR64, XOR8, XOR16, XOR32, XOR64,
+    BITAND, BITOR, BITXOR, BITSHL, BITSHR,
 
     // general instructions
     STORECONST,
@@ -110,6 +110,7 @@ enum class Instruction : unsigned char {
     PUTS,
     NOP,
     NOT,
+    BITNOT,
     CONVERT,
 
     // literals

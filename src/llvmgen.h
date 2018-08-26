@@ -37,7 +37,6 @@ public:
     vector<llvm::Function *> allFns;
     llvm::DIScope *currentScope;
     string currentScopeName;
-    bool forcing;
 
     LlvmGen(const char *fileName);
 
