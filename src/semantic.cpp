@@ -23,7 +23,7 @@ Node * makeTypeConcrete(Node *typeInfo) {
         typeInfo->typeData.kind = NodeTypekind::I64;
     }
     else if (kind == NodeTypekind::FLOAT_LITERAL) {
-        typeInfo->typeData.kind = NodeTypekind::F64;
+        typeInfo->typeData.kind = NodeTypekind::F32;
     }
 
     return typeInfo;
@@ -249,6 +249,19 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
     cpi_assert(desired->type == NodeType::TYPE);
     cpi_assert(actual->type == NodeType::TYPE);
 
+    // if we are comparing an autocast and a non-autocast, then match them and fill in the autocast data
+    if (actual->typeData.kind == NodeTypekind::AUTOCAST && desired->typeData.kind == NodeTypekind::AUTOCAST) {
+        return false;
+    }
+    if (desired->typeData.kind == NodeTypekind::AUTOCAST && actual->typeData.kind != NodeTypekind::AUTOCAST) {
+        desired->typeData = actual->typeData;
+        return true;
+    }
+    if (actual->typeData.kind == NodeTypekind::AUTOCAST && desired->typeData.kind != NodeTypekind::AUTOCAST) {
+        actual->typeData = desired->typeData;
+        return true;
+    }
+
     // if we are comparing two named types and they don't have the same names, then false
     if (desired->typeData.name != nullptr
         && actual->typeData.name != nullptr
@@ -471,9 +484,13 @@ Node *defaultValueFor(Semantic *semantic, Node *type) {
 
     switch (type->typeData.kind) {
         case NodeTypekind::INT_LITERAL:
+        case NodeTypekind::U8:
         case NodeTypekind::I8:
+        case NodeTypekind::U16:
         case NodeTypekind::I16:
+        case NodeTypekind::U32:
         case NodeTypekind::I32:
+        case NodeTypekind::U64:
         case NodeTypekind::I64: {
             auto def = new Node();
             def->type = NodeType::INT_LITERAL;
@@ -736,6 +753,10 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
 
     auto savedFnDecl = semantic->currentFnDecl;
     semantic->currentFnDecl = node;
+
+    for (auto param : node->fnDeclData.params) {
+        semantic->addLocal(param);
+    }
 
     data->tableIndex = fnTableId;
     fnTableId += 1;
@@ -1164,7 +1185,12 @@ void resolveCast(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->castData.type);
     semantic->resolveTypes(node->castData.value);
 
-    node->typeInfo = node->castData.type;
+    if (node->castData.type != nullptr) {
+        node->typeInfo = node->castData.type;
+    }
+    else {
+        node->typeInfo = new Node(NodeTypekind::AUTOCAST);
+    }
 }
 
 void resolveStringLiteral(Semantic *semantic, Node *node) {
@@ -2972,10 +2998,10 @@ void resolveIsKind(Semantic *semantic, Node *node) {
         case NodeTypekind::I64: {
             matches = node->isKindData.tokenType == LexerTokenType::I64;
         } break;
+        case NodeTypekind::FLOAT_LITERAL:
         case NodeTypekind::F32: {
             matches = node->isKindData.tokenType == LexerTokenType::F32;
         } break;
-        case NodeTypekind::FLOAT_LITERAL:
         case NodeTypekind::F64: {
             matches = node->isKindData.tokenType == LexerTokenType::F64;
         } break;

@@ -100,7 +100,7 @@ type Surface struct {
 
 type KeyboardEvent struct {
     _type: i32,
-    timetamp: i32,
+    timestamp: i32,
     windowId: i32,
     state: i8,
     repeat: i8,

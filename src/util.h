@@ -101,6 +101,7 @@ enum class NodeTypekind: int32_t {
     POINTER = 18,
     EXPOSED_AST = 19,
     DOT = 20,
+    AUTOCAST = 21
 };
 
 enum class LexerTokenType : int32_t {

@@ -1,7 +1,7 @@
 fn main() {
     #import "textedit";
-    #import "sdl";
+    textedit.example();
 
-    -- textedit.example();
-    sdl.runGame();
+    return 0;
 }
+

@@ -20,7 +20,7 @@ type TextContext struct {
     cairoContext: *cairo.Context,
 
     font: []i8,
-    text: typeof(buf.make!(i8)()),
+    text: returntypeof(buf.make!(i8)),
 
     done: bool,
 
@@ -34,10 +34,10 @@ fn loadFonts(tctx: *TextContext) {
     -- tctx.font = "/Users/chadrussell/Projects/text/Noto-unhinted/NotoColorEmoji.ttf";
     -- tctx.font = "/Users/chadrussell/Projects/text/emojione-android.ttf";
     -- tctx.font = "/Users/chadrussell/Projects/text/emojione-apple.ttc";
-    -- tctx.text = buf.from("🙈 🇹🇩");
+    -- tctx.text = buf.from("🙈 🤣 🇹🇩");
 
-    -- tctx.font = "/Users/chadrussell/Library/Fonts/Roboto-Light.ttf";
-    tctx.font = "/Library/Fonts/Inconsolata.otf";
+    tctx.font = "/Users/chadrussell/Library/Fonts/Roboto-Light.ttf";
+    -- tctx.font = "/Library/Fonts/Inconsolata.otf";
     -- tctx.font = "/Users/chadrussell/Projects/text/JFWilwod.ttf";
     tctx.text = buf.from("hello");
 
@@ -90,7 +90,7 @@ fn initCairo1(tctx: *TextContext) {
 
     -- Get Cairo surface form SDL2 surface
     tctx.cairoSurface = cairo.cairo_image_surface_create_for_data(
-            cast(*i8) tctx.sdlSurface.pixels,
+            cast() tctx.sdlSurface.pixels,
             cairo.FORMAT_RGB24,
             tctx.sdlSurface.w,
             tctx.sdlSurface.h,
@@ -100,13 +100,13 @@ fn initCairo1(tctx: *TextContext) {
     cairoY_Multiplier := rendererHeight / windowHeight;
 
     -- Scale cairo to use screen resolution
-    cairo.cairo_surface_set_device_scale(tctx.cairoSurface, cast(f64) cairoX_Multiplier, cast(f64) cairoY_Multiplier);
+    cairo.cairo_surface_set_device_scale(tctx.cairoSurface, cast() cairoX_Multiplier, cast() cairoY_Multiplier);
 
     -- Get Cairo context from Cairo surface
     tctx.cairoContext = cairo.cairo_create(tctx.cairoSurface);
     cairo.cairo_set_source_rgba(tctx.cairoContext, 0.0, 0.0, 0.0, 1.0);
     cairo.cairo_set_font_face(tctx.cairoContext, tctx.cairoFont);
-    cairo.cairo_set_font_size(tctx.cairoContext, cast(f64) FONT_SIZE);
+    cairo.cairo_set_font_size(tctx.cairoContext, cast() FONT_SIZE);
 }
 
 fn drawText(tctx: *TextContext) {
@@ -135,22 +135,22 @@ fn drawText(tctx: *TextContext) {
     y: i32 = 0;
 
     i := 0;
-    while i < cast(i64) glyphCount {
-        (tctx.cairoGlyphs + i).index = cast(i64) (glyphInfo + i).codepoint;
-        (tctx.cairoGlyphs + i).x = cast(f64) x + cast(f64) (glyphPos + i).xOffset / 64.0;
-        (tctx.cairoGlyphs + i).y = -(cast(f64) y + cast(f64) (glyphPos + i).yOffset / 64.0);
-        x = x + cast(i32) (cast(f64) (glyphPos + i).xAdvance / 64.0);
-        y = y + cast(i32) (cast(f64) (glyphPos + i).yAdvance / 64.0);
+    while i < cast() glyphCount {
+        (tctx.cairoGlyphs + i).index = cast() (glyphInfo + i).codepoint;
+        (tctx.cairoGlyphs + i).x = cast() x + cast(f64) (glyphPos + i).xOffset / 64.0;
+        (tctx.cairoGlyphs + i).y = -(cast() y + cast(f64) (glyphPos + i).yOffset / 64.0);
+        x = x + cast() (cast(f64) (glyphPos + i).xAdvance / 64.0);
+        y = y + cast() (cast(f64) (glyphPos + i).yAdvance / 64.0);
 
         i += 1;
     }
 
     -- Move glyph to be on window middle
     i = 0;
-    while i < cast(i64) glyphCount {
+    while i < cast() glyphCount {
         ithCairoGlyph := tctx.cairoGlyphs + i;
 
-        ithCairoGlyph.y = ithCairoGlyph.y + (cast(f64) HEIGHT) / 2;
+        ithCairoGlyph.y = ithCairoGlyph.y + cast() (HEIGHT / 2);
 
         i += 1;
     }
@@ -187,7 +187,7 @@ fn initSdl(tctx: *TextContext) {
     tctx.sdlWindow = window;
 }
 
-fn freeStuff(tctx: *TextContext) {
+fn shutdown(tctx: *TextContext) {
     mem.free(tctx.cairoGlyphs);
     cairo.cairo_surface_destroy(tctx.cairoSurface);
     cairo.cairo_destroy(tctx.cairoContext);
@@ -216,9 +216,17 @@ fn example() {
                 tctx.done = true;
             }
             else if event._type == sdl.KEYDOWN {
-                &tctx.text|buf.append("a"[0]);
+                if event.keysym.scancode == 42 {
+                    tctx.text.buf.count -= 1;
+                }
+                else {
+                    &tctx.text|buf.append("a"[0]);
+                }
+
                 drawText(&tctx);
             }
         }
     }
+
+    shutdown(&tctx);
 }

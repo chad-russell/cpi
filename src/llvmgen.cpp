@@ -1095,7 +1095,7 @@ void LlvmGen::gen(Node *node) {
             gen(resolvedValue);
             storeIfNeeded(resolvedValue);
 
-            auto toType = resolve(node->castData.type);
+            auto toType = resolve(node->typeInfo);
             auto fromType = resolve(resolvedValue->typeInfo);
 
             if (isNumericType(fromType) && isNumericType(toType)) {
@@ -1149,12 +1149,12 @@ void LlvmGen::gen(Node *node) {
             }
             else if (fromType->typeData.kind == NodeTypekind::POINTER && toType->typeData.kind == NodeTypekind::I64) {
                 // ptr to int
-                node->llvmData = builder.CreatePtrToInt(rvalueFor(resolvedValue), typeFor(node->castData.type));
+                node->llvmData = builder.CreatePtrToInt(rvalueFor(resolvedValue), typeFor(node->typeInfo));
             }
             else {
                 node->llvmData = rvalueFor(resolvedValue);
-                if (node->llvmData && resolve(node->castData.type)->typeData.kind == NodeTypekind::POINTER) {
-                    node->llvmData = builder.CreateBitCast(rvalueFor(resolvedValue), typeFor(node->castData.type));
+                if (node->llvmData && resolve(node->typeInfo)->typeData.kind == NodeTypekind::POINTER) {
+                    node->llvmData = builder.CreateBitCast(rvalueFor(resolvedValue), typeFor(node->typeInfo));
                 }
 
                 if (node->llvmLocal) {

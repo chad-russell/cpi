@@ -1,9 +1,10 @@
 TODO:
-    - autocast
-
-    - disallow modifying aliases (i.e. any kind of lvalue assignment)
+    - best way of specifying generic types (returntype/typeof hacks are maybe a little janky)
+        - parameterized types?
 
     - character literals
+
+    - disallow modifying aliases (i.e. any kind of lvalue assignment)
 
     - something for c-style enums?
         - like a way to specify that our enum has no value
@@ -15,8 +16,6 @@ TODO:
         - ```
             #foreign("init") fn glfwInit() bool
         ```
-
-    - best way of specifying generic types (returntype/typeof hacks are maybe a little janky)
 
     - better interpreter debugging
         - support for removing breakpoints

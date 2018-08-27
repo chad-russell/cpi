@@ -362,16 +362,13 @@ void BytecodeGen::gen(Node *node) {
                     append(node->bytecode, Instruction::CONSTF32);
                     auto litData = static_cast<float>(node->floatLiteralData.value);
                     append(node->bytecode, toBytes(litData));
-                }
-                    break;
+                } break;
                 case NodeTypekind::F64: {
                     append(node->bytecode, Instruction::CONSTF64);
                     auto litData = node->floatLiteralData.value;
                     append(node->bytecode, toBytes(litData));
-                }
-                    break;
-                default:
-                    cpi_assert(false);
+                } break;
+                default: cpi_assert(false);
             }
         }
             break;
@@ -425,7 +422,7 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, Instruction::RELCONSTI64);
                 append(instructions, toBytes(data.rhs->localOffset));
 
-                cpi_assert(resolvedDecl->nodeData->typeInfo->typeData.kind == NodeTypekind::POINTER);
+                cpi_assert(resolve(resolvedDecl->nodeData->typeInfo)->typeData.kind == NodeTypekind::POINTER);
                 append(instructions, toBytes32(typeSize(resolvedDecl->typeInfo)));
             } else if (resolvedDecl->type == NodeType::DOT) {
                 // store rvalue into it's slot
@@ -1030,7 +1027,7 @@ void BytecodeGen::gen(Node *node) {
             storeValue(node->castData.value, node->castData.value->localOffset);
 
             auto fromType = resolve(resolve(node->castData.value)->typeInfo);
-            auto toType = resolve(node->castData.type);
+            auto toType = resolve(node->typeInfo);
 
             // handle numeric conversions
             if (isNumericType(fromType)
@@ -1054,7 +1051,7 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, Instruction::RELCONSTI64);
                 append(instructions, toBytes(node->castData.value->localOffset));
 
-                append(instructions, toBytes32(typeSize(node->castData.type)));
+                append(instructions, toBytes32(typeSize(node->typeInfo)));
             }
         } break;
         case NodeType::UNARY_NEG: {
@@ -1140,6 +1137,8 @@ void BytecodeGen::gen(Node *node) {
         case NodeType::MODULE:
         case NodeType::DEFER:
         case NodeType::LINK:
+        case NodeType::TYPEOF:
+        case NodeType::RETURNTYPEOF:
         case NodeType::IMPORT: {
             // nothing to do!
         } break;

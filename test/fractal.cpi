@@ -5,9 +5,9 @@ fn drawFractal() {
     shades := " .-:;+=xX$& ";
     limit := shades.count - 1;
 
-    row := 0.0;
-    while row < 24.0 {
-        defer { row += 1.0; }
+    row := 0;
+    while row < 24 {
+        defer { row += 1; }
 
         buf := buffer.make!(i8)(64);
         defer {
@@ -15,7 +15,7 @@ fn drawFractal() {
             mem.free(buf.buf.data);
         }
 
-        r := row / 12.0 - 1.0;
+        r := cast(f32) row / 12.0 - 1.0;
         line := "";
 
         col := 0;

@@ -1749,7 +1749,8 @@ Node *Parser::parseRvalueSimple() {
         popFront();
 
         expect(LexerTokenType::LPAREN, "(");
-        cast->castData.type = parseType();
+        if (lexer->front.type != LexerTokenType::RPAREN)
+            cast->castData.type = parseType();
         expect(LexerTokenType::RPAREN, ")");
 
         cast->castData.value = parseRvalueSimple();
