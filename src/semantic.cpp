@@ -256,7 +256,6 @@ Node *matchParameterizedType(Semantic *semantic, Node *parameterizedType, Node *
         vector_at(declParams, i)->paramData.polyLink = nullptr;
     }
 
-    // findme
     auto ctGivenParams = vector_init<Node *>(ctDeclParams.length);
     auto encounteredError = assignParams(semantic, concreteType, ctDeclParams, ctGivenParams);
     cpi_assert(!encounteredError);
@@ -287,6 +286,7 @@ Node *matchParameterizedType(Semantic *semantic, Node *parameterizedType, Node *
         semantic->resolveTypes(ctValue);
     }
 
+    newType->parameterizedTypeData.typeDecl->typeData.polyRefinement = parameterizedType;
     return newType->parameterizedTypeData.typeDecl;
 }
 
@@ -811,6 +811,19 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
     }
 
     if (data->ctParams.length != 0 && !data->cameFromPolymorph) {
+        if (node->fnDeclData.isImpl) {
+            // todo(chad): check fn is named
+            // todo(chad): check fn is not external
+            // todo(chad): check fn has at least one param
+            // todo(chad): check first param is not polymorphic
+            auto polyRefinement = vector_at(node->fnDeclData.params, noIppFlag ? 0 : 1)->paramData.polyRefinement;
+            semantic->resolveTypes(polyRefinement);
+            auto firstParamType = resolve(polyRefinement);
+
+            cpi_assert(firstParamType->type == NodeType::PARAMETERIZED_TYPE);
+            vector_append(*firstParamType->parameterizedTypeData.typeDecl->typeData.scopedFns, node);
+        }
+
         return;
     }
 
@@ -1615,6 +1628,7 @@ void resolveType(Semantic *semantic, Node *node) {
             semantic->resolveTypes(newType->parameterizedTypeData.typeDecl);
 
             node->resolved = newType->parameterizedTypeData.typeDecl;
+            node->resolved->typeData.polyRefinement = resolvedType;
         } break;
     }
 }
@@ -1818,8 +1832,13 @@ Node *resolveSymbolWithScopeType(Semantic *semantic, int64_t atom, Node *firstPa
     semantic->resolveTypes(firstParam);
 
     auto resolvedScopeType = resolve(firstParam->typeInfo);
-    while (resolvedScopeType->typeData.kind == NodeTypekind::POINTER) {
-        resolvedScopeType = resolve(resolvedScopeType->typeData.pointerTypeData.underlyingType);
+    while (resolvedScopeType->typeData.kind == NodeTypekind::POINTER || resolvedScopeType->typeData.polyRefinement != nullptr) {
+        if (resolvedScopeType->typeData.kind == NodeTypekind::POINTER) {
+            resolvedScopeType = resolve(resolvedScopeType->typeData.pointerTypeData.underlyingType);
+        }
+        else {
+            resolvedScopeType = resolve(resolvedScopeType->typeData.polyRefinement);
+        }
     }
 
     for (auto scope : *resolvedScopeType->typeData.scopedFns) {
@@ -2040,8 +2059,6 @@ void resolveFnCall(Semantic *semantic, Node *node) {
                 }
                 else {
                     if (!typesMatch(declParam->typeInfo, givenParam->paramData.value->typeInfo, semantic)) {
-                        // todo if match exposed to real type then set resolved on exposed to real and pass match
-                        // unless already set then error?
                         semantic->reportError({node, declParam, givenParam}, Error{node->region, "static type mismatch!"});
                     }
                 }
@@ -2095,6 +2112,13 @@ void resolveFnCall(Semantic *semantic, Node *node) {
             semantic->resolveTypes(givenParam);
             if (!typesMatch(declParam->typeInfo, givenParam->typeInfo, semantic)) {
                 semantic->reportError({node, declParam, givenParam}, Error{node->region, "type mismatch!"});
+            }
+
+            if (declParam->paramData.polyRefinement != nullptr) {
+                auto resolvedGivenTypeInfo = resolve(givenParam->typeInfo);
+                if (resolvedGivenTypeInfo->typeData.polyRefinement != resolve(declParam->paramData.polyRefinement)) {
+                    semantic->reportError({node, declParam, givenParam}, Error{node->region, "polymorph refinement not met"});
+                }
             }
 
             maybeStructDefault(semantic, givenParam->paramData.value, resolve(declParam->paramData.type));
@@ -2215,6 +2239,10 @@ void resolveDeclParam(Semantic *semantic, Node *node) {
 
     if (node->paramData.type == nullptr) {
         node->paramData.type = node->paramData.value->typeInfo;
+    }
+
+    if (node->paramData.polyRefinement != nullptr) {
+        semantic->resolveTypes(node->paramData.polyRefinement);
     }
 
     auto resolvedType = resolve(node->paramData.type);

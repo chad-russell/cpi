@@ -1,3 +1,13 @@
+type Foo struct {
+    x: !T,
+    y: T
+}
+
+fn id(T: Ast = typeof(t))(t: T/Foo) {
+    return t;
+}
+
 fn main() {
-    return 0;
+    f: Foo = {3, 4};
+    return id(f).y;
 }

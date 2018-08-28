@@ -253,6 +253,7 @@ struct TypeData {
     Node *name;
 
     vector_t<Node *> *scopedFns;
+    Node *polyRefinement;
 
     union {
         FnTypeData fnTypeData;
@@ -273,6 +274,7 @@ struct ParamData {
     Node *value;
 
     Node *polyLink;
+    Node *polyRefinement;
     bool isAutoPolyParam;
 
     int64_t index;

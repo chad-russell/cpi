@@ -304,6 +304,11 @@ vector_t<Node *> Parser::parseDeclParams() {
             }
             node->paramData.type = parseType();
 
+            if (lexer->front.type == LexerTokenType::DIV) {
+                popFront(); // '/'
+                node->paramData.polyRefinement = parseSymbol();
+            }
+
             if (lexer->front.type == LexerTokenType::EQ) {
                 popFront();
                 node->paramData.value = parseRvalue();

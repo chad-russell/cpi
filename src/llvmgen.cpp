@@ -403,7 +403,8 @@ void LlvmGen::gen(Node *node) {
 
                 builder.CreateRet(builder.CreateLoad(realRet));
             } else {
-                builder.CreateRetVoid();
+                // return {}
+                builder.CreateRet(llvm::ConstantStruct::get((llvm::StructType *) voidTy));
             }
         } break;
         case NodeType::INT_LITERAL: {

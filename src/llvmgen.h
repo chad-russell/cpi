@@ -28,7 +28,7 @@ public:
     llvm::Constant *panicFunc;
     llvm::Constant *printfFunc;
 
-    llvm::Type *voidTy;
+    llvm::StructType *voidTy;
 
     // Create a new pass manager attached to it.
     unique_ptr<llvm::legacy::FunctionPassManager> TheFPM;
