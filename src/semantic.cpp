@@ -229,6 +229,67 @@ int maybeMatchUnionToStructLiteral(Node *desired, Node *actual, Semantic *semant
     }
 }
 
+Node *matchParameterizedType(Semantic *semantic, Node *parameterizedType, Node *concreteType) {
+    auto resolvedType = resolve(parameterizedType->parameterizedTypeData.typeDecl);
+
+    auto newType = semantic->deepCopyScopedStmt(resolvedType, resolvedType->scope);
+
+    // assign parameters
+    auto ctDeclParams = newType->parameterizedTypeData.ctParams;
+
+    auto declParams = newType->parameterizedTypeData.typeDecl->typeData.structTypeData.params;
+    auto givenParams = concreteType->typeData.structTypeData.params;
+    assignParams(semantic, parameterizedType, declParams, givenParams);
+
+    for (auto p : givenParams) {
+        p->semantic = false;
+        semantic->resolveTypes(p);
+    }
+
+    for (unsigned long i = 0; i < givenParams.length; i++) {
+        vector_at(declParams, i)->paramData.polyLink = vector_at(givenParams, i);
+    }
+
+    semantic->resolveTypes(newType->parameterizedTypeData.typeDecl);
+
+    for (unsigned long i = 0; i < givenParams.length; i++) {
+        vector_at(declParams, i)->paramData.polyLink = nullptr;
+    }
+
+    // findme
+    auto ctGivenParams = vector_init<Node *>(ctDeclParams.length);
+    auto encounteredError = assignParams(semantic, concreteType, ctDeclParams, ctGivenParams);
+    cpi_assert(!encounteredError);
+
+    for (unsigned long i = 0; i < ctDeclParams.length; i++) {
+        const auto& ctParam = vector_at(ctGivenParams, i);
+        const auto& ctDeclParam = vector_at(ctDeclParams, i);
+
+        Node *ctValue;
+        if (ctParam->type == NodeType::VALUE_PARAM) {
+            ctValue = ctParam->paramData.value;
+        } else {
+            ctValue = ctParam;
+        }
+
+        ctValue = resolve(ctValue);
+
+        auto declParamType = resolve(ctDeclParam->paramData.type);
+        if (declParamType != nullptr && declParamType->typeData.kind == NodeTypekind::EXPOSED_AST) {
+            ctDeclParam->staticValue = ctValue;
+        }
+        else {
+            auto constantized = constantize(semantic, ctValue);
+            ctDeclParam->staticValue = constantized;
+        }
+
+        ctValue->semantic = false;
+        semantic->resolveTypes(ctValue);
+    }
+
+    return newType->parameterizedTypeData.typeDecl;
+}
+
 bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
     desired = resolve(desired);
     actual = resolve(actual);
@@ -244,6 +305,13 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
     if (actual->type != NodeType::TYPE) {
         semantic->resolveTypes(actual);
         actual = resolve(actual);
+    }
+
+    if (desired->type == NodeType::PARAMETERIZED_TYPE) {
+        desired = resolve(matchParameterizedType(semantic, desired, actual));
+    }
+    if (actual->type == NodeType::PARAMETERIZED_TYPE) {
+        actual = resolve(matchParameterizedType(semantic, actual, desired));
     }
 
     cpi_assert(desired->type == NodeType::TYPE);
@@ -1185,6 +1253,10 @@ void resolveCast(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->castData.type);
     semantic->resolveTypes(node->castData.value);
 
+    if (resolve(node->castData.type)->type == NodeType::PARAMETERIZED_TYPE) {
+        node->castData.type = matchParameterizedType(semantic, resolve(node->castData.type), node->castData.value->typeInfo);
+    }
+
     if (node->castData.type != nullptr) {
         node->typeInfo = node->castData.type;
     }
@@ -1419,6 +1491,9 @@ void resolveDecl(Semantic *semantic, Node *node) {
     auto shouldCheckTypeMatch = node->declData.initialValue != nullptr
                                 && node->declData.initialValue->typeInfo != nullptr
                                 && node->declData.type != nullptr;
+    if (shouldCheckTypeMatch && resolve(node->declData.type)->type == NodeType::PARAMETERIZED_TYPE) {
+        node->declData.type = matchParameterizedType(semantic, resolve(node->declData.type), node->declData.initialValue->typeInfo);
+    }
     if (shouldCheckTypeMatch && !typesMatch(node->declData.type, node->declData.initialValue->typeInfo, semantic)) {
         ostringstream s("");
         s << "Type mismatch! wanted " << node->declData.type->typeData
@@ -1484,8 +1559,8 @@ void resolveType(Semantic *semantic, Node *node) {
 
             for (auto param : node->typeData.structTypeData.params) {
                 semantic->resolveTypes(param);
-                auto size = typeSize(param->paramData.type);
-                auto align = typeAlign(param->paramData.type);
+                auto size = typeSize(param->typeInfo);
+                auto align = typeAlign(param->typeInfo);
 
                 if (align > 0) { total += total % align; } // alignment
 
@@ -1517,6 +1592,29 @@ void resolveType(Semantic *semantic, Node *node) {
         case NodeTypekind::DOT: {
             semantic->resolveTypes(node->typeData.dotTypeData);
             node->typeData = resolve(node->typeData.dotTypeData)->typeData;
+        } break;
+        case NodeTypekind::PARAMETERIZED: {
+            cpi_assert(node->typeData.parameterizedTypeTypeData.value->type == NodeType::FN_CALL);
+
+            semantic->resolveTypes(node->typeData.parameterizedTypeTypeData.value->fnCallData.fn);
+
+            auto resolvedType = resolve(node->typeData.parameterizedTypeTypeData.value->fnCallData.fn);
+            cpi_assert(resolvedType->type == NodeType::PARAMETERIZED_TYPE);
+
+            auto newType = semantic->deepCopyScopedStmt(resolvedType, resolvedType->scope);
+
+            // assign parameters
+            auto declParams = newType->parameterizedTypeData.ctParams;
+            auto givenParams = node->typeData.parameterizedTypeTypeData.value->fnCallData.ctParams;
+            assignParams(semantic, node, declParams, givenParams);
+
+            for (unsigned long i = 0; i < declParams.length; i++) {
+                vector_at(declParams, i)->staticValue = vector_at(givenParams, i)->paramData.value;
+            }
+
+            semantic->resolveTypes(newType->parameterizedTypeData.typeDecl);
+
+            node->resolved = newType->parameterizedTypeData.typeDecl;
         } break;
     }
 }
@@ -2119,20 +2217,22 @@ void resolveDeclParam(Semantic *semantic, Node *node) {
         node->paramData.type = node->paramData.value->typeInfo;
     }
 
-    semantic->resolveTypes(node->paramData.type);
+    auto resolvedType = resolve(node->paramData.type);
+
+    semantic->resolveTypes(resolvedType);
     if (node->paramData.polyLink != nullptr) {
         semantic->resolveTypes(node->paramData.polyLink);
         node->typeInfo = node->paramData.polyLink->typeInfo;
     } else {
-        node->typeInfo = node->paramData.type;
+        node->typeInfo = resolvedType;
     }
 
-    if (node->paramData.type != nullptr && node->paramData.value != nullptr) {
+    if (resolvedType != nullptr && node->paramData.value != nullptr) {
         if (!typesMatch(node->paramData.type, node->paramData.value->typeInfo, semantic)) {
             semantic->reportError({node}, Error{node->region, "Type mismatch decl param"});
         }
 
-        maybeStructDefault(semantic, node->paramData.value, resolve(node->paramData.type));
+        maybeStructDefault(semantic, node->paramData.value, resolvedType);
     }
 
     makeTypeConcrete(node->typeInfo);
@@ -2947,9 +3047,10 @@ void resolveRun(Semantic *semantic, Node *node) {
 }
 
 void resolveTypeof(Semantic *semantic, Node *node) {
-    semantic->resolveTypes(node->nodeData);
+    auto resolvedNodeData = resolve(node->nodeData);
+    semantic->resolveTypes(resolvedNodeData);
     node->typeInfo = new Node(NodeTypekind::EXPOSED_AST);
-    node->staticValue = node->nodeData->typeInfo;
+    node->staticValue = resolvedNodeData->typeInfo;
 }
 
 void resolveReturnTypeof(Semantic *semantic, Node *node) {
@@ -3255,7 +3356,9 @@ void Semantic::resolveTypes(Node *node) {
         case NodeType::LINK: {
             resolveLink(this, node);
         } break;
-        case NodeType::END_SCOPE: break;
+        case NodeType::PARAMETERIZED_TYPE:
+        case NodeType::END_SCOPE:
+            break;
         default: cpi_assert(false);
     }
 }

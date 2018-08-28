@@ -620,15 +620,49 @@ Node *Parser::parseTypeDecl() {
 
     auto typeName = parseSymbol();
 
+    vector_t<Node *> ctParams = {};
+    if (lexer->front.type == LexerTokenType::LPAREN) {
+        popFront(); // '('
+
+        scopes.push(new Scope(scopes.top()));
+        ctParams = parseDeclParams();
+
+        expect(LexerTokenType::RPAREN, ")");
+    }
+
     auto typeDecl = parseType();
     initTypeData(typeDecl);
-    scopeInsert(typeName->symbolData.atomId, typeDecl);
 
     typeDecl->typeData.name = typeName;
-    typeDecl->region = Region{lexer->srcInfo, saved, typeDecl->region.end};
     typeDecl->scope = scopes.top();
+    typeDecl->region = Region{lexer->srcInfo, saved, typeDecl->region.end};
 
-    return typeDecl;
+    if (ctParams.length == 0) {
+        scopeInsert(typeName->symbolData.atomId, typeDecl);
+        return typeDecl;
+    }
+
+    auto pt = new Node(typeDecl->region.srcInfo, NodeType::PARAMETERIZED_TYPE, typeDecl->scope);
+    pt->region = typeDecl->region;
+    pt->parameterizedTypeData.ctParams = ctParams;
+    pt->parameterizedTypeData.typeDecl = typeDecl;
+
+    for (auto param : ctParams) {
+        scopeInsert(param->paramData.name->symbolData.atomId, param);
+    }
+    if (typeDecl->typeData.kind == NodeTypekind::STRUCT) {
+        for (auto param : typeDecl->typeData.structTypeData.params) {
+            scopeInsert(param->paramData.name->symbolData.atomId, param);
+        }
+    }
+
+    scopes.pop();
+
+    if (!isCopying) {
+        scopeInsert(typeName->symbolData.atomId, pt);
+    }
+
+    return pt;
 }
 
 Node *Parser::parseModuleDecl() {
@@ -1321,8 +1355,12 @@ Node *Parser::parseType() {
                     type->typeData.kind = NodeTypekind::DOT;
                     type->typeData.dotTypeData = typeName;
                 } break;
+                case NodeType::FN_CALL: {
+                    type->typeData.kind = NodeTypekind::PARAMETERIZED;
+                    type->typeData.parameterizedTypeTypeData.value = typeName;
+                } break;
                 default: {
-                    reportError("expected a symbol or dot for type name");
+                    reportError("expected a symbol, dot or parameterized specialization for type name");
                 }
             }
         } break;
@@ -1334,9 +1372,8 @@ Node *Parser::parseType() {
             initStructTypeData(type);
             type->typeData.structTypeData.params = parseDeclParams();
 
+            type->region.end = lexer->front.region.end;
             expect(LexerTokenType::RCURLY, "}");
-
-            type->region.end = lexer->lastLoc;
         } break;
         case LexerTokenType::ENUM: {
             expect(LexerTokenType::ENUM, "enum");
@@ -1583,9 +1620,12 @@ Node *Parser::parseLvalueOrLiteral() {
         popFront();
     }
 
-    if (lexer->front.type == LexerTokenType::I8 || lexer->front.type == LexerTokenType::I16
-        || lexer->front.type == LexerTokenType::I32 || lexer->front.type == LexerTokenType::I64
-        || lexer->front.type == LexerTokenType::F32 || lexer->front.type == LexerTokenType::F64) {
+    if (lexer->front.type == LexerTokenType::U8 || lexer->front.type == LexerTokenType::I8
+        || lexer->front.type == LexerTokenType::U16 || lexer->front.type == LexerTokenType::I16
+        || lexer->front.type == LexerTokenType::U32 || lexer->front.type == LexerTokenType::I32
+        || lexer->front.type == LexerTokenType::U64 || lexer->front.type == LexerTokenType::I64
+        || lexer->front.type == LexerTokenType::F32 || lexer->front.type == LexerTokenType::F64
+        || lexer->front.type == LexerTokenType::BOOLEAN) {
         return parseType();
     }
 

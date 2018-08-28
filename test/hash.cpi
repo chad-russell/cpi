@@ -1,65 +1,58 @@
 #import "io";
 #import "mem";
 
--- todo(chad): this should be built-in to the compiler
-fn mod(x: !T, y: T) {
-    return x - (x / y) * y;
+type Str []i8
+
+-- todo(chad): can't do recursive parameterized types until we memoize
+type Bucket(TKey: Ast, TValue: Ast) struct {
+    key: TKey,
+    value: TValue,
+    next: *none
 }
 
-type str []i8
+type Hash(TKey: Ast, TValue: Ast) struct {
+    size: i64,
+    buckets: []*Bucket!(TKey, TValue)
+}
 
-fn hash(KeyType: Ast, ValueType: Ast, bucketCount: i64)() {
-    type Bucket struct {
-        key: KeyType,
-        value: ValueType,
-        next : *Bucket = nil
-    }
+fn hash(TKey: Ast, TValue: Ast, bucketCount: i64)() {
+    type BucketPtr *Bucket!(TKey, TValue)
 
-    type Hash struct {
-        size: i64,
-        buckets: []*Bucket
-    }
-
-    ht := mem.heap!(Hash)({
-        size: 0,
-        buckets: cast([]*Bucket) {
-            data: mem.alloc!(i64)(bucketCount),
-            count: bucketCount
-        }
-    });
+    ht: Hash!(TKey, TValue);
+    ht.buckets.count = bucketCount;
+    ht.buckets.data = mem.alloc!(BucketPtr)(bucketCount);
 
     return ht;
 }
 
-impl str {
-    fn hasher(s: str) {
-        return 0;
-    }
-
-    fn equals(str1: str, str2: str) {
-        if str1.count != str2.count { return false; }
-        i := 0;
-        while i < str1.count {
-            if str1[i] != str2[i] { return false; }
-            i += 1;
-        }
-
-        return true;
-    }
+#impl fn hasher(s: Str) {
+    return 0;
 }
 
-fn hashInsert(ht: !T, key: !KeyType, value: !ValueType) {
-    hash := hasher(key) | mod(ht.buckets.count);
+#impl fn equals(str1: Str, str2: Str) {
+    if str1.count != str2.count { return false; }
+    i := 0;
+    while i < str1.count {
+        if str1[i] != str2[i] { return false; }
+        i += 1;
+    }
+
+    return true;
+}
+
+fn hashInsert(TKey := typeof(ht.buckets[0].key), TValue := typeof(ht.buckets[0].value))(ht: !HT, key: TKey, value: TValue) {
+    hash := hasher(key)  mod ht.buckets.count;
 
     if ht.buckets[hash] != nil {
         lastBucket := ht.buckets[hash];
+
         if lastBucket.key | equals(key) {
             lastBucket.value = value;
             return {};
         }
 
         while lastBucket.next != nil {
-            lastBucket = lastBucket.next;
+            lastBucket = cast() lastBucket.next;
 
             if lastBucket.key | equals(key) {
                 lastBucket.value = value;
@@ -86,8 +79,8 @@ fn hashInsert(ht: !T, key: !KeyType, value: !ValueType) {
     return {};
 }
 
-fn hashGet(ht: !T, key: !KeyType) {
-    hash := hasher(key) | mod(ht.buckets.count);
+fn hashGet(TKey := typeof(ht.buckets[0].key))(ht: !HT, key: TKey) {
+    hash := hasher(key) mod ht.buckets.count;
 
     if ht.buckets[hash] != nil {
         lastBucket := ht.buckets[hash];
@@ -107,7 +100,7 @@ fn hashGet(ht: !T, key: !KeyType) {
 }
 
 fn test() {
-    h := hash!(str, i64, 10)();
+    h := hash!(Str, i64, 10)();
 
     hashInsert(&h, "barrrrrr", 5);
     hashInsert(&h, "carrrrrr", 13);
@@ -117,3 +110,4 @@ fn test() {
         "car is: ", ^hashGet(&h, "carrrrrr"), "\n",
     });
 }
+

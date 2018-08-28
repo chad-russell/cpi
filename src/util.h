@@ -77,6 +77,7 @@ enum class NodeType {
     ALIAS = 44,
     LINK = 45,
     UNARY_BITNOT = 46,
+    PARAMETERIZED_TYPE = 47,
 };
 
 enum class NodeTypekind: int32_t {
@@ -101,7 +102,8 @@ enum class NodeTypekind: int32_t {
     POINTER = 18,
     EXPOSED_AST = 19,
     DOT = 20,
-    AUTOCAST = 21
+    AUTOCAST = 21,
+    PARAMETERIZED = 22,
 };
 
 enum class LexerTokenType : int32_t {
@@ -242,6 +244,10 @@ struct SymbolTypeData {
     int64_t atomId;
 };
 
+struct ParameterizedTypeTypeData {
+    Node *value;
+};
+
 struct TypeData {
     NodeTypekind kind;
     Node *name;
@@ -254,6 +260,7 @@ struct TypeData {
         PointerTypeData pointerTypeData;
         SymbolTypeData symbolTypeData;
         Node *dotTypeData;
+        ParameterizedTypeTypeData parameterizedTypeTypeData;
         double floatTypeData;
         int64_t intTypeData;
         bool boolTypeData;
@@ -438,6 +445,11 @@ struct ImportData {
     Node *alias;
 };
 
+struct ParameterizedTypeData {
+    vector_t<Node *> ctParams;
+    Node *typeDecl;
+};
+
 struct DeferData {
     vector_t<Node *> stmts;
 };
@@ -509,6 +521,7 @@ public:
         UnaryNegData unaryNegData;
         LinkData linkData;
         ImportData importData;
+        ParameterizedTypeData parameterizedTypeData;
     };
 
     Node *staticValue = nullptr;

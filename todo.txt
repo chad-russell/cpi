@@ -2,6 +2,10 @@ TODO:
     - best way of specifying generic types (returntype/typeof hacks are maybe a little janky)
         - parameterized types?
 
+    - operator overloading?
+        - +, -, *, /, comparison
+        - custom?
+
     - character literals
 
     - disallow modifying aliases (i.e. any kind of lvalue assignment)
@@ -11,6 +15,7 @@ TODO:
 
     - do static array sizes make sense?
         - [5]i32
+        - if so, should this be used to represent string literals?
 
     - way to specify foreign function names different from given name
         - ```

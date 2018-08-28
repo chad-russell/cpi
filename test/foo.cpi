@@ -1,7 +1,16 @@
+type Pair(T := typeof(v1)) struct {
+    v1: T,
+    v2: T
+}
+
+#import "io";
+
 fn main() {
-    #import "textedit";
-    textedit.example();
+    i64Pair: Pair = {3, 4};
+    io.println(i64Pair);
+
+    strPair := cast(Pair) {"foo", "bar"};
+    io.println(strPair);
 
     return 0;
 }
-
