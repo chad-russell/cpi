@@ -357,6 +357,15 @@ void LlvmGen::gen(Node *node) {
                     }
 
                     local->llvmLocal = resolvedLocal->llvmLocal;
+
+                    // store any param locals
+                    // todo(chad): is this a hacky way to see if the local is a param?
+                    for (auto param: node->fnDeclData.params) {
+                        if (param == local) {
+                            gen(param);
+                            store((llvm::Value *) param->llvmData, (llvm::Value *) param->llvmLocal);
+                        }
+                    }
                 }
             }
 

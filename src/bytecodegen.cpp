@@ -885,12 +885,9 @@ void BytecodeGen::gen(Node *node) {
         case NodeType::ADDRESS_OF: {
             gen(node->nodeData);
 
-            if (node->nodeData->isLocal || node->nodeData->isBytecodeLocal) {
+            if (hasNoLocalByDefault(node->nodeData) && (node->nodeData->isLocal || node->nodeData->isBytecodeLocal)) {
                 storeValue(node->nodeData, node->nodeData->localOffset);
             }
-
-            append(node->bytecode, Instruction::RELI64);
-            append(node->bytecode, toBytes(node->nodeData->localOffset));
 
             if (node->isLocal || node->isBytecodeLocal) {
                 append(instructions, Instruction::STORECONST);
@@ -1213,13 +1210,26 @@ void BytecodeGen::storeValue(Node *node, int64_t offset) {
             append(instructions, toBytes32(node->fnDeclData.tableIndex));
         } break;
         case NodeType::ADDRESS_OF: {
-            append(instructions, Instruction::STORECONST);
+            if (node->nodeData->type == NodeType::DOT && node->nodeData->dotData.pointerIsRelative) {
+                append(instructions, Instruction::STORE);
 
-            append(instructions, Instruction::RELCONSTI64);
-            append(instructions, toBytes(offset));
+                append(instructions, Instruction::RELCONSTI64);
+                append(instructions, toBytes(offset));
 
-            append(instructions, Instruction::RELI64);
-            append(instructions, toBytes(node->nodeData->localOffset));
+                append(instructions, Instruction::RELCONSTI64);
+                append(instructions, toBytes(node->nodeData->localOffset));
+
+                append(instructions, toBytes32(8));
+            }
+            else {
+                append(instructions, Instruction::STORECONST);
+
+                append(instructions, Instruction::RELCONSTI64);
+                append(instructions, toBytes(offset));
+
+                append(instructions, Instruction::RELI64);
+                append(instructions, toBytes(node->nodeData->localOffset));
+            }
         } break;
         case NodeType::DEREF: {
             append(instructions, Instruction::STORE);

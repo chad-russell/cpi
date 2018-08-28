@@ -26,7 +26,7 @@ fn hash(TKey: Ast, TValue: Ast, bucketCount: i64)() {
 }
 
 #impl fn hasher(s: Str) {
-    return 0;
+    return s.count;
 }
 
 #impl fn equals(str1: Str, str2: Str) {
@@ -41,7 +41,7 @@ fn hash(TKey: Ast, TValue: Ast, bucketCount: i64)() {
 }
 
 fn hashInsert(TKey := typeof(ht.buckets[0].key), TValue := typeof(ht.buckets[0].value))(ht: !HT, key: TKey, value: TValue) {
-    hash := hasher(key)  mod ht.buckets.count;
+    hash := hasher(key) mod ht.buckets.count;
 
     if ht.buckets[hash] != nil {
         lastBucket := ht.buckets[hash];
@@ -84,6 +84,7 @@ fn hashGet(TKey := typeof(ht.buckets[0].key))(ht: !HT, key: TKey) {
 
     if ht.buckets[hash] != nil {
         lastBucket := ht.buckets[hash];
+
         if lastBucket.key | equals(key) {
             return &lastBucket.value;
         }
@@ -102,12 +103,10 @@ fn hashGet(TKey := typeof(ht.buckets[0].key))(ht: !HT, key: TKey) {
 fn test() {
     h := hash!(Str, i64, 10)();
 
-    hashInsert(&h, "barrrrrr", 5);
-    hashInsert(&h, "carrrrrr", 13);
+    hashInsert(&h, "bar", 5);
+    hashInsert(&h, "carr", 13);
 
-    io.printMany({
-        "bar is: ", ^hashGet(&h, "barrrrrr"), "\n",
-        "car is: ", ^hashGet(&h, "carrrrrr"), "\n",
-    });
+    basic.assert(^hashGet(&h, "bar") == 5);
+    basic.assert(^hashGet(&h, "carr") == 13);
 }
 

@@ -1,6 +1,17 @@
 TODO:
-    - best way of specifying generic types (returntype/typeof hacks are maybe a little janky)
-        - parameterized types?
+    - returning literal address of dotted pointer where the pointer is passed in through a function parameter in bytecode doesn't always work
+
+    - naked return in llvm
+
+    - more robustness around parameterized types
+        - memoization for parameterized types and functions
+        - bring back Type as another way of saying Ast basically, but it should check that you're passing in some kind of type
+        - in functions, allow for !T/Foo syntax
+            - e.g. ```fn foo(t: !T/Foo) { ... }```
+            - e.g. ```fn foo(T: Type/Foo)(t: T) { ... }```
+            - should mean that it can be any concrete version of the parameterized type Foo
+                - will need to keep track of which parameterized type each concrete type comes from (probably in typeData)
+            - when then fn is a #impl, should add the impl to the generic type
 
     - operator overloading?
         - +, -, *, /, comparison
