@@ -398,7 +398,7 @@ Node *makeAutoPolyCtParam(Node *originalParam) {
     return newParam;
 }
 
-void maybeAddAutoPolyFor(Node *decl, vector_t<Node *> params) {
+void maybeAddAutoPolyForFnDecl(Node *decl, vector_t<Node *> params) {
     auto isAutoPoly = false;
     for (auto p : params) {
         if (p->paramData.isAutoPolyParam) {
@@ -407,11 +407,26 @@ void maybeAddAutoPolyFor(Node *decl, vector_t<Node *> params) {
     }
 
     if (isAutoPoly) {
-        decl->fnDeclData.params = params;
-
         for (auto p : params) {
             if (p->paramData.isAutoPolyParam) {
                 vector_append(decl->fnDeclData.ctParams, makeAutoPolyCtParam(p));
+            }
+        }
+    }
+}
+
+void maybeAddAutoPolyForTypeDecl(vector_t<Node *> &ctParams, vector_t<Node *> params) {
+    auto isAutoPoly = false;
+    for (auto p : params) {
+        if (p->paramData.isAutoPolyParam) {
+            isAutoPoly = true;
+        }
+    }
+
+    if (isAutoPoly) {
+        for (auto p : params) {
+            if (p->paramData.isAutoPolyParam) {
+                vector_append(ctParams, makeAutoPolyCtParam(p));
             }
         }
     }
@@ -458,11 +473,11 @@ Node *Parser::parseFnDecl() {
         decl->fnDeclData.ctParams = firstParams;
         decl->fnDeclData.params = secondParams;
 
-        maybeAddAutoPolyFor(decl, secondParams);
+        maybeAddAutoPolyForFnDecl(decl, secondParams);
     } else {
         decl->fnDeclData.params = firstParams;
 
-        maybeAddAutoPolyFor(decl, firstParams);
+        maybeAddAutoPolyForFnDecl(decl, firstParams);
     }
 
     // return type
@@ -621,12 +636,11 @@ Node *Parser::parseTypeDecl() {
     auto typeName = parseSymbol();
 
     vector_t<Node *> ctParams = {};
+    scopes.push(new Scope(scopes.top()));
+
     if (lexer->front.type == LexerTokenType::LPAREN) {
         popFront(); // '('
-
-        scopes.push(new Scope(scopes.top()));
         ctParams = parseDeclParams();
-
         expect(LexerTokenType::RPAREN, ")");
     }
 
@@ -637,7 +651,10 @@ Node *Parser::parseTypeDecl() {
     typeDecl->scope = scopes.top();
     typeDecl->region = Region{lexer->srcInfo, saved, typeDecl->region.end};
 
+    maybeAddAutoPolyForTypeDecl(ctParams, typeDecl->typeData.structTypeData.params);
+
     if (ctParams.length == 0) {
+        scopes.pop();
         scopeInsert(typeName->symbolData.atomId, typeDecl);
         return typeDecl;
     }

@@ -1,15 +1,16 @@
-type Pair(T := typeof(v1)) struct {
-    v1: T,
-    v2: T
+type Pair(default: typeof(v1)) struct {
+    v1: !T = default,
+    v2: T = default
 }
 
 #import "io";
 
 fn main() {
-    i64Pair: Pair = {3, 4};
+    i64Pair: Pair!(3, i64);
     io.println(i64Pair);
 
-    strPair := cast(Pair) {"foo", "bar"};
+    type Str []i8
+    strPair: Pair!("foo", Str) = {v2: "bar"};
     io.println(strPair);
 
     return 0;

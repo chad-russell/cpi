@@ -1253,7 +1253,7 @@ void resolveCast(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->castData.type);
     semantic->resolveTypes(node->castData.value);
 
-    if (resolve(node->castData.type)->type == NodeType::PARAMETERIZED_TYPE) {
+    if (node->castData.type != nullptr && resolve(node->castData.type)->type == NodeType::PARAMETERIZED_TYPE) {
         node->castData.type = matchParameterizedType(semantic, resolve(node->castData.type), node->castData.value->typeInfo);
     }
 

@@ -4,9 +4,9 @@
 type Str []i8
 
 -- todo(chad): can't do recursive parameterized types until we memoize
-type Bucket(TKey: Ast, TValue: Ast) struct {
-    key: TKey,
-    value: TValue,
+type Bucket struct {
+    key: !TKey,
+    value: !TValue,
     next: *none
 }
 
