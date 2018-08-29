@@ -118,7 +118,7 @@ void debugPrintVar(ostream &target, Interpreter *interp, TypeData td, int64_t of
             target << *((int32_t *) offset) << " (todo(chad): look up the fn name)";
         } break;
         case NodeTypekind::STRUCT: {
-            if (td.structTypeData.isSecretlyEnum) {
+            if (td.structTypeData.isSecretlyUnion) {
                 auto nvr = interp->nextVarReference;
                 interp->nextVarReference += 1;
 

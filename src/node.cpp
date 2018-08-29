@@ -221,8 +221,16 @@ void initStructTypeData(Node *node) {
     node->typeData.structTypeData.params = vector_init<Node *>(8);
     node->typeData.structTypeData.isSecretlyArray = false;
     node->typeData.structTypeData.secretArrayElementType = nullptr;
-    node->typeData.structTypeData.isSecretlyEnum = false;
+    node->typeData.structTypeData.isSecretlyUnion = false;
+    node->typeData.structTypeData.unionTagType = nullptr;
     node->typeData.structTypeData.coercedType = nullptr;
+}
+
+void initEnumTypeData(Node *node) {
+    node->typeData.kind = NodeTypekind::ENUM;
+
+    node->typeData.enumTypeData.type = nullptr;
+    node->typeData.enumTypeData.params = vector_init<Node *>(16);
 }
 
 void initFnTypeData(Node *node) {

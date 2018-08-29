@@ -97,9 +97,9 @@ LlvmGen::LlvmGen(const char *fileName) : builder(context), module(llvm::make_uni
 
 void LlvmGen::finalize() {
     // DO_OPTIMIZE
-//    for (auto fn : allFns) {
-//        TheFPM->run(*fn);
-//    }
+    for (auto fn : allFns) {
+        TheFPM->run(*fn);
+    }
     verifyModule(*module, &llvm::errs());
 }
 
@@ -173,11 +173,16 @@ llvm::Type *LlvmGen::typeFor(Node *node) {
                 return llvm::StructType::get(context, elementTypes);
             }
 
-            else if (node->typeData.structTypeData.isSecretlyEnum) {
+            else if (node->typeData.structTypeData.isSecretlyUnion) {
                 vector<llvm::Type *> elementTypes;
 
                 // tag
-                elementTypes.push_back(builder.getInt64Ty());
+                if (node->typeData.structTypeData.unionTagType != nullptr) {
+                    elementTypes.push_back(typeFor(node->typeData.structTypeData.unionTagType));
+                }
+                else {
+                    elementTypes.push_back(builder.getInt64Ty());
+                }
 
                 // value size
                 uint64_t dataSizeInBytes = 0;
@@ -828,7 +833,7 @@ void LlvmGen::gen(Node *node) {
                 auto foundParam = resolvedDecl->dotData.resolved;
                 auto paramIndex = (uint64_t) foundParam->paramData.index;
 
-                if (resolve(resolvedDecl->dotData.lhs->typeInfo)->typeData.structTypeData.isSecretlyEnum && paramIndex != 0) {
+                if (resolve(resolvedDecl->dotData.lhs->typeInfo)->typeData.structTypeData.isSecretlyUnion && paramIndex != 0) {
                     paramIndex = 1;
                 }
 
@@ -880,9 +885,9 @@ void LlvmGen::gen(Node *node) {
                 resolvedTypeInfo = resolve(resolvedTypeInfo->typeData.pointerTypeData.underlyingType);
             }
 
-            auto isSecretlyEnum = false;
-            if (resolvedTypeInfo->typeData.structTypeData.isSecretlyEnum) {
-                isSecretlyEnum = true;
+            auto isSecretlyUnion = false;
+            if (resolvedTypeInfo->typeData.structTypeData.isSecretlyUnion) {
+                isSecretlyUnion = true;
 
                 int64_t tag = foundParam->paramData.name->symbolData.atomId;
 
@@ -919,7 +924,7 @@ void LlvmGen::gen(Node *node) {
             if (node->dotData.lhs->isLocal) {
                 auto gep = builder.CreateGEP(gepTarget, geps);
 
-                if (isSecretlyEnum && paramIndex == 1) {
+                if (isSecretlyUnion && paramIndex == 1) {
                     // bitcast gepTarget to the correct thing...
                     if (resolve(foundParam->typeInfo)->typeData.kind == NodeTypekind::NONE) {
                         gep = builder.CreateBitCast(gep, builder.getInt8PtrTy(0));
@@ -938,7 +943,7 @@ void LlvmGen::gen(Node *node) {
                 vector<unsigned int> values = { (unsigned int) paramIndex };
                 node->llvmData = builder.CreateExtractValue(gepTarget, values);
 
-                if (isSecretlyEnum && paramIndex == 1) {
+                if (isSecretlyUnion && paramIndex == 1) {
                     // bitcast gepTarget to the correct thing...
                     llvm::Type *realType = resolve(foundParam->typeInfo)->typeData.kind == NodeTypekind::NONE
                                            ? builder.getInt8Ty()
@@ -1017,7 +1022,7 @@ void LlvmGen::gen(Node *node) {
             builder.CreateCall(panicFunc, { builder.CreateGlobalStringPtr("assertion failed!!!") });
         } break;
         case NodeType::STRUCT_LITERAL: {
-            if (node->typeInfo->typeData.structTypeData.coercedType != nullptr && node->typeInfo->typeData.structTypeData.coercedType->typeData.structTypeData.isSecretlyEnum) {
+            if (node->typeInfo->typeData.structTypeData.coercedType != nullptr && node->typeInfo->typeData.structTypeData.coercedType->typeData.structTypeData.isSecretlyUnion) {
                 // we need to store the tag and the value.
                 auto tagIndex = vector_at(node->typeInfo->typeData.structTypeData.params, 0)->paramData.index;
 
@@ -1278,6 +1283,7 @@ void LlvmGen::gen(Node *node) {
         case NodeType::END_SCOPE:
         case NodeType::IMPORT:
         case NodeType::LINK:
+        case NodeType::PARAMETERIZED_TYPE:
         case NodeType::MODULE: {
             // nothing to do
         } break;

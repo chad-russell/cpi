@@ -653,7 +653,6 @@ Node *Parser::parseTypeDecl() {
     initTypeData(typeDecl);
 
     typeDecl->typeData.name = typeName;
-    typeDecl->scope = scopes.top();
     typeDecl->region = Region{lexer->srcInfo, saved, typeDecl->region.end};
 
     maybeAddAutoPolyForTypeDecl(ctParams, typeDecl->typeData.structTypeData.params);
@@ -1379,7 +1378,7 @@ Node *Parser::parseType() {
                 } break;
                 case NodeType::FN_CALL: {
                     type->typeData.kind = NodeTypekind::PARAMETERIZED;
-                    type->typeData.parameterizedTypeTypeData.value = typeName;
+                    type->typeData.polymorphTypeTypeData.value = typeName;
                 } break;
                 default: {
                     reportError("expected a symbol, dot or parameterized specialization for type name");
@@ -1398,12 +1397,52 @@ Node *Parser::parseType() {
             expect(LexerTokenType::RCURLY, "}");
         } break;
         case LexerTokenType::ENUM: {
-            expect(LexerTokenType::ENUM, "enum");
+            popFront();
+
+            initEnumTypeData(type);
+
+            scopes.push(new Scope(scopes.top()));
+            type->scope = scopes.top();
+
+            if (lexer->front.type == LexerTokenType::LPAREN) {
+                popFront(); // '('
+                type->typeData.enumTypeData.type = parseType();
+                expect(LexerTokenType::RPAREN, ")");
+            }
+            else {
+                type->typeData.enumTypeData.type = new Node(NodeTypekind::I64);
+            }
+
+            expect(LexerTokenType::LCURLY, "{");
+            type->typeData.enumTypeData.params = parseValueParams();
+
+            for (auto p : type->typeData.enumTypeData.params) {
+                if (p->paramData.name == nullptr) {
+                    p->paramData.name = p->paramData.value;
+                    p->paramData.value = nullptr;
+                }
+
+                scopeInsert(p->paramData.name->symbolData.atomId, p);
+            }
+
+            expect(LexerTokenType::RCURLY, "}");
+
+            scopes.pop();
+        } break;
+        case LexerTokenType::UNION: {
+            popFront();
+
+            initStructTypeData(type);
+
+            if (lexer->front.type == LexerTokenType::LPAREN) {
+                popFront(); // '('
+                type->typeData.structTypeData.unionTagType = parseType();
+                expect(LexerTokenType::RPAREN, ")");
+            }
 
             expect(LexerTokenType::LCURLY, "{");
 
-            initStructTypeData(type);
-            type->typeData.structTypeData.isSecretlyEnum = true;
+            type->typeData.structTypeData.isSecretlyUnion = true;
 
             auto tagSymbol = new Node();
             tagSymbol->type = NodeType::SYMBOL;
@@ -1413,8 +1452,12 @@ Node *Parser::parseType() {
             auto tagParam = new Node(lexer->srcInfo, NodeType::DECL_PARAM, scopes.top());
             tagParam->paramData.index = 0;
 
-            // todo(chad): allow the user to specify the width of the tag
-            tagParam->paramData.type = new Node(NodeTypekind::I64);
+            if (type->typeData.structTypeData.unionTagType != nullptr) {
+                tagParam->paramData.type = type->typeData.structTypeData.unionTagType;
+            }
+            else {
+                tagParam->paramData.type = new Node(NodeTypekind::I64);
+            }
             tagParam->paramData.name = tagSymbol;
 
             vector_append(type->typeData.structTypeData.params, tagParam);
@@ -1581,8 +1624,9 @@ Node *Parser::parseIsKind() {
         || lexer->front.type == LexerTokenType::BOOLEAN
         || lexer->front.type == LexerTokenType::FN
         || lexer->front.type == LexerTokenType::STRUCT
-        || lexer->front.type == LexerTokenType::ENUM
+        || lexer->front.type == LexerTokenType::UNION
         || lexer->front.type == LexerTokenType::NONE
+        || lexer->front.type == LexerTokenType::ENUM
         || (lexer->front.type == LexerTokenType::LSQUARE && lexer->next.type == LexerTokenType::RSQUARE)
         || lexer->front.type == LexerTokenType::MUL) {
         type->isKindData.tokenType = lexer->front.type;

@@ -190,6 +190,7 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "#impl", LexerTokenType::IMPL)) { return; }
     if (tryEatKeyword(&next, "type", LexerTokenType::TYPE)) { return; }
     if (tryEatKeyword(&next, "struct", LexerTokenType::STRUCT)) { return; }
+    if (tryEatKeyword(&next, "union", LexerTokenType::UNION)) { return; }
     if (tryEatKeyword(&next, "enum", LexerTokenType::ENUM)) { return; }
     if (tryEatKeyword(&next, "return", LexerTokenType::RETURN)) { return; }
     if (tryEatKeyword(&next, "bool", LexerTokenType::BOOLEAN)) { return; }

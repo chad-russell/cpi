@@ -1,13 +1,13 @@
-type Foo struct {
-    x: !T,
-    y: T
+type TriBool enum {
+    YES,
+    NO: 15,
+    MAYBE
 }
 
-fn id(T: Ast = typeof(t))(t: T/Foo) {
-    return t;
-}
+#import "io";
 
 fn main() {
-    f: Foo = {3, 4};
-    return id(f).y;
+    t: TriBool = TriBool.MAYBE;
+    io.println(t);
+    return 0;
 }

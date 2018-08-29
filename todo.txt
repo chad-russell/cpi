@@ -1,21 +1,9 @@
 TODO:
-    - more robustness around parameterized types
-        - memoization for parameterized types and functions
-
-    - operator overloading?
-        - +, -, *, /, comparison
-        - custom?
-
-    - character literals
+    - static array sizes?
+        - [5]i32
+        - should this be used to represent string literals?
 
     - disallow modifying aliases (i.e. any kind of lvalue assignment)
-
-    - something for c-style enums?
-        - like a way to specify that our enum has no value
-
-    - do static array sizes make sense?
-        - [5]i32
-        - if so, should this be used to represent string literals?
 
     - way to specify foreign function names different from given name
         - ```
@@ -32,8 +20,8 @@ TODO:
             - use this for step/continue backwards in vscode
         - ctfe debugging
 
-    - switch (on enum (tag))
-        - only real benefit is that the compiler could warn you if you miss a case
+    - switch (on enum/union)
+        - only real benefit over if/else is that the compiler could warn you if you miss a case
 
     - threading
         - for interpreter, should create another interpreter and add it to a list. Execution should round-robin over all interpreters in the list
@@ -72,3 +60,7 @@ TODO:
                 -- do stuff. Should lock at the beginning and unlock at the end
             }
         ```
+
+    - operator overloading?
+        - +, -, *, /, comparison
+

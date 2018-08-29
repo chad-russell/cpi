@@ -58,6 +58,10 @@ void BytecodeGen::binopHelper(string instructionStr, Node *node, int32_t scale) 
         kind = resolvedLhsType->typeData.kind;
     }
 
+    if (kind == NodeTypekind::ENUM) {
+        kind = resolvedLhsType->typeData.enumTypeData.type->typeData.kind;
+    }
+
     string toAppend;
     switch (kind) {
         case NodeTypekind::U8:
@@ -498,6 +502,7 @@ void BytecodeGen::gen(Node *node) {
                     append(node->bytecode, Instruction::RELF64);
                     append(node->bytecode, toBytes(localOffset));
                 } break;
+                case NodeTypekind::ENUM:
                 case NodeTypekind::NONE:
                 case NodeTypekind::STRUCT: {
                     // nothing to do
@@ -1130,12 +1135,17 @@ void BytecodeGen::gen(Node *node) {
             gen(node->declData.initialValue);
             node->bytecode = node->declData.initialValue->bytecode;
         } break;
+        case NodeType::ENUM_LITERAL: {
+            gen(node->enumLiteralData.value);
+            node->bytecode = node->enumLiteralData.value->bytecode;
+        } break;
         case NodeType::STRING_LITERAL:
         case NodeType::MODULE:
         case NodeType::DEFER:
         case NodeType::LINK:
         case NodeType::TYPEOF:
         case NodeType::RETURNTYPEOF:
+        case NodeType::PARAMETERIZED_TYPE:
         case NodeType::IMPORT: {
             // nothing to do!
         } break;
@@ -1286,16 +1296,22 @@ void BytecodeGen::storeValue(Node *node, int64_t offset) {
         } break;
         case NodeType::STRUCT_LITERAL: {
             if (node->typeInfo->typeData.structTypeData.coercedType != nullptr
-                && node->typeInfo->typeData.structTypeData.coercedType->typeData.structTypeData.isSecretlyEnum) {
+                && node->typeInfo->typeData.structTypeData.coercedType->typeData.structTypeData.isSecretlyUnion) {
+
                 // we need to store the tag and the value.
                 auto tagIndex = vector_at(node->typeInfo->typeData.structTypeData.params, 0)->paramData.index;
                 auto value = vector_at(node->structLiteralData.params, 0);
 
                 auto tagValue = new Node(node->region);
                 tagValue->type = NodeType::INT_LITERAL;
-                // todo(chad): allow the user to specify the size of the tag (or maybe do it automatically?)
-                // todo(chad): maybe do this sooner - like in semantic back when we recognize this case?
-                tagValue->typeInfo = new Node(NodeTypekind::I64);
+                if (node->typeInfo->typeData.structTypeData.coercedType->typeData.structTypeData.unionTagType != nullptr) {
+                    tagValue->typeInfo = node->typeInfo->typeData.structTypeData.coercedType->typeData.structTypeData.unionTagType;
+                }
+                else {
+                    // todo(chad): allow the user to specify the size of the tag (or maybe do it automatically?)
+                    // todo(chad): maybe do this sooner - like in semantic back when we recognize this case?
+                    tagValue->typeInfo = new Node(NodeTypekind::I64);
+                }
                 tagValue->intLiteralData.value = tagIndex;
 
                 cpi_assert(value->type == NodeType::VALUE_PARAM);
@@ -1344,6 +1360,9 @@ void BytecodeGen::storeValue(Node *node, int64_t offset) {
         } break;
         case NodeType::ALIAS: {
             storeValue(node->declData.initialValue, offset);
+        } break;
+        case NodeType::ENUM_LITERAL: {
+            storeValue(node->enumLiteralData.value, offset);
         } break;
         default:
             cpi_assert(false);

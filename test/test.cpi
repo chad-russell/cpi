@@ -170,6 +170,56 @@ fn runAllTests() {
     assert(context.id == 1);
 
     testHash();
+
+    testPolyRecursion();
+
+    testPolyImpl();
+}
+
+fn testPolyImpl() {
+    type FooPair struct {
+        x: !T,
+        y: T
+    }
+
+    #impl fn implTest(t: !T/FooPair) {
+        return 5;
+    }
+
+    type BarPair struct {
+        x: !T,
+        y: T
+    }
+
+    #impl fn implTest(t: !T/BarPair) {
+        return 13;
+    }
+
+    f1: FooPair = {3, 4};
+    f2: FooPair = {true, false};
+
+    b: BarPair = {3, 4};
+
+    (f1|implTest == 5)|assert;
+    (f2|implTest == 5)|assert;
+
+    (b|implTest == 13)|assert;
+}
+
+fn testPolyRecursion() {
+    type PolyLinkedList(default: Ast) struct {
+        val := default,
+        next: *PolyLinkedList!(default) = nil
+    }
+
+    fn polyFib(n: !T) {
+        if n == 0 or n == 1 { return 1; }
+        return polyFib(n - 1) + polyFib(n - 2);
+    }
+
+    p: PolyLinkedList!(polyFib(8));
+    p.next = &p;
+    assert(p.next.next.next.next.val == 34);
 }
 
 fn testHash() {
@@ -255,9 +305,16 @@ fn testModule() {
 }
 
 fn testPrinting() {
-    e: enum {x: i32, y: bool} = { y: false };
-    io.printWithSpaces({123, "string", false, []{1, 2, 3}, {x: 3, y: &8767}, e});
-    puts("\n\n");
+    e: union {x: i32, y: bool} = { y: false };
+    io.printWithSpaces({
+        123,
+        "string",
+        false,
+        []{1, 2, 3},
+        {x: 3, y: &8767},
+        e,
+        "\n\n"
+    });
 }
 
 fn testUnion1() {
@@ -273,7 +330,7 @@ fn testUnion1() {
     x: unionFoo = {18};
     y: unionBar;
 
-    a : enum {x: unionFoo, y: unionBar};
+    a : union {x: unionFoo, y: unionBar};
 
     a.x = x;
 
@@ -917,7 +974,7 @@ fn testAnySimple1() {
         params: []ParamData
     }
 
-    type EnumData struct {
+    type UnionData struct {
         params: []ParamData
     }
 
@@ -934,7 +991,7 @@ fn testAnySimple1() {
         elementType: *TypeInfo
     }
 
-    type TypeInfo enum {
+    type TypeInfo union {
         NONE:          none,
         INT_LITERAL:   i64,
         I8:            none,
@@ -947,7 +1004,7 @@ fn testAnySimple1() {
         FN:            FnData,
         STRUCT:        StructData,
         POINTER:       PointerData,
-        ENUM:          EnumData,
+        UNION:         UnionData,
         ARRAY:         ArrayData,
     }
 

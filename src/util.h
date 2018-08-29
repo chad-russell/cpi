@@ -78,6 +78,7 @@ enum class NodeType {
     LINK = 45,
     UNARY_BITNOT = 46,
     PARAMETERIZED_TYPE = 47,
+    ENUM_LITERAL = 48,
 };
 
 enum class NodeTypekind: int32_t {
@@ -104,6 +105,7 @@ enum class NodeTypekind: int32_t {
     DOT = 20,
     AUTOCAST = 21,
     PARAMETERIZED = 22,
+    ENUM = 23,
 };
 
 enum class LexerTokenType : int32_t {
@@ -144,6 +146,7 @@ enum class LexerTokenType : int32_t {
     FN,
     TYPE,
     STRUCT,
+    UNION,
     ENUM,
     SYMBOL,
     INT_LITERAL,
@@ -230,10 +233,17 @@ struct StructTypeData {
     bool isSecretlyArray;
     Node *secretArrayElementType;
 
-    bool isSecretlyEnum;
+    bool isSecretlyUnion;
+    Node *unionTagType;
+
     int32_t alignment;
 
     Node *coercedType;
+};
+
+struct EnumTypeData {
+    Node *type;
+    vector_t<Node *> params;
 };
 
 struct PointerTypeData {
@@ -258,10 +268,11 @@ struct TypeData {
     union {
         FnTypeData fnTypeData;
         StructTypeData structTypeData;
+        EnumTypeData enumTypeData;
         PointerTypeData pointerTypeData;
         SymbolTypeData symbolTypeData;
         Node *dotTypeData;
-        ParameterizedTypeTypeData parameterizedTypeTypeData;
+        ParameterizedTypeTypeData polymorphTypeTypeData;
         double floatTypeData;
         int64_t intTypeData;
         bool boolTypeData;
@@ -452,6 +463,11 @@ struct ParameterizedTypeData {
     Node *typeDecl;
 };
 
+struct EnumLiteralData {
+    Node *type;
+    Node *value;
+};
+
 struct DeferData {
     vector_t<Node *> stmts;
 };
@@ -524,6 +540,7 @@ public:
         LinkData linkData;
         ImportData importData;
         ParameterizedTypeData parameterizedTypeData;
+        EnumLiteralData enumLiteralData;
     };
 
     Node *staticValue = nullptr;

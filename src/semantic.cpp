@@ -29,6 +29,60 @@ Node * makeTypeConcrete(Node *typeInfo) {
     return typeInfo;
 }
 
+Node *Semantic::findExistingPolymorph(Node *polymorph, vector_t<Node *> givenParams) {
+    for (auto pm : polymorphs) {
+        if (pm.target == polymorph) {
+            if (pm.givenParams.length != givenParams.length) {
+                continue;
+            }
+
+            auto match = true;
+            for (unsigned int i = 0; i < pm.givenParams.length; i++) {
+                auto origPgp = vector_at(pm.givenParams, i);
+                auto origGp = vector_at(givenParams, i);
+
+                resolveTypes(origPgp);
+                resolveTypes(origGp);
+
+                auto pgp = resolve(origPgp->paramData.value);
+                auto gp = resolve(origGp->paramData.value);
+
+                if (pgp->type != NodeType::TYPE || gp->type != NodeType::TYPE) {
+                    pgp = constantize(this, pgp);
+                    gp = constantize(this, gp);
+
+                    if (pgp->type == gp->type) {
+                        switch (pgp->type) {
+                            case NodeType::INT_LITERAL:
+                                match = pgp->intLiteralData.value == gp->intLiteralData.value;
+                                break;
+                            case NodeType::FLOAT_LITERAL:
+                                match = pgp->floatLiteralData.value == gp->floatLiteralData.value;
+                                break;
+                            case NodeType::BOOLEAN_LITERAL:
+                                match = pgp->boolLiteralData.value == gp->boolLiteralData.value;
+                                break;
+                            default: match = false;
+                        }
+                    }
+                    else {
+                        match = false;
+                    }
+                }
+                else if (!typesMatch(pgp, gp, this, false)) {
+                    match = false;
+                }
+            }
+
+            if (match) {
+                return pm.result;
+            }
+        }
+    }
+
+    return nullptr;
+}
+
 void addContextParameterForCall(Semantic *semantic, Node *node) {
     auto newParams = vector_init<Node *>(node->fnCallData.params.length + 1);
 
@@ -100,6 +154,8 @@ int32_t typeSize(Node *type) {
             return 8;
         case NodeTypekind::SYMBOL:
             cpi_assert(false);
+        case NodeTypekind::ENUM:
+            return typeSize(resolved->typeData.enumTypeData.type);
         case NodeTypekind::STRUCT: {
             if (resolved->typeData.structTypeData.coercedType != nullptr) {
                 return typeSize(resolved->typeData.structTypeData.coercedType);
@@ -109,8 +165,13 @@ int32_t typeSize(Node *type) {
             auto largest = 0;
             auto largestAlign = 0;
 
-            // todo(chad): this should be configurable based on the width specified by the user (if/when we allow that)
-            auto tagSizeInBytes = 8;
+            int64_t tagSizeInBytes;
+            if (resolved->typeData.structTypeData.isSecretlyUnion && resolved->typeData.structTypeData.unionTagType != nullptr) {
+                tagSizeInBytes = typeSize(resolved->typeData.structTypeData.unionTagType);
+            }
+            else {
+                tagSizeInBytes = 8;
+            }
 
             for (auto param : resolved->typeData.structTypeData.params) {
                 auto size = typeSize(param->paramData.type);
@@ -122,7 +183,7 @@ int32_t typeSize(Node *type) {
                 }
 
                 // if it's a union and we're not assigning to the 'tag' part, then the offset is the size of the tag
-                if (resolved->typeData.structTypeData.isSecretlyEnum && param->paramData.index > 0) {
+                if (resolved->typeData.structTypeData.isSecretlyUnion && param->paramData.index > 0) {
                     param->localOffset = tagSizeInBytes;
                 }
                 else {
@@ -140,7 +201,7 @@ int32_t typeSize(Node *type) {
                 }
             }
 
-            if (resolved->typeData.structTypeData.isSecretlyEnum) {
+            if (resolved->typeData.structTypeData.isSecretlyUnion) {
                 total = tagSizeInBytes + largest;
             }
 
@@ -159,8 +220,6 @@ int32_t typeSize(Node *type) {
     return 0;
 }
 
-bool typesMatch(Node *desired, Node *actual, Semantic *semantic);
-
 int maybeMatchUnionToStructLiteral(Node *desired, Node *actual, Semantic *semantic) {
     auto actualTypeData = resolve(actual)->typeData;
     if (actualTypeData.kind != NodeTypekind::STRUCT) {
@@ -174,14 +233,14 @@ int maybeMatchUnionToStructLiteral(Node *desired, Node *actual, Semantic *semant
     }
     auto desiredStructData = desiredTypeData.structTypeData;
 
-    if ((actualStructData.isSecretlyEnum && !desiredStructData.isSecretlyEnum)
-        || (desiredStructData.isSecretlyEnum && !actualStructData.isSecretlyEnum)) {
+    if ((actualStructData.isSecretlyUnion && !desiredStructData.isSecretlyUnion)
+        || (desiredStructData.isSecretlyUnion && !actualStructData.isSecretlyUnion)) {
         // if the other one is a struct literal, then we just need to match that there is only one param,
         // and that it matches something in the other one
 
         Node *unionToMatchAgainst = desired;
         Node *other = actual;
-        if (actualStructData.isSecretlyEnum) {
+        if (actualStructData.isSecretlyUnion) {
             unionToMatchAgainst = actual;
             other = desired;
         }
@@ -239,7 +298,7 @@ Node *matchParameterizedType(Semantic *semantic, Node *parameterizedType, Node *
 
     auto declParams = newType->parameterizedTypeData.typeDecl->typeData.structTypeData.params;
     auto givenParams = concreteType->typeData.structTypeData.params;
-    assignParams(semantic, parameterizedType, declParams, givenParams);
+    assignParams(semantic, parameterizedType, declParams, givenParams, false);
 
     for (auto p : givenParams) {
         p->semantic = false;
@@ -257,7 +316,7 @@ Node *matchParameterizedType(Semantic *semantic, Node *parameterizedType, Node *
     }
 
     auto ctGivenParams = vector_init<Node *>(ctDeclParams.length);
-    auto encounteredError = assignParams(semantic, concreteType, ctDeclParams, ctGivenParams);
+    auto encounteredError = assignParams(semantic, concreteType, ctDeclParams, ctGivenParams, false);
     cpi_assert(!encounteredError);
 
     for (unsigned long i = 0; i < ctDeclParams.length; i++) {
@@ -290,7 +349,7 @@ Node *matchParameterizedType(Semantic *semantic, Node *parameterizedType, Node *
     return newType->parameterizedTypeData.typeDecl;
 }
 
-bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
+bool typesMatch(Node *desired, Node *actual, Semantic *semantic, bool reportError) {
     desired = resolve(desired);
     actual = resolve(actual);
 
@@ -476,7 +535,7 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic) {
             return true;
         }
 
-        auto encounteredError = assignParams(semantic, actual, desired->typeData.structTypeData.params, actual->typeData.structTypeData.params);
+        auto encounteredError = assignParams(semantic, actual, desired->typeData.structTypeData.params, actual->typeData.structTypeData.params, reportError);
         if (encounteredError) {
             return false;
         }
@@ -1007,7 +1066,7 @@ Node *constantize(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node);
     node = resolve(node);
 
-    if (node->type == NodeType::TYPE) {
+    if (node->type == NodeType::TYPE || node->type == NodeType::FN_DECL) {
         return node;
     }
 
@@ -1027,7 +1086,8 @@ Node *constantize(Semantic *semantic, Node *node) {
         return node;
     }
 
-    if (node->type == NodeType::INT_LITERAL || node->type == NodeType::BOOLEAN_LITERAL || node->type == NodeType::FN_DECL) {
+    if (node->type == NodeType::INT_LITERAL || node->type == NodeType::BOOLEAN_LITERAL
+        || node->type == NodeType::FN_DECL || node->type == NodeType::ENUM_LITERAL) {
         return node;
     }
 
@@ -1373,7 +1433,7 @@ void resolveSymbol(Semantic *semantic, Node *node) {
     node->typeInfo = node->resolved->typeInfo;
 }
 
-bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<Node *> &declParams, vector_t<Node *> &givenParams) {
+bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<Node *> &declParams, vector_t<Node *> &givenParams, bool reportError) {
     vector_t<bool> openParams = vector_init<bool>(declParams.length + 1);
     vector_t<Node *> newParams = vector_init<Node *>(declParams.length + 1);
 
@@ -1402,8 +1462,10 @@ bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<No
                     auto openParam = vector_at(openParams, j);
                     if (!openParam) {
                         encounteredError = true;
-                        semantic->reportError({errorReportTarget},
-                                              Error{errorReportTarget->region, "passed a parameter twice"});
+                        if (reportError) {
+                            semantic->reportError({errorReportTarget},
+                                                  Error{errorReportTarget->region, "passed a parameter twice"});
+                        }
                     }
 
                     if (typesMatch(declParam->typeInfo, passedParam->typeInfo, semantic)) {
@@ -1418,7 +1480,9 @@ bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<No
             }
             if (!found) {
                 encounteredError = true;
-                semantic->reportError({errorReportTarget}, Error{errorReportTarget->region, "unable to find one of the parameters"});
+                if (reportError) {
+                    semantic->reportError({errorReportTarget}, Error{errorReportTarget->region, "unable to find one of the parameters"});
+                }
             }
         }
         else {
@@ -1427,7 +1491,10 @@ bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<No
             while (j < newParams.length && !(vector_at(openParams, j))) { j += 1; }
             if (j >= newParams.length) {
                 encounteredError = true;
-                semantic->reportError({errorReportTarget}, Error{errorReportTarget->region, "too many parameters passed!"});
+                if (reportError) {
+                    semantic->reportError({errorReportTarget},
+                                          Error{errorReportTarget->region, "too many parameters passed!"});
+                }
             }
             else {
                 auto declParam = vector_at(declParams, j);
@@ -1465,14 +1532,19 @@ bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<No
         if (openParamsI || vector_at(newParams, i) == nullptr) {
             encounteredError = true;
 
-            ostringstream s("");
-            s << "unassigned parameter: " << atomTable->backwardAtoms[vector_at(declParams, i)->paramData.name->symbolData.atomId];
-            auto sstr = s.str();
-            semantic->reportError({errorReportTarget}, Error{errorReportTarget->region, sstr});
+            if (reportError) {
+                ostringstream s("");
+                s << "unassigned parameter: " << atomTable->backwardAtoms[vector_at(declParams, i)->paramData.name->symbolData.atomId];
+                auto sstr = s.str();
+
+                semantic->reportError({errorReportTarget}, Error{errorReportTarget->region, sstr});
+            }
         }
     }
 
-    givenParams = newParams;
+    if (!encounteredError) {
+        givenParams = newParams;
+    }
 
     return encounteredError;
 }
@@ -1484,7 +1556,7 @@ void maybeStructDefault(Semantic *semantic, Node *rhs, Node *lhsType) {
 
     if (rhs->type == NodeType::STRUCT_LITERAL
         && lhsType->typeData.kind == NodeTypekind::STRUCT
-        && !lhsType->typeData.structTypeData.isSecretlyEnum
+        && !lhsType->typeData.structTypeData.isSecretlyUnion
         && !lhsType->typeData.structTypeData.isSecretlyArray) {
         assignParams(semantic, rhs, lhsType->typeData.structTypeData.params, rhs->structLiteralData.params);
     }
@@ -1607,28 +1679,37 @@ void resolveType(Semantic *semantic, Node *node) {
             node->typeData = resolve(node->typeData.dotTypeData)->typeData;
         } break;
         case NodeTypekind::PARAMETERIZED: {
-            cpi_assert(node->typeData.parameterizedTypeTypeData.value->type == NodeType::FN_CALL);
+            cpi_assert(node->typeData.polymorphTypeTypeData.value->type == NodeType::FN_CALL);
 
-            semantic->resolveTypes(node->typeData.parameterizedTypeTypeData.value->fnCallData.fn);
+            semantic->resolveTypes(node->typeData.polymorphTypeTypeData.value->fnCallData.fn);
 
-            auto resolvedType = resolve(node->typeData.parameterizedTypeTypeData.value->fnCallData.fn);
+            auto resolvedType = resolve(node->typeData.polymorphTypeTypeData.value->fnCallData.fn);
             cpi_assert(resolvedType->type == NodeType::PARAMETERIZED_TYPE);
 
             auto newType = semantic->deepCopyScopedStmt(resolvedType, resolvedType->scope);
 
             // assign parameters
             auto declParams = newType->parameterizedTypeData.ctParams;
-            auto givenParams = node->typeData.parameterizedTypeTypeData.value->fnCallData.ctParams;
+            auto givenParams = node->typeData.polymorphTypeTypeData.value->fnCallData.ctParams;
             assignParams(semantic, node, declParams, givenParams);
 
-            for (unsigned long i = 0; i < declParams.length; i++) {
-                vector_at(declParams, i)->staticValue = vector_at(givenParams, i)->paramData.value;
+            auto maybeExistingType = semantic->findExistingPolymorph(resolvedType, givenParams);
+            if (maybeExistingType != nullptr) {
+                node->resolved = maybeExistingType;
+                node->resolved->typeData.polyRefinement = resolvedType;
             }
+            else {
+                vector_append(semantic->polymorphs, Polymorphed{resolvedType, givenParams, newType->parameterizedTypeData.typeDecl});
 
-            semantic->resolveTypes(newType->parameterizedTypeData.typeDecl);
+                for (unsigned long i = 0; i < declParams.length; i++) {
+                    vector_at(declParams, i)->staticValue = vector_at(givenParams, i)->paramData.value;
+                }
 
-            node->resolved = newType->parameterizedTypeData.typeDecl;
-            node->resolved->typeData.polyRefinement = resolvedType;
+                semantic->resolveTypes(newType->parameterizedTypeData.typeDecl);
+
+                node->resolved = newType->parameterizedTypeData.typeDecl;
+                node->resolved->typeData.polyRefinement = resolvedType;
+            }
         } break;
     }
 }
@@ -1875,6 +1956,8 @@ void resolveFnCall(Semantic *semantic, Node *node) {
     semantic->resolveTypes(resolvedFn);
     resolvedFn = resolve(resolvedFn);
 
+    auto originalResolvedFn = resolvedFn;
+
     auto isPoly = resolvedFn->type == NodeType::FN_DECL && resolvedFn->fnDeclData.ctParams.length != 0;
     Node *polyResolvedFn = nullptr;
 
@@ -1909,13 +1992,12 @@ void resolveFnCall(Semantic *semantic, Node *node) {
 
     if (isPoly) {
         // make a new function
-        // todo(chad): memoize this based on the ctParams
         polyResolvedFn = semantic->deepCopyScopedStmt(resolvedFn, resolvedFn->scope);
         cpi_assert(polyResolvedFn->type == NodeType::FN_DECL);
         polyResolvedFn->fnDeclData.cameFromPolymorph = true;
 
-        node->fnCallData.fn->resolved = polyResolvedFn;
         resolvedFn = polyResolvedFn;
+        node->fnCallData.fn->resolved = resolvedFn;
     }
 
     // assign runtime params
@@ -1954,9 +2036,7 @@ void resolveFnCall(Semantic *semantic, Node *node) {
     // assign compile-time params
     if (isPoly) {
         auto encounteredError = assignParams(semantic, node, resolvedFn->fnDeclData.ctParams, node->fnCallData.ctParams);
-        if (encounteredError) {
-            cpi_assert(false);
-        }
+        cpi_assert(!encounteredError);
 
         // We want to resolve all semantic parameters, but we DON'T want to add any locals
         auto savedFnDecl = semantic->currentFnDecl;
@@ -2095,6 +2175,15 @@ void resolveFnCall(Semantic *semantic, Node *node) {
         }
 
         semantic->currentFnDecl = savedCurrentFnDecl;
+
+        auto maybeExistingFn = semantic->findExistingPolymorph(originalResolvedFn, node->fnCallData.ctParams);
+        if (maybeExistingFn != nullptr) {
+            resolvedFn = maybeExistingFn;
+            node->fnCallData.fn->resolved = resolvedFn;
+        }
+        else {
+            vector_append(semantic->polymorphs, Polymorphed{originalResolvedFn, node->fnCallData.ctParams, resolvedFn});
+        }
     }
 
     semantic->resolveTypes(resolvedFn);
@@ -2143,7 +2232,7 @@ void possiblyResolveAssignToUnion(Semantic *semantic, Node *originalAssignment, 
         while (typeData.kind == NodeTypekind::POINTER) {
             typeData = typeData.pointerTypeData.underlyingType->typeData;
         }
-        assigningToUnion = typeData.kind == NodeTypekind::STRUCT && typeData.structTypeData.isSecretlyEnum;
+        assigningToUnion = typeData.kind == NodeTypekind::STRUCT && typeData.structTypeData.isSecretlyUnion;
     }
 
     // don't set the tag when assigning to the tag parameter
@@ -2416,6 +2505,17 @@ void resolveModuleDot(Semantic *semantic, Node *node) {
     node->typeInfo = found->typeInfo;
 }
 
+void resolveEnumDot(Semantic *semantic, Node *node) {
+    auto found = resolve(node->dotData.lhs)->scope->find(node->dotData.rhs->symbolData.atomId);
+
+    if (found == nullptr) {
+        semantic->reportError({node, found}, Error{node->region, "Could not resolve dot"});
+        return;
+    }
+
+    node->resolved = found->paramData.value;
+}
+
 void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
     semantic->resolveTypes(lhs);
 
@@ -2424,6 +2524,32 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
 
     if (resolvedLhs->type == NodeType::MODULE) {
         resolveModuleDot(semantic, node);
+        return;
+    }
+
+    if (resolvedLhs->type == NodeType::TYPE && resolvedLhs->typeData.kind == NodeTypekind::ENUM) {
+        auto enumType = resolvedLhs->typeData.enumTypeData.type;
+        semantic->resolveTypes(enumType);
+
+        // assign values for all the params
+        int64_t currentValue = 0;
+        for (auto p : resolvedLhs->typeData.enumTypeData.params) {
+            if (p->paramData.value == nullptr) {
+                currentValue += 1;
+            }
+            else {
+                currentValue = constantize(semantic, p->paramData.value)->intLiteralData.value;
+            }
+
+            p->paramData.value = new Node(p->region.srcInfo, NodeType::INT_LITERAL, p->scope);
+            p->paramData.value->intLiteralData.value = currentValue;
+            p->paramData.value->typeInfo = enumType;
+            p->typeInfo = resolvedLhs;
+        }
+
+        resolveEnumDot(semantic, node);
+        node->typeInfo = resolvedLhs;
+
         return;
     }
 
@@ -2486,7 +2612,7 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
     }
 
     if (!semantic->lvalueAssignmentContext) {
-        auto isUnionAccess = resolvedLhsTypeInfo->typeData.structTypeData.isSecretlyEnum;
+        auto isUnionAccess = resolvedLhsTypeInfo->typeData.structTypeData.isSecretlyUnion;
 
         // todo(chad): keep the atomId for "tag" handy so we don't have to look it up all the time...
         auto isTagAccess = node->dotData.rhs->symbolData.atomId == atomTable->insertStr("tag");
@@ -2717,7 +2843,7 @@ void resolveStaticFor(Semantic *semantic, Node *node) {
     }
     else if (resolvedTargetType->typeData.kind == NodeTypekind::STRUCT
             && !resolvedTargetType->typeData.structTypeData.isSecretlyArray
-            && !resolvedTargetType->typeData.structTypeData.isSecretlyEnum) {
+            && !resolvedTargetType->typeData.structTypeData.isSecretlyUnion) {
         auto params = resolvedTargetType->typeData.structTypeData.params;
 
         for (unsigned long staticIdx = 0; staticIdx < params.length; staticIdx += 1) {
@@ -2940,7 +3066,7 @@ void resolveTagCheck(Semantic *semantic, Node *node) {
     }
 
     cpi_assert(resolvedType->typeData.kind == NodeTypekind::STRUCT);
-    if (!resolvedType->typeData.structTypeData.isSecretlyEnum) {
+    if (!resolvedType->typeData.structTypeData.isSecretlyUnion) {
         semantic->reportError({node, node->nodeData}, Error{
                 node->region,
                 "Can only do a tagcheck on a union"
@@ -3145,8 +3271,8 @@ void resolveIsKind(Semantic *semantic, Node *node) {
             if (resolvedType->typeData.structTypeData.isSecretlyArray) {
                 matches = node->isKindData.tokenType == LexerTokenType::LSQUARE;
             }
-            else if (resolvedType->typeData.structTypeData.isSecretlyEnum) {
-                matches = node->isKindData.tokenType == LexerTokenType::ENUM;
+            else if (resolvedType->typeData.structTypeData.isSecretlyUnion) {
+                matches = node->isKindData.tokenType == LexerTokenType::UNION;
             }
             else {
                 matches = node->isKindData.tokenType == LexerTokenType::STRUCT;
@@ -3154,6 +3280,9 @@ void resolveIsKind(Semantic *semantic, Node *node) {
         } break;
         case NodeTypekind::POINTER: {
             matches = node->isKindData.tokenType == LexerTokenType::MUL;
+        } break;
+        case NodeTypekind::ENUM: {
+            matches = node->isKindData.tokenType == LexerTokenType::ENUM;
         } break;
         default: {}
     }
@@ -3181,25 +3310,28 @@ void resolveFieldsof(Semantic *semantic, Node *node) {
     auto resolvedNodeData = resolve(node->nodeData);
 
     auto canDo = true;
-    auto isEnum = false;
+    auto isUnion = false;
     vector_t<Node *> params = vector_init<Node *>(10);
     if (resolvedNodeData->typeData.kind == NodeTypekind::STRUCT) {
         if (resolvedNodeData->typeData.structTypeData.isSecretlyArray) {
             canDo = false;
         }
-        isEnum = resolvedNodeData->typeData.structTypeData.isSecretlyEnum;
+        isUnion = resolvedNodeData->typeData.structTypeData.isSecretlyUnion;
 
         params = resolvedNodeData->typeData.structTypeData.params;
     }
     else if (resolvedNodeData->typeData.kind == NodeTypekind::FN) {
         params = resolvedNodeData->typeData.fnTypeData.params;
     }
+    else if (resolvedNodeData->typeData.kind == NodeTypekind::ENUM) {
+        params = resolvedNodeData->typeData.enumTypeData.params;
+    }
     else {
         canDo = false;
     }
 
     if (!canDo) {
-        semantic->reportError({node}, Error{node->region, "Can only do #fieldsof on a struct/enum/fn type"});
+        semantic->reportError({node}, Error{node->region, "Can only do #fieldsof on a struct/union/enum/fn type"});
         return;
     }
 
@@ -3208,33 +3340,59 @@ void resolveFieldsof(Semantic *semantic, Node *node) {
     initArrayLiteralData(resolved);
 
     for (auto param : params) {
-        cpi_assert(param->type == NodeType::DECL_PARAM);
+        if (param->type == NodeType::VALUE_PARAM) {
+            auto fieldLit = new Node();
+            fieldLit->scope = node->scope;
+            fieldLit->type = NodeType::STRUCT_LITERAL;
+            initStructLiteralData(fieldLit);
+            fieldLit->structLiteralData.params = vector_init<Node *>(2);
 
-        if (param->paramData.index == 0 && isEnum) {
-            // skip the 'tag' field
-            continue;
+            auto valueLit = new Node();
+            valueLit->scope = node->scope;
+            valueLit->type = NodeType::INT_LITERAL;
+            valueLit->intLiteralData.value = param->paramData.value->intLiteralData.value;
+            valueLit->typeInfo = param->paramData.value->typeInfo;
+
+            auto nameLit = new Node();
+            nameLit->scope = node->scope;
+            nameLit->type = NodeType::STRING_LITERAL;
+            nameLit->stringLiteralData.value = new string(
+                    param->paramData.name == nullptr ? "" : atomTable->backwardAtoms[param->paramData.name->symbolData.atomId]);
+
+            vector_append(fieldLit->structLiteralData.params, wrapInValueParam(nameLit, "name"));
+            vector_append(fieldLit->structLiteralData.params, wrapInValueParam(valueLit, "value"));
+
+            vector_append(resolved->arrayLiteralData.elements, fieldLit);
         }
+        else {
+            cpi_assert(param->type == NodeType::DECL_PARAM);
 
-        auto indexLit = new Node();
-        indexLit->scope = node->scope;
-        indexLit->type = NodeType::INT_LITERAL;
-        indexLit->intLiteralData.value = param->paramData.index;
+            if (param->paramData.index == 0 && isUnion) {
+                // skip the 'tag' field
+                continue;
+            }
 
-        auto nameLit = new Node();
-        nameLit->scope = node->scope;
-        nameLit->type = NodeType::STRING_LITERAL;
-        nameLit->stringLiteralData.value = new string(
-                param->paramData.name == nullptr ? "" : atomTable->backwardAtoms[param->paramData.name->symbolData.atomId]);
+            auto indexLit = new Node();
+            indexLit->scope = node->scope;
+            indexLit->type = NodeType::INT_LITERAL;
+            indexLit->intLiteralData.value = param->paramData.index;
 
-        auto fieldLit = new Node();
-        fieldLit->scope = node->scope;
-        fieldLit->type = NodeType::STRUCT_LITERAL;
-        initStructLiteralData(fieldLit);
-        fieldLit->structLiteralData.params = vector_init<Node *>(2);
-        vector_append(fieldLit->structLiteralData.params, wrapInValueParam(indexLit, "index"));
-        vector_append(fieldLit->structLiteralData.params, wrapInValueParam(nameLit, "name"));
+            auto nameLit = new Node();
+            nameLit->scope = node->scope;
+            nameLit->type = NodeType::STRING_LITERAL;
+            nameLit->stringLiteralData.value = new string(
+                    param->paramData.name == nullptr ? "" : atomTable->backwardAtoms[param->paramData.name->symbolData.atomId]);
 
-        vector_append(resolved->arrayLiteralData.elements, fieldLit);
+            auto fieldLit = new Node();
+            fieldLit->scope = node->scope;
+            fieldLit->type = NodeType::STRUCT_LITERAL;
+            initStructLiteralData(fieldLit);
+            fieldLit->structLiteralData.params = vector_init<Node *>(2);
+            vector_append(fieldLit->structLiteralData.params, wrapInValueParam(indexLit, "index"));
+            vector_append(fieldLit->structLiteralData.params, wrapInValueParam(nameLit, "name"));
+
+            vector_append(resolved->arrayLiteralData.elements, fieldLit);
+        }
     }
 
     semantic->resolveTypes(resolved);
@@ -3384,6 +3542,7 @@ void Semantic::resolveTypes(Node *node) {
         case NodeType::LINK: {
             resolveLink(this, node);
         } break;
+        case NodeType::ENUM_LITERAL:
         case NodeType::PARAMETERIZED_TYPE:
         case NodeType::END_SCOPE:
             break;
