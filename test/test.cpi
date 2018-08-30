@@ -180,6 +180,17 @@ fn runAllTests() {
     testIter2();
 
     testIter3();
+
+    testNestedPoly();
+}
+
+fn testNestedPoly() {
+    type Foo(T: Ast) T
+
+    a: Foo!(Foo!(Foo!(Foo!(Foo!(i64))))) = 13;
+
+    assert(#iskind(typeof(a), i64));
+    assert(a == 13);
 }
 
 fn testPolyCast() {

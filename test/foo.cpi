@@ -1,10 +1,4 @@
-type Foo(T: Ast) T
-
-type Bar(T: Ast) T
-
 fn main() {
-    a: Foo!(Bar!(i64));
-
     return 0;
 }
 
