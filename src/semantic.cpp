@@ -321,12 +321,12 @@ Node *matchParameterizedType(Semantic *semantic, Node *parameterizedType, Node *
     auto declParams = newType->parameterizedTypeData.typeDecl->typeData.structTypeData.params;
     auto givenParams = concreteType->typeData.structTypeData.params;
 
-    assignParams(semantic, parameterizedType, declParams, givenParams, false);
-
     for (auto p : givenParams) {
         p->semantic = false;
         semantic->resolveTypes(p);
     }
+
+    assignParams(semantic, parameterizedType, declParams, givenParams, false);
 
     for (unsigned long i = 0; i < givenParams.length; i++) {
         vector_at(declParams, i)->paramData.polyLink = vector_at(givenParams, i);
@@ -632,7 +632,10 @@ Node *defaultValueFor(Semantic *semantic, Node *type) {
     type = resolve(type);
     semantic->resolveTypes(type);
 
-    cpi_assert(type->type == NodeType::TYPE);
+    if (type->type != NodeType::TYPE) {
+        semantic->reportError({type}, Error{type->region, "Expected a type"});
+        return nullptr;
+    }
 
     switch (type->typeData.kind) {
         case NodeTypekind::INT_LITERAL:
@@ -1502,14 +1505,10 @@ bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<No
                         }
                     }
 
-                    if (typesMatch(declParam->typeInfo, passedParam->typeInfo, semantic)) {
-                        passedParam->typeInfo = declParam->paramData.type;
-                        vector_set_at(newParams, j, passedParam);
-                        vector_set_at(openParams, j, false);
-                    }
-                    else {
-                        encounteredError = true;
-                    }
+                    // match!
+                    passedParam->typeInfo = declParam->paramData.type;
+                    vector_set_at(newParams, j, passedParam);
+                    vector_set_at(openParams, j, false);
                 }
             }
             if (!found) {
@@ -1716,37 +1715,44 @@ void resolveType(Semantic *semantic, Node *node) {
             node->typeData = resolve(node->typeData.dotTypeData)->typeData;
         } break;
         case NodeTypekind::PARAMETERIZED: {
-            cpi_assert(node->typeData.polymorphTypeTypeData.value->type == NodeType::FN_CALL);
+            resolveParameterizedType();
 
-            semantic->resolveTypes(node->typeData.polymorphTypeTypeData.value->fnCallData.fn);
-
-            auto resolvedType = resolve(node->typeData.polymorphTypeTypeData.value->fnCallData.fn);
-            cpi_assert(resolvedType->type == NodeType::PARAMETERIZED_TYPE);
-
-            auto newType = semantic->deepCopyScopedStmt(resolvedType, resolvedType->scope);
-
-            // assign parameters
-            auto declParams = newType->parameterizedTypeData.ctParams;
-            auto givenParams = node->typeData.polymorphTypeTypeData.value->fnCallData.ctParams;
-            assignParams(semantic, node, declParams, givenParams);
-
-            auto maybeExistingType = semantic->findExistingPolymorph(resolvedType, givenParams);
-            if (maybeExistingType != nullptr) {
-                node->resolved = maybeExistingType;
-                node->resolved->typeData.polyRefinement = resolvedType;
-            }
-            else {
-                vector_append(semantic->polymorphs, Polymorphed{resolvedType, givenParams, newType->parameterizedTypeData.typeDecl});
-
-                for (unsigned long i = 0; i < declParams.length; i++) {
-                    vector_at(declParams, i)->staticValue = vector_at(givenParams, i)->paramData.value;
-                }
-
-                semantic->resolveTypes(newType->parameterizedTypeData.typeDecl);
-
-                node->resolved = newType->parameterizedTypeData.typeDecl;
-                node->resolved->typeData.polyRefinement = resolvedType;
-            }
+//            cpi_assert(node->typeData.polymorphTypeTypeData.value->type == NodeType::FN_CALL);
+//
+//            semantic->resolveTypes(node->typeData.polymorphTypeTypeData.value->fnCallData.fn);
+//
+//            auto resolvedType = resolve(node->typeData.polymorphTypeTypeData.value->fnCallData.fn);
+//            cpi_assert(resolvedType->type == NodeType::PARAMETERIZED_TYPE);
+//
+//            auto newType = semantic->deepCopyScopedStmt(resolvedType, resolvedType->scope);
+//
+//            // assign parameters
+//            auto declParams = newType->parameterizedTypeData.ctParams;
+//            auto givenParams = node->typeData.polymorphTypeTypeData.value->fnCallData.ctParams;
+//
+//            for (auto gp : givenParams) {
+//                semantic->resolveTypes(gp);
+//            }
+//
+//            assignParams(semantic, node, declParams, givenParams);
+//
+//            auto maybeExistingType = semantic->findExistingPolymorph(resolvedType, givenParams);
+//            if (maybeExistingType != nullptr) {
+//                node->resolved = maybeExistingType;
+//                node->resolved->typeData.polyRefinement = resolvedType;
+//            }
+//            else {
+//                vector_append(semantic->polymorphs, Polymorphed{resolvedType, givenParams, newType->parameterizedTypeData.typeDecl});
+//
+//                for (unsigned long i = 0; i < declParams.length; i++) {
+//                    vector_at(declParams, i)->staticValue = vector_at(givenParams, i)->paramData.value;
+//                }
+//
+//                semantic->resolveTypes(newType->parameterizedTypeData.typeDecl);
+//
+//                node->resolved = newType->parameterizedTypeData.typeDecl;
+//                node->resolved->typeData.polyRefinement = resolvedType;
+//            }
         } break;
         case NodeTypekind::ENUM: {
             auto enumType = node->typeData.enumTypeData.type;
@@ -1988,6 +1994,10 @@ Node *resolveSymbolWithScopeType(Semantic *semantic, int64_t atom, Node *firstPa
     return nullptr;
 }
 
+void resolveParameterizedType(Node *pt, Node *fnCall) {
+    // findme
+}
+
 void resolveFnCall(Semantic *semantic, Node *node) {
     node->sourceMapStatement = true;
     semantic->addLocal(node);
@@ -2012,6 +2022,11 @@ void resolveFnCall(Semantic *semantic, Node *node) {
 
     semantic->resolveTypes(resolvedFn);
     resolvedFn = resolve(resolvedFn);
+
+    if (resolvedFn->type == NodeType::PARAMETERIZED_TYPE) {
+        resolveParameterizedType(resolvedFn, node);
+        return;
+    }
 
     auto originalResolvedFn = resolvedFn;
 
@@ -2418,9 +2433,11 @@ void resolveDeclParam(Semantic *semantic, Node *node) {
 }
 
 void resolveValueParam(Semantic *semantic, Node *node) {
-    semantic->resolveTypes(node->paramData.value);
-    node->paramData.type = node->paramData.value->typeInfo;
-    node->typeInfo = node->paramData.value->typeInfo;
+    auto resolvedValue = resolve(node->paramData.value);
+
+    semantic->resolveTypes(resolvedValue);
+    node->paramData.type = resolvedValue->typeInfo;
+    node->typeInfo = resolvedValue->typeInfo;
 }
 
 void resolveDeref(Semantic *semantic, Node *node) {

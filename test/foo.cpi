@@ -1,73 +1,10 @@
+type Foo(T: Ast) T
+
+type Bar(T: Ast) T
+
 fn main() {
-    testIter3();
+    a: Foo!(Bar!(i64));
 
     return 0;
 }
 
-#import "io";
-
-fn testIter3() {
-    type ArrRefRange(T := typeof(arr[0])) struct {
-        arr: []T,
-        curr := 0
-    }
-
-    #impl fn empty(r: !R/ArrRefRange) {
-        return r.curr >= r.arr.count;
-    }
-
-    #impl fn front(r: !R/ArrRefRange) {
-        return r.arr[r.curr];
-    }
-
-    #impl fn popFront(R := typeof(^r))(r: *R/ArrRefRange) {
-        r.curr += 1;
-    }
-
-    fn iter(T := typeof(arr[0]))(arr: []T) {
-        return cast(ArrRefRange) { arr };
-    }
-
-    fn map(f: Ast)(range: !R) {
-        #import "buffer";
-
-        b := buffer.make!(typeof(front(range)))();
-        for it: range {
-            &b|buffer.append(f(it));
-        }
-        return b.buf|iter;
-    }
-
-    fn filter(f: Ast)(range: !R) {
-        #import "buffer";
-
-        b := buffer.make!(typeof(front(range)))();
-        for it: range {
-            if f(it) {
-                &b|buffer.append(it);
-            }
-        }
-        return b.buf|iter;
-    }
-
-    fn collect(t: !T) {
-        return t.arr;
-    }
-
-    answer := []{1, 2, 3, 4, 5}
-                | iter
-                | map!(fn(x: !T) { return x * x; })
-                | filter!(fn(x: !T) { return x < 10; })
-                | collect;
-
-    io.printMany({"final array: ", answer, "\n"});
-
-    assert(answer.count == 3);
-    assert(answer[0] == 1);
-    assert(answer[1] == 4);
-    assert(answer[2] == 9);
-}
-
-fn assert(b: bool) {
-    if (b == false) { panic(); }
-}

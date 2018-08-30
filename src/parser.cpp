@@ -2081,9 +2081,15 @@ Node *Parser::parseFnCall() {
 
     if (lexer->front.type == LexerTokenType::NOT) {
         expect(LexerTokenType::NOT, "!");
-        expect(LexerTokenType::LPAREN, "(");
-        call->fnCallData.ctParams = parseValueParams();
-        expect(LexerTokenType::RPAREN, ")");
+
+        if (lexer->front.type == LexerTokenType::LPAREN) {
+            expect(LexerTokenType::LPAREN, "(");
+            call->fnCallData.ctParams = parseValueParams();
+            expect(LexerTokenType::RPAREN, ")");
+        }
+        else {
+            vector_append(call->fnCallData.ctParams, wrapInValueParam(parseSymbol(), nullptr));
+        }
     }
 
     if (lexer->front.type == LexerTokenType::LPAREN) {
