@@ -3,5 +3,9 @@
 build/*
 *.o
 test/*.dylib
+test/foo
+test/foo.ll
+test/test
+test/test.ll
 cmake-build-debug/*
 cmake-build-release/*
