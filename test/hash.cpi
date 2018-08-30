@@ -3,11 +3,10 @@
 
 type Str []i8
 
--- todo(chad): can't do recursive parameterized types until we memoize
 type Bucket struct {
     key: !TKey,
     value: !TValue,
-    next: *none
+    next: *Bucket!(TKey, TValue)
 }
 
 type Hash(TKey: Ast, TValue: Ast) struct {
@@ -40,7 +39,20 @@ fn hash(TKey: Ast, TValue: Ast, bucketCount: i64)() {
     return true;
 }
 
-fn hashInsert(TKey := typeof(ht.buckets[0].key), TValue := typeof(ht.buckets[0].value))(ht: !HT, key: TKey, value: TValue) {
+type HashTest struct {
+    x: i64,
+    y: i64
+}
+
+#impl fn hasher(s: HashTest) {
+    return s.x;
+}
+
+#impl fn equals(h1: HashTest, h2: HashTest) {
+    return h1.x == h2.x and h1.y == h2.y;
+}
+
+fn hashInsert(TKey := typeof(ht.buckets[0].key), TValue := typeof(ht.buckets[0].value))(ht: !HT/Hash, key: TKey, value: TValue) {
     hash := hasher(key) mod ht.buckets.count;
 
     if ht.buckets[hash] != nil {
@@ -75,11 +87,9 @@ fn hashInsert(TKey := typeof(ht.buckets[0].key), TValue := typeof(ht.buckets[0].
         ht.buckets[hash] = bucket;
         ht.size += 1;
     }
-
-    return;
 }
 
-fn hashGet(TKey := typeof(ht.buckets[0].key))(ht: !HT, key: TKey) {
+fn hashGet(TKey := typeof(ht.buckets[0].key))(ht: !HT/Hash, key: TKey) {
     hash := hasher(key) mod ht.buckets.count;
 
     if ht.buckets[hash] != nil {
@@ -102,11 +112,18 @@ fn hashGet(TKey := typeof(ht.buckets[0].key))(ht: !HT, key: TKey) {
 
 fn test() {
     h := hash!(Str, i64, 10)();
+    h2 := hash!(HashTest, Str, 10)();
 
     hashInsert(&h, "bar", 5);
     hashInsert(&h, "carr", 13);
 
+    hashInsert(&h2, {2, 3}, "foo");
+    hashInsert(&h2, {3, 4}, "bar");
+
     basic.assert(^hashGet(&h, "bar") == 5);
     basic.assert(^hashGet(&h, "carr") == 13);
+
+    basic.assert(^hashGet(&h2, cast() {2, 3}) | equals("foo"));
+    basic.assert(^hashGet(&h2, cast() {3, 4}) | equals("bar"));
 }
 

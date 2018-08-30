@@ -29,67 +29,76 @@ Node * makeTypeConcrete(Node *typeInfo) {
     return typeInfo;
 }
 
+bool polymorphMatches(Semantic *semantic, vector_t<Node *> givenParams, vector_t<Node *> pmGivenParams) {
+    if (pmGivenParams.length != givenParams.length) {
+        return false;
+    }
+
+    for (unsigned int i = 0; i < pmGivenParams.length; i++) {
+        auto origPgp = vector_at(pmGivenParams, i);
+        auto origGp = vector_at(givenParams, i);
+
+        semantic->resolveTypes(origPgp);
+        semantic->resolveTypes(origGp);
+
+        auto pgp = resolve(origPgp->paramData.value);
+        auto gp = resolve(origGp->paramData.value);
+
+        if (pgp->type != NodeType::TYPE || gp->type != NodeType::TYPE) {
+            pgp = constantize(semantic, pgp);
+            gp = constantize(semantic, gp);
+
+            if (pgp->type == gp->type) {
+                switch (pgp->type) {
+                    case NodeType::INT_LITERAL:
+                        if (pgp->intLiteralData.value != gp->intLiteralData.value) {
+                            return false;
+                        }
+                        break;
+                    case NodeType::FLOAT_LITERAL:
+                        if (pgp->floatLiteralData.value != gp->floatLiteralData.value) {
+                            return false;
+                        }
+                        break;
+                    case NodeType::BOOLEAN_LITERAL:
+                        if (pgp->boolLiteralData.value != gp->boolLiteralData.value) {
+                            return false;
+                        }
+                        break;
+                    default: return false;
+                }
+            }
+            else {
+                return false;
+            }
+        }
+        else if (pgp->typeData.kind == NodeTypekind::U8
+                 || pgp->typeData.kind == NodeTypekind::I8
+                 || pgp->typeData.kind == NodeTypekind::U16
+                 || pgp->typeData.kind == NodeTypekind::I16
+                 || pgp->typeData.kind == NodeTypekind::U32
+                 || pgp->typeData.kind == NodeTypekind::I32
+                 || pgp->typeData.kind == NodeTypekind::U64
+                 || pgp->typeData.kind == NodeTypekind::I64
+                 || pgp->typeData.kind == NodeTypekind::F32
+                 || pgp->typeData.kind == NodeTypekind::F64
+                 || pgp->typeData.kind == NodeTypekind::BOOLEAN) {
+            if (pgp->typeData.kind != gp->typeData.kind) {
+                return false;
+            }
+        }
+        else if (pgp != gp) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 Node *Semantic::findExistingPolymorph(Node *polymorph, vector_t<Node *> givenParams) {
     for (auto pm : polymorphs) {
-        if (pm.target == polymorph) {
-            if (pm.givenParams.length != givenParams.length) {
-                continue;
-            }
-
-            auto match = true;
-            for (unsigned int i = 0; i < pm.givenParams.length; i++) {
-                auto origPgp = vector_at(pm.givenParams, i);
-                auto origGp = vector_at(givenParams, i);
-
-                resolveTypes(origPgp);
-                resolveTypes(origGp);
-
-                auto pgp = resolve(origPgp->paramData.value);
-                auto gp = resolve(origGp->paramData.value);
-
-                if (pgp->type != NodeType::TYPE || gp->type != NodeType::TYPE) {
-                    pgp = constantize(this, pgp);
-                    gp = constantize(this, gp);
-
-                    if (pgp->type == gp->type) {
-                        switch (pgp->type) {
-                            case NodeType::INT_LITERAL:
-                                match = pgp->intLiteralData.value == gp->intLiteralData.value;
-                                break;
-                            case NodeType::FLOAT_LITERAL:
-                                match = pgp->floatLiteralData.value == gp->floatLiteralData.value;
-                                break;
-                            case NodeType::BOOLEAN_LITERAL:
-                                match = pgp->boolLiteralData.value == gp->boolLiteralData.value;
-                                break;
-                            default: match = false;
-                        }
-                    }
-                    else {
-                        match = false;
-                    }
-                }
-                else if (pgp->typeData.kind == NodeTypekind::U8
-                         || pgp->typeData.kind == NodeTypekind::I8
-                         || pgp->typeData.kind == NodeTypekind::U16
-                         || pgp->typeData.kind == NodeTypekind::I16
-                         || pgp->typeData.kind == NodeTypekind::U32
-                         || pgp->typeData.kind == NodeTypekind::I32
-                         || pgp->typeData.kind == NodeTypekind::U64
-                         || pgp->typeData.kind == NodeTypekind::I64
-                         || pgp->typeData.kind == NodeTypekind::F32
-                         || pgp->typeData.kind == NodeTypekind::F64
-                         || pgp->typeData.kind == NodeTypekind::BOOLEAN) {
-                    match = pgp->typeData.kind == gp->typeData.kind;
-                }
-                else if (pgp != gp) {
-                    match = false;
-                }
-            }
-
-            if (match) {
-                return pm.result;
-            }
+        if (pm.target == polymorph && polymorphMatches(this, givenParams, pm.givenParams)) {
+            return pm.result;
         }
     }
 
@@ -1351,6 +1360,7 @@ void resolveCast(Semantic *semantic, Node *node) {
 
     if (node->castData.type != nullptr) {
         node->typeInfo = node->castData.type;
+        node->castData.value->typeInfo = resolve(node->castData.type);
     }
     else {
         node->typeInfo = new Node(NodeTypekind::AUTOCAST);
@@ -1492,15 +1502,7 @@ bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<No
                         }
                     }
 
-                    // todo(chad): this is DANGEROUS!!!
-                    // Basically if we can't resolve the types, we assume the types are/will be the same
-                    // this *might* get caught later when we resolve the concrete version of the polymorph, but I'm not really sure at all
-                    if (declParam->typeInfo == nullptr || passedParam->typeInfo == nullptr) {
-                        passedParam->typeInfo = declParam->paramData.type;
-                        vector_set_at(newParams, j, passedParam);
-                        vector_set_at(openParams, j, false);
-                    }
-                    else if (typesMatch(declParam->typeInfo, passedParam->typeInfo, semantic)) {
+                    if (typesMatch(declParam->typeInfo, passedParam->typeInfo, semantic)) {
                         passedParam->typeInfo = declParam->paramData.type;
                         vector_set_at(newParams, j, passedParam);
                         vector_set_at(openParams, j, false);

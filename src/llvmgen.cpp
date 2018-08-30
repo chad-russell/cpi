@@ -226,6 +226,9 @@ llvm::Type *LlvmGen::typeFor(Node *node) {
         case NodeTypekind::NONE: {
             return llvm::StructType::get(context, false);
         }
+        case NodeTypekind::ENUM: {
+            return typeFor(node->typeData.enumTypeData.type);
+        }
         default: cpi_assert(false);
     }
 
@@ -1171,10 +1174,6 @@ void LlvmGen::gen(Node *node) {
                 if (node->llvmData && resolve(node->typeInfo)->typeData.kind == NodeTypekind::POINTER) {
                     node->llvmData = builder.CreateBitCast(rvalueFor(resolvedValue), typeFor(node->typeInfo));
                 }
-
-                if (node->llvmLocal) {
-                    store(rvalueFor(resolvedValue), (llvm::Value *) node->llvmLocal);
-                }
             }
 
             if (node->llvmData && node->llvmLocal) {
@@ -1284,6 +1283,7 @@ void LlvmGen::gen(Node *node) {
         case NodeType::IMPORT:
         case NodeType::LINK:
         case NodeType::PARAMETERIZED_TYPE:
+        case NodeType::TYPEOF:
         case NodeType::MODULE: {
             // nothing to do
         } break;

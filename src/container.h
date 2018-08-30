@@ -192,7 +192,6 @@ auto begin(vector_t<T> &v) {
 
 template<typename T>
 auto end(vector_t<T> &v) {
-    // todo(chad): is this dangerous???
     return &v.items[v.length];
 }
 
