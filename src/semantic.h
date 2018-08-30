@@ -37,4 +37,5 @@ public:
 bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<Node *> &declParams, vector_t<Node *> &givenParams, bool reportError = true);
 Node *constantize(Semantic *semantic, Node *node);
 bool typesMatch(Node *desired, Node *actual, Semantic *semantic, bool reportError = true);
+void maybeStructDefault(Semantic *semantic, Node *rhs, Node *lhsType);
 

@@ -69,7 +69,20 @@ Node *Semantic::findExistingPolymorph(Node *polymorph, vector_t<Node *> givenPar
                         match = false;
                     }
                 }
-                else if (!typesMatch(pgp, gp, this, false)) {
+                else if (pgp->typeData.kind == NodeTypekind::U8
+                         || pgp->typeData.kind == NodeTypekind::I8
+                         || pgp->typeData.kind == NodeTypekind::U16
+                         || pgp->typeData.kind == NodeTypekind::I16
+                         || pgp->typeData.kind == NodeTypekind::U32
+                         || pgp->typeData.kind == NodeTypekind::I32
+                         || pgp->typeData.kind == NodeTypekind::U64
+                         || pgp->typeData.kind == NodeTypekind::I64
+                         || pgp->typeData.kind == NodeTypekind::F32
+                         || pgp->typeData.kind == NodeTypekind::F64
+                         || pgp->typeData.kind == NodeTypekind::BOOLEAN) {
+                    match = pgp->typeData.kind == gp->typeData.kind;
+                }
+                else if (pgp != gp) {
                     match = false;
                 }
             }
@@ -161,11 +174,11 @@ int32_t typeSize(Node *type) {
                 return typeSize(resolved->typeData.structTypeData.coercedType);
             }
 
-            auto total = 0;
-            auto largest = 0;
-            auto largestAlign = 0;
+            int32_t total = 0;
+            int32_t largest = 0;
+            int32_t largestAlign = 0;
 
-            int64_t tagSizeInBytes;
+            int32_t tagSizeInBytes;
             if (resolved->typeData.structTypeData.isSecretlyUnion && resolved->typeData.structTypeData.unionTagType != nullptr) {
                 tagSizeInBytes = typeSize(resolved->typeData.structTypeData.unionTagType);
             }
@@ -381,10 +394,12 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic, bool reportErro
         return false;
     }
     if (desired->typeData.kind == NodeTypekind::AUTOCAST && actual->typeData.kind != NodeTypekind::AUTOCAST) {
+        maybeStructDefault(semantic, desired->typeData.autocastData, actual);
         desired->typeData = actual->typeData;
         return true;
     }
     if (actual->typeData.kind == NodeTypekind::AUTOCAST && desired->typeData.kind != NodeTypekind::AUTOCAST) {
+        maybeStructDefault(semantic, actual->typeData.autocastData, desired);
         actual->typeData = desired->typeData;
         return true;
     }
@@ -686,6 +701,9 @@ Node *defaultValueFor(Semantic *semantic, Node *type) {
             initStructLiteralData(def);
             def->typeInfo = type;
             return def;
+        }
+        case NodeTypekind::ENUM: {
+            return vector_at(type->typeData.enumTypeData.params, 0)->paramData.value;
         }
         default:
             cpi_assert(false);
@@ -1335,6 +1353,11 @@ void resolveCast(Semantic *semantic, Node *node) {
     }
     else {
         node->typeInfo = new Node(NodeTypekind::AUTOCAST);
+        node->typeInfo->typeData.autocastData = node->castData.value;
+    }
+
+    if (node->castData.value != nullptr && node->castData.type != nullptr) {
+        maybeStructDefault(semantic, node->castData.value, node->castData.type);
     }
 }
 
@@ -1550,6 +1573,9 @@ bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<No
 }
 
 void maybeStructDefault(Semantic *semantic, Node *rhs, Node *lhsType) {
+    rhs = resolve(rhs);
+    lhsType = resolve(lhsType);
+
     while (rhs->type == NodeType::ADDRESS_OF || rhs->type == NodeType::DEREF) {
         rhs = rhs->nodeData;
     }
@@ -1709,6 +1735,26 @@ void resolveType(Semantic *semantic, Node *node) {
 
                 node->resolved = newType->parameterizedTypeData.typeDecl;
                 node->resolved->typeData.polyRefinement = resolvedType;
+            }
+        } break;
+        case NodeTypekind::ENUM: {
+            auto enumType = node->typeData.enumTypeData.type;
+            semantic->resolveTypes(enumType);
+
+            // assign values for all the params
+            int64_t currentValue = 0;
+            for (auto p : node->typeData.enumTypeData.params) {
+                if (p->paramData.value == nullptr) {
+                    currentValue += 1;
+                }
+                else {
+                    currentValue = constantize(semantic, p->paramData.value)->intLiteralData.value;
+                }
+
+                p->paramData.value = new Node(p->region.srcInfo, NodeType::INT_LITERAL, p->scope);
+                p->paramData.value->intLiteralData.value = currentValue;
+                p->paramData.value->typeInfo = enumType;
+                p->typeInfo = node;
             }
         } break;
     }
@@ -2205,6 +2251,11 @@ void resolveFnCall(Semantic *semantic, Node *node) {
 
             if (declParam->paramData.polyRefinement != nullptr) {
                 auto resolvedGivenTypeInfo = resolve(givenParam->typeInfo);
+
+                while (resolvedGivenTypeInfo->typeData.kind == NodeTypekind::POINTER) {
+                    resolvedGivenTypeInfo = resolvedGivenTypeInfo->typeData.pointerTypeData.underlyingType;
+                }
+
                 if (resolvedGivenTypeInfo->typeData.polyRefinement != resolve(declParam->paramData.polyRefinement)) {
                     semantic->reportError({node, declParam, givenParam}, Error{node->region, "polymorph refinement not met"});
                 }
@@ -2335,8 +2386,8 @@ void resolveDeclParam(Semantic *semantic, Node *node) {
     }
 
     auto resolvedType = resolve(node->paramData.type);
-
     semantic->resolveTypes(resolvedType);
+
     if (node->paramData.polyLink != nullptr) {
         semantic->resolveTypes(node->paramData.polyLink);
         node->typeInfo = node->paramData.polyLink->typeInfo;
@@ -2528,24 +2579,7 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
     }
 
     if (resolvedLhs->type == NodeType::TYPE && resolvedLhs->typeData.kind == NodeTypekind::ENUM) {
-        auto enumType = resolvedLhs->typeData.enumTypeData.type;
-        semantic->resolveTypes(enumType);
-
-        // assign values for all the params
-        int64_t currentValue = 0;
-        for (auto p : resolvedLhs->typeData.enumTypeData.params) {
-            if (p->paramData.value == nullptr) {
-                currentValue += 1;
-            }
-            else {
-                currentValue = constantize(semantic, p->paramData.value)->intLiteralData.value;
-            }
-
-            p->paramData.value = new Node(p->region.srcInfo, NodeType::INT_LITERAL, p->scope);
-            p->paramData.value->intLiteralData.value = currentValue;
-            p->paramData.value->typeInfo = enumType;
-            p->typeInfo = resolvedLhs;
-        }
+        semantic->resolveTypes(resolvedLhs);
 
         resolveEnumDot(semantic, node);
         node->typeInfo = resolvedLhs;
@@ -2901,6 +2935,87 @@ void resolveStaticFor(Semantic *semantic, Node *node) {
     }
 }
 
+void resolveForWithNonArrayTarget(Semantic *semantic, Node *node) {
+    // todo(chad): try to find an iterator instead of blindly forging ahead
+//    semantic->reportError({node, node->forData.target}, Error{
+//            node->forData.target->region,
+//            "'for' target is not an array and no iterator found"
+//    });
+
+    // target := target
+    auto targetDecl = new Node(node->forData.target->region.srcInfo, NodeType::DECL, node->forData.target->scope);
+    targetDecl->region = node->forData.target->region;
+    targetDecl->declData.initialValue = node->forData.target;
+    semantic->addLocal(targetDecl);
+
+    // empty(target)
+    auto emptySymbol = new Node(node->region.srcInfo, NodeType::SYMBOL, node->scope);
+    emptySymbol->symbolData.atomId = atomTable->insertStr("empty");
+
+    auto emptyCall = new Node(targetDecl->region.srcInfo, NodeType::FN_CALL, targetDecl->scope);
+    emptyCall->region = targetDecl->region;
+    emptyCall->fnCallData.fn = emptySymbol;
+    vector_append(emptyCall->fnCallData.params, wrapInValueParam(targetDecl, nullptr));
+
+    // !empty(target)
+    auto notEmpty = new Node(targetDecl->region.srcInfo, NodeType::UNARY_NOT, targetDecl->scope);
+    notEmpty->region = targetDecl->region;
+    notEmpty->nodeData = emptyCall;
+    semantic->addLocal(notEmpty);
+
+    // while !empty(target)
+    auto rewrittenWhile = new Node(node->region.srcInfo, NodeType::WHILE, node->scope);
+    rewrittenWhile->region = node->region;
+    rewrittenWhile->whileData.condition = notEmpty;
+
+    // front(target)
+    auto frontSymbol = new Node(node->region.srcInfo, NodeType::SYMBOL, node->scope);
+    frontSymbol->symbolData.atomId = atomTable->insertStr("front");
+
+    auto frontCall = new Node(targetDecl->region.srcInfo, NodeType::FN_CALL, targetDecl->scope);
+    frontCall->region = targetDecl->region;
+    frontCall->fnCallData.fn = frontSymbol;
+    vector_append(frontCall->fnCallData.params, wrapInValueParam(targetDecl, nullptr));
+
+    // it := front(target)
+    auto aliasDecl = new Node(node->forData.element_alias->region.srcInfo, NodeType::DECL, node->forData.element_alias->scope);
+    aliasDecl->region = node->forData.element_alias->region;
+    aliasDecl->declData.lhs = node->forData.element_alias;
+    aliasDecl->declData.initialValue = frontCall;
+    semantic->addLocal(aliasDecl);
+    hash_insert(node->scope->symbols, node->forData.element_alias->symbolData.atomId, aliasDecl);
+
+    // &target
+    auto addrOfTarget = new Node(targetDecl->region.srcInfo, NodeType::ADDRESS_OF, targetDecl->scope);
+    addrOfTarget->region = targetDecl->region;
+    addrOfTarget->nodeData = targetDecl;
+
+    // popFront(&target)
+    auto popFrontSymbol = new Node(node->region.srcInfo, NodeType::SYMBOL, node->scope);
+    popFrontSymbol->symbolData.atomId = atomTable->insertStr("popFront");
+
+    auto popFrontCall = new Node(targetDecl->region.srcInfo, NodeType::FN_CALL, targetDecl->scope);
+    popFrontCall->region = targetDecl->region;
+    popFrontCall->fnCallData.fn = popFrontSymbol;
+    vector_append(popFrontCall->fnCallData.params, wrapInValueParam(addrOfTarget, nullptr));
+
+    vector_append(node->forData.rewritten, targetDecl);
+
+    // while !empty(target) {
+    //     it := front(target);
+    //     {stmts}
+    //     popFront(&target);
+    // }
+    vector_append(rewrittenWhile->whileData.stmts, aliasDecl);
+    for (auto stmt : node->forData.stmts) {
+        vector_append(rewrittenWhile->whileData.stmts, stmt);
+    }
+    vector_append(rewrittenWhile->whileData.stmts, popFrontCall);
+
+    semantic->resolveTypes(rewrittenWhile);
+    vector_append(node->forData.rewritten, rewrittenWhile);
+}
+
 void resolveFor(Semantic *semantic, Node *node) {
     if (node->forData.isStatic) {
         resolveStaticFor(semantic, node);
@@ -2911,10 +3026,8 @@ void resolveFor(Semantic *semantic, Node *node) {
     auto resolvedTypeInfo = resolve(node->forData.target->typeInfo);
 
     if (!(resolvedTypeInfo->typeData.kind == NodeTypekind::STRUCT && resolvedTypeInfo->typeData.structTypeData.isSecretlyArray)) {
-        semantic->reportError({node, node->forData.target}, Error{
-                node->forData.target->region,
-                "'for' target must be an array"
-        });
+        resolveForWithNonArrayTarget(semantic, node);
+        return;
     }
 
     // create a new declaration with the alias as the lvalue, and the array type as the type
@@ -3403,7 +3516,8 @@ void resolveFieldsof(Semantic *semantic, Node *node) {
 void Semantic::resolveTypes(Node *node) {
     if (node == nullptr) { return; }
 
-    if (node->semantic && node->type != NodeType::STRING_LITERAL) {
+    // DECL_PARAM because it might be polyLinked.....
+    if (node->semantic && node->type != NodeType::STRING_LITERAL && node->type != NodeType::DECL_PARAM) {
         return;
     }
     node->semantic = true;

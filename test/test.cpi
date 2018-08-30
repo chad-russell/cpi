@@ -174,6 +174,36 @@ fn runAllTests() {
     testPolyRecursion();
 
     testPolyImpl();
+
+    testIter2();
+}
+
+fn testIter2() {
+    type ArrRefRange(T := typeof(arr[0])) struct {
+        arr: []T,
+        curr := 0
+    }
+
+    #impl fn empty(r: !R/ArrRefRange) {
+        return r.curr >= r.arr.count;
+    }
+
+    #impl fn front(r: !R/ArrRefRange) {
+        return &r.arr[r.curr];
+    }
+
+    #impl fn popFront(R := typeof(^r))(r: *R/ArrRefRange) {
+        r.curr += 1;
+    }
+
+    arr := []{1, 2, 3};
+    for it: cast(ArrRefRange) { arr } {
+        ^it *= ^it;
+    }
+
+    assert(arr[0] == 1);
+    assert(arr[1] == 4);
+    assert(arr[2] == 9);
 }
 
 fn testPolyImpl() {
@@ -305,6 +335,7 @@ fn testModule() {
 }
 
 fn testPrinting() {
+    t: enum { YES, NO, MAYBE };
     e: union {x: i32, y: bool} = { y: false };
     io.printWithSpaces({
         123,
@@ -313,6 +344,7 @@ fn testPrinting() {
         []{1, 2, 3},
         {x: 3, y: &8767},
         e,
+        t,
         "\n\n"
     });
 }

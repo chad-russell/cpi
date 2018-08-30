@@ -1253,12 +1253,12 @@ void BytecodeGen::storeValue(Node *node, int64_t offset) {
 
             append(instructions, toBytes32(typeSize(node->typeInfo)));
         } break;
+        case NodeType::CAST:
         case NodeType::DECL_PARAM:
         case NodeType::FN_CALL:
         case NodeType::BINOP:
         case NodeType::UNARY_NOT:
         case NodeType::UNARY_BITNOT:
-        case NodeType::CAST:
         case NodeType::DECL: {
             auto resolved = resolve(node);
 

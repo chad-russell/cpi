@@ -276,6 +276,7 @@ struct TypeData {
         double floatTypeData;
         int64_t intTypeData;
         bool boolTypeData;
+        Node *autocastData;
     };
 };
 

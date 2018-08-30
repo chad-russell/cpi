@@ -1,4 +1,7 @@
 TODO:
+    - switch (on enum/union)
+        - only real benefit over if/else is that the compiler could warn you if you miss a case
+
     - static array sizes?
         - [5]i32
         - should this be used to represent string literals?
@@ -19,9 +22,6 @@ TODO:
                 - might not be an issue once context is a thing, especially considering that anything calling out to C won't work either
             - use this for step/continue backwards in vscode
         - ctfe debugging
-
-    - switch (on enum/union)
-        - only real benefit over if/else is that the compiler could warn you if you miss a case
 
     - threading
         - for interpreter, should create another interpreter and add it to a list. Execution should round-robin over all interpreters in the list
