@@ -311,6 +311,7 @@ Node *matchParameterizedType(Semantic *semantic, Node *parameterizedType, Node *
 
     auto declParams = newType->parameterizedTypeData.typeDecl->typeData.structTypeData.params;
     auto givenParams = concreteType->typeData.structTypeData.params;
+
     assignParams(semantic, parameterizedType, declParams, givenParams, false);
 
     for (auto p : givenParams) {
@@ -1491,7 +1492,15 @@ bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<No
                         }
                     }
 
-                    if (typesMatch(declParam->typeInfo, passedParam->typeInfo, semantic)) {
+                    // todo(chad): this is DANGEROUS!!!
+                    // Basically if we can't resolve the types, we assume the types are/will be the same
+                    // this *might* get caught later when we resolve the concrete version of the polymorph, but I'm not really sure at all
+                    if (declParam->typeInfo == nullptr || passedParam->typeInfo == nullptr) {
+                        passedParam->typeInfo = declParam->paramData.type;
+                        vector_set_at(newParams, j, passedParam);
+                        vector_set_at(openParams, j, false);
+                    }
+                    else if (typesMatch(declParam->typeInfo, passedParam->typeInfo, semantic)) {
                         passedParam->typeInfo = declParam->paramData.type;
                         vector_set_at(newParams, j, passedParam);
                         vector_set_at(openParams, j, false);
@@ -2253,7 +2262,7 @@ void resolveFnCall(Semantic *semantic, Node *node) {
                 auto resolvedGivenTypeInfo = resolve(givenParam->typeInfo);
 
                 while (resolvedGivenTypeInfo->typeData.kind == NodeTypekind::POINTER) {
-                    resolvedGivenTypeInfo = resolvedGivenTypeInfo->typeData.pointerTypeData.underlyingType;
+                    resolvedGivenTypeInfo = resolve(resolvedGivenTypeInfo->typeData.pointerTypeData.underlyingType);
                 }
 
                 if (resolvedGivenTypeInfo->typeData.polyRefinement != resolve(declParam->paramData.polyRefinement)) {
