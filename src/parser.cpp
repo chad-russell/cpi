@@ -1999,6 +1999,10 @@ int8_t Parser::operatorPrecedence(LexerTokenType type) {
     switch (type) {
         case LexerTokenType::AND:
         case LexerTokenType::OR:
+        case LexerTokenType::ADDEQ:
+        case LexerTokenType::SUBEQ:
+        case LexerTokenType::MULEQ:
+        case LexerTokenType::DIVEQ:
             return 1;
 
         case LexerTokenType::EQ_EQ:

@@ -1,0 +1,20 @@
+type Range struct {
+    start: i64,
+    end: i64
+}
+
+fn range(start: i64, end: i64) {
+    return cast(Range) {start, end};
+}
+
+#impl fn empty(r: Range) {
+    return r.start >= r.end;
+}
+
+#impl fn front(r: Range) {
+    return r.start;
+}
+
+#impl fn popFront(r: *Range) {
+    r.start += 1;
+}

@@ -11,7 +11,7 @@ int reusedPolymorphs;
 int newPolymorphs;
 long long int totalFnDeclDuration;
 
-Node * makeTypeConcrete(Node *typeInfo) {
+Node *makeTypeConcrete(Node *typeInfo) {
     auto resolved = resolve(typeInfo);
     if (resolved == nullptr) {
         return nullptr;
@@ -30,7 +30,7 @@ Node * makeTypeConcrete(Node *typeInfo) {
         typeInfo->typeData.kind = NodeTypekind::F32;
     }
 
-    return typeInfo;
+    return resolved;
 }
 
 bool simpleTypeMatch(Node *t1, Node *t2) {
@@ -1050,9 +1050,13 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
     auto localIndex = 0;
     for (auto local : data->locals) {
         auto resolvedLocal = resolve(local);
-        if (resolvedLocal != local && resolvedLocal->isLocal) { continue; }
+        if (resolvedLocal != local && resolvedLocal->isLocal) {
+            local->localOffset = resolvedLocal->localOffset;
+            continue;
+        }
 
         local->localOffset = semantic->currentFnDecl->fnDeclData.stackSize;
+        resolvedLocal->localOffset = local->localOffset;
 
         // todo(chad): DANGEROUS!!! But I don't know of a better way to deal with the fact that we can have non-typechecked things because of static if, etc.
         if (local->typeInfo != nullptr) {
@@ -1262,7 +1266,9 @@ Node *constantize(Semantic *semantic, Node *node) {
         staticNode->type = NodeType::INT_LITERAL;
         staticNode->intLiteralData.value = staticValue;
     }
-    else if (resolvedTypeInfo->typeData.kind == NodeTypekind::U64 || resolvedTypeInfo->typeData.kind == NodeTypekind::I64) {
+    else if (resolvedTypeInfo->typeData.kind == NodeTypekind::INT_LITERAL
+             || resolvedTypeInfo->typeData.kind == NodeTypekind::U64
+             || resolvedTypeInfo->typeData.kind == NodeTypekind::I64) {
         auto staticValue = interp->readFromStack<int64_t>(copied->localOffset);
         staticNode->type = NodeType::INT_LITERAL;
         staticNode->intLiteralData.value = staticValue;
@@ -2460,8 +2466,6 @@ void resolveDeclParam(Semantic *semantic, Node *node) {
 
         maybeStructDefault(semantic, node->paramData.value, resolvedType);
     }
-
-    makeTypeConcrete(node->typeInfo);
 }
 
 void resolveValueParam(Semantic *semantic, Node *node) {
@@ -2657,7 +2661,11 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
         while (resolvedLhsTypeInfo->typeData.kind == NodeTypekind::POINTER) {
             resolvedLhsTypeInfo = resolve(resolvedLhsTypeInfo->typeData.pointerTypeData.underlyingType);
         }
-        cpi_assert(resolvedLhsTypeInfo->typeData.kind == NodeTypekind::STRUCT);
+
+        if (resolvedLhsTypeInfo->typeData.kind != NodeTypekind::STRUCT) {
+            semantic->reportError({node}, Error{node->region, "Invalid dot lhs"});
+            return;
+        }
     }
 
     if (resolvedLhs->type == NodeType::DOT) {

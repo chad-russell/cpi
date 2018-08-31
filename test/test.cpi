@@ -178,6 +178,18 @@ fn runAllTests() {
     testIter3();
 
     testNestedPoly();
+
+    testConversion();
+}
+
+fn testConversion() {
+    type Color struct {
+        r: i8,
+        g: i8,
+        b: i8
+    }
+
+    background: Color = {54, 110, 122};
 }
 
 fn testNestedPoly() {
