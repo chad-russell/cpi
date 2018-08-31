@@ -1,4 +1,6 @@
 TODO:
+    - initial values on fn parameters and struct fields should be constantized
+
     - switch (on enum/union)
         - only real benefit over if/else is that the compiler could warn you if you miss a case
 
@@ -6,7 +8,10 @@ TODO:
         - [5]i32
         - should this be used to represent string literals?
 
-    - disallow modifying aliases (i.e. any kind of lvalue assignment)
+    - disallow modifying constantized values (i.e. any kind of lvalue assignment) for aliases, ctParams, etc
+
+    - operator overloading?
+        - +, -, *, /, comparison
 
     - way to specify foreign function names different from given name
         - ```
@@ -60,7 +65,4 @@ TODO:
                 -- do stuff. Should lock at the beginning and unlock at the end
             }
         ```
-
-    - operator overloading?
-        - +, -, *, /, comparison
 

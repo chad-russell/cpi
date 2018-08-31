@@ -1,4 +1,7 @@
+#import "textedit";
+
 fn main() {
+    textedit.example();
+
     return 0;
 }
-

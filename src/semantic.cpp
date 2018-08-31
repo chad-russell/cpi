@@ -7,6 +7,10 @@
 #include <memory>
 #include <utility>
 
+int reusedPolymorphs;
+int newPolymorphs;
+long long int totalFnDeclDuration;
+
 Node * makeTypeConcrete(Node *typeInfo) {
     auto resolved = resolve(typeInfo);
     if (resolved == nullptr) {
@@ -27,6 +31,37 @@ Node * makeTypeConcrete(Node *typeInfo) {
     }
 
     return typeInfo;
+}
+
+bool simpleTypeMatch(Node *t1, Node *t2) {
+    t1 = resolve(t1);
+    t2 = resolve(t2);
+
+    if (t1->type != NodeType::TYPE || t2->type != NodeType::TYPE) {
+        return false;
+    }
+
+    if (t1->typeData.kind == NodeTypekind::U8
+             || t1->typeData.kind == NodeTypekind::I8
+             || t1->typeData.kind == NodeTypekind::U16
+             || t1->typeData.kind == NodeTypekind::I16
+             || t1->typeData.kind == NodeTypekind::U32
+             || t1->typeData.kind == NodeTypekind::I32
+             || t1->typeData.kind == NodeTypekind::U64
+             || t1->typeData.kind == NodeTypekind::I64
+             || t1->typeData.kind == NodeTypekind::F32
+             || t1->typeData.kind == NodeTypekind::F64
+             || t1->typeData.kind == NodeTypekind::BOOLEAN) {
+        return t1->typeData.kind == t2->typeData.kind;
+    }
+    else if (t1->typeData.kind == NodeTypekind::STRUCT
+             && t1->typeData.structTypeData.isSecretlyArray
+             && t2->typeData.kind == NodeTypekind::STRUCT
+             && t2->typeData.structTypeData.isSecretlyArray) {
+        return simpleTypeMatch(t1->typeData.structTypeData.secretArrayElementType, t2->typeData.structTypeData.secretArrayElementType);
+    }
+
+    return t1 == t2;
 }
 
 bool polymorphMatches(Semantic *semantic, vector_t<Node *> givenParams, vector_t<Node *> pmGivenParams) {
@@ -72,22 +107,7 @@ bool polymorphMatches(Semantic *semantic, vector_t<Node *> givenParams, vector_t
                 return false;
             }
         }
-        else if (pgp->typeData.kind == NodeTypekind::U8
-                 || pgp->typeData.kind == NodeTypekind::I8
-                 || pgp->typeData.kind == NodeTypekind::U16
-                 || pgp->typeData.kind == NodeTypekind::I16
-                 || pgp->typeData.kind == NodeTypekind::U32
-                 || pgp->typeData.kind == NodeTypekind::I32
-                 || pgp->typeData.kind == NodeTypekind::U64
-                 || pgp->typeData.kind == NodeTypekind::I64
-                 || pgp->typeData.kind == NodeTypekind::F32
-                 || pgp->typeData.kind == NodeTypekind::F64
-                 || pgp->typeData.kind == NodeTypekind::BOOLEAN) {
-            if (pgp->typeData.kind != gp->typeData.kind) {
-                return false;
-            }
-        }
-        else if (pgp != gp) {
+        else if (!simpleTypeMatch(pgp, gp)) {
             return false;
         }
     }
@@ -98,10 +118,12 @@ bool polymorphMatches(Semantic *semantic, vector_t<Node *> givenParams, vector_t
 Node *Semantic::findExistingPolymorph(Node *polymorph, vector_t<Node *> givenParams) {
     for (auto pm : polymorphs) {
         if (pm.target == polymorph && polymorphMatches(this, givenParams, pm.givenParams)) {
+            reusedPolymorphs += 1;
             return pm.result;
         }
     }
 
+    newPolymorphs += 1;
     return nullptr;
 }
 
@@ -1363,7 +1385,11 @@ void resolveCast(Semantic *semantic, Node *node) {
 
     if (node->castData.type != nullptr) {
         node->typeInfo = node->castData.type;
-        node->castData.value->typeInfo = resolve(node->castData.type);
+
+        auto resolvedType = resolve(node->castData.type);
+        if (!isNumericType(resolvedType)) {
+            node->castData.value->typeInfo = resolve(node->castData.type);
+        }
     }
     else {
         node->typeInfo = new Node(NodeTypekind::AUTOCAST);
@@ -2740,29 +2766,20 @@ void resolveIf(Semantic *semantic, Node *node) {
         staticCondition = resolvedTypeInfo->typeData.boolTypeData;
     }
 
-    bool shouldResolveIfStmts = true;
-    bool shouldResolveElseStmts = true;
     if (isStatic) {
         if (staticCondition) {
-            shouldResolveElseStmts = false;
             node->ifData.elseStmts = {};
         }
         else {
-            shouldResolveIfStmts = false;
             node->ifData.stmts = {};
         }
     }
 
-    if (shouldResolveIfStmts) {
-        for (const auto& stmt : node->ifData.stmts) {
-            semantic->resolveTypes(stmt);
-        }
+    for (const auto& stmt : node->ifData.stmts) {
+        semantic->resolveTypes(stmt);
     }
-
-    if (shouldResolveElseStmts) {
-        for (const auto& stmt : node->ifData.elseStmts) {
-            semantic->resolveTypes(stmt);
-        }
+    for (const auto& stmt : node->ifData.elseStmts) {
+        semantic->resolveTypes(stmt);
     }
 }
 

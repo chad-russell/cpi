@@ -328,7 +328,7 @@ void LlvmGen::gen(Node *node) {
                 if (resolvedTypeInfo->type == NodeType::TYPE) {
                     nodeTypeToAlloca = resolve(resolvedLocal->typeInfo);
                 } else if (resolvedTypeInfo->type == NodeType::TYPEOF) {
-                    // todo(chad): this should probably be disallowed, and we should instead find a way to always have typeInfo be NodeType::TYPE
+                    // todo(chad): this should probably be disallowed, and we should instead find a way to always have typeInfo resolve to a NodeType::TYPE
                     cpi_assert(resolvedLocal->typeInfo->staticValue != nullptr);
                     nodeTypeToAlloca = resolvedLocal->typeInfo->staticValue;
                 } else {
@@ -337,14 +337,8 @@ void LlvmGen::gen(Node *node) {
 
                 cpi_assert(nodeTypeToAlloca->type == NodeType::TYPE);
 
-                // todo(chad): this doesn't (always) work
-//                auto isAutoDerefStorage = resolvedLocal->type == NodeType::DOT
-//                                          && resolvedLocal->dotData.lhs->typeInfo->typeData.kind == NodeTypekind::POINTER;
-                auto isAutoDerefStorage = false;
-
                 auto typeToAlloca = typeFor(nodeTypeToAlloca);
-                auto shouldCreateAlloca = nodeTypeToAlloca->typeData.kind != NodeTypekind::NONE
-                                            && !isAutoDerefStorage;
+                auto shouldCreateAlloca = nodeTypeToAlloca->typeData.kind != NodeTypekind::NONE;
 
                 if (shouldCreateAlloca) {
                     if (resolvedLocal->type == NodeType::DECL) {
@@ -776,6 +770,7 @@ void LlvmGen::gen(Node *node) {
             if (node->nodeData->type == NodeType::ARRAY_INDEX) {
                 auto resolved = resolve(node->nodeData);
                 gen(resolved);
+
                 storeIfNeeded(resolved);
 
                 node->llvmData = resolved->llvmData;
@@ -785,8 +780,8 @@ void LlvmGen::gen(Node *node) {
             else {
                 auto resolved = resolve(node->nodeData);
                 gen(resolved);
-                storeIfNeeded(resolved);
 
+                storeIfNeeded(resolved);
                 node->llvmData = resolved->llvmLocal;
 
                 if (node->isLocal) {

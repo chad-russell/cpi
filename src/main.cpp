@@ -94,9 +94,15 @@ InputType inputTypeFromExtension(const string &fileName) {
 }
 
 int main(int argc, char **argv) {
+    chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
+
     nodeId = 0;
     debugFlag = 0;
     noIppFlag = 0;
+
+    reusedPolymorphs = 0;
+    newPolymorphs = 0;
+    totalFnDeclDuration = 0;
 
     atomTable = new AtomTable();
     atomTable->atoms = hash_init<string, int64_t>(1000);
@@ -442,6 +448,13 @@ int main(int argc, char **argv) {
 
         out.close();
     }
+
+//    cout << "reused " << reusedPolymorphs << " polymorphs, made " << newPolymorphs << " polymorphs." << endl;
+
+    chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
+    auto duration = chrono::duration_cast<chrono::microseconds>( t2 - t1 ).count();
+
+    cout << "TOTAL DURATION: " << duration << endl;
 
     return 0;
 }

@@ -98,6 +98,10 @@ type Surface struct {
     refcount: i32
 }
 
+-- todo(chad):
+    -- We're using this essentially as the SDL_Event union, but that union is way bigger than this
+    -- So we have to add some padding to make them the same size.
+    -- We should actually take the time to represent the full union at some point...
 type KeyboardEvent struct {
     _type: i32,
     timestamp: i32,
@@ -106,7 +110,11 @@ type KeyboardEvent struct {
     repeat: i8,
     padding2: i8,
     padding3: i8,
-    keysym: Keysym
+    keysym: Keysym,
+
+    paddingHackChad1: i64,
+    paddingHackChad2: i64,
+    paddingHackChad3: i64,
 }
 
 type Keysym struct {

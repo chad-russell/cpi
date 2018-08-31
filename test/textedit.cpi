@@ -12,7 +12,7 @@ FONT_SIZE: i32 = 20;
 
 type TextContext struct {
     hbFont: *hb.Font,
-    hbBuffer: *hb.Buffer,
+    hbBuffer: *hb.Buffer = nil,
 
     cairoFont: *cairo.FontFace,
     cairoGlyphs: *cairo.Glyph,
@@ -20,9 +20,9 @@ type TextContext struct {
     cairoContext: *cairo.Context,
 
     font: []i8,
-    text: returntypeof(buf.make!(i8)),
+    text: buf.Buffer!(i8),
 
-    done: bool,
+    done := false,
 
     sdlWindow: *sdl.Window,
     sdlSurface: *sdl.Surface,
@@ -149,7 +149,6 @@ fn drawText(tctx: *TextContext) {
     i = 0;
     while i < cast() glyphCount {
         ithCairoGlyph := tctx.cairoGlyphs + i;
-
         ithCairoGlyph.y = ithCairoGlyph.y + cast() (HEIGHT / 2);
 
         i += 1;
@@ -197,9 +196,12 @@ fn shutdown(tctx: *TextContext) {
     sdl.SDL_Quit();
 }
 
+fn use(t: !T) {
+    m := t;
+}
+
 fn example() {
     tctx: TextContext;
-    tctx.done = false;
 
     initSdl(&tctx);
 

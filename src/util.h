@@ -17,6 +17,10 @@ extern unsigned long fnTableId;
 extern int debugFlag;
 extern int noIppFlag;
 
+extern int reusedPolymorphs;
+extern int newPolymorphs;
+extern long long int totalFnDeclDuration;
+
 const char *readFile(const char *fileName);
 
 bool startsWith(string *s, unsigned long startPos, string pre);

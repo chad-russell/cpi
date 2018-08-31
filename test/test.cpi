@@ -3,7 +3,7 @@
 
 fn main() {
     runAllTests();
-    
+
     return 0;
 }
 
@@ -164,10 +164,6 @@ fn runAllTests() {
     testIteration(cast(I64) 5);
     io.println("--------");
     testIteration(cast(String) "foo");
-
-    assert(context.id == 0);
-    incrementContextId();
-    assert(context.id == 1);
 
     testHash();
 
