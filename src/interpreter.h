@@ -94,6 +94,7 @@ public:
     SourceMap sourceMap;
     vector<unsigned long> breakpoints = {};
     bool continuing = false;
+    SourceMapStatement stoppedOnStatement;
 
     vector_t<Node *> externalFnTable;
     vector_t<void *> libs;

@@ -12,6 +12,26 @@ void append(vector<unsigned char> &instructions, Instruction instruction) {
     append(instructions, static_cast<unsigned char>(instruction));
 }
 
+//makeStore(Instruction::RELCONSTI64, toBytes(node->dotData.autoDerefStorage->localOffset),
+//        Instruction::I64, readBytes, toBytes32(8));
+void makeStore(Instruction readInst, int64_t readOffset,
+               Instruction writeInst, int64_t writeOffset,
+               int64_t size) {
+//        append(instructions, Instruction::STORE);
+//
+//        append(instructions, Instruction::RELCONSTI64);
+//        append(instructions, toBytes(node->dotData.autoDerefStorage->localOffset));
+//
+//        append(instructions, Instruction::I64);
+//        if (i == 0) {
+//            append(instructions, toBytes(node->dotData.lhs->localOffset));
+//        } else {
+//            append(instructions, toBytes(node->dotData.autoDerefStorage->localOffset));
+//        }
+//
+//        append(instructions, toBytes32(8));
+}
+
 Node *bytecodeResolve(Node *n) {
     if (n == nullptr) { return nullptr; }
 
@@ -145,19 +165,14 @@ void BytecodeGen::genDot(Node *node) {
         pointerCount += 1;
     }
     for (auto i = 0; i < pointerCount - 1; i++) {
-        append(instructions, Instruction::STORE);
-
-        append(instructions, Instruction::RELCONSTI64);
-        append(instructions, toBytes(node->dotData.autoDerefStorage->localOffset));
-
-        append(instructions, Instruction::I64);
+        int64_t readBytes;
         if (i == 0) {
-            append(instructions, toBytes(node->dotData.lhs->localOffset));
+            readBytes = node->dotData.lhs->localOffset;
         } else {
-            append(instructions, toBytes(node->dotData.autoDerefStorage->localOffset));
+            readBytes = node->dotData.autoDerefStorage->localOffset;
         }
 
-        append(instructions, toBytes32(8));
+        makeStore(Instruction::RELCONSTI64, node->dotData.autoDerefStorage->localOffset, Instruction::I64, readBytes, 8);
     }
 
     // dot is one of the few places where we actually *set* the node->localOffset, instead of just storing to it.

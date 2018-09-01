@@ -317,8 +317,7 @@ void Interpreter::interpret() {
     while ((unsigned long) pc < instructions.size() && !terminated) {
 
         bool shouldStop = false;
-        SourceMapStatement stoppedOnStatement;
-        if (debugFlag) {
+//        if (debugFlag) {
             auto stmtStop = false;
             for (auto&& s : sourceMap.statements) {
                 if (s.instIndex == (unsigned long) pc) {
@@ -331,9 +330,9 @@ void Interpreter::interpret() {
             auto breakStop = breakStopIf != breakpoints.end();
 
             shouldStop = (stmtStop && !continuing) || breakStop;
-        }
+//        }
 
-        while (shouldStop && !terminated && depth < overDepth) {
+        while (debugFlag && shouldStop && !terminated && depth < overDepth) {
             continuing = false;
             overDepth = (2 << 15) + 1;
 
@@ -965,7 +964,14 @@ void interpretStore(Interpreter *interp) {
     auto to = &interp->stack[storeOffset];
     auto from = &interp->stack[readOffset];
 
-    memcpy(to, from, static_cast<size_t>(size));
+    if (to == nullptr) {
+        cout << "nil pointer dereference!!" << endl;
+        cout << "at or near: " << interp->stoppedOnStatement.startLine << ":" << interp->stoppedOnStatement.startCol;
+        exit(-1);
+    }
+    else {
+        memcpy(to, from, static_cast<size_t>(size));
+    }
 }
 
 void interpretStoreConst(Interpreter *interp) {
