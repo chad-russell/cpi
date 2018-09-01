@@ -449,7 +449,7 @@ int main(int argc, char **argv) {
         out.close();
     }
 
-//    cout << "reused " << reusedPolymorphs << " polymorphs, made " << newPolymorphs << " polymorphs." << endl;
+    cout << "reused " << reusedPolymorphs << " polymorphs, made " << newPolymorphs << " polymorphs." << endl;
 
     chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
     auto duration = chrono::duration_cast<chrono::microseconds>( t2 - t1 ).count();

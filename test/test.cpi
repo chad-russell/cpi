@@ -156,13 +156,13 @@ fn runAllTests() {
 
     testPipe();
 
-    io.printMany({"fuckme: ", fuckme, "\n"});
+    io.printFln("fuckme: %", {fuckme});
 
     assert(test2.a == 7);
     assert(test2.test.test2.test.test2.bbb() == test2.test.topLevel);
 
     testIteration(cast(I64) 5);
-    io.println("--------");
+    puts("--------\n");
     testIteration(cast(String) "foo");
 
     testHash();
@@ -180,6 +180,10 @@ fn runAllTests() {
     testNestedPoly();
 
     testConversion();
+
+    io.println("\n\n--- TYPEINFO");
+    #import "typeinfo";
+    typeinfo.test();
 }
 
 fn testConversion() {
@@ -433,16 +437,16 @@ fn testModule() {
 fn testPrinting() {
     t: enum { YES, NO, MAYBE };
     e: union {x: i32, y: bool} = { y: false };
-    io.printWithSpaces({
-        123,
-        "string",
-        false,
-        []{1, 2, 3},
-        {x: 3, y: &8767},
-        e,
-        t,
-        "\n\n"
-    });
+    -- io.printWithSpaces({
+        -- 123,
+        -- "string",
+        -- false,
+        -- []{1, 2, 3},
+        -- {x: 3, y: &8767},
+        -- e,
+        -- t,
+        -- "\n\n"
+    -- });
 }
 
 fn testUnion1() {
@@ -670,7 +674,7 @@ fn id(t: !T) T {
 }
 
 fn idC(t: !T) {
-    io.println({id: context.id});
+    io.printFln("id: %", {context.id});
     return t;
 }
 

@@ -265,6 +265,7 @@ int32_t typeSize(Node *type) {
 
             return total;
         }
+        default: cpi_assert(false);
     }
 
     cpi_assert(false);
@@ -717,6 +718,21 @@ Node *defaultValueFor(Semantic *semantic, Node *type) {
             def->type = NodeType::STRUCT_LITERAL;
             initStructLiteralData(def);
 
+            Node *largestParam = nullptr;
+            int64_t largestParamSize = 0;
+
+            if (type->typeData.structTypeData.isSecretlyUnion) {
+                auto zero = new Node();
+                zero->type = NodeType::INT_LITERAL;
+                zero->intLiteralData.value = 0;
+                semantic->resolveTypes(zero);
+
+                auto tagParam = wrapInValueParam(zero, nullptr);
+                semantic->resolveTypes(tagParam);
+
+                vector_append(def->structLiteralData.params, tagParam);
+            }
+
             for (auto param : type->typeData.structTypeData.params) {
                 auto vp = param->paramData.value;
                 if (vp == nullptr) {
@@ -737,7 +753,27 @@ Node *defaultValueFor(Semantic *semantic, Node *type) {
                 }
 
                 semantic->resolveTypes(vp);
-                vector_append(def->structLiteralData.params, vp);
+
+                if (type->typeData.structTypeData.isSecretlyUnion) {
+                    if (largestParam == nullptr) {
+                        largestParam = vp;
+                    }
+                    else {
+                        auto vpSize = typeSize(vp->typeInfo);
+                        if (vpSize > largestParamSize) {
+                            largestParamSize = vpSize;
+                            largestParam = vp;
+                        }
+                    }
+                }
+                else {
+                    vector_append(def->structLiteralData.params, vp);
+                }
+            }
+
+            if (largestParam != nullptr) {
+                semantic->resolveTypes(largestParam);
+                vector_append(def->structLiteralData.params, largestParam);
             }
 
             def->typeInfo = type;
@@ -1744,9 +1780,14 @@ void resolveType(Semantic *semantic, Node *node) {
         case NodeTypekind::EXPOSED_AST:
         case NodeTypekind::INT_LITERAL:
         case NodeTypekind::FLOAT_LITERAL:
+        case NodeTypekind::AUTOCAST:
+        case NodeTypekind::U8:
         case NodeTypekind::I8:
+        case NodeTypekind::U16:
         case NodeTypekind::I16:
+        case NodeTypekind::U32:
         case NodeTypekind::I32:
+        case NodeTypekind::U64:
         case NodeTypekind::I64:
         case NodeTypekind::F32:
         case NodeTypekind::F64:
@@ -1882,7 +1923,7 @@ void rewritePipe(Semantic *semantic, Node *node) {
 }
 
 void rewriteMathEQ(Semantic *semantic, Node *node) {
-    LexerTokenType binopType;
+    LexerTokenType binopType{};
     switch (node->binopData.type) {
         case LexerTokenType::ADDEQ: {
             binopType = LexerTokenType::ADD;

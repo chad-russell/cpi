@@ -222,7 +222,7 @@ fn example() {
                     tctx.text.buf.count -= 1;
                 }
                 else {
-                    &tctx.text|buf.append("a"[0]);
+                    &tctx.text|append("a"[0]);
                 }
 
                 drawText(&tctx);
@@ -231,4 +231,8 @@ fn example() {
     }
 
     shutdown(&tctx);
+}
+
+fn main() {
+    example();
 }

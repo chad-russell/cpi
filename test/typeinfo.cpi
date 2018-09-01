@@ -168,13 +168,14 @@ fn any(t: !T) {
 #import "io";
 
 fn test() {
-    -- a := {fuck: 13, me: 3.14, harder: true};
-    -- io.println(typeInfo!(typeof(a))());
+    a := {fuck: 13, me: 3.14, harder: true};
+    io.println(typeInfo!(typeof(a))());
 
-    -- b := 13;
-    -- io.println(any(b));
-    -- io.println(^cast(*i64) any(b).value);
+    b := 13;
+    io.println(any(b));
+    io.println(^cast(*i64) any(b).value);
 
     type C i64
-    io.println(typeInfo!(C)());
+    ti := typeInfo!(C)();
+    io.println(ti);
 }

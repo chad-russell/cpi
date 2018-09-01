@@ -1,6 +1,17 @@
+type Fuck union {
+    _pointer: *i8,
+    _array: *i8,
+    _union: []i8,
+    _enum: []i8
+}
+
+fn fails() {
+    f: Fuck;
+    return f;
+}
+
 fn main() {
-    #import "io";
-    io.printFln("hello, %. I am % years old!", {"world", 3});
+    fails();
 
     return 0;
 }
