@@ -1,4 +1,4 @@
-fn drawFractal() {
+fn draw() {
     #import "io";
     #import "buffer";
 
@@ -9,7 +9,7 @@ fn drawFractal() {
     while row < 24 {
         defer { row += 1; }
 
-        buf := buffer.make!i8(64);
+        buf := buffer.make!(i8)(64);
         defer {
             #import "mem";
             mem.free(buf.buf.data);

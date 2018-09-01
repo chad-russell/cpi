@@ -1,7 +1,6 @@
-#import "textedit";
-
 fn main() {
-    textedit.example();
+    #import "io";
+    io.printFln("hello, %. I am % years old!", {"world", 3});
 
     return 0;
 }

@@ -1,6 +1,10 @@
 TODO:
     - initial values on fn parameters and struct fields should be constantized
 
+    - match return values with return types before they get fully checked
+
+    - #run makeover
+
     - switch (on enum/union)
         - only real benefit over if/else is that the compiler could warn you if you miss a case
 

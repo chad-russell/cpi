@@ -1,0 +1,13 @@
+#link "libc";
+
+fn rand() i32
+fn srand(seed: i32) none
+fn time(timer: *none) i64
+
+fn seed() {
+    srand(cast() time(nil));
+}
+
+fn fromArray(E := typeof(arr[0]))(arr: []E) {
+    return arr[cast() rand() mod arr.count];
+}

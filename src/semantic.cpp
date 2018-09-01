@@ -41,6 +41,13 @@ bool simpleTypeMatch(Node *t1, Node *t2) {
         return false;
     }
 
+    // if t1 has a name and t2 has a name and they're not the same, then it's not a match
+    // but if they have the same name it's not necessarily a match, they could be from different modules or some shit
+    if (t1->typeData.name != nullptr && t2->typeData.name != nullptr
+        && t1->typeData.name->symbolData.atomId != t2->typeData.name->symbolData.atomId) {
+        return false;
+    }
+
     if (t1->typeData.kind == NodeTypekind::U8
              || t1->typeData.kind == NodeTypekind::I8
              || t1->typeData.kind == NodeTypekind::U16
@@ -713,10 +720,20 @@ Node *defaultValueFor(Semantic *semantic, Node *type) {
             for (auto param : type->typeData.structTypeData.params) {
                 auto vp = param->paramData.value;
                 if (vp == nullptr) {
-                    vp = wrapInValueParam(defaultValueFor(semantic, param->typeInfo), param->paramData.name->symbolData.atomId);
+                    if (param->paramData.name != nullptr) {
+                        vp = wrapInValueParam(defaultValueFor(semantic, param->typeInfo), param->paramData.name->symbolData.atomId);
+                    }
+                    else {
+                        vp = wrapInValueParam(defaultValueFor(semantic, param->typeInfo), nullptr);
+                    }
                 }
                 else {
-                    vp = wrapInValueParam(vp, param->paramData.name->symbolData.atomId);
+                    if (param->paramData.name != nullptr) {
+                        vp = wrapInValueParam(vp, param->paramData.name->symbolData.atomId);
+                    }
+                    else {
+                        vp = wrapInValueParam(vp, nullptr);
+                    }
                 }
 
                 semantic->resolveTypes(vp);
@@ -962,6 +979,18 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
         semantic->resolveTypes(param);
     }
 
+    if (node->fnDeclData.isImpl) {
+        // todo(chad): check fn is named
+        // todo(chad): check fn is not external
+        // todo(chad): check fn has at least one param
+        // todo(chad): check first param is not polymorphic
+        auto firstParamType = resolve(vector_at(node->fnDeclData.params, noIppFlag ? 0 : 1)->typeInfo);
+        while (firstParamType->typeData.kind == NodeTypekind::POINTER) {
+            firstParamType = resolve(firstParamType->typeData.pointerTypeData.underlyingType);
+        }
+        vector_append(*firstParamType->typeData.scopedFns, node);
+    }
+
     if (data->body.length == 0) {
         if (data->returnType == nullptr) {
             data->returnType = new Node(NodeTypekind::NONE);
@@ -1070,18 +1099,6 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
         // we push the params onto the stack in reverse order
         paramOffset -= typeSize(declParam->typeInfo);
         declParam->localOffset = paramOffset;
-    }
-
-    if (node->fnDeclData.isImpl) {
-        // todo(chad): check fn is named
-        // todo(chad): check fn is not external
-        // todo(chad): check fn has at least one param
-        // todo(chad): check first param is not polymorphic
-        auto firstParamType = resolve(vector_at(node->fnDeclData.params, noIppFlag ? 0 : 1)->typeInfo);
-        while (firstParamType->typeData.kind == NodeTypekind::POINTER) {
-            firstParamType = resolve(firstParamType->typeData.pointerTypeData.underlyingType);
-        }
-        vector_append(*firstParamType->typeData.scopedFns, node);
     }
 
     semantic->currentFnDecl = savedFnDecl;
@@ -3316,60 +3333,7 @@ void resolveRun(Semantic *semantic, Node *node) {
     cpi_assert(node->nodeData->type == NodeType::FN_CALL);
     auto ctFn = node->nodeData->fnCallData.fn;
 
-    auto ctSemantic = new Semantic();
-    ctSemantic->resolveTypes(ctFn);
-
-    auto gen = new BytecodeGen();
-    gen->isMainFn = true;
-    gen->sourceMap.sourceInfo = node->region.srcInfo;
-    gen->processFnDecls = true;
-
-    // wrap in a function that simply returns the value -- that way we get args and stuff
-    auto wrappedFn = new Node(node->region.srcInfo, NodeType::FN_DECL, node->scope);
-    auto wrappedRet = new Node(node->region.srcInfo, NodeType::RETURN, node->scope);
-    wrappedRet->nodeData = node->nodeData;
-    vector_append(wrappedFn->fnDeclData.body, wrappedRet);
-    vector_append(wrappedFn->fnDeclData.returns, wrappedRet);
-    ctSemantic->resolveTypes(wrappedFn);
-    auto fnCall = new Node(node->region.srcInfo, NodeType::FN_CALL, node->scope);
-    fnCall->fnCallData.fn = wrappedFn;
-    // done wrapping
-
-    gen->gen(fnCall);
-    gen->instructions.push_back((unsigned char) Instruction::EXIT);
-    while (!gen->toProcess.empty()) {
-        gen->isMainFn = false;
-        gen->processFnDecls = true;
-        gen->gen(gen->toProcess.front());
-        gen->toProcess.pop();
-    }
-    gen->fixup();
-
-    auto interp = new Interpreter(semantic->linkLibs);
-    interp->instructions = gen->instructions;
-    interp->fnTable = gen->fnTable;
-    interp->sourceMap = gen->sourceMap;
-    interp->externalFnTable = gen->externalFnTable;
-    auto instructions = gen->instructions;
-    auto fnTable = gen->fnTable;
-
-    interp->continuing = true;
-    interp->instructions = instructions;
-    interp->fnTable = fnTable;
-    interp->interpret();
-
-    switch (node->typeInfo->typeData.kind) {
-        case NodeTypekind::I32:
-        case NodeTypekind::I64: {
-            auto resolved = new Node(node->region.srcInfo, NodeType::INT_LITERAL, node->scope);
-            resolved->typeInfo = node->typeInfo;
-            resolved->intLiteralData.value = interp->readFromStack<int32_t>(0);
-            node->resolved = resolved;
-        } break;
-        default: {
-            cpi_assert(false && "unsupported typekind for CTE");
-        } break;
-    }
+    node->resolved = constantize(semantic, ctFn);
 }
 
 void resolveTypeof(Semantic *semantic, Node *node) {

@@ -241,7 +241,7 @@ fn testIter3() {
 
         b := buffer.make!(typeof(front(range)))();
         for it: range {
-            &b|buffer.append(f(it));
+            &b|append(f(it));
         }
         return b.buf|iter;
     }
@@ -252,7 +252,7 @@ fn testIter3() {
         b := buffer.make!(typeof(front(range)))();
         for it: range {
             if f(it) {
-                &b|buffer.append(it);
+                &b|append(it);
             }
         }
         return b.buf|iter;
@@ -1084,12 +1084,12 @@ fn testBuffer() {
     f.x = 3;
     f.y = 4;
 
-    buffer.set(&b, 200, f);
+    &b|set(200, f);
 
-    assert(buffer.get(&b, 200).x == 3);
-    assert(buffer.get(&b, 200).y == 4);
+    assert(get(&b, 200).x == 3);
+    assert(get(&b, 200).y == 4);
 
-    buffer.release(b);
+    release(b);
 }
 
 fn testAnySimple1() {

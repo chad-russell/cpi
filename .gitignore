@@ -7,6 +7,6 @@ test/foo
 test/foo.ll
 test/test
 test/test.ll
-test/png
+test/wallpaper
 cmake-build-debug/*
 cmake-build-release/*

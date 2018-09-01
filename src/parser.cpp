@@ -239,6 +239,11 @@ Node *Parser::parseTopLevel() {
         return parseFnDecl();
     }
 
+    // run
+    if (lexer->front.type == LexerTokenType::RUN) {
+        return parseRun();
+    }
+
     // impl fn decl
     if (lexer->front.type == LexerTokenType::IMPL) {
         return parseImplFnDecl();
@@ -735,6 +740,11 @@ Node *Parser::parseScopedStmt() {
     // ret
     if (lexer->front.type == LexerTokenType::RETURN) {
         return parseReturn();
+    }
+
+    // run
+    if (lexer->front.type == LexerTokenType::RUN) {
+        return parseRun();
     }
 
     // fn decl

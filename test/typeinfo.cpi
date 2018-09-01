@@ -1,0 +1,180 @@
+#import "mem";
+#import "iter";
+#import "buffer": buf;
+
+fn strcpy(s: []i8) {
+    newStr: []i8;
+    newStr.count = s.count;
+    newStr.data = mem.alloc!(i8)(s.count);
+    mem.memcpy(newStr.data, s.data, s.count * sizeof(i8));
+
+    return newStr;
+}
+
+type TypeInfo union {
+    _tooDeep: none,
+    _none: none,
+    _i8 : none,
+    _i16: none,
+    _i32: none,
+    _i64: none,
+    _f32: none,
+    _f64: none,
+    _bool: none,
+    _pointer: *TypeInfo,
+    _array: *TypeInfo,
+    _struct: []TypeInfoField,
+    _union: []TypeInfoField,
+    _enum: []TypeInfoField
+}
+
+type TypeInfoField struct {
+    name: []i8,
+    typeInfo: TypeInfo
+}
+
+#impl fn print(f: TypeInfoField) {
+    puts(f.name);
+    puts(": ");
+    io.print(f.typeInfo);
+}
+
+fn typeInfo(T: Ast)(recursionCount := 0) {
+    ti: TypeInfo;
+
+    if recursionCount > 3 {
+        ti._tooDeep = {};
+        return ti;
+    }
+
+    #if #iskind(T, i8) {
+        ti._i8 = {};
+    }
+    else #if #iskind(T, i16) {
+        ti._i16 = {};
+    }
+    else #if #iskind(T, i32) {
+        ti._i32 = {};
+    }
+    else #if #iskind(T, i64) {
+        ti._i64 = {};
+    }
+    else #if #iskind(T, f32) {
+        ti._f32 = {};
+    }
+    else #if #iskind(T, f64) {
+        ti._f64 = {};
+    }
+    else #if #iskind(T, bool) {
+        ti._bool = {};
+    }
+    else #if #iskind(T, *) {
+        t: T;
+        underlyingType := mem.alloc!(TypeInfo)();
+        ^underlyingType = typeInfo!(typeof(^t))(recursionCount + 1);
+        ti._pointer = underlyingType;
+    }
+    else #if #iskind(T, []) {
+        t: T;
+        ti._array = typeInfo!(typeof(t[0]))(recursionCount + 1) | mem.heap;
+    }
+    else #if #iskind(T, struct) {
+        t: T;
+        fields := buf.make!(TypeInfoField)();
+        #for it, i: #fieldsof(T) {
+            fieldType := typeInfo!(typeof(t[i]))(recursionCount + 1);
+            &fields|append({it.name|strcpy, fieldType});
+        }
+        ti._struct = fields.buf;
+    }
+    else #if #iskind(T, union) {
+        t: T;
+        fields := buf.make!(TypeInfoField)();
+        #for it, i: #fieldsof(T) {
+            fieldType := typeInfo!(typeof(t[i]))(recursionCount + 1);
+            &fields|append({it.name|strcpy, fieldType});
+        }
+        ti._union = fields.buf;
+    }
+    else #if #iskind(T, none) {
+        ti._none = {};
+    }
+    else {
+        panic();
+    }
+
+    return ti;
+}
+
+#impl fn print(t: TypeInfo) {
+    if tagcheck(t._i8) {
+        io.print("i8");
+    }
+    else if tagcheck(t._i16) {
+        io.print("i16");
+    }
+    else if tagcheck(t._i32) {
+        io.print("i32");
+    }
+    else if tagcheck(t._i64) {
+        io.print("i64");
+    }
+    else if tagcheck(t._f32) {
+        io.print("f32");
+    }
+    else if tagcheck(t._f64) {
+        io.print("f64");
+    }
+    else if tagcheck(t._bool) {
+        io.print("bool");
+    }
+    else if tagcheck(t._pointer) {
+        io.printMany({"*", ^t._pointer});
+    }
+    else if tagcheck(t._array) {
+        io.printMany({"[]", ^t._array});
+    }
+    else if tagcheck(t._struct) {
+        io.print("struct{");
+        for field: t._struct {
+            io.print(field);
+        }
+        io.print("}");
+    }
+    else if tagcheck(t._union) {
+        io.println("union{");
+        for field: t._union {
+            io.print(field);
+        }
+        io.print("}");
+    }
+    else if tagcheck(t._enum) {
+        io.println("enum");
+    }
+}
+
+type Any struct {
+    typeInfo: TypeInfo,
+    value: *none
+}
+
+fn any(t: !T) {
+    return cast(Any) {
+        typeInfo: typeInfo!(T)(),
+        value: mem.heap(t)
+    };
+}
+
+#import "io";
+
+fn test() {
+    -- a := {fuck: 13, me: 3.14, harder: true};
+    -- io.println(typeInfo!(typeof(a))());
+
+    -- b := 13;
+    -- io.println(any(b));
+    -- io.println(^cast(*i64) any(b).value);
+
+    type C i64
+    io.println(typeInfo!(C)());
+}
