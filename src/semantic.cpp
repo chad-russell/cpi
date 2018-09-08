@@ -296,6 +296,7 @@ int maybeMatchUnionToStructLiteral(Node *desired, Node *actual, Semantic *semant
             unionToMatchAgainst = actual;
             other = desired;
         }
+        unionToMatchAgainst = resolve(unionToMatchAgainst);
 
         if (other->typeData.structTypeData.params.length != 1) {
             return 0;
@@ -744,11 +745,13 @@ Node *defaultValueFor(Semantic *semantic, Node *type) {
                     }
                 }
                 else {
+                    auto cst = constantize(semantic, vp);
+
                     if (param->paramData.name != nullptr) {
-                        vp = wrapInValueParam(vp, param->paramData.name->symbolData.atomId);
+                        vp = wrapInValueParam(cst, param->paramData.name->symbolData.atomId);
                     }
                     else {
-                        vp = wrapInValueParam(vp, nullptr);
+                        vp = wrapInValueParam(cst, nullptr);
                     }
                 }
 
@@ -1048,6 +1051,10 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
     cpi_assert(data->returnType != nullptr);
     semantic->resolveTypes(data->returnType);
 
+    if (data->bodyScope != nullptr) {
+        data->bodyScope->fnReturnType = data->returnType;
+    }
+
     node->typeInfo = new Node(NodeTypekind::FN);
     initFnTypeData(node->typeInfo);
     node->typeInfo->typeData.fnTypeData.params = vector_init<Node *>(10);
@@ -1071,31 +1078,36 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
     for (auto ret : data->returns) {
         semantic->resolveTypes(ret);
 
-         if (ret->typeInfo != nullptr) {
-             if (!typesMatch(ret->typeInfo, data->returnType, semantic)) {
-                 ostringstream s("");
-                 s << "Type mismatch; function return type is "
-                   << data->returnType->typeData.kind
-                   << ", but this is "
-                   << ret->typeInfo->typeData.kind;
+        auto matchedUnion = maybeMatchUnionToStructLiteral(data->returnType, ret->typeInfo, semantic);
+        if (matchedUnion == 1) {
+            semantic->reportError({}, Error{node->region, "error assigning struct literal to union"});
+        }
 
-                 semantic->reportError({ret, ret->typeInfo, data->returnType},
-                 Error{ret->retData.value->region, s.str()});
-             }
-         }
-         else {
-             if (data->returnType == nullptr) {
-                 auto note = Note{ret->retData.value->region, "because we cannot find the type of this returned value"};
-                 semantic->reportError({node, ret},
-                                       Error{node->region,
-                                             "could not resolve return type for fn",
-                                             {note}});
-             }
-             else {
-                 semantic->reportError({node, ret, ret->retData.value},
-                 Error{ret->retData.value->region, "could not resolved type of return statement"});
-             }
-         }
+        if (ret->typeInfo != nullptr) {
+            if (!typesMatch(data->returnType, ret->typeInfo, semantic)) {
+                ostringstream s("");
+                s << "Type mismatch; function return type is "
+                  << data->returnType->typeData.kind
+                  << ", but this is "
+                  << ret->typeInfo->typeData.kind;
+
+                semantic->reportError({ret, ret->typeInfo, data->returnType},
+                                      Error{ret->retData.value->region, s.str()});
+            }
+        }
+        else {
+            if (data->returnType == nullptr) {
+                auto note = Note{ret->retData.value->region, "because we cannot find the type of this returned value"};
+                semantic->reportError({node, ret},
+                                      Error{node->region,
+                                            "could not resolve return type for fn",
+                                            {note}});
+            }
+            else {
+                semantic->reportError({node, ret, ret->retData.value},
+                                      Error{ret->retData.value->region, "could not resolved type of return statement"});
+            }
+        }
     }
 
     // check to see everything worked out ok
@@ -1176,7 +1188,7 @@ Node *constantize(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node);
     node = resolve(node);
 
-    if (node->type == NodeType::TYPE || node->type == NodeType::FN_DECL) {
+    if (node->type == NodeType::TYPE || node->type == NodeType::FN_DECL || node->type == NodeType::NIL_LITERAL) {
         return node;
     }
 
@@ -1341,6 +1353,8 @@ Node *constantize(Semantic *semantic, Node *node) {
 
     node->staticValue = staticNode;
     copied->staticValue = staticNode;
+
+    interp_destroy(interp);
 
     return staticNode;
 }
@@ -1567,10 +1581,9 @@ bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<No
     auto encounteredError = false;
 
     for (auto passedParam : givenParams) {
-        auto valueAndNameNotNull = passedParam->type == NodeType::VALUE_PARAM && passedParam->paramData.name != nullptr;
-        auto declAndNameNotNull = passedParam->type == NodeType::DECL_PARAM && passedParam->paramData.name != nullptr;
+        auto namesNotNull = passedParam->paramData.name != nullptr;
 
-        if (valueAndNameNotNull || declAndNameNotNull) {
+        if (namesNotNull) {
             // look up that name in the declaration
             auto found = false;
             for (unsigned long j = 0; j < declParams.length; j++) {
@@ -3369,12 +3382,10 @@ void resolvePuts(Semantic *semantic, Node *node) {
 void resolveRun(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node->nodeData);
 
-    node->typeInfo = node->nodeData->typeInfo;
-
     cpi_assert(node->nodeData->type == NodeType::FN_CALL);
-    auto ctFn = node->nodeData->fnCallData.fn;
 
-    node->resolved = constantize(semantic, ctFn);
+    node->resolved = constantize(semantic, node->nodeData);
+    node->typeInfo = node->nodeData->typeInfo;
 }
 
 void resolveTypeof(Semantic *semantic, Node *node) {

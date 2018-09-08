@@ -1,0 +1,54 @@
+#import "io";
+#import "zmq/zmq";
+#import "iter";
+#import "mem";
+
+#link "libc";
+
+fn system(command: *i8) i32
+fn execvp(program: *i8, args: **i8) i32
+fn gets(line: *i8) none
+
+fn getLine() {
+    count := 1024;
+
+    chars := cast(*i8) basic.tmp(count);
+    gets(chars);
+
+    line: []i8;
+    line.data = chars;
+    line.count = count;
+    return line;
+}
+
+fn main() {
+    -- system("/Users/chadrussell/Projects/cpi/cmake-build-debug/cpi /Users/chadrussell/Projects/cpi/test/foo.cpi --interpret --debug &"|io.cstr);
+
+    ctx := zmq.ctx();
+    requester := zmq.socket(ctx, zmq.SocketType.REQ);
+    zmq.connect(requester, "tcp://localhost:5555");
+
+    bufCount := 32768;
+
+    buf : []i8;
+    buf.count = bufCount;
+    buf.data = mem.alloc!(i8)(bufCount);
+    defer { mem.free(buf.data); }
+
+    while true {
+        zmq.send(requester, getLine());
+        defer { basic.resetTmp(); }
+
+        received := zmq.recv(requester, buf);
+        if received > 0 {
+            buf.count = cast() received;
+            io.println(buf);
+            buf.count = bufCount;
+        }
+    }
+
+    zmq.close(requester);
+    zmq.ctxDestroy(ctx);
+
+    return 0;
+}

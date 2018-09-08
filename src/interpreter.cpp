@@ -11,25 +11,41 @@
 #include <dlfcn.h>
 #include <ffi.h>
 #include <SDL2/SDL.h>
+#include <stdio.h>
+
+#include<sys/types.h>
+#include <fcntl.h>
+#include <zconf.h>
 
 using namespace std;
 
-void printStmt(Interpreter *interp, int32_t pcStmtStart, bool withLineInfo = false) {
+void printStmt(Interpreter *interp, int32_t pcStmtStart, ostream &s, bool withLineInfo = false) {
     for (auto stmt : interp->sourceMap.statements) {
         if (stmt.instIndex == (unsigned long) pcStmtStart) {
-            cout << interp->sourceMap.sourceInfo.source->substr(stmt.startByte, stmt.endByte - stmt.startByte);
+            s << stmt.node->region.srcInfo.source->substr(stmt.startByte, stmt.endByte - stmt.startByte);
 
             if (withLineInfo) {
-                cout << "[" << stmt.startLine << "] ";
+                s << "[" << stmt.startLine << "]";
             }
-
-            cout << endl;
         }
     }
 }
 
-void printCurrentStmt(Interpreter *interp, bool withLineInfo = false) {
-    printStmt(interp, interp->pc, withLineInfo);
+void printCurrentStmt(Interpreter *interp, ostream &s, bool withLineInfo = false) {
+    printStmt(interp, interp->pc, s, withLineInfo);
+}
+
+bool isValidPtr(void *p) {
+    if (p == nullptr) { return false; }
+
+    bool ret = true;
+    int nullfd = open("/dev/random", O_WRONLY);
+    if (write(nullfd, p, sizeof(void *)) < 0) {
+        ret = false;
+    }
+
+    close(nullfd);
+    return ret;
 }
 
 void debugPrintVar(ostream &target, Interpreter *interp, TypeData td, int64_t offset, vector<string> &extraLines) {
@@ -42,27 +58,79 @@ void debugPrintVar(ostream &target, Interpreter *interp, TypeData td, int64_t of
         } break;
         case NodeTypekind::I8: {
             auto p = (char *) offset;
-            if (p != nullptr) {
+            if (isValidPtr(p)) {
                 target << *p;
+            }
+            else {
+                target << "ERROR: could not read";
             }
         } break;
         case NodeTypekind::I16: {
             auto p = (int16_t *) offset;
-            if (p != nullptr) {
+            if (isValidPtr(p)) {
                 target << *p;
+            }
+            else {
+                target << "ERROR: could not read";
             }
         } break;
         case NodeTypekind::I32: {
             auto p = (int32_t *) offset;
-            if (p != nullptr) {
+            if (isValidPtr(p)) {
                 target << *p;
+            }
+            else {
+                target << "ERROR: could not read";
             }
         } break;
         case NodeTypekind::I64: {
             auto p = (int64_t *) offset;
-            if (p != nullptr) {
+            if (isValidPtr(p)) {
                 target << *p;
             }
+            else {
+                target << "ERROR: could not read";
+            }
+        } break;
+        case NodeTypekind::ENUM: {
+            if (!isValidPtr((void *) offset)) {
+                target << "<<INVALID>>";
+            }
+            else {
+                int64_t enumValue = 0;
+
+                switch (td.enumTypeData.type->typeData.kind) {
+                    case NodeTypekind::I8: {
+                        enumValue = *(int8_t *) offset;
+                    } break;
+                    case NodeTypekind::I16: {
+                        enumValue = *(int16_t *) offset;
+                    } break;
+                    case NodeTypekind::I32: {
+                        enumValue = *(int32_t *) offset;
+                    } break;
+                    case NodeTypekind::I64: {
+                        enumValue = *(int64_t *) offset;
+                    } break;
+                    case NodeTypekind::INT_LITERAL: {
+                        enumValue = td.intTypeData;
+                    } break;
+                    default: cpi_assert(false);
+                }
+
+                if (enumValue >= td.enumTypeData.params.length) {
+                    target << "<<INVALID>>";
+                }
+                else {
+                    auto enumAtom = vector_at(td.enumTypeData.params, (unsigned long) enumValue - 1)->paramData.name->symbolData.atomId;
+                    auto enumName = atomTable->backwardAtoms[enumAtom];
+                    target << enumName;
+                }
+            }
+
+            target << " (";
+            debugPrintVar(target, interp, td.enumTypeData.type->typeData, offset, extraLines);
+            target << ")";
         } break;
         case NodeTypekind::FLOAT_LITERAL: {
             target << td.floatTypeData;
@@ -72,52 +140,84 @@ void debugPrintVar(ostream &target, Interpreter *interp, TypeData td, int64_t of
         } break;
         case NodeTypekind::BOOLEAN: {
             auto p = (int32_t *) offset;
-            if (p != nullptr) {
+            if (isValidPtr(p)) {
                 target << ((*p) == 1 ? "true" : "false");
+            }
+            else {
+                target << "ERROR: could not read";
             }
         } break;
         case NodeTypekind::F32: {
             auto p = (float *) offset;
-            if (p != nullptr) {
+            if (isValidPtr(p)) {
                 target << *p;
+            }
+            else {
+                target << "ERROR: could not read";
             }
         } break;
         case NodeTypekind::F64: {
             auto p = (double *) offset;
-            if (p != nullptr) {
+            if (isValidPtr(p)) {
                 target << *p;
+            }
+            else {
+                target << "ERROR: could not read";
             }
         } break;
         case NodeTypekind::POINTER: {
             auto nvr = interp->nextVarReference;
             interp->nextVarReference += 1;
 
-            auto loadedOffset = *((int64_t *) offset);
-            auto found = hash_get(interp->pointerRecursion, loadedOffset);
-            if (found != nullptr) {
-                target << *found;
-                break;
+            int64_t loadedOffset = 0;
+            bool isValidOffset = false;
+            if (isValidPtr((int64_t *) offset)) {
+                isValidOffset = true;
+                loadedOffset = *((int64_t *) offset);
             }
 
-            auto toInsert = string("#" + to_string(nvr));
-            hash_insert(interp->pointerRecursion, loadedOffset, toInsert);
+            if (isValidOffset) {
+                auto found = hash_get(interp->pointerRecursion, loadedOffset);
+                if (found != nullptr) {
+                    target << *found;
+                    break;
+                }
+
+                auto toInsert = string("#" + to_string(nvr));
+                hash_insert(interp->pointerRecursion, loadedOffset, toInsert);
+            }
 
             target << "#" << nvr;
 
             ostringstream extra("");
             extra << "#" << nvr << ": ";
+            extra << "*(0x" << hex << loadedOffset << dec << ")";
             if (loadedOffset == 0) {
                 extra << "nil";
             }
+            else if (!isValidOffset) {
+                extra << "<<invalid ptr>>";
+            }
             else {
                 debugPrintVar(extra, interp, resolve(td.pointerTypeData.underlyingType)->typeData, loadedOffset, extraLines);
-                extraLines.push_back(extra.str());
             }
+
+            extraLines.push_back(extra.str());
         } break;
         case NodeTypekind::FN: {
-            target << *((int32_t *) offset) << " (todo(chad): look up the fn name)";
+            if (isValidPtr((int32_t *) offset)) {
+                target << *((int32_t *) offset) << " (todo(chad): look up the fn name)";
+            }
+            else {
+                target << "<<invalid fn ptr>>";
+            }
         } break;
         case NodeTypekind::STRUCT: {
+            if (!isValidPtr((int64_t *) offset)) {
+                target << "<<invalid>>";
+                break;
+            }
+
             if (td.structTypeData.isSecretlyUnion) {
                 auto nvr = interp->nextVarReference;
                 interp->nextVarReference += 1;
@@ -126,38 +226,54 @@ void debugPrintVar(ostream &target, Interpreter *interp, TypeData td, int64_t of
 
                 auto tag = *((int64_t *) offset);
 
-                auto param = vector_at(td.structTypeData.params, (unsigned long) tag);
-                cpi_assert(param->type == NodeType::DECL_PARAM);
-
                 ostringstream extra("");
                 extra << "#" << nvr << ": ";
                 extra << "{";
                 if (tag > 0) {
-                    extra << "tag:" << tag << " ";
+                    extra << "tag:" << tag;
                 }
-                extra << atomTable->backwardAtoms[param->paramData.name->symbolData.atomId] << ":";
-                debugPrintVar(extra, interp, resolve(param->typeInfo)->typeData, offset + 8, extraLines);
+
+                if (tag >= 0 && tag < td.structTypeData.params.length) {
+                    extra << " ";
+                    auto param = vector_at(td.structTypeData.params, (unsigned long) tag);
+                    cpi_assert(param->type == NodeType::DECL_PARAM);
+
+                    extra << atomTable->backwardAtoms[param->paramData.name->symbolData.atomId] << ":";
+                    debugPrintVar(extra, interp, resolve(param->typeInfo)->typeData, offset + 8, extraLines);
+                }
                 extra << "}";
 
-                extraLines.push_back(extra.str());
+                auto extraStr = extra.str();
+                extraLines.push_back(extraStr);
             }
             else if (td.structTypeData.isSecretlyArray) {
                 auto resolvedElementType = resolve(td.structTypeData.secretArrayElementType);
 
                 auto size = *((int64_t *) (offset + 8));
+                auto realSize = size > 50 ? 50 : size;
                 auto ts = typeSize(td.structTypeData.secretArrayElementType);
                 auto array_offset = *((int64_t *) offset);
 
                 if (resolvedElementType->typeData.kind == NodeTypekind::I8) {
+                    auto charPtr = (int8_t *) array_offset;
+
                     target << "\"";
-                    for (auto i = 0; i < size; i++) {
-                        if ((int8_t *) array_offset != nullptr) {
-                            target << *((int8_t *) array_offset);
+                    for (auto i = 0; i < realSize; i++) {
+                        if (isValidPtr(charPtr)) {
+                            switch (*charPtr) {
+                                case '\n': {
+                                    target << "\\n";
+                                }
+                                default: target << *charPtr;
+                            }
                         }
                         else {
-                            target << "0";
+                            target << "�";
                         }
-                        array_offset += ts;
+                        charPtr += 1;
+                    }
+                    if (realSize < size) {
+                        target << "...(truncated)";
                     }
                     target << "\"";
                 }
@@ -172,15 +288,18 @@ void debugPrintVar(ostream &target, Interpreter *interp, TypeData td, int64_t of
                     extra << "#" << nvr << ": ";
 
                     extra << "[";
-                    for (auto i = 0; i < size; i++) {
+                    for (auto i = 0; i < realSize; i++) {
                         extra << to_string(i) << ":";
 
                         debugPrintVar(extra, interp, resolve(td.structTypeData.secretArrayElementType)->typeData, array_offset, extraLines);
                         array_offset += ts;
 
-                        if (i < size - 1) {
+                        if (i < realSize - 1) {
                             extra << " ";
                         }
+                    }
+                    if (realSize < size) {
+                        target << "...(truncated)";
                     }
                     extra << "]";
 
@@ -233,34 +352,39 @@ void debugPrintVar(ostream &target, Interpreter *interp, TypeData td, int64_t of
     }
 }
 
-void debugPrintVar(Interpreter *interp, int32_t bp, Node *n) {
+void debugPrintVar(Interpreter *interp, int32_t bp, Node *n, ostream &s) {
     cpi_assert(n->isLocal || n->isBytecodeLocal);
 
     auto resolvedTypeinfo = resolve(resolve(n)->typeInfo);
 
+    if (resolvedTypeinfo == nullptr) {
+        s << "<<cannot resolve type>>";
+        return;
+    }
+
     vector<string> extra;
-    debugPrintVar(cout, interp, resolvedTypeinfo->typeData, ((int64_t) interp->stack.data()) + bp + n->localOffset, extra);
-    cout << endl;
+    debugPrintVar(s, interp, resolvedTypeinfo->typeData, ((int64_t) interp->stack.data()) + bp + n->localOffset, extra);
+    s << endl;
     for (const auto &e : extra) {
-        cout << e << endl;
+        s << e << endl;
     }
 }
 
-void printVarsInScope(Interpreter *interp, Scope *scope, int32_t bp, bool isLast = false) {
+void printVarsInScope(Interpreter *interp, Scope *scope, int32_t bp, ostringstream &s, bool isLast = false) {
     for (auto i = 0; i < scope->symbols->bucket_count; i++) {
         auto bucket = scope->symbols->buckets[i];
         if (bucket != nullptr) {
             if (bucket->value->isLocal || bucket->value->isBytecodeLocal) {
-                cout << atomTable->backwardAtoms[bucket->key] << ": ";
-                debugPrintVar(interp, bp, bucket->value);
+                s << atomTable->backwardAtoms[bucket->key] << ": ";
+                debugPrintVar(interp, bp, bucket->value, s);
             }
 
             while (bucket->next != nullptr) {
                 bucket = bucket->next;
 
                 if (bucket->value->isLocal || bucket->value->isBytecodeLocal) {
-                    cout << atomTable->backwardAtoms[bucket->key] << ": ";
-                    debugPrintVar(interp, bp, bucket->value);
+                    s << atomTable->backwardAtoms[bucket->key] << ": ";
+                    debugPrintVar(interp, bp, bucket->value, s);
                 }
             }
         }
@@ -273,27 +397,41 @@ void printVarsInScope(Interpreter *interp, Scope *scope, int32_t bp, bool isLast
             auto p = vector_at(scope->fnScopeParams, i);
             assert(p->type == NodeType::DECL_PARAM);
 
-            cout << atomTable->backwardAtoms[p->paramData.name->symbolData.atomId] << ": ";
+            s << atomTable->backwardAtoms[p->paramData.name->symbolData.atomId] << ": ";
 
             auto resolvedTypeinfo = resolve(p->paramData.type);
             offset -= typeSize(resolvedTypeinfo);
 
             vector<string> extra;
-            debugPrintVar(cout, interp, resolvedTypeinfo->typeData, ((int64_t) interp->stack.data()) + bp + p->localOffset, extra);
-            cout << endl;
+            debugPrintVar(s, interp, resolvedTypeinfo->typeData, ((int64_t) interp->stack.data()) + bp + p->localOffset, extra);
+            s << endl;
 
             for (const auto &e : extra) {
-                cout << e << endl;
+                s << e << endl;
+            }
+        }
+
+        // fn return value
+        if (scope->fnReturnType != nullptr) {
+            s << "*RETURN*: ";
+
+            vector<string> extra;
+            debugPrintVar(s, interp, scope->fnReturnType->typeData, ((int64_t) interp->stack.data()) + bp, extra);
+            s << endl;
+            for (const auto &e : extra) {
+                s << e << endl;
             }
         }
     }
 
-    if (!isLast) {
-        printVarsInScope(interp, scope->parent, bp, scope->isFunctionScope);
+    if (!isLast && scope->parent != nullptr) {
+        printVarsInScope(interp, scope->parent, bp, s, scope->isFunctionScope);
     }
 }
 
-void printCurrentVars(Interpreter *interp, int32_t bp, uint32_t pc) {
+ostringstream printCurrentVars(Interpreter *interp, int32_t bp, uint32_t pc) {
+    ostringstream s("");
+
     for (auto stmt : interp->sourceMap.statements) {
         if (stmt.instIndex == (unsigned long) pc) {
             auto node = stmt.node;
@@ -306,58 +444,106 @@ void printCurrentVars(Interpreter *interp, int32_t bp, uint32_t pc) {
                 node = vector_at(node->fnDeclData.body, 0);
             }
 
-            printVarsInScope(interp, node->scope, bp);
+            printVarsInScope(interp, node->scope, bp, s);
         }
     }
+
+    return s;
+}
+
+string getInfo(Interpreter *interp) {
+    ostringstream s("");
+
+    interp->nextVarReference = 1;
+    interp->pointerRecursion = hash_init<int64_t, string>(50);
+
+    s << interp->depth + 1 << endl;
+
+    auto bp = interp->bp;
+    auto pc = interp->pc;
+
+    for (uint16_t i = 0; i < interp->depth + 1; i++) {
+        // line 1: location
+        for (auto stmt : interp->sourceMap.statements) {
+            if (stmt.node->region.srcInfo.fileName != nullptr && stmt.instIndex == (unsigned long) pc) {
+                s << *stmt.node->region.srcInfo.fileName << endl;
+                s << stmt.startLine << endl;
+                s << stmt.startCol << endl;
+            }
+        }
+
+        s << printCurrentVars(interp, bp, pc).str();
+
+        if (i < interp->depth) {
+            bp = interp->readFromStack<int32_t>(bp - 8);
+            pc = (uint32_t) interp->pcs.at(interp->pcs.size() - 1 - i);
+            s << "---" << endl;
+        }
+    }
+
+    return s.str();
 }
 
 void Interpreter::interpret() {
     auto mp = new MnemonicPrinter(this->instructions);
 
+//    auto cline = (char *) "";
+//    if (this->debugging) {
+//        zmq_bind(zmq_sock, "tcp://*:5555");
+//        cline = (char *) calloc(4096, sizeof(char));
+//    }
+
     while ((unsigned long) pc < instructions.size() && !terminated) {
-
-        bool shouldStop = false;
-//        if (debugFlag) {
-            auto stmtStop = false;
-            for (auto&& s : sourceMap.statements) {
-                if (s.instIndex == (unsigned long) pc) {
-                    stoppedOnStatement = s;
-                    stmtStop = true;
-                }
+        auto stmtStop = false;
+        for (auto&& s : sourceMap.statements) {
+            if (s.instIndex == (unsigned long) pc) {
+                stoppedOnStatement = s;
+                stmtStop = true;
+                break;
             }
+        }
 
-            auto breakStopIf = find(breakpoints.begin(), breakpoints.end(), pc);
-            auto breakStop = breakStopIf != breakpoints.end();
+        auto breakStopIf = find(breakpoints.begin(), breakpoints.end(), pc);
+        auto breakStop = breakStopIf != breakpoints.end();
+        bool shouldStop = (stmtStop && !continuing) || breakStop;
 
-            shouldStop = (stmtStop && !continuing) || breakStop;
-//        }
-
-        while (debugFlag && shouldStop && !terminated && depth < overDepth) {
+        while (this->debugging && shouldStop && !terminated && depth < overDepth) {
             continuing = false;
             overDepth = (2 << 15) + 1;
 
             lastValidPc = pc;
 
+//            auto received = zmq_recv(zmq_sock, cline, 1024, 0);
+//            cline[received] = 0;
+//            auto line = string(cline);
             string line;
             getline(cin, line);
-            while (line != "" && !terminated) {
+
+            while (!line.empty() && !terminated) {
                 if (line == "stack") {
-                    cout << "[";
+                    ostringstream s("");
+
+                    s << "[";
                     for (auto i = 0; i < sp; i++) {
-                        cout << static_cast<int32_t>(stack[i]);
-                        if (i < sp - 1) { cout << ", "; }
+                        s << static_cast<int32_t>(stack[i]);
+                        if (i < sp - 1) { s << ", "; }
                     }
-                    cout << "]";
-                    cout << endl;
+                    s << "]" << endl;
+
+                    zsend(s.str());
                 } else if (line == "frame") {
-                    cout << "[";
+                    ostringstream s("");
+
+                    s << "[";
                     for (auto i = bp; i < sp; i++) {
-                        cout << static_cast<int32_t>(stack[i]);
-                        if (i < sp - 1) { cout << ", "; }
+                        s << static_cast<int32_t>(stack[i]);
+                        if (i < sp - 1) { s << ", "; }
                     }
-                    cout << "]";
-                    cout << endl;
+                    s << "]" << endl;
+
+                    zsend(s.str());
                 } else if (startsWith(&line, "break ")) {
+                    // todo(chad): support filenames
                     int32_t bNum;
                     sscanf(line.c_str(), "break %d", &bNum);
 
@@ -367,44 +553,24 @@ void Interpreter::interpret() {
                             breakpoints.push_back(stmt.instIndex);
                         }
                     }
+
+                    zsend("");
                 } else if (line == "breakRemove") {
+                    // todo(chad): lol
                     breakpoints = {};
                 } else if (line == "location") {
+                    ostringstream s("");
+
                     for (auto stmt : sourceMap.statements) {
                         if (stmt.instIndex == (unsigned long) pc) {
-                            cout << stmt.startLine << endl;
-                            cout << stmt.startCol << endl;
+                            s << stmt.startLine << endl;
+                            s << stmt.startCol << endl;
                         }
                     }
+
+                    zsend(s.str());
                 } else if (line == "info") {
-                    this->nextVarReference = 1;
-                    this->pointerRecursion = hash_init<int64_t, string>(50);
-
-                    cout << this->depth + 1 << endl;
-
-                    auto bp = this->bp;
-                    auto pc = this->pc;
-
-                    for (uint16_t i = 0; i < this->depth + 1; i++) {
-                        // line 1: location
-                        for (auto stmt : this->sourceMap.statements) {
-                            if (stmt.instIndex == (unsigned long) pc) {
-                                cout << *stmt.node->region.srcInfo.fileName << endl;
-                                cout << stmt.startLine << endl;
-                                cout << stmt.startCol << endl;
-                            }
-                        }
-
-                        printCurrentVars(this, bp, pc);
-                        bp = this->readFromStack<int32_t>(bp - 8);
-
-                        if (i < this->depth) {
-                            pc = (uint32_t) this->pcs.at(this->pcs.size() - 1 - i);
-                            cout << "---" << endl;
-                        }
-                    }
-
-                    // todo(chad): free pointerRecursion
+                    zsend(getInfo(this));
                 } else if (startsWith(&line, "eval")) {
                     auto stmt = line.substr(5);
 
@@ -447,6 +613,7 @@ void Interpreter::interpret() {
                     while (!gen->toProcess.empty()) {
                         gen->isMainFn = false;
                         gen->processFnDecls = true;
+                        gen->forcing = true;
                         gen->gen(gen->toProcess.front());
                         gen->toProcess.pop();
                     }
@@ -475,10 +642,17 @@ void Interpreter::interpret() {
                     interp->interpret();
 
                     // todo(chad): present the type of the answer appropriately -- don't just assume it's i64
-                    auto answer = interp->readFromStack<int32_t>(interp->bp);
-                    cout << "answer: " << answer << endl;
+                    auto answer = interp->readFromStack<int64_t>(interp->bp);
+
+                    ostringstream s("");
+                    s << "answer: " << answer << endl;
+                    zsend(s.str());
+
+                    interp_destroy(interp);
                 } else if (line == "stmt") {
-                    printCurrentStmt(this);
+                    ostringstream s("");
+                    printCurrentStmt(this, s);
+                    zsend(s.str());
                 } else if (line == "asm") {
                     // print all insts between this stmt and the next one
                     auto firstIndex = pc;
@@ -491,11 +665,12 @@ void Interpreter::interpret() {
                         }
                     }
 
-                    cout << mp->debugString(firstIndex, lastIndex);
+                    zsend(mp->debugString(firstIndex, lastIndex));
                 } else if (line == "vars") {
-                    printCurrentVars(this, this->bp, this->pc);
+                    zsend(printCurrentVars(this, this->bp, this->pc).str());
                 } else if (line == "step") {
                     shouldStop = false;
+                    zsend("");
                     break;
                 } else if (line == "over") {
                     auto instAt = table.at(instructions[pc]);
@@ -503,6 +678,7 @@ void Interpreter::interpret() {
                         overDepth = depth + 1;
                     }
                     shouldStop = false;
+                    zsend("");
                     break;
                 } else if (line == "out") {
                     // prevent accidentally stepping 'out' of main fn
@@ -510,18 +686,29 @@ void Interpreter::interpret() {
                         overDepth = depth;
                     }
                     shouldStop = false;
+                    zsend("");
                     break;
                 } else if (line == "continue") {
                     shouldStop = false;
                     continuing = true;
+                    zsend("");
                     break;
                 } else if (line == "terminate" || line == "q" || line == "quit") {
                     terminated = true;
+                    zsend("");
                     break;
                 } else {
-                    cout << "unrecognized command" << endl;
+                    zsend("unrecognized command");
                 }
 
+//                received = zmq_recv(zmq_sock, cline, 1024, 0);
+//                if (received != -1) {
+//                    cline[received] = 0;
+//                    line = string(cline);
+//                }
+//                else {
+//                    line = "";
+//                }
                 getline(cin, line);
             }
         }
@@ -535,13 +722,20 @@ void Interpreter::interpret() {
     delete mp;
 }
 
+void Interpreter::zsend(string s) {
+    // todo(chad): expose this through a command-line flag so we can choose zmq over stderr, for example
+//    zmq_send(zmq_sock, s.c_str(), s.size(), 0);
+
+    cerr << s << endl;
+}
+
 void interpretExit(Interpreter *interp) {
     interp->terminated = true;
 }
 
 void interpretPanic(Interpreter *interp) {
     cout << "assertion failed!!!" << endl;
-//    printStmt(interp, interp->lastStmtPc, true);
+    printCurrentStmt(interp, cout, true);
     exit(0);
 }
 
@@ -815,6 +1009,7 @@ ffi_type *ffiTypeFor(Node *type) {
             return dp_type;
         }
         case NodeTypekind::POINTER: return &ffi_type_pointer;
+        case NodeTypekind::ENUM: return ffiTypeFor(type->typeData.enumTypeData.type);
 
         default: cpi_assert(false);
     }
@@ -1007,5 +1202,15 @@ void interpretStoreConst(Interpreter *interp) {
         memcpy(&interp->stack[storeOffset], &value, sizeof(double));
     } else {
         cpi_assert(false);
+    }
+}
+
+void interp_destroy(Interpreter *interp) {
+    if (interp == nullptr) {
+        return;
+    }
+
+    if (interp->debugging) {
+        zmq_ctx_destroy(interp->zmq_ctx);
     }
 }

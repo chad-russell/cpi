@@ -4,6 +4,7 @@
 #include <vector>
 #include <stack>
 #include <dlfcn.h>
+#include <zmq.h>
 
 #include "assembler.h"
 
@@ -95,6 +96,7 @@ public:
     vector<unsigned long> breakpoints = {};
     bool continuing = false;
     SourceMapStatement stoppedOnStatement;
+    bool debugging = false;
 
     vector_t<Node *> externalFnTable;
     vector_t<void *> libs;
@@ -102,6 +104,9 @@ public:
     // used for stepping 'over' functions (as opposed to normal step which goes 'into')
     uint16_t depth = 0;
     int32_t overDepth = (2 << 15) + 1;
+
+    void *zmq_ctx;
+    void *zmq_sock;
 
     Interpreter(vector_t<string *> externalLibs): Interpreter(2048 * 64, externalLibs) {}
 
@@ -114,6 +119,11 @@ public:
         }
 
         this->fnTable = hash_init<uint32_t, uint64_t>(100);
+
+        if (debugFlag) {
+            zmq_ctx = zmq_ctx_new();
+            zmq_sock = zmq_socket(zmq_ctx, ZMQ_REP);
+        }
 
         table = {
                 interpretMathAdd<int8_t>,
@@ -254,6 +264,7 @@ public:
     void callIndex(int64_t index);
 
     void dumpStack();
+    void zsend(string s);
 
     template <typename T>
     void copyToStack(T t, int64_t offset) {
@@ -352,6 +363,8 @@ public:
         }
     }
 };
+
+void interp_destroy(Interpreter *interp);
 
 template<typename FROM, typename TO>
 void interpretConvertFromTo(void *fromAddr, void *toAddr) {

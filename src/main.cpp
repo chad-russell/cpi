@@ -245,6 +245,7 @@ int main(int argc, char **argv) {
             interp->fnTable = gen->fnTable;
             interp->sourceMap = gen->sourceMap;
             interp->externalFnTable = gen->externalFnTable;
+            interp->debugging = debugFlag == 0 ? false : true;
 
             instructions = gen->instructions;
             fnTable = gen->fnTable;
@@ -448,6 +449,8 @@ int main(int argc, char **argv) {
 
         out.close();
     }
+
+    interp_destroy(interp);
 
     cout << "reused " << reusedPolymorphs << " polymorphs, made " << newPolymorphs << " polymorphs." << endl;
 

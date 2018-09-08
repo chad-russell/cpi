@@ -3,6 +3,10 @@ type Range struct {
     end: i64
 }
 
+fn until(end: i64) {
+    return range(0, end);
+}
+
 fn range(start: i64, end: i64) {
     return cast(Range) {start, end};
 }

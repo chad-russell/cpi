@@ -1,0 +1,28 @@
+#import "io";
+#import "zmq";
+#import "../iter";
+#import "mem";
+
+fn main() {
+    io.println("Connecting to hello world server…");
+    ctx := zmq.ctx();
+    requester := zmq.socket(ctx, zmq.SocketType.REQ);
+    zmq.connect(requester, "tcp://localhost:5555");
+
+    buf : []i8;
+    buf.count = 10;
+    buf.data = mem.alloc!(i8)(buf.count);
+    defer { mem.free(buf.data); }
+
+    for i: iter.until(10) {
+        io.printFln("Sending Hello %…", {i});
+        zmq.send(requester, "Hello");
+        zmq.recv (requester, buf);
+        io.printFln("Received % %", {buf, i});
+    }
+
+    zmq.close(requester);
+    zmq.ctxDestroy(ctx);
+
+    return 0;
+}

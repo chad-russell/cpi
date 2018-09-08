@@ -531,6 +531,7 @@ Node *Parser::parseFnDecl() {
     scopes.push(new Scope(scopes.top()));
     scopes.top()->isFunctionScope = true;
     scopes.top()->fnScopeParams = decl->fnDeclData.params;
+    decl->fnDeclData.bodyScope = scopes.top();
 
     auto savedStaticIfScope = this->staticIfScope;
     this->staticIfScope = scopes.top();
@@ -545,6 +546,7 @@ Node *Parser::parseFnDecl() {
             vector_append(decl->fnDeclData.body, scopedStmt);
         }
     }
+    appendEndScope(decl->fnDeclData.body);
     auto end = expect(LexerTokenType::RCURLY, "}");
 
     decl->region.end = end.region.end;
@@ -2102,7 +2104,7 @@ Node *Parser::parseFnCall() {
             expect(LexerTokenType::RPAREN, ")");
         }
         else {
-            vector_append(call->fnCallData.ctParams, wrapInValueParam(parseSymbol(), nullptr));
+            vector_append(call->fnCallData.ctParams, wrapInValueParam(parseLvalueOrLiteral(), nullptr));
         }
     }
 

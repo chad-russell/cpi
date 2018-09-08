@@ -1,0 +1,65 @@
+#import "mem";
+
+type Buffer(T := typeof(buf[0])) struct {
+    capacity: i64,
+    buf: []T
+}
+
+fn make(T: Ast)(capacity := 1) {
+    buf: []T;
+    buf.count = 0;
+    buf.data = cast(*T) mem.malloc(capacity * sizeof(T));
+
+    return cast(Buffer) {
+        capacity: capacity,
+        buf: buf
+    };
+}
+
+fn from(T := typeof(t[0]))(t: []T) {
+    b := make!T(t.count);
+    b.buf.count = t.count;
+    mem.memcpy(b.buf.data, t.data, t.count * sizeof(T));
+    return b;
+}
+
+#impl fn release(b: !T/Buffer) {
+    mem.free(cast(*none) b.buf.data);
+}
+
+#impl fn ensureCapacity(b: !T/Buffer, index: i64) {
+    if b.capacity == 0 {
+        b.capacity = 1;
+    }
+
+    type E typeof(b.buf[0])
+
+    while index >= b.capacity {
+        b.capacity = b.capacity * 2;
+
+        newBuf: []E;
+        newBuf.count = b.buf.count;
+        newBuf.data = cast(*E) mem.malloc(b.capacity * sizeof(E));
+        mem.memcpy(newBuf.data, b.buf.data, b.buf.count * sizeof(E));
+        mem.free(b.buf.data);
+
+        b.buf = newBuf;
+    }
+}
+
+#impl fn set( T := typeof(^b), E := typeof(b.buf[0]) )(b: *T/Buffer, index: i64, e: E) {
+    ensureCapacity(b, index);
+
+    b.buf[index] = e;
+    return b.capacity;
+}
+
+#impl fn append( T := typeof(^b), E := typeof(b.buf[0]) )(b: *T/Buffer, e: E) {
+    set(b, b.buf.count, e);
+    b.buf.count += 1;
+}
+
+#impl fn get(b: !T/Buffer, index: i64) {
+    ensureCapacity(b, index);
+    return b.buf[index];
+}

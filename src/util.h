@@ -304,6 +304,7 @@ struct FnDeclData {
     vector_t<Node *> body;
     vector_t<Node *> locals;
     vector_t<Node *> returns;
+    Scope *bodyScope;
 
     int32_t stackSize;
     uint64_t instOffset;
@@ -495,6 +496,7 @@ public:
 
     bool isFunctionScope = false;
     vector_t<Node *> fnScopeParams = vector_init<Node *>(4);
+    Node *fnReturnType = nullptr;
 
     // methods
     explicit Scope(Scope *parent);

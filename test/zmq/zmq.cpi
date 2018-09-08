@@ -1,0 +1,64 @@
+#link "libzmq";
+
+#import "io";
+
+type SocketType enum(i32) {
+    PAIR: 0,
+    PUB: 1,
+    SUB: 2,
+    REQ: 3,
+    REP: 4,
+    DEALER: 5,
+    ROUTER: 6,
+    PULL: 7,
+    PUSH: 8,
+    XPUB: 9,
+    XSUB: 10,
+    STREAM: 11
+}
+
+type Ctx *none
+type Socket *none
+
+module c {
+    fn zmq_ctx_new() Ctx
+    fn zmq_socket(ctx: Ctx, _type: SocketType) Socket
+    fn zmq_bind(socket: Socket, addr: *i8) i32
+    fn zmq_recv(socket: Socket, buf: *i8, len: i32, flags: i32) i32
+    fn zmq_send(socket: Socket, buf: *i8, len: i32, flags: i32) i32
+    fn zmq_connect(socket: Socket, addr: *i8) i32
+    fn zmq_close(socket: Socket) i32
+    fn zmq_ctx_destroy(ctx: Ctx) i32
+}
+
+fn ctx() {
+    return c.zmq_ctx_new();
+}
+
+fn socket(ctx: Ctx, _type: SocketType) {
+    return c.zmq_socket(ctx, _type);
+}
+
+fn bind(socket: Socket, addr: []i8) {
+    return c.zmq_bind(socket, io.cstr(addr));
+}
+
+fn recv(socket: Socket, buf: []i8, flags: i32 = 0) {
+    return c.zmq_recv(socket, buf.data, cast() buf.count, flags);
+}
+
+fn send(socket: Socket, buf: []i8, flags: i32 = 0) {
+    return c.zmq_send(socket, buf.data, cast() buf.count, flags);
+}
+
+fn connect(socket: Socket, addr: []i8) {
+    return c.zmq_connect(socket, io.cstr(addr));
+}
+
+fn close(socket: Socket) {
+    return c.zmq_close(socket);
+}
+
+fn ctxDestroy(ctx: Ctx) {
+    return c.zmq_ctx_destroy(ctx);
+}

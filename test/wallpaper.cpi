@@ -12,6 +12,10 @@ type Color struct {
     b: i8
 }
 
+fn color(r: i8, g: i8, b: i8) Color {
+    return {r, g, b};
+}
+
 fn fill_rect(pixels: [][]i8, x: i64, y: i64, w: i64, h: i64, color: Color) {
   for row: iter.range(y, y + h) {
     for col: iter.range(x, x + w) {
@@ -47,15 +51,15 @@ fn write_png_file(filename: []i8) {
 
   png.png_write_info(pngCtx, info);
 
-  background : Color = {54, 110, 122};
-  cubeBackground: Color = {35, 49, 62};
+  background := color(54, 110, 122);
+  cubeBackground := color(35, 49, 62);
 
-  blue: Color = {69, 133, 212};
-  red: Color = {239, 41, 35};
-  orange: Color = {230, 126, 34};
-  yellow: Color = {246, 201, 53};
-  green: Color = {57, 202, 116};
-  white: Color = {250, 250, 250};
+  blue := color(69, 133, 212);
+  red := color(239, 41, 35);
+  orange := color(230, 126, 34);
+  yellow := color(246, 201, 53);
+  green := color(57, 202, 116);
+  white := color(250, 250, 250);
 
   faceColors := []{blue, red, orange, yellow, green, white};
 

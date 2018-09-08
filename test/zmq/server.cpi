@@ -1,0 +1,25 @@
+#import "zmq";
+#import "mem";
+#import "io";
+#import "../iter";
+
+fn main() {
+    --  Socket to talk to clients
+    ctx := zmq.ctx();
+    responder := zmq.socket(ctx, zmq.SocketType.REP);
+    rc := zmq.bind(responder, "tcp://*:5555");
+    basic.assert(rc == 0);
+
+    buf : []i8;
+    buf.count = 10;
+    buf.data = mem.alloc!(i8)(buf.count);
+    defer { mem.free(buf.data); }
+
+    for i: iter.until(10) {
+        zmq.recv(responder, buf);
+        io.printFln("Received %", {buf});
+        zmq.send(responder, "World");
+    }
+
+    return 0;
+}

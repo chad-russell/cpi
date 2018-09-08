@@ -212,6 +212,7 @@ void initFnDeclData(Node *node) {
     node->fnDeclData.isExternal = false;
     node->fnDeclData.tableIndex = 0;
     node->fnDeclData.isImpl = false;
+    node->fnDeclData.bodyScope = nullptr;
 }
 
 void initStructTypeData(Node *node) {

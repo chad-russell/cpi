@@ -1,26 +1,6 @@
-fn withIter() {
-    #import "iter";
-
-    total := 0;
-    for i: iter.range(1, 1_000_000) {
-        total += 1;
-    }
-
-    return total;
-}
-
-fn noIter() {
-    total := 0;
-    i := 0;
-    while i < 1_000_000 {
-        total += 1;
-        i = i + 1;
-    }
-
-    return total;
-}
-
 fn main() {
-    -- return noIter();
-    return withIter();
+    #import "sdl";
+    sdl.runGame();
+
+    return 0;
 }
