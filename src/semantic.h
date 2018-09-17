@@ -1,3 +1,6 @@
+#ifndef SEMANTIC_H
+#define SEMANTIC_H
+
 #include <vector>
 
 #include "node.h"
@@ -39,3 +42,4 @@ Node *constantize(Semantic *semantic, Node *node);
 bool typesMatch(Node *desired, Node *actual, Semantic *semantic, bool reportError = true);
 void maybeStructDefault(Semantic *semantic, Node *rhs, Node *lhsType);
 
+#endif // SEMANTIC_H

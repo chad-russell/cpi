@@ -1,0 +1,17 @@
+type Optional(T := typeof(value)) struct {
+    hasValue: bool,
+    value: T
+}
+
+fn yes(t: !T) {
+    o: Optional!(T);
+    o.hasValue = true;
+    o.value = t;
+    return o;
+}
+
+fn no(T: Ast)() {
+    o: Optional!(T);
+    o.hasValue = false;
+    return o;
+}

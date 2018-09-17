@@ -1,0 +1,34 @@
+#link "/Users/chadrussell/Projects/se/cmake-build-release/libse_shared";
+
+type Buf struct {
+    length: i64,
+    capacity: i64,
+    bytes: *i8,
+
+    rc: i32
+}
+
+type EditorBuffer struct {
+    filePath: **i8,
+
+    globalUndo: *none,
+    Undo: *none,
+
+    undoIdx: *i64,
+    globalUndoIdx: *i64,
+
+    currentScreen: *none,
+
+    saveToUndo: *i8
+}
+
+fn editor_buffer_create(virtualLineLength: i32) EditorBuffer
+fn editor_buffer_destroy(eb: EditorBuffer) none
+fn editor_buffer_insert(eb: EditorBuffer, text: *i8) none
+fn editor_buffer_get_char_count(eb: EditorBuffer) i64
+fn editor_buffer_set_cursor_point(eb: EditorBuffer, row: i64, col: i64) none
+fn editor_buffer_set_cursor_is_selection(eb: EditorBuffer, isSelection: i8) none
+fn editor_buffer_delete(eb: EditorBuffer) none
+fn editor_buffer_get_text_between_points(eb: EditorBuffer, startLine: i64, startCol: i64, endLine: i64, endCol: i64) *Buf
+fn editor_buffer_set_cursor_pos_relative(eb: EditorBuffer, relative: i64) none
+fn editor_buffer_get_line_count(eb: EditorBuffer) i64

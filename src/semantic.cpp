@@ -1075,6 +1075,20 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
 
     semantic->currentFnDecl->fnDeclData.stackSize += typeSize(data->returnType);
 
+    // check to see everything worked out ok
+    if (data->returnType == nullptr) {
+        ostringstream s("");
+        s << "could not resolve return type for fn '"
+          << atomTable->backwardAtoms[data->name->symbolData.atomId]
+          << "'";
+
+        semantic->reportError({node}, Error{node->region, s.str()});
+    }
+
+    for (auto stmt : data->body) {
+        semantic->resolveTypes(stmt);
+    }
+
     for (auto ret : data->returns) {
         semantic->resolveTypes(ret);
 
@@ -1108,20 +1122,6 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
                                       Error{ret->retData.value->region, "could not resolved type of return statement"});
             }
         }
-    }
-
-    // check to see everything worked out ok
-    if (data->returnType == nullptr) {
-        ostringstream s("");
-        s << "could not resolve return type for fn '"
-          << atomTable->backwardAtoms[data->name->symbolData.atomId]
-          << "'";
-
-        semantic->reportError({node}, Error{node->region, s.str()});
-    }
-
-    for (auto stmt : data->body) {
-        semantic->resolveTypes(stmt);
     }
 
     auto localIndex = 0;
@@ -1835,7 +1835,7 @@ void resolveType(Semantic *semantic, Node *node) {
 
             if (node->resolved == nullptr) {
                 ostringstream s("");
-                s << "undeclared identifier " << atomTable->backwardAtoms[node->typeData.symbolTypeData.atomId];
+                s << "undeclared type identifier " << atomTable->backwardAtoms[node->typeData.symbolTypeData.atomId];
                 semantic->reportError({node}, Error{node->region, s.str()});
                 return;
             }

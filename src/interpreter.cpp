@@ -22,10 +22,10 @@ using namespace std;
 void printStmt(Interpreter *interp, int32_t pcStmtStart, ostream &s, bool withLineInfo = false) {
     for (auto stmt : interp->sourceMap.statements) {
         if (stmt.instIndex == (unsigned long) pcStmtStart) {
-            s << stmt.node->region.srcInfo.source->substr(stmt.startByte, stmt.endByte - stmt.startByte);
+            s << stmt.node->region.srcInfo.source->substr(stmt.node->region.start.byteIndex, stmt.node->region.end.byteIndex - stmt.node->region.start.byteIndex);
 
             if (withLineInfo) {
-                s << "[" << stmt.startLine << "]";
+                s << "[" << stmt.node->region.start.line << "]";
             }
         }
     }
@@ -467,8 +467,8 @@ string getInfo(Interpreter *interp) {
         for (auto stmt : interp->sourceMap.statements) {
             if (stmt.node->region.srcInfo.fileName != nullptr && stmt.instIndex == (unsigned long) pc) {
                 s << *stmt.node->region.srcInfo.fileName << endl;
-                s << stmt.startLine << endl;
-                s << stmt.startCol << endl;
+                s << stmt.node->region.start.line << endl;
+                s << stmt.node->region.start.col << endl;
             }
         }
 
@@ -484,6 +484,175 @@ string getInfo(Interpreter *interp) {
     return s.str();
 }
 
+void runDebugger(Interpreter *interp, MnemonicPrinter *mp) {
+    auto stmtStop = false;
+    for (auto&& s : interp->sourceMap.statements) {
+        if (s.instIndex == (unsigned long) interp->pc) {
+            interp->stoppedOnStatement = s;
+            stmtStop = true;
+            break;
+        }
+    }
+
+    auto breakStopIf = find_if(interp->breakpoints.begin(), interp->breakpoints.end(), [&](auto bp){ return bp.instIndex == interp->pc; });
+    auto breakStop = breakStopIf != interp->breakpoints.end();
+    if (breakStop) {
+        if (breakStopIf->conditional) {
+            auto evald = evaluate<int32_t>(interp->bp, interp->stack, interp->stoppedOnStatement.node->region.srcInfo, interp->stoppedOnStatement.node->scope, breakStopIf->condition);
+            if (evald == 0) {
+                breakStop = false;
+            }
+        }
+    }
+    bool shouldStop = (stmtStop && !interp->continuing) || breakStop;
+
+    while (interp->debugging && shouldStop && !interp->terminated && interp->depth < interp->overDepth) {
+        interp->continuing = false;
+        interp->overDepth = (2 << 15) + 1;
+
+        interp->lastValidPc = interp->pc;
+
+//            auto received = zmq_recv(zmq_sock, cline, 1024, 0);
+//            cline[received] = 0;
+//            auto line = string(cline);
+        string line;
+        getline(cin, line);
+
+        while (!line.empty() && !interp->terminated) {
+            if (line == "stack") {
+                ostringstream s("");
+
+                s << "[";
+                for (auto i = 0; i < interp->sp; i++) {
+                    s << static_cast<int32_t>(interp->stack[i]);
+                    if (i < interp->sp - 1) { s << ", "; }
+                }
+                s << "]" << endl;
+
+                interp->zsend(s.str());
+            } else if (line == "frame") {
+                ostringstream s("");
+
+                s << "[";
+                for (auto i = interp->bp; i < interp->sp; i++) {
+                    s << static_cast<int32_t>(interp->stack[i]);
+                    if (i < interp->sp - 1) { s << ", "; }
+                }
+                s << "]" << endl;
+
+                interp->zsend(s.str());
+            } else if (startsWith(&line, "break ")) {
+                int32_t bNum;
+                int read;
+                sscanf(line.c_str(), "break %d%n", &bNum, &read);
+
+                auto rest = line.substr(read + 1);
+
+                auto openSquareIndex = rest.find('[');
+                auto closeSquareIndex = rest.find(']');
+
+                auto fileName = rest.substr(0, openSquareIndex - 1);
+                auto condition = rest.substr(openSquareIndex + 1, closeSquareIndex - (openSquareIndex + 1));
+
+                // find the statement which is on this line
+                for (auto stmt : interp->sourceMap.statements) {
+                    if (stmt.node->region.start.line == (unsigned long) bNum &&
+                        *stmt.node->region.srcInfo.fileName == fileName) {
+
+                        Breakpoint bp = {stmt.instIndex, condition.length() > 0, condition};
+                        interp->breakpoints.push_back(bp);
+                    }
+                }
+
+                interp->zsend("");
+            } else if (line == "breakRemoveAll") {
+                interp->breakpoints = {};
+            } else if (line == "location") {
+                ostringstream s("");
+
+                for (auto stmt : interp->sourceMap.statements) {
+                    if (stmt.instIndex == (unsigned long) interp->pc) {
+                        s << stmt.node->region.start.line << endl;
+                        s << stmt.node->region.start.col << endl;
+                    }
+                }
+
+                interp->zsend(s.str());
+            } else if (line == "info") {
+                interp->zsend(getInfo(interp));
+            } else if (startsWith(&line, "eval")) {
+                auto stmt = line.substr(5);
+
+                auto answer = evaluate<int64_t>(interp->bp, interp->stack, interp->stoppedOnStatement.node->region.srcInfo, interp->stoppedOnStatement.node->scope, stmt);
+
+                ostringstream s("");
+                s << "answer: " << answer << endl;
+                interp->zsend(s.str());
+            } else if (line == "stmt") {
+                ostringstream s("");
+                printCurrentStmt(interp, s);
+                interp->zsend(s.str());
+            } else if (line == "asm") {
+                // print all insts between this stmt and the next one
+                auto firstIndex = interp->pc;
+                auto lastIndex = interp->pc;
+                for (auto statement : interp->sourceMap.statements) {
+                    auto stmt = statement;
+                    if (stmt.instIndex == (unsigned long) interp->pc) {
+                        lastIndex = (int32_t) statement.instEndIndex;
+                        break;
+                    }
+                }
+
+                interp->zsend(mp->debugString(firstIndex, lastIndex));
+            } else if (line == "vars") {
+                interp->zsend(printCurrentVars(interp, interp->bp, interp->pc).str());
+            } else if (line == "step") {
+                shouldStop = false;
+                interp->zsend("");
+                break;
+            } else if (line == "over") {
+                auto instAt = interp->table.at(interp->instructions[interp->pc]);
+                if (instAt == interpretCall || instAt == interpretCalli) {
+                    interp->overDepth = interp->depth + 1;
+                }
+                shouldStop = false;
+                interp->zsend("");
+                break;
+            } else if (line == "out") {
+                // prevent accidentally stepping 'out' of main fn
+                if (interp->depth > 0) {
+                    interp->overDepth = interp->depth;
+                }
+                shouldStop = false;
+                interp->zsend("");
+                break;
+            } else if (line == "continue") {
+                shouldStop = false;
+                interp->continuing = true;
+                interp->zsend("");
+                break;
+            } else if (line == "terminate" || line == "q" || line == "quit") {
+                interp->terminated = true;
+                interp->zsend("");
+                break;
+            } else {
+                interp->zsend("unrecognized command");
+            }
+
+//                received = zmq_recv(zmq_sock, cline, 1024, 0);
+//                if (received != -1) {
+//                    cline[received] = 0;
+//                    line = string(cline);
+//                }
+//                else {
+//                    line = "";
+//                }
+            getline(cin, line);
+        }
+    }
+}
+
 void Interpreter::interpret() {
     auto mp = new MnemonicPrinter(this->instructions);
 
@@ -494,223 +663,8 @@ void Interpreter::interpret() {
 //    }
 
     while ((unsigned long) pc < instructions.size() && !terminated) {
-        auto stmtStop = false;
-        for (auto&& s : sourceMap.statements) {
-            if (s.instIndex == (unsigned long) pc) {
-                stoppedOnStatement = s;
-                stmtStop = true;
-                break;
-            }
-        }
-
-        auto breakStopIf = find(breakpoints.begin(), breakpoints.end(), pc);
-        auto breakStop = breakStopIf != breakpoints.end();
-        bool shouldStop = (stmtStop && !continuing) || breakStop;
-
-        while (this->debugging && shouldStop && !terminated && depth < overDepth) {
-            continuing = false;
-            overDepth = (2 << 15) + 1;
-
-            lastValidPc = pc;
-
-//            auto received = zmq_recv(zmq_sock, cline, 1024, 0);
-//            cline[received] = 0;
-//            auto line = string(cline);
-            string line;
-            getline(cin, line);
-
-            while (!line.empty() && !terminated) {
-                if (line == "stack") {
-                    ostringstream s("");
-
-                    s << "[";
-                    for (auto i = 0; i < sp; i++) {
-                        s << static_cast<int32_t>(stack[i]);
-                        if (i < sp - 1) { s << ", "; }
-                    }
-                    s << "]" << endl;
-
-                    zsend(s.str());
-                } else if (line == "frame") {
-                    ostringstream s("");
-
-                    s << "[";
-                    for (auto i = bp; i < sp; i++) {
-                        s << static_cast<int32_t>(stack[i]);
-                        if (i < sp - 1) { s << ", "; }
-                    }
-                    s << "]" << endl;
-
-                    zsend(s.str());
-                } else if (startsWith(&line, "break ")) {
-                    // todo(chad): support filenames
-                    int32_t bNum;
-                    sscanf(line.c_str(), "break %d", &bNum);
-
-                    // find the statement which is on this line
-                    for (auto stmt : sourceMap.statements) {
-                        if (stmt.startLine == (unsigned long) bNum) {
-                            breakpoints.push_back(stmt.instIndex);
-                        }
-                    }
-
-                    zsend("");
-                } else if (line == "breakRemove") {
-                    // todo(chad): lol
-                    breakpoints = {};
-                } else if (line == "location") {
-                    ostringstream s("");
-
-                    for (auto stmt : sourceMap.statements) {
-                        if (stmt.instIndex == (unsigned long) pc) {
-                            s << stmt.startLine << endl;
-                            s << stmt.startCol << endl;
-                        }
-                    }
-
-                    zsend(s.str());
-                } else if (line == "info") {
-                    zsend(getInfo(this));
-                } else if (startsWith(&line, "eval")) {
-                    auto stmt = line.substr(5);
-
-                    auto evalFnDecl = new Node(stoppedOnStatement.node->region.srcInfo, NodeType::FN_DECL, stoppedOnStatement.node->scope);
-
-                    auto evalLexer = new Lexer(stmt, false);
-
-                    auto evalParser = new Parser(evalLexer);
-                    evalParser->isCopying = true;
-                    evalParser->scopes.pop();
-                    evalParser->scopes.push(stoppedOnStatement.node->scope);
-                    evalParser->currentFnDecl = evalFnDecl;
-                    auto parsed = evalParser->parseRvalue();
-
-                    // set the srcInfo to the original srcInfo in case there's polymorphs
-                    evalLexer->srcInfo = stoppedOnStatement.node->region.srcInfo;
-
-                    auto semantic = new Semantic();
-                    semantic->lexer = evalLexer;
-                    semantic->parser = evalParser;
-                    semantic->addStaticIfs(evalParser->scopes.top());
-                    semantic->addImports(*evalParser->imports, *evalParser->impls);
-                    semantic->currentFnDecl = evalFnDecl;
-
-                    auto wrappedRet = new Node(parsed->region.srcInfo, NodeType::RETURN, parsed->scope);
-                    wrappedRet->nodeData = parsed;
-
-                    vector_append(evalFnDecl->fnDeclData.body, wrappedRet);
-                    vector_append(evalFnDecl->fnDeclData.returns, wrappedRet);
-                    semantic->resolveTypes(parsed);
-                    semantic->resolveTypes(evalFnDecl);
-
-                    // gen
-                    auto gen = new BytecodeGen();
-                    gen->isMainFn = true;
-                    gen->sourceMap.sourceInfo = evalFnDecl->region.srcInfo;
-                    gen->processFnDecls = true;
-
-                    gen->gen(evalFnDecl);
-                    while (!gen->toProcess.empty()) {
-                        gen->isMainFn = false;
-                        gen->processFnDecls = true;
-                        gen->forcing = true;
-                        gen->gen(gen->toProcess.front());
-                        gen->toProcess.pop();
-                    }
-                    gen->fixup();
-
-                    for (auto g : gen->generatedNodes) {
-                        g->gen = false;
-                        g->bytecode = {};
-                    }
-
-//                    auto m = new MnemonicPrinter(gen->instructions);
-//                    m->fnTable = gen->fnTable;
-//                    cout << m->debugString() << endl;
-
-                    auto interp = new Interpreter(semantic->linkLibs);
-                    interp->bp = this->bp;
-                    interp->sp = this->bp;
-                    interp->externalFnTable = gen->externalFnTable;
-                    interp->instructions = gen->instructions;
-                    interp->fnTable = gen->fnTable;
-                    interp->stack = this->stack; // todo(chad): this copies a lot of stuff. Make stack a vector_t? (or maybe we actually want to copy...)
-                    interp->sourceMap = gen->sourceMap;
-                    interp->continuing = true;
-                    interp->instructions = gen->instructions;
-                    interp->fnTable = gen->fnTable;
-                    interp->interpret();
-
-                    // todo(chad): present the type of the answer appropriately -- don't just assume it's i64
-                    auto answer = interp->readFromStack<int64_t>(interp->bp);
-
-                    ostringstream s("");
-                    s << "answer: " << answer << endl;
-                    zsend(s.str());
-
-                    interp_destroy(interp);
-                } else if (line == "stmt") {
-                    ostringstream s("");
-                    printCurrentStmt(this, s);
-                    zsend(s.str());
-                } else if (line == "asm") {
-                    // print all insts between this stmt and the next one
-                    auto firstIndex = pc;
-                    auto lastIndex = pc;
-                    for (auto statement : sourceMap.statements) {
-                        auto stmt = statement;
-                        if (stmt.instIndex == (unsigned long) pc) {
-                            lastIndex = (int32_t) statement.instEndIndex;
-                            break;
-                        }
-                    }
-
-                    zsend(mp->debugString(firstIndex, lastIndex));
-                } else if (line == "vars") {
-                    zsend(printCurrentVars(this, this->bp, this->pc).str());
-                } else if (line == "step") {
-                    shouldStop = false;
-                    zsend("");
-                    break;
-                } else if (line == "over") {
-                    auto instAt = table.at(instructions[pc]);
-                    if (instAt == interpretCall || instAt == interpretCalli) {
-                        overDepth = depth + 1;
-                    }
-                    shouldStop = false;
-                    zsend("");
-                    break;
-                } else if (line == "out") {
-                    // prevent accidentally stepping 'out' of main fn
-                    if (depth > 0) {
-                        overDepth = depth;
-                    }
-                    shouldStop = false;
-                    zsend("");
-                    break;
-                } else if (line == "continue") {
-                    shouldStop = false;
-                    continuing = true;
-                    zsend("");
-                    break;
-                } else if (line == "terminate" || line == "q" || line == "quit") {
-                    terminated = true;
-                    zsend("");
-                    break;
-                } else {
-                    zsend("unrecognized command");
-                }
-
-//                received = zmq_recv(zmq_sock, cline, 1024, 0);
-//                if (received != -1) {
-//                    cline[received] = 0;
-//                    line = string(cline);
-//                }
-//                else {
-//                    line = "";
-//                }
-                getline(cin, line);
-            }
+        if (this->debugging) {
+            runDebugger(this, mp);
         }
 
         if (!terminated) {
@@ -988,11 +942,15 @@ ffi_type *ffiTypeFor(Node *type) {
     switch (type->typeData.kind) {
         case NodeTypekind::NONE: return &ffi_type_void;
         case NodeTypekind::I8: return &ffi_type_sint8;
+        case NodeTypekind::U8: return &ffi_type_uint8;
         case NodeTypekind::I16: return &ffi_type_sint16;
+        case NodeTypekind::U16: return &ffi_type_uint16;
         case NodeTypekind::BOOLEAN:
         case NodeTypekind::I32:
             return &ffi_type_sint32;
+        case NodeTypekind::U32: return &ffi_type_uint32;
         case NodeTypekind::I64: return &ffi_type_sint64;
+        case NodeTypekind::U64: return &ffi_type_uint64;
         case NodeTypekind::F32: return &ffi_type_float;
         case NodeTypekind::F64: return &ffi_type_double;
         case NodeTypekind::STRUCT: {
@@ -1000,7 +958,6 @@ ffi_type *ffiTypeFor(Node *type) {
             auto args = (ffi_type **) malloc((type->typeData.structTypeData.params.length + 1) * sizeof(ffi_type *));
             for (unsigned long i = 0; i < type->typeData.structTypeData.params.length; i++) {
                 args[i] = ffiTypeFor(vector_at(type->typeData.structTypeData.params, i)->typeInfo);
-                i += 1;
             }
 
             args[type->typeData.structTypeData.params.length] = nullptr;
@@ -1029,11 +986,20 @@ void interpretCalle(Interpreter *interp) {
     auto fnName = atomTable->backwardAtoms[originalFn->fnDeclData.name->symbolData.atomId];
 
     void *found_fn = nullptr;
-    for (auto handle : interp->libs) {
-        found_fn = dlsym(handle, fnName.c_str());
-        char* err = dlerror();
-        if (!err) {
-            break;
+
+    auto hashFound = hash_get(interp->externalSymbols, fnName);
+    if (hashFound != nullptr) {
+        found_fn = *hashFound;
+    }
+
+    if (found_fn == nullptr) {
+        for (auto handle : interp->libs) {
+            found_fn = dlsym(handle, fnName.c_str());
+            char* err = dlerror();
+            if (!err) {
+                hash_insert(interp->externalSymbols, fnName, found_fn);
+                break;
+            }
         }
     }
 
@@ -1042,16 +1008,16 @@ void interpretCalle(Interpreter *interp) {
         exit(1);
     }
 
-    auto paramCount = originalFn->fnDeclData.params.length;
+    unsigned long paramCount = originalFn->fnDeclData.params.length;
     auto ffiArgs = (ffi_type **) malloc(paramCount * sizeof(ffi_type *));
 
-    for (auto i = 0; i < paramCount; i++) {
+    for (unsigned long i = 0; i < paramCount; i++) {
         ffiArgs[i] = ffiTypeFor(vector_at(originalFn->fnDeclData.params, i)->typeInfo);
     }
 
     ffi_cif cif;
     auto returnType = ffiTypeFor(originalFn->fnDeclData.returnType);
-    ffi_status status = ffi_prep_cif(&cif, FFI_DEFAULT_ABI, paramCount, returnType, ffiArgs);
+    ffi_status status = ffi_prep_cif(&cif, FFI_DEFAULT_ABI, (unsigned int) paramCount, returnType, ffiArgs);
     if (status != FFI_OK) {
         fprintf(stderr, "ffi_prep_cif failed: %d\n", status);
         exit(1);
@@ -1161,7 +1127,7 @@ void interpretStore(Interpreter *interp) {
 
     if (to == nullptr) {
         cout << "nil pointer dereference!!" << endl;
-        cout << "at or near: " << interp->stoppedOnStatement.startLine << ":" << interp->stoppedOnStatement.startCol;
+        cout << "at or near: " << interp->stoppedOnStatement.node->region.start.line << ":" << interp->stoppedOnStatement.node->region.start.col;
         exit(-1);
     }
     else {

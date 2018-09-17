@@ -7,6 +7,8 @@
 #include <zmq.h>
 
 #include "assembler.h"
+#include "semantic.h"
+#include "bytecodegen.h"
 
 class Interpreter;
 
@@ -67,10 +69,18 @@ void interpretMathBitwiseXor(Interpreter *interp);
 void interpretMathBitwiseShl(Interpreter *interp);
 void interpretMathBitwiseshr(Interpreter *interp);
 
+struct Breakpoint {
+    unsigned long instIndex;
+
+    bool conditional = false;
+    string condition = "";
+};
+
 class Interpreter {
 public:
     vector<unsigned char> instructions = {};
     hash_t<uint32_t, uint64_t> *fnTable;
+    hash_t<string, void *> *externalSymbols;
 
     vector<unsigned char> stack = {};
     int32_t stackSize = 1024;
@@ -93,7 +103,7 @@ public:
     bool terminated = false;
 
     SourceMap sourceMap;
-    vector<unsigned long> breakpoints = {};
+    vector<Breakpoint> breakpoints = {};
     bool continuing = false;
     SourceMapStatement stoppedOnStatement;
     bool debugging = false;
@@ -118,7 +128,8 @@ public:
             stack.push_back(0);
         }
 
-        this->fnTable = hash_init<uint32_t, uint64_t>(100);
+        this->fnTable = hash_init<uint32_t, uint64_t>(64);
+        this->externalSymbols = hash_init<string, void *>(64);
 
         if (debugFlag) {
             zmq_ctx = zmq_ctx_new();
@@ -499,6 +510,83 @@ void interpretCmpLte(Interpreter *interp) {
     int32_t result = a <= b ? 1 : 0;
     auto storeOffset = interp->consume<int64_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
+}
+
+template<typename T>
+int64_t evaluate(int32_t bp, vector<unsigned char> &stack, SourceInfo srcInfo, Scope *scope, string code) {
+    auto evalFnDecl = new Node(srcInfo, NodeType::FN_DECL, scope);
+
+    auto evalLexer = new Lexer(code, false);
+
+    auto evalParser = new Parser(evalLexer);
+    evalParser->isCopying = true;
+    evalParser->scopes.pop();
+    evalParser->scopes.push(scope);
+    evalParser->currentFnDecl = evalFnDecl;
+    auto parsed = evalParser->parseRvalue();
+
+    // set the srcInfo to the original srcInfo in case there's polymorphs
+    evalLexer->srcInfo = srcInfo;
+
+    auto semantic = new Semantic();
+    semantic->lexer = evalLexer;
+    semantic->parser = evalParser;
+    semantic->addStaticIfs(evalParser->scopes.top());
+    semantic->addImports(*evalParser->imports, *evalParser->impls);
+    semantic->currentFnDecl = evalFnDecl;
+
+    auto wrappedRet = new Node(parsed->region.srcInfo, NodeType::RETURN, parsed->scope);
+    wrappedRet->nodeData = parsed;
+
+    vector_append(evalFnDecl->fnDeclData.body, wrappedRet);
+    vector_append(evalFnDecl->fnDeclData.returns, wrappedRet);
+    semantic->resolveTypes(parsed);
+    semantic->resolveTypes(evalFnDecl);
+
+    // gen
+    auto gen = new BytecodeGen();
+    gen->isMainFn = true;
+    gen->sourceMap.sourceInfo = evalFnDecl->region.srcInfo;
+    gen->processFnDecls = true;
+
+    gen->gen(evalFnDecl);
+    while (!gen->toProcess.empty()) {
+        gen->isMainFn = false;
+        gen->processFnDecls = true;
+        gen->forcing = true;
+        gen->gen(gen->toProcess.front());
+        gen->toProcess.pop();
+    }
+    gen->fixup();
+
+    for (auto g : gen->generatedNodes) {
+        g->gen = false;
+        g->bytecode = {};
+    }
+
+    auto m = new MnemonicPrinter(gen->instructions);
+    m->fnTable = gen->fnTable;
+    cout << m->debugString() << endl;
+
+    auto interp = new Interpreter(semantic->linkLibs);
+    interp->bp = bp;
+    interp->sp = bp;
+    interp->externalFnTable = gen->externalFnTable;
+    interp->instructions = gen->instructions;
+    interp->fnTable = gen->fnTable;
+    interp->stack = stack; // todo(chad): this copies a lot of stuff. Make stack a vector_t? (or maybe we actually want to copy...)
+    interp->sourceMap = gen->sourceMap;
+    interp->continuing = true;
+    interp->instructions = gen->instructions;
+    interp->fnTable = gen->fnTable;
+    interp->interpret();
+
+    // todo(chad): present the type of the answer appropriately -- don't just assume it's i64
+    auto answer = interp->readFromStack<int64_t>(interp->bp);
+
+    interp_destroy(interp);
+
+    return answer;
 }
 
 #endif // INTERPRETER_H

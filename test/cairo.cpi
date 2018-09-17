@@ -10,9 +10,17 @@ FORMAT_A1: i32        = 3;
 FORMAT_RGB16_565: i32 = 4;
 FORMAT_RGB30: i32     = 5;
 
+type Antialias enum(i32) {
+    DEFAULT,
+    NONE,
+    GRAY,
+    SUBPIXEL
+}
+
 type FontFace none
 type Surface none
 type Context none
+type Pattern none
 
 type Glyph struct {
     index: i64,
@@ -20,9 +28,20 @@ type Glyph struct {
     y: f64
 }
 
+type GlyphExtents struct {
+    xBearing: f64,
+    yBearing: f64,
+    width: f64,
+    height: f64,
+    xAdvance: f64,
+    yAdvance: f64
+}
+
 fn cairo_ft_font_face_create_for_ft_face(face: ft.Face, loadFlags: i32) *FontFace
 fn cairo_image_surface_create_for_data(data: *i8, format: i32, width: i32, height: i32, stride: i32) *Surface
+fn cairo_image_surface_create(format: i32, width: i32, height: i32) *Surface
 fn cairo_surface_set_device_scale(surface: *Surface, xScale: f64, yScale: f64) none
+fn cairo_surface_get_device_scale(surface: *Surface, xScale: *f64, yScale: *f64) none
 fn cairo_create(surface: *Surface) *Context
 fn cairo_set_source_rgba(context: *Context, r: f64, g: f64, b: f64, a: f64) none
 fn cairo_set_font_face(context: *Context, face: *FontFace) none
@@ -34,3 +53,16 @@ fn cairo_glyph_allocate(glyphCount: i32) *Glyph
 fn cairo_glyph_free(glyphs: *Glyph) none
 fn cairo_show_glyphs(cr: *Context, glyphs: *Glyph, numGlyphs: i32) none
 fn cairo_set_source_rgb(cr: *Context, r: f64, g: f64, b: f64) none
+fn cairo_set_source_surface(cr: *Context, surface: *Surface, x: f64, y: f64) none
+fn cairo_set_source(cr: *Context, pattern: *Pattern) none
+fn cairo_rectangle(cr: *Context, x: f64, y: f64, width: f64, height: f64) none
+fn cairo_fill(cr: *Context) none
+fn cairo_paint(cr: *Context) none
+fn cairo_set_antialias(cr: *Context, antialias: Antialias) none
+fn cairo_pattern_create_for_surface(surface: *Surface) *Pattern
+fn cairo_translate(cr: *Context, tx: f64, ty: f64) none
+fn cairo_save(cr: *Context) none
+fn cairo_restore(cr: *Context) none
+fn cairo_image_surface_get_width(surface: *Surface) i32
+fn cairo_image_surface_get_height(surface: *Surface) i32
+fn cairo_glyph_extents(cr: *Context, glyphs: *Glyph, numGlyphs: i32, extents: *GlyphExtents) none

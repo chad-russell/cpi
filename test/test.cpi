@@ -437,16 +437,16 @@ fn testModule() {
 fn testPrinting() {
     t: enum { YES, NO, MAYBE };
     e: union {x: i32, y: bool} = { y: false };
-    -- io.printWithSpaces({
-        -- 123,
-        -- "string",
-        -- false,
-        -- []{1, 2, 3},
-        -- {x: 3, y: &8767},
-        -- e,
-        -- t,
-        -- "\n\n"
-    -- });
+    io.printWithSpaces({
+        123,
+        "string",
+        false,
+        []{1, 2, 3},
+        {x: 3, y: &8767},
+        e,
+        t,
+        "\n\n"
+    });
 }
 
 fn testUnion1() {

@@ -1,16 +1,75 @@
 #link "libsdl2";
+#import "io";
 
 INIT_EVERYTHING: i32 = 29233;
 INIT_VIDEO: i32 = 20;
 QUIT: i32 = 256;
+
 KEYDOWN: i32 = 768;
-K_RIGHT: i32 = 1073741903;
-K_LEFT: i32 = 1073741904;
-K_UP: i32 = 1073741906;
-K_DOWN: i32 = 1073741905;
+
 WINDOWPOS_UNDEFINED: i32 = 536805376;
 WINDOW_SHOWN: i32 = 0x00000004;
 WINDOW_ALLOW_HIGHDPI: i32 = 0x00002000;
+
+type Key enum(i32) {
+    a: 4,
+    b: 5,
+    c: 6,
+    d: 7,
+    e: 8,
+    f: 9,
+    g: 10,
+    h: 11,
+    i: 12,
+    j: 13,
+    k: 14,
+    l: 15,
+    m: 16,
+    n: 17,
+    o: 18,
+    p: 19,
+    q: 20,
+    r: 21,
+    s: 22,
+    t: 23,
+    u: 24,
+    v: 25,
+    w: 26,
+    x: 27,
+    y: 28,
+    z: 29,
+
+    BACKSPACE: 42,
+    SPACE: 44,
+
+    `,`: 54,
+    `.`: 55,
+
+    RIGHT: 79,
+    LEFT: 80,
+    DOWN: 81,
+    UP: 82,
+
+    SHIFT: 225,
+}
+
+#impl fn isalpha(key: Key) {
+    ckey := cast(i32) key;
+
+    return (ckey >= 4 and ckey <= 29)
+        or (ckey >= 54 and ckey <= 55);
+}
+
+#impl fn charsFor(key: Key) *i8 {
+    -- todo(chad): should be able to do #for here...
+    for f: #fieldsof(Key) {
+        if f.value == cast(i32) key {
+            return f.name|io.cstr;
+        }
+    }
+
+    return "\0".data;
+}
 
 fn SDL_Init(flags: i32) i32
 fn SDL_CreateWindow(name: *i8, x: i32, y: i32, w: i32, h: i32, flags: i32) *Window
@@ -118,14 +177,14 @@ type KeyboardEvent struct {
 }
 
 type Keysym struct {
-    scancode: i32,
+    scancode: Key,
     sym: i32,
     mod1: i8,
     mod2: i8,
     unused: i32
 }
 
-fn runGame() {
+fn demoGame() {
     winX: i32 = 100;
     winY: i32 = 200;
     sizeX: i32 = 300;
@@ -157,16 +216,16 @@ fn runGame() {
             }
             else if event._type == KEYDOWN
             {
-                if event.keysym.sym == K_RIGHT {
+                if event.keysym.scancode == Key.RIGHT {
                     playerPos.x += 10;
                 }
-                else if event.keysym.sym == K_LEFT {
+                else if event.keysym.scancode == Key.LEFT {
                     playerPos.x -= 10;
                 }
-                else if event.keysym.sym == K_UP {
+                else if event.keysym.scancode == Key.UP {
                     playerPos.y -= 10;
                 }
-                else if event.keysym.sym == K_DOWN {
+                else if event.keysym.scancode == Key.DOWN {
                     playerPos.y += 10;
                 }
 

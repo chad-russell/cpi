@@ -144,7 +144,6 @@ enum class LexerTokenType : int32_t {
     COMMA,
     SINGLE_QUOTE,
     DOUBLE_QUOTE,
-    BACK_TICK,
     VERTICAL_BAR,
     AT,
     FN,
@@ -700,13 +699,6 @@ ostream &operator<<(ostream &os, Colored<T> colored) {
 struct SourceMapStatement {
     unsigned long instIndex;
     unsigned long instEndIndex;
-
-    unsigned long startLine;
-    unsigned long startCol;
-
-    unsigned long startByte;
-    unsigned long endByte;
-
     Node *node;
 };
 

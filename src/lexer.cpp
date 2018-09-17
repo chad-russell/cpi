@@ -233,6 +233,8 @@ void Lexer::popFront() {
         auto saved_loc = loc;
 
         eat(); // eat first back tick
+        this->lastLoc = loc;
+
         while (loc.byteIndex < srcInfo.source->length() && srcInfo.source->at(loc.byteIndex) != '`') {
             eat();
         }
@@ -245,9 +247,10 @@ void Lexer::popFront() {
                          {note}});
         }
 
+        popFrontFinalize(0, next);
+
         eat(); // eat trailing back tick
 
-        popFrontFinalize(0, next);
         return;
     }
 

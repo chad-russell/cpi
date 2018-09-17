@@ -268,7 +268,7 @@ void BytecodeGen::gen(Node *node) {
     }
 
     if (node->sourceMapStatement && node->type != NodeType::FN_CALL) {
-        sourceMap.statements.push_back(SourceMapStatement{ instructions.size(), instructions.size(), node->region.start.line, node->region.start.col, node->region.start.byteIndex, node->region.end.byteIndex, node });
+        sourceMap.statements.push_back(SourceMapStatement{ instructions.size(), instructions.size(), node });
     }
 
     switch (node->type) {
@@ -310,7 +310,7 @@ void BytecodeGen::gen(Node *node) {
                 storeValue(node->retData.value, 0);
             }
 
-            sourceMap.statements.push_back(SourceMapStatement{ instructions.size(), instructions.size(), node->region.start.line, node->region.start.col, node->region.start.byteIndex, node->region.end.byteIndex, node });
+            sourceMap.statements.push_back(SourceMapStatement{ instructions.size(), instructions.size(), node });
             append(instructions, Instruction::NOP);
 
             if (isMainFn) {
@@ -711,6 +711,14 @@ void BytecodeGen::gen(Node *node) {
                             binopHelper("SLT", node);
                         }
                     } break;
+                    case LexerTokenType::LE: {
+                        if (isFloat) {
+                            binopHelper("LE", node);
+                        }
+                        else {
+                            binopHelper("SLE", node);
+                        }
+                    } break;
                     case LexerTokenType::GT: {
                         if (isFloat) {
                             binopHelper("GT", node);
@@ -811,7 +819,7 @@ void BytecodeGen::gen(Node *node) {
                 append(instructions, toBytes(totalParamsSize));
             }
 
-            sourceMap.statements.push_back(SourceMapStatement{ instructions.size(), instructions.size(), node->region.start.line, node->region.start.col, node->region.start.byteIndex, node->region.end.byteIndex, node });
+            sourceMap.statements.push_back(SourceMapStatement{ instructions.size(), instructions.size(), node });
 
             if (resolvedFn->type == NodeType::FN_DECL) {
                 if (resolvedFn->fnDeclData.isExternal) {

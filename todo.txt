@@ -2,15 +2,16 @@ TODO:
     - support passing args to main fn
 
     - build a better debugger backend
-        - communicate over zmq instead of stdio
-        - support for removing breakpoints
+        - the way things are currently evaulated is likely deeply flawed because of things needing storage... sigh....
         - conditional breakpoints
         - ability to do eval in the context of a particular stack frame (e.g. eval this 3 frames ago)
-        - ctfe debugging (?)
+        - CT arguments should show up as variables in the inspector
+        - ability to set variables (where applicable)
+        - support for breakpoints on columns, ranges
         - implement option to have memory as a rope structure -- infinite undo/redo of program execution state
-            - will need to re-work how this works considering malloc/free escape out of our sandbox
-                - might not be an issue once context is a thing, especially considering that anything calling out to C won't work either
+            - will need to transition to always using the context allocator instead of libc malloc/free
             - use this for step/continue backwards in vscode
+        - ctfe debugging (?)
 
     - how to add user variables to context?
 

@@ -269,18 +269,18 @@ void AssemblyLexer::popFrontFinalize(Token newNext, vector<unsigned char> newIns
     instructions.insert(instructions.end(), newInst.begin(), newInst.end());
 
     if (argCount == 0) {
-        sourceMap.statements.push_back(SourceMapStatement{
-                lastInstStart,
-                instructions.size(),
-
-                savedLoc.line,
-                savedLoc.col,
-
-                savedLoc.byteIndex,
-                newNext.region.end.byteIndex,
-
-                nullptr
-        });
+//        sourceMap.statements.push_back(SourceMapStatement{
+//                lastInstStart,
+//                instructions.size(),
+//
+//                savedLoc.line,
+//                savedLoc.col,
+//
+//                savedLoc.byteIndex,
+//                newNext.region.end.byteIndex,
+//
+//                nullptr
+//        });
 
         // ignore whitespace
         while (loc.byteIndex < sourceMap.sourceInfo.source->length() && isspace(sourceMap.sourceInfo.source->at(loc.byteIndex))) {
