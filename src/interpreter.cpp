@@ -497,7 +497,7 @@ void runDebugger(Interpreter *interp, MnemonicPrinter *mp) {
     auto breakStop = breakStopIf != interp->breakpoints.end();
     if (breakStop) {
         if (breakStopIf->conditional) {
-            auto evald = evaluate<int32_t>(interp->bp, interp->sp, interp->stack, interp->stoppedOnStatement.node->region.srcInfo, interp->stoppedOnStatement.node->scope, breakStopIf->condition);
+            auto evald = evaluate<int32_t>(interp, interp->stoppedOnStatement.node->region.srcInfo, interp->stoppedOnStatement.node->scope, breakStopIf->condition);
             if (evald == 0) {
                 breakStop = false;
             }
@@ -582,7 +582,7 @@ void runDebugger(Interpreter *interp, MnemonicPrinter *mp) {
             } else if (startsWith(&line, "eval")) {
                 auto stmt = line.substr(5);
 
-                auto answer = evaluate<int64_t>(interp->bp, interp->sp, interp->stack, interp->stoppedOnStatement.node->region.srcInfo, interp->stoppedOnStatement.node->scope, stmt);
+                auto answer = evaluate<int64_t>(interp, interp->stoppedOnStatement.node->region.srcInfo, interp->stoppedOnStatement.node->scope, stmt);
 
                 ostringstream s("");
                 s << "answer: " << answer << endl;

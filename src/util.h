@@ -557,9 +557,10 @@ public:
     bool semantic = false;
     bool printed = false;
     bool tagCheck = false;
-    bool gen = false;
     bool llvmGen = false;
     bool sourceMapStatement = false;
+
+    uint32_t genId = 0;
 
     // todo(chad): better way to store this?
     vector<unsigned char> bytecode;

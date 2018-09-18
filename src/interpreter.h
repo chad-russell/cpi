@@ -513,11 +513,10 @@ void interpretCmpLte(Interpreter *interp) {
     interp->copyToStack(result, interp->bp + storeOffset);
 }
 
-// todo(chad): the pieces are almost here, but need some work
 template<typename T>
-int64_t evaluate(int32_t bp, int32_t sp, vector<unsigned char> &stack, SourceInfo srcInfo, Scope *scope, string code) {
+int64_t evaluate(Interpreter *fromInterp, SourceInfo srcInfo, Scope *scope, string code) {
     auto evalFnDecl = new Node(srcInfo, NodeType::FN_DECL, scope);
-    evalFnDecl->fnDeclData.debugLocalOffset = sp - bp;
+    evalFnDecl->fnDeclData.debugLocalOffset = fromInterp->sp - fromInterp->bp;
 
     auto evalLexer = new Lexer(std::move(code), false);
 
@@ -550,25 +549,27 @@ int64_t evaluate(int32_t bp, int32_t sp, vector<unsigned char> &stack, SourceInf
     gen->isMainFn = true;
     gen->sourceMap.sourceInfo = evalFnDecl->region.srcInfo;
     gen->processFnDecls = true;
-    gen->debugLocalOffset = bp - sp;
+    gen->debugLocalOffset = fromInterp->bp - fromInterp->sp;
 
     gen->gen(evalFnDecl);
+    gen->debugLocalOffset = 0;
+
     while (!gen->toProcess.empty()) {
         gen->isMainFn = false;
         gen->processFnDecls = true;
-        gen->forcing = true;
+        gen->genId = 2;
         gen->gen(gen->toProcess.front());
         gen->toProcess.pop();
     }
     gen->fixup();
 
     for (auto g : gen->generatedNodes) {
-        g->gen = false;
+        g->genId = 0;
         g->bytecode = {};
 
         if (g->debugBytecodeAdjusted) {
             g->debugBytecodeAdjusted = false;
-            g->localOffset -= gen->debugLocalOffset;
+            g->localOffset -= (fromInterp->bp - fromInterp->sp);
         }
     }
 
@@ -578,13 +579,17 @@ int64_t evaluate(int32_t bp, int32_t sp, vector<unsigned char> &stack, SourceInf
 
     auto interp = new Interpreter(semantic->linkLibs);
 
-    interp->bp = bp;
-    interp->sp = bp;
+    interp->bp = fromInterp->bp;
+    interp->sp = fromInterp->bp;
 
-    interp->externalFnTable = gen->externalFnTable;
+    interp->externalFnTable = fromInterp->externalFnTable;
+    for (auto &entry : gen->externalFnTable) {
+        vector_append(interp->externalFnTable, entry);
+    }
+    interp->libs = fromInterp->libs;
     interp->instructions = gen->instructions;
     interp->fnTable = gen->fnTable;
-    interp->stack = stack; // todo(chad): this copies a lot of stuff. Make stack a vector_t? (or maybe we actually want to copy...)
+    interp->stack = fromInterp->stack; // todo(chad): this copies a lot of stuff. Make stack a vector_t? (or maybe we actually want to copy...)
     interp->sourceMap = gen->sourceMap;
     interp->continuing = true;
     interp->instructions = gen->instructions;

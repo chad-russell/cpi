@@ -1274,7 +1274,7 @@ Node *constantize(Semantic *semantic, Node *node) {
     gen->fixup();
 
     for (auto g : gen->generatedNodes) {
-        g->gen = false;
+        g->genId = 0;
         g->bytecode = {};
     }
 

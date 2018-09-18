@@ -243,21 +243,19 @@ void BytecodeGen::gen(Node *node) {
         return;
     }
 
-    if (node->gen && !forcing) {
+    if (node->genId >= genId) {
         return;
     }
 
     // when forcing, don't run the risk of adding double bytecode
-    if (forcing) {
-        node->bytecode = {};
-    }
+    node->bytecode = {};
 
     if (this->debugLocalOffset != 0 && !node->debugBytecodeAdjusted) {
         node->debugBytecodeAdjusted = true;
         node->localOffset += this->debugLocalOffset;
     }
 
-    node->gen = true;
+    node->genId = genId;
     vector_append(this->generatedNodes, node);
 
     for (auto stmt : node->preStmts) {
@@ -1314,12 +1312,9 @@ void BytecodeGen::storeValue(Node *node, int64_t offset) {
             storeValue(node->arrayLiteralData.structLiteralRepresentation, offset);
         } break;
         case NodeType::STRING_LITERAL: {
-            auto savedForcing = this->forcing;
-            this->forcing = true;
-
+            this->genId += 1;
             storeValue(node->stringLiteralData.arrayLiteralRepresentation, offset);
-
-            this->forcing = savedForcing;
+            this->genId -= 1;
         } break;
         case NodeType::UNARY_NEG: {
             storeValue(node->unaryNegData.rewritten, offset);

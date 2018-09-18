@@ -27,7 +27,7 @@ public:
     vector_t<Node *> externalFnTable = vector_init<Node *>(8);
 
     bool isMainFn;
-    bool forcing = false;
+    uint32_t genId = 1;
 
     int64_t debugLocalOffset = 0;
 
