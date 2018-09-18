@@ -203,6 +203,7 @@ enum class LexerTokenType : int32_t {
     LINK,
     IMPL,
     MOD,
+    NOTAG,
 };
 
 struct SourceInfo {
@@ -312,6 +313,7 @@ struct FnDeclData {
     uint32_t tableIndex;
     bool cameFromPolymorph;
     bool isImpl;
+    int64_t debugLocalOffset;
 };
 
 struct DeclData {

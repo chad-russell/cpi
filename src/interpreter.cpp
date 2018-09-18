@@ -10,7 +10,6 @@
 #include <sstream>
 #include <dlfcn.h>
 #include <ffi.h>
-#include <SDL2/SDL.h>
 #include <stdio.h>
 
 #include<sys/types.h>

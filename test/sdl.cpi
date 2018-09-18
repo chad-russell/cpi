@@ -5,7 +5,10 @@ INIT_EVERYTHING: i32 = 29233;
 INIT_VIDEO: i32 = 20;
 QUIT: i32 = 256;
 
-KEYDOWN: i32 = 768;
+KEYDOWN: i32 = 0x300;
+MOUSEMOTION: i32 = 0x400;
+MOUSEBUTTONDOWN: i32 = 0x401;
+MOUSEBUTTONUP: i32 = 0x402;
 
 WINDOWPOS_UNDEFINED: i32 = 536805376;
 WINDOW_SHOWN: i32 = 0x00000004;
@@ -39,6 +42,7 @@ type Key enum(i32) {
     y: 28,
     z: 29,
 
+    ENTER: 40,
     BACKSPACE: 42,
     SPACE: 44,
 
@@ -76,7 +80,7 @@ fn SDL_CreateWindow(name: *i8, x: i32, y: i32, w: i32, h: i32, flags: i32) *Wind
 fn SDL_CreateRenderer(window: *Window, index: i32, flags: i32) *Renderer
 fn SDL_RenderSetLogicalSize(renderer: *Renderer, width: i32, height: i32) none
 fn SDL_SetRenderDrawColor(renderer: *Renderer, r: i8, g: i8, b: i8, a: i8) none
-fn SDL_PollEvent(event: *KeyboardEvent) i32
+fn SDL_PollEvent(event: *Event) i32
 fn SDL_RenderClear(renderer: *Renderer) none
 fn SDL_RenderFillRect(renderer: *Renderer, playerPos: *Rect) none
 fn SDL_RenderPresent(renderer: *Renderer) none
@@ -89,6 +93,7 @@ fn SDL_FillRect(surface: *Surface, rect: *Rect, color: i32) i32
 fn SDL_MapRGB(format: *PixelFormat, r: i8, g: i8, b: i8) i32
 fn SDL_CreateTextureFromSurface(renderer: *Renderer, surface: *Surface) *Texture
 fn SDL_RenderCopy(renderer: *Renderer, texture: *Texture, srcRect: *Rect, dstRect: *Rect) i32
+fn SDL_GetMouseState(x: *i32, y: *i32) u32
 
 type Window none
 type Renderer none
@@ -157,10 +162,39 @@ type Surface struct {
     refcount: i32
 }
 
--- todo(chad):
-    -- We're using this essentially as the SDL_Event union, but that union is way bigger than this
-    -- So we have to add some padding to make them the same size.
-    -- We should actually take the time to represent the full union at some point...
+type Event struct {
+    _type: i32,
+
+    data: struct {
+        event: KeyboardEvent,
+    }
+}
+
+type MouseMotionEvent struct {
+    _type: i32,
+    timestamp: u32,
+    windowID: u32,
+    which: u32,
+    state: u32,
+    x: i32,
+    y: i32,
+    xrel: i32,
+    yrel: i32
+}
+
+type MouseButtonEvent struct {
+    _type: i32,
+    timestamp: u32,
+    windowID: u32,
+    which: u32,
+    button: u8,
+    state: u8,
+    clicks: u8,
+    padding1: u8,
+    x: i32,
+    y: i32
+}
+
 type KeyboardEvent struct {
     _type: i32,
     timestamp: i32,
@@ -169,11 +203,7 @@ type KeyboardEvent struct {
     repeat: i8,
     padding2: i8,
     padding3: i8,
-    keysym: Keysym,
-
-    paddingHackChad1: i64,
-    paddingHackChad2: i64,
-    paddingHackChad3: i64,
+    keysym: Keysym
 }
 
 type Keysym struct {
@@ -208,7 +238,7 @@ fn demoGame() {
     loop := true;
     while loop
     {
-        event: KeyboardEvent;
+        event: Event;
         while SDL_PollEvent(&event) != 0
         {
             if event._type == QUIT {
@@ -216,16 +246,18 @@ fn demoGame() {
             }
             else if event._type == KEYDOWN
             {
-                if event.keysym.scancode == Key.RIGHT {
+                keyboardEvent := cast(KeyboardEvent) event;
+
+                if keyboardEvent.keysym.scancode == Key.RIGHT {
                     playerPos.x += 10;
                 }
-                else if event.keysym.scancode == Key.LEFT {
+                else if keyboardEvent.keysym.scancode == Key.LEFT {
                     playerPos.x -= 10;
                 }
-                else if event.keysym.scancode == Key.UP {
+                else if keyboardEvent.keysym.scancode == Key.UP {
                     playerPos.y -= 10;
                 }
-                else if event.keysym.scancode == Key.DOWN {
+                else if keyboardEvent.keysym.scancode == Key.DOWN {
                     playerPos.y += 10;
                 }
 

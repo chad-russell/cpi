@@ -1458,7 +1458,6 @@ Node *Parser::parseType() {
 
             auto tagSymbol = new Node();
             tagSymbol->type = NodeType::SYMBOL;
-
             tagSymbol->symbolData.atomId = atomTable->insertStr("tag");
 
             auto tagParam = new Node(lexer->srcInfo, NodeType::DECL_PARAM, scopes.top());
@@ -1473,6 +1472,7 @@ Node *Parser::parseType() {
             tagParam->paramData.name = tagSymbol;
 
             vector_append(type->typeData.structTypeData.params, tagParam);
+
             auto declaredParams = parseDeclParams();
             for (auto dp : declaredParams) {
                 dp->paramData.index += 1;

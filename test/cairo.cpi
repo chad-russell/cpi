@@ -37,9 +37,30 @@ type GlyphExtents struct {
     yAdvance: f64
 }
 
+type Operator enum(i32) {
+    CAIRO_OPERATOR_CLEAR: 0,
+
+    CAIRO_OPERATOR_SOURCE,
+    CAIRO_OPERATOR_OVER,
+    CAIRO_OPERATOR_IN,
+    CAIRO_OPERATOR_OUT,
+    CAIRO_OPERATOR_ATOP,
+
+    CAIRO_OPERATOR_DEST,
+    CAIRO_OPERATOR_DEST_OVER,
+    CAIRO_OPERATOR_DEST_IN,
+    CAIRO_OPERATOR_DEST_OUT,
+    CAIRO_OPERATOR_DEST_ATOP,
+
+    CAIRO_OPERATOR_XOR,
+    CAIRO_OPERATOR_ADD,
+    CAIRO_OPERATOR_SATURATE
+}
+
 fn cairo_ft_font_face_create_for_ft_face(face: ft.Face, loadFlags: i32) *FontFace
 fn cairo_image_surface_create_for_data(data: *i8, format: i32, width: i32, height: i32, stride: i32) *Surface
 fn cairo_image_surface_create(format: i32, width: i32, height: i32) *Surface
+fn cairo_surface_create_for_rectangle (surface: *Surface, x: f64, y: f64, width: f64, height: f64) *Surface
 fn cairo_surface_set_device_scale(surface: *Surface, xScale: f64, yScale: f64) none
 fn cairo_surface_get_device_scale(surface: *Surface, xScale: *f64, yScale: *f64) none
 fn cairo_create(surface: *Surface) *Context
@@ -66,3 +87,4 @@ fn cairo_restore(cr: *Context) none
 fn cairo_image_surface_get_width(surface: *Surface) i32
 fn cairo_image_surface_get_height(surface: *Surface) i32
 fn cairo_glyph_extents(cr: *Context, glyphs: *Glyph, numGlyphs: i32, extents: *GlyphExtents) none
+fn cairo_set_operator(cr: *Context, operator: Operator) none

@@ -32,3 +32,4 @@ fn editor_buffer_delete(eb: EditorBuffer) none
 fn editor_buffer_get_text_between_points(eb: EditorBuffer, startLine: i64, startCol: i64, endLine: i64, endCol: i64) *Buf
 fn editor_buffer_set_cursor_pos_relative(eb: EditorBuffer, relative: i64) none
 fn editor_buffer_get_line_count(eb: EditorBuffer) i64
+fn editor_buffer_get_line_length(eb: EditorBuffer, line: i64) i64

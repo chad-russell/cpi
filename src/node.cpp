@@ -213,6 +213,7 @@ void initFnDeclData(Node *node) {
     node->fnDeclData.tableIndex = 0;
     node->fnDeclData.isImpl = false;
     node->fnDeclData.bodyScope = nullptr;
+    node->fnDeclData.debugLocalOffset = 0;
 }
 
 void initStructTypeData(Node *node) {

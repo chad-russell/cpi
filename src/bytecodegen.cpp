@@ -1271,8 +1271,6 @@ void BytecodeGen::storeValue(Node *node, int64_t offset) {
                     tagValue->typeInfo = node->typeInfo->typeData.structTypeData.coercedType->typeData.structTypeData.unionTagType;
                 }
                 else {
-                    // todo(chad): allow the user to specify the size of the tag (or maybe do it automatically?)
-                    // todo(chad): maybe do this sooner - like in semantic back when we recognize this case?
                     tagValue->typeInfo = new Node(NodeTypekind::I64);
                 }
                 tagValue->intLiteralData.value = tagIndex;

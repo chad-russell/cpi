@@ -1,6 +1,10 @@
 TODO:
     - support passing args to main fn
 
+    - better unions (?)
+        - @notag attribute on type decl?
+        - @tag to specify which field should get used as the tag?
+
     - build a better debugger backend
         - the way things are currently evaulated is likely deeply flawed because of things needing storage... sigh....
         - conditional breakpoints

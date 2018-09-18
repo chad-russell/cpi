@@ -1,6 +1,7 @@
 #ifndef INTERPRETER_H
 #define INTERPRETER_H
 
+#include <utility>
 #include <vector>
 #include <stack>
 #include <dlfcn.h>
@@ -512,11 +513,12 @@ void interpretCmpLte(Interpreter *interp) {
     interp->copyToStack(result, interp->bp + storeOffset);
 }
 
+// todo(chad): the pieces are almost here, but need some work
 template<typename T>
 int64_t evaluate(int32_t bp, vector<unsigned char> &stack, SourceInfo srcInfo, Scope *scope, string code) {
     auto evalFnDecl = new Node(srcInfo, NodeType::FN_DECL, scope);
 
-    auto evalLexer = new Lexer(code, false);
+    auto evalLexer = new Lexer(std::move(code), false);
 
     auto evalParser = new Parser(evalLexer);
     evalParser->isCopying = true;
@@ -529,18 +531,17 @@ int64_t evaluate(int32_t bp, vector<unsigned char> &stack, SourceInfo srcInfo, S
     evalLexer->srcInfo = srcInfo;
 
     auto semantic = new Semantic();
+    semantic->currentFnDecl = evalFnDecl;
     semantic->lexer = evalLexer;
     semantic->parser = evalParser;
     semantic->addStaticIfs(evalParser->scopes.top());
     semantic->addImports(*evalParser->imports, *evalParser->impls);
-    semantic->currentFnDecl = evalFnDecl;
 
     auto wrappedRet = new Node(parsed->region.srcInfo, NodeType::RETURN, parsed->scope);
     wrappedRet->nodeData = parsed;
 
     vector_append(evalFnDecl->fnDeclData.body, wrappedRet);
     vector_append(evalFnDecl->fnDeclData.returns, wrappedRet);
-    semantic->resolveTypes(parsed);
     semantic->resolveTypes(evalFnDecl);
 
     // gen
