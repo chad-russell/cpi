@@ -335,6 +335,8 @@ fn shutdown(tctx: *TextContext) {
 fn demo() {
     tctx: TextContext;
 
+    a := 13;
+
     tctx.eb = se.editor_buffer_create(80);
 
     initSdl(&tctx);

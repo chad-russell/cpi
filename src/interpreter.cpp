@@ -121,9 +121,14 @@ void debugPrintVar(ostream &target, Interpreter *interp, TypeData td, int64_t of
                     target << "<<INVALID>>";
                 }
                 else {
-                    auto enumAtom = vector_at(td.enumTypeData.params, (unsigned long) enumValue - 1)->paramData.name->symbolData.atomId;
-                    auto enumName = atomTable->backwardAtoms[enumAtom];
-                    target << enumName;
+                    if (enumValue <= 0 || enumValue >= td.enumTypeData.params.length) {
+                        target << "<<no name>>";
+                    }
+                    else {
+                        auto enumAtom = vector_at(td.enumTypeData.params, (unsigned long) enumValue - 1)->paramData.name->symbolData.atomId;
+                        auto enumName = atomTable->backwardAtoms[enumAtom];
+                        target << enumName;
+                    }
                 }
             }
 
@@ -555,10 +560,13 @@ void runDebugger(Interpreter *interp, MnemonicPrinter *mp) {
 
                 // find the statement which is on this line
                 for (auto stmt : interp->sourceMap.statements) {
-                    if (stmt.node->region.start.line == (unsigned long) bNum &&
-                        *stmt.node->region.srcInfo.fileName == fileName) {
+                    if (stmt.node->region.start.line == (unsigned long) bNum && *stmt.node->region.srcInfo.fileName == fileName) {
+                        bool isConditional = condition.length() > 0;
+                        if (openSquareIndex == string::npos || closeSquareIndex == string::npos) {
+                            isConditional = false;
+                        }
 
-                        Breakpoint bp = {stmt.instIndex, condition.length() > 0, condition};
+                        Breakpoint bp = {stmt.instIndex, isConditional, condition};
                         interp->breakpoints.push_back(bp);
                     }
                 }

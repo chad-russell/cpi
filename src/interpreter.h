@@ -573,9 +573,9 @@ int64_t evaluate(Interpreter *fromInterp, SourceInfo srcInfo, Scope *scope, stri
         }
     }
 
-    auto m = new MnemonicPrinter(gen->instructions);
-    m->fnTable = gen->fnTable;
-    cout << m->debugString() << endl;
+//    auto m = new MnemonicPrinter(gen->instructions);
+//    m->fnTable = gen->fnTable;
+//    cout << m->debugString() << endl;
 
     auto interp = new Interpreter(semantic->linkLibs);
 
