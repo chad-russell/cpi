@@ -515,8 +515,9 @@ void interpretCmpLte(Interpreter *interp) {
 
 // todo(chad): the pieces are almost here, but need some work
 template<typename T>
-int64_t evaluate(int32_t bp, vector<unsigned char> &stack, SourceInfo srcInfo, Scope *scope, string code) {
+int64_t evaluate(int32_t bp, int32_t sp, vector<unsigned char> &stack, SourceInfo srcInfo, Scope *scope, string code) {
     auto evalFnDecl = new Node(srcInfo, NodeType::FN_DECL, scope);
+    evalFnDecl->fnDeclData.debugLocalOffset = sp - bp;
 
     auto evalLexer = new Lexer(std::move(code), false);
 
@@ -549,6 +550,7 @@ int64_t evaluate(int32_t bp, vector<unsigned char> &stack, SourceInfo srcInfo, S
     gen->isMainFn = true;
     gen->sourceMap.sourceInfo = evalFnDecl->region.srcInfo;
     gen->processFnDecls = true;
+    gen->debugLocalOffset = bp - sp;
 
     gen->gen(evalFnDecl);
     while (!gen->toProcess.empty()) {
@@ -563,6 +565,11 @@ int64_t evaluate(int32_t bp, vector<unsigned char> &stack, SourceInfo srcInfo, S
     for (auto g : gen->generatedNodes) {
         g->gen = false;
         g->bytecode = {};
+
+        if (g->debugBytecodeAdjusted) {
+            g->debugBytecodeAdjusted = false;
+            g->localOffset -= gen->debugLocalOffset;
+        }
     }
 
     auto m = new MnemonicPrinter(gen->instructions);
@@ -570,8 +577,10 @@ int64_t evaluate(int32_t bp, vector<unsigned char> &stack, SourceInfo srcInfo, S
     cout << m->debugString() << endl;
 
     auto interp = new Interpreter(semantic->linkLibs);
+
     interp->bp = bp;
     interp->sp = bp;
+
     interp->externalFnTable = gen->externalFnTable;
     interp->instructions = gen->instructions;
     interp->fnTable = gen->fnTable;

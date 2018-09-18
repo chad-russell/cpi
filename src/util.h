@@ -567,6 +567,7 @@ public:
 
     bool isBytecodeLocal = false;
     bool skipAllButPostStmts = false;
+    bool debugBytecodeAdjusted = false;
 
     // the offset of the storage for this node from the current base pointer
     int64_t localOffset = 0;

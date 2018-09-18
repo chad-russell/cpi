@@ -1135,6 +1135,11 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
         local->localOffset = semantic->currentFnDecl->fnDeclData.stackSize;
         resolvedLocal->localOffset = local->localOffset;
 
+        if (data->debugLocalOffset != 0) {
+            local->localOffset += data->debugLocalOffset;
+            resolvedLocal->localOffset += data->debugLocalOffset;
+        }
+
         // todo(chad): DANGEROUS!!! But I don't know of a better way to deal with the fact that we can have non-typechecked things because of static if, etc.
         if (local->typeInfo != nullptr) {
             semantic->currentFnDecl->fnDeclData.stackSize += typeSize(local->typeInfo);

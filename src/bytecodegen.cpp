@@ -252,6 +252,11 @@ void BytecodeGen::gen(Node *node) {
         node->bytecode = {};
     }
 
+    if (this->debugLocalOffset != 0 && !node->debugBytecodeAdjusted) {
+        node->debugBytecodeAdjusted = true;
+        node->localOffset += this->debugLocalOffset;
+    }
+
     node->gen = true;
     vector_append(this->generatedNodes, node);
 

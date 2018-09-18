@@ -29,6 +29,8 @@ public:
     bool isMainFn;
     bool forcing = false;
 
+    int64_t debugLocalOffset = 0;
+
     // for going back at the end and setting call/jump locations
     // I guess this is like a poor man's linker
     vector_t<Fixup> fixups;
