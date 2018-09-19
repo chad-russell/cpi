@@ -241,16 +241,11 @@ llvm::Value *LlvmGen::rvalueFor(Node *node) {
 
     if (resolved->typeInfo->typeData.kind == NodeTypekind::NONE) { return llvm::ConstantStruct::get(llvm::StructType::get(context, false), {}); }
 
+    if(resolved->isLocal && resolved->llvmLocal) {
+        return builder.CreateLoad((llvm::Value *) resolved->llvmLocal);
+    }
     if (resolved->type == NodeType::DOT && resolved->dotData.lhs->isLocal) {
         return builder.CreateLoad((llvm::Value *) resolved->llvmData);
-    }
-
-    if (resolved->llvmData != nullptr) {
-        return (llvm::Value *) resolved->llvmData;
-    }
-
-    if (resolved->isLocal && resolved->llvmLocal) {
-        return builder.CreateLoad((llvm::Value *) resolved->llvmLocal);
     }
 
     return (llvm::Value *) resolved->llvmData;
@@ -260,8 +255,7 @@ void LlvmGen::gen(Node *node) {
     if (node->llvmGen
         && node->type != NodeType::STRING_LITERAL
         && node->type != NodeType::ARRAY_LITERAL
-        && node->type != NodeType::STRUCT_LITERAL
-        && node->type != NodeType::ALIAS) {
+        && node->type != NodeType::STRUCT_LITERAL) {
         return;
     }
 
