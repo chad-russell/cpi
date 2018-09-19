@@ -122,7 +122,7 @@ void debugPrintVar(ostream &target, Interpreter *interp, TypeData td, int64_t of
                 }
                 else {
                     if (enumValue <= 0 || enumValue >= td.enumTypeData.params.length) {
-                        target << "<<no name>>";
+                        target << "<<NONAME>>";
                     }
                     else {
                         auto enumAtom = vector_at(td.enumTypeData.params, (unsigned long) enumValue - 1)->paramData.name->symbolData.atomId;

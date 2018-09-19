@@ -1133,7 +1133,6 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
         }
 
         local->localOffset = semantic->currentFnDecl->fnDeclData.stackSize;
-        resolvedLocal->localOffset = local->localOffset;
 
         if (data->debugLocalOffset != 0) {
             local->localOffset += data->debugLocalOffset;
@@ -1193,7 +1192,10 @@ Node *constantize(Semantic *semantic, Node *node) {
     semantic->resolveTypes(node);
     node = resolve(node);
 
-    if (node->type == NodeType::TYPE || node->type == NodeType::FN_DECL || node->type == NodeType::NIL_LITERAL) {
+    if (node->type == NodeType::TYPE || node->type == NodeType::FN_DECL || node->type == NodeType::NIL_LITERAL
+        || node->type == NodeType::INT_LITERAL
+        || node->type == NodeType::FLOAT_LITERAL
+        || node->type == NodeType::BOOLEAN_LITERAL) {
         return node;
     }
 
@@ -1751,9 +1753,10 @@ void resolveDecl(Semantic *semantic, Node *node) {
 
 void resolveAlias(Semantic *semantic, Node *node) {
     resolveDecl(semantic, node);
-    node->resolved = constantize(semantic, resolve(node->declData.initialValue));
-    semantic->resolveTypes(node->resolved);
-    node->typeInfo = node->resolved->typeInfo;
+
+    node->nodeData = constantize(semantic, resolve(node->declData.initialValue));
+    semantic->resolveTypes(node->nodeData);
+    node->typeInfo = node->nodeData->typeInfo;
 }
 
 Node *resolveParameterizedType(Semantic *semantic, Node *pt, Node *fnCall) {

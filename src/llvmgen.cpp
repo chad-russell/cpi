@@ -29,6 +29,7 @@ llvm::Value *LlvmGen::store(llvm::Value *val, llvm::Value *ptr) {
 //    return builder.CreateStore(val, ptr);
 }
 
+// todo(chad): why this wrapper????
 bool needsStorage(Node *node) {
     return hasNoLocalByDefault(node);
 }
@@ -240,11 +241,16 @@ llvm::Value *LlvmGen::rvalueFor(Node *node) {
 
     if (resolved->typeInfo->typeData.kind == NodeTypekind::NONE) { return llvm::ConstantStruct::get(llvm::StructType::get(context, false), {}); }
 
-    if (resolved->isLocal) {
-        return builder.CreateLoad((llvm::Value *) resolved->llvmLocal);
-    }
-    else if (resolved->type == NodeType::DOT && resolved->dotData.lhs->isLocal) {
+    if (resolved->type == NodeType::DOT && resolved->dotData.lhs->isLocal) {
         return builder.CreateLoad((llvm::Value *) resolved->llvmData);
+    }
+
+    if (resolved->llvmData != nullptr) {
+        return (llvm::Value *) resolved->llvmData;
+    }
+
+    if (resolved->isLocal && resolved->llvmLocal) {
+        return builder.CreateLoad((llvm::Value *) resolved->llvmLocal);
     }
 
     return (llvm::Value *) resolved->llvmData;
@@ -254,7 +260,8 @@ void LlvmGen::gen(Node *node) {
     if (node->llvmGen
         && node->type != NodeType::STRING_LITERAL
         && node->type != NodeType::ARRAY_LITERAL
-        && node->type != NodeType::STRUCT_LITERAL) {
+        && node->type != NodeType::STRUCT_LITERAL
+        && node->type != NodeType::ALIAS) {
         return;
     }
 
@@ -419,7 +426,7 @@ void LlvmGen::gen(Node *node) {
                 node->llvmData = llvm::ConstantInt::get(typeFor(node->typeInfo), (uint64_t) node->intLiteralData.value);
             }
 
-            if (node->isLocal) {
+            if (node->isLocal && node->llvmLocal) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
         } break;
@@ -491,7 +498,8 @@ void LlvmGen::gen(Node *node) {
 
                 // todo(chad): @Hack there doesn't seem to be another way to cast things...
                 auto realParam = builder.CreateAlloca(declParamType, nullptr, "realParam");
-                builder.CreateStore(rvalueFor(param->paramData.value), builder.CreateBitCast(realParam, passedParamType->getPointerTo(0)));
+                auto realParamCasted = builder.CreateBitCast(realParam, passedParamType->getPointerTo(0));
+                builder.CreateStore(rvalueFor(param->paramData.value), realParamCasted);
 
                 args.push_back(builder.CreateLoad(realParam));
 
@@ -608,9 +616,6 @@ void LlvmGen::gen(Node *node) {
                 gen(node->binopData.lhs);
                 gen(node->binopData.rhs);
 
-                storeIfNeeded(node->binopData.lhs);
-                storeIfNeeded(node->binopData.rhs);
-
                 auto lhsValue = rvalueFor(node->binopData.lhs);
                 auto rhsValue = rvalueFor(node->binopData.rhs);
 
@@ -692,6 +697,18 @@ void LlvmGen::gen(Node *node) {
                             case LexerTokenType::MOD: {
                                 value = builder.CreateFRem(lhsValue, rhsValue);
                             } break;
+                            case LexerTokenType::LT: {
+                                value = builder.CreateFCmpOLT(lhsValue, rhsValue);
+                            } break;
+                            case LexerTokenType::LE: {
+                                value = builder.CreateFCmpOLE(lhsValue, rhsValue);
+                            } break;
+                            case LexerTokenType::GT: {
+                                value = builder.CreateFCmpOGT(lhsValue, rhsValue);
+                            } break;
+                            case LexerTokenType::GE: {
+                                value = builder.CreateFCmpOGE(lhsValue, rhsValue);
+                            } break;
                             default: cpi_assert(false);
                         }
                     }
@@ -751,7 +768,7 @@ void LlvmGen::gen(Node *node) {
 
                     node->llvmData = value;
 
-                    if (node->isLocal) {
+                    if (node->isLocal && node->llvmLocal) {
                         store(value, (llvm::Value *) node->llvmLocal);
                     }
                 }
@@ -762,7 +779,7 @@ void LlvmGen::gen(Node *node) {
             auto fn = static_cast<llvm::Function *>(currentFnDecl->llvmData);
             node->llvmData = &fn->arg_begin()[resolvedParam->paramData.index];
 
-            if (node->isLocal) {
+            if (node->isLocal && node->llvmLocal) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
         } break;
@@ -784,7 +801,7 @@ void LlvmGen::gen(Node *node) {
                 storeIfNeeded(resolved);
                 node->llvmData = resolved->llvmLocal;
 
-                if (node->isLocal) {
+                if (node->isLocal && node->llvmLocal) {
                     store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
                 }
             }
@@ -795,7 +812,7 @@ void LlvmGen::gen(Node *node) {
 
             node->llvmData = builder.CreateLoad(rvalueFor(resolved));
 
-            if (node->isLocal) {
+            if (node->isLocal && node->llvmLocal) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
         } break;
@@ -900,7 +917,7 @@ void LlvmGen::gen(Node *node) {
             auto resolvedLhs = resolve(node->dotData.lhs);
 
             llvm::Value *gepTarget = nullptr;
-            if (node->dotData.lhs->isLocal) {
+            if (node->dotData.lhs->isLocal && node->dotData.lhs->llvmLocal) {
                 gepTarget = (llvm::Value *) resolvedLhs->llvmLocal;
             } else {
                 gepTarget = (llvm::Value *) resolvedLhs->llvmData;
@@ -944,7 +961,7 @@ void LlvmGen::gen(Node *node) {
                 if (isSecretlyUnion && paramIndex == 1) {
                     // bitcast gepTarget to the correct thing...
                     llvm::Type *realType = resolve(foundParam->typeInfo)->typeData.kind == NodeTypekind::NONE
-                                           ? builder.getInt8Ty()
+                                           ? (llvm::Type *) builder.getInt8Ty()
                                            : typeFor(foundParam->typeInfo);
 
                     auto dumbcast = builder.CreateAlloca(realType, nullptr, "dumbcast");
@@ -953,7 +970,7 @@ void LlvmGen::gen(Node *node) {
                     node->llvmLocal = dumbcast;
                     node->llvmData = builder.CreateLoad(dumbcast);
                 }
-                else if (node->isLocal) {
+                else if (node->isLocal && node->llvmLocal) {
                     store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
                 }
             }
@@ -1044,7 +1061,7 @@ void LlvmGen::gen(Node *node) {
 
                 node->llvmData = blankSlate;
 
-                if (node->isLocal) {
+                if (node->isLocal && node->llvmLocal) {
                     store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
                 }
             }
@@ -1087,7 +1104,7 @@ void LlvmGen::gen(Node *node) {
 
                 node->llvmData = blankSlate;
 
-                if (node->isLocal) {
+                if (node->isLocal && node->llvmLocal) {
                     store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
                 }
             }
@@ -1098,7 +1115,7 @@ void LlvmGen::gen(Node *node) {
             node->llvmData = node->arrayLiteralData.structLiteralRepresentation->llvmData;
             node->llvmLocal = node->arrayLiteralData.structLiteralRepresentation->llvmLocal;
 
-            if (node->isLocal) {
+            if (node->isLocal && node->llvmLocal) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
         } break;
@@ -1186,7 +1203,7 @@ void LlvmGen::gen(Node *node) {
             gen(node->stringLiteralData.arrayLiteralRepresentation);
             node->llvmData = node->stringLiteralData.arrayLiteralRepresentation->llvmData;
 
-            if (node->isLocal) {
+            if (node->isLocal && node->llvmLocal) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
         } break;
@@ -1255,7 +1272,7 @@ void LlvmGen::gen(Node *node) {
             gen(node->resolved);
 
             node->llvmData = node->resolved->llvmData;
-            if (node->isLocal) {
+            if (node->isLocal && node->llvmLocal) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
         } break;
@@ -1264,14 +1281,13 @@ void LlvmGen::gen(Node *node) {
             gen(node->resolved);
 
             node->llvmData = node->resolved->llvmData;
-            if (node->isLocal) {
+            if (node->isLocal && node->llvmLocal) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
         } break;
         case NodeType::ALIAS: {
-            gen(node->declData.initialValue);
-
-            node->llvmData = node->declData.initialValue->llvmData;
+            gen(node->nodeData);
+            node->llvmData = node->nodeData->llvmData;
         } break;
         case NodeType::DEFER:
         case NodeType::END_SCOPE:

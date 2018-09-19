@@ -1129,8 +1129,8 @@ void BytecodeGen::gen(Node *node) {
             append(instructions, Instruction::NOP);
         } break;
         case NodeType::ALIAS: {
-            gen(node->declData.initialValue);
-            node->bytecode = node->declData.initialValue->bytecode;
+            gen(node->nodeData);
+            node->bytecode =node->nodeData->bytecode;
         } break;
         case NodeType::ENUM_LITERAL: {
             gen(node->enumLiteralData.value);

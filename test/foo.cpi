@@ -1,6 +1,13 @@
-fn main() {
-    a := 3;
-    b := 5;
+FUCK := 13;
 
-    return 0;
+fn F1() {
+    return FUCK * 2;
+}
+
+fn F2() {
+    return FUCK * 3;
+}
+
+fn main() {
+    return F1() + F2();
 }

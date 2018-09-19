@@ -435,12 +435,27 @@ int main(int argc, char **argv) {
             system("/usr/local/Cellar/llvm/5.0.1/bin/llc --filetype=obj ./output.bc");
 
             ostringstream command;
-            command << "clang -O0 -L . -o " << outputFileName;
+            command << "clang -O3 -L .";
             for (auto link : semantic->linkLibs) {
+                // todo(chad): make convenience fn for getting file/dir name from long path
+                lastSlash = 0;
+                unsigned long i = 0;
+                for (auto ch : *link) {
+                    if (ch == '/') {
+                        lastSlash = i;
+                    }
+                    i += 1;
+                }
+
+                if (lastSlash > 0) {
+                    command << " -L " << link->substr(0, lastSlash);
+                    *link = link->substr(lastSlash + 1);
+                }
+
                 // substr(3) to strip "lib" from the prefix
                 command << " -l" << link->substr(3);
             }
-            command << " output.o";
+            command << " -o " << outputFileName << " output.o";
             system(command.str().c_str());
 
             // need to keep the .o file because apparently that's where the debug info is stored
