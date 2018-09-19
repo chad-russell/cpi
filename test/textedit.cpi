@@ -6,10 +6,13 @@
 #import "freetype": ft;
 #import "iter";
 #import "se";
+#import "mem";
 
 WIDTH     : i32 = 800;
 HEIGHT    : i32 = 350;
 FONT_SIZE : i32 = 20;
+
+fn noopFree(d: *none) { }
 
 type CachedGlyph struct {
     codepoint: i32,
@@ -27,7 +30,7 @@ type Rect(T := typeof(x)) struct {
 type CachedLine struct {
     low: f64,
     high: f64,
-    glyphs: buf.Buffer!(Rect!(f64))
+    glyphs: buf.Buffer!(Rect!(f64), basic.tmp, noopFree)
 }
 
 type TextContext struct {
@@ -46,8 +49,8 @@ type TextContext struct {
     font: []i8,
     eb: *se.EditorBuffer,
 
-    glyphCache: buf.Buffer!(CachedGlyph),
-    lineCache: buf.Buffer!(CachedLine),
+    glyphCache: buf.Buffer!(CachedGlyph, mem.malloc, mem.free),
+    lineCache: buf.Buffer!(CachedLine, basic.tmp, noopFree),
 
     done := false,
 
@@ -145,8 +148,8 @@ fn initCairo(tctx: *TextContext) {
     cairo.cairo_set_font_face(tctx.cairoTextContext, tctx.cairoFont);
     cairo.cairo_set_font_size(tctx.cairoTextContext, cast() FONT_SIZE);
 
-    tctx.glyphCache = buf.make!(CachedGlyph)();
-    tctx.lineCache = buf.make!(CachedLine)();
+    tctx.glyphCache = buf.make!(CachedGlyph, mem.malloc, mem.free)();
+    tctx.lineCache = buf.make!(CachedLine, basic.tmp, noopFree)();
 
     tctx.cairoMouseSurface = cairo.cairo_image_surface_create(cairo.FORMAT_ARGB32, cast() tctx.sdlSurface.w, cast() tctx.sdlSurface.h);
     tctx.cairoMousePattern = cairo.cairo_pattern_create_for_surface(tctx.cairoMouseSurface);
@@ -180,7 +183,7 @@ fn drawMouse(tctx: *TextContext, x: i32, y: i32) {
     line := cast(i64) (y / FONT_SIZE);
 
     -- single character
-    if line >= 0 and line <= tctx.lineCache.buf.count {
+    if line >= 0 and line < tctx.lineCache.buf.count {
         cl := tctx.lineCache.buf[line];
         for g: cl.glyphs.buf {
             -- todo(chad): write 'rect contains point' fn
@@ -302,20 +305,21 @@ fn drawLine(tctx: *TextContext, line: i64) {
     glyphInfo := hb.hb_buffer_get_glyph_infos(tctx.hbBuffer, nil);
     glyphPos := hb.hb_buffer_get_glyph_positions(tctx.hbBuffer, nil);
 
-    cl: CachedLine = {cast() (tctx.windowHeight + 10), 0, buf.make!(Rect!(f64))()};
+    clGlyphs := buf.make!(Rect!(f64), basic.tmp, noopFree)();
+    cl: CachedLine = {cast() (tctx.windowHeight + 10), 0, clGlyphs};
 
-    x: f64 = 0;
+    x: f64 = 5;
     y: f64 = cast() (cast() FONT_SIZE * (line + 1));
 
     for i: iter.until(cast() glyphCount) {
         found := findGlyph(tctx, cast() (glyphInfo + i).codepoint);
 
         cairo.cairo_save(tctx.cairoTextContext);
-        cairo.cairo_translate(tctx.cairoTextContext, x + found.extents.xBearing, y + found.extents.yBearing);
+        cairo.cairo_translate(tctx.cairoTextContext, x, y + found.extents.yBearing);
 
         cairo.cairo_set_source(tctx.cairoTextContext, found.pattern);
         cairo.cairo_rectangle(tctx.cairoTextContext,
-            0,
+            found.extents.xBearing,
             0,
             cast() (found.extents.width + 1),
             cast() (found.extents.height + 1));
@@ -343,12 +347,17 @@ fn drawLine(tctx: *TextContext, line: i64) {
     ensureCapacity(&tctx.lineCache, line + 1);
     tctx.lineCache.buf[line] = cl;
 
-    if tctx.lineCache.buf.count < line {
+    if tctx.lineCache.buf.count < line + 1 {
         tctx.lineCache.buf.count = line + 1;
     }
 }
 
 fn drawText(tctx: *TextContext) {
+    basic.resetTmp();
+    tctx.lineCache = buf.make!(CachedLine, basic.tmp, noopFree)();
+
+    clear(tctx);
+
     lineCount := se.editor_buffer_get_line_count(tctx.eb);
 
     for line: iter.until(lineCount) {
@@ -402,7 +411,6 @@ fn demo() {
     loadFonts(&tctx);
     initCairo(&tctx);
 
-    clear(&tctx);
     drawText(&tctx);
     commit(&tctx);
 
@@ -414,7 +422,7 @@ fn demo() {
                 tctx.done = true;
             }
             else if event._type == sdl.KEYDOWN {
-                keyboardEvent := cast(sdl.KeyboardEvent) event;
+                keyboardEvent := cast(*sdl.KeyboardEvent) &event;
                 -- io.println(cast(i32) keyboardEvent.keysym.scancode);
 
                 if keyboardEvent.keysym.scancode == sdl.Key.BACKSPACE {
@@ -433,12 +441,11 @@ fn demo() {
                     se.editor_buffer_insert(tctx.eb, charsFor(keyboardEvent.keysym.scancode));
                 }
 
-                clear(&tctx);
                 drawText(&tctx);
                 commit(&tctx);
             }
             else if event._type == sdl.MOUSEMOTION {
-                mouseEvent := cast(sdl.MouseMotionEvent) event;
+                mouseEvent := cast(*sdl.MouseMotionEvent) &event;
 
                 xMouse: i32;
                 yMouse: i32;

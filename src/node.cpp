@@ -115,8 +115,12 @@ void initImportData(Node *node) {
 void initTypeData(Node *node) {
     node->typeData.scopedFns = (vector_t<Node *> *) malloc(sizeof(vector_t<Node *>));
     *node->typeData.scopedFns = vector_init<Node *>(4);
+
     node->typeData.name = nullptr;
-    node->typeData.polyRefinement = nullptr;
+    node->typeData.polyCameFrom = nullptr;
+
+    node->typeData.polyParams = (vector_t<Node *> *) malloc(sizeof(vector_t<Node *>));
+    *node->typeData.polyParams = vector_init<Node *>(4);
 }
 
 void initArrayLiteralData(Node *node) {
@@ -193,7 +197,7 @@ void initParamData(Node *node) {
     node->paramData.type = nullptr;
     node->paramData.value = nullptr;
     node->paramData.polyLink = nullptr;
-    node->paramData.polyRefinement = nullptr;
+    node->paramData.polyCameFrom = nullptr;
     node->paramData.index = 0;
 }
 

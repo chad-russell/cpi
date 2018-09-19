@@ -1,5 +1,5 @@
--- #link "/Users/chadrussell/Projects/se/cmake-build-release/libse_shared";
-#link "/Users/chadrussell/Projects/se/cmake-build-release/libse";
+#link "/Users/chadrussell/Projects/se/cmake-build-release/libse_shared";
+-- #link "/Users/chadrussell/Projects/se/cmake-build-release/libse";
 
 type Buf struct {
     length: i64,
