@@ -1,20 +1,18 @@
-fn one() {
-    puts("one\n");
+fn test(t: !T) {
+    t||foo;
 }
 
-fn two() {
-    puts("two\n");
-}
-
-type A(F := one) struct { }
-
-fn go(t: !T/A) {
-    T.F();
-}
+type I32 i32
 
 fn main() {
-    a: A!(two);
-    go(a);
+    i: I32 = 13;
+    test(i);
 
     return 0;
+}
+
+#attr(I32) {
+    fn foo(i: I32) {
+        puts("hey there!\n");
+    }
 }

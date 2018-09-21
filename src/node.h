@@ -30,6 +30,8 @@ void initDotData(Node *node);
 void initBinopData(Node *node);
 void initFnCallData(Node *node);
 void initAssignData(Node *node);
+void initAttrData(Node *node);
+void initAttrofData(Node *node);
 void initDeclData(Node *node);
 void initParamData(Node *node);
 void initFnDeclData(Node *node);
@@ -39,6 +41,7 @@ void initFnTypeData(Node *node);
 void initModuleData(Node *node);
 void initDeferData(Node *node);
 void initEndScopeData(Node *node);
+void initParameterizedTypeData(Node *node);
 void initTypeData(Node *node);
 void initImportData(Node *node);
 

@@ -1283,6 +1283,24 @@ void LlvmGen::gen(Node *node) {
             gen(node->nodeData);
             node->llvmData = node->nodeData->llvmData;
         } break;
+        case NodeType::ATTROF: {
+            auto resolved = resolve(node);
+            gen(resolved);
+            node->llvmData = resolved->llvmData;
+
+            if (node->isLocal) {
+                store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
+            }
+        } break;
+        case NodeType::HASATTR: {
+            auto resolved = resolve(node);
+            gen(resolved);
+            node->llvmData = resolved->llvmData;
+
+            if (node->isLocal) {
+                store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
+            }
+        } break;
         case NodeType::DEFER:
         case NodeType::END_SCOPE:
         case NodeType::IMPORT:

@@ -70,6 +70,7 @@ struct Parser {
     vector_t<Node *> parseValueParams();
     Node *parseFnDecl();
     Node *parseImplFnDecl();
+    Node *parseAttr();
     Node *parseImport();
     Node *parseTypeDecl();
     Node *parseModuleDecl();
@@ -90,6 +91,8 @@ struct Parser {
     Node *parseSizeof();
     Node *parseIsKind();
     Node *parseFieldsof();
+    Node *parseAttrof();
+    Node *parseHasAttr();
     Node *parsePuts();
     Node *parseTagCheck();
     Node *parseLvalueOrLiteral();

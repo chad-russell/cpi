@@ -969,6 +969,106 @@ void resolveLink(Semantic *semantic, Node *node) {
     vector_append(semantic->linkLibs, node->linkData.name);
 }
 
+void resolveAttr(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->attrData.target);
+
+    auto resolvedTarget = resolve(node->attrData.target);
+    if (resolvedTarget->type != NodeType::TYPE && resolvedTarget->type != NodeType::PARAMETERIZED_TYPE) {
+        semantic->reportError({node, node->attrData.target}, Error{node->attrData.target->region, "Expected a type for #attr target"});
+        return;
+    }
+
+    for (auto stmt : node->attrData.stmts) {
+        semantic->resolveTypes(stmt);
+
+        if (resolvedTarget->type == NodeType::TYPE) {
+            vector_append(*resolvedTarget->typeData.attributes, stmt);
+        }
+        else if (resolvedTarget->type == NodeType::PARAMETERIZED_TYPE) {
+            vector_append(resolvedTarget->parameterizedTypeData.attributes, stmt);
+        }
+    }
+}
+
+Node *findAttr(Semantic *semantic, Node *node) {
+    semantic->resolveTypes(node->attrofData.target);
+
+    cpi_assert(node->attrofData.attr->type == NodeType::SYMBOL);
+    auto attrAtomId = node->attrofData.attr->symbolData.atomId;
+
+    auto resolvedTarget = resolve(node->attrofData.target);
+
+    vector_t<Node *> attributes;
+    if (resolvedTarget->type == NodeType::TYPE) {
+        while (resolvedTarget->typeData.kind == NodeTypekind::POINTER) {
+            resolvedTarget = resolvedTarget->typeData.pointerTypeData.underlyingType;
+        }
+
+        attributes = *resolvedTarget->typeData.attributes;
+    }
+    else if (resolvedTarget->type == NodeType::PARAMETERIZED_TYPE) {
+        attributes = resolvedTarget->parameterizedTypeData.attributes;
+    }
+    else {
+        cpi_assert(false);
+    }
+
+    for (auto attr : attributes) {
+        if (attr->type == NodeType::FN_DECL) {
+            auto fnNameAtomId = attr->fnDeclData.name->symbolData.atomId;
+
+            if (fnNameAtomId == attrAtomId) {
+                return attr;
+            }
+        }
+
+        // todo(chad): handle other node types too
+    }
+
+    if (resolvedTarget->type == NodeType::TYPE && resolvedTarget->typeData.polyCameFrom != nullptr) {
+        attributes = resolvedTarget->typeData.polyCameFrom->parameterizedTypeData.attributes;
+
+        for (auto attr : attributes) {
+            if (attr->type == NodeType::FN_DECL) {
+                auto fnNameAtomId = attr->fnDeclData.name->symbolData.atomId;
+
+                if (fnNameAtomId == attrAtomId) {
+                    return attr;
+                }
+            }
+
+            // todo(chad): handle other node types too
+        }
+    }
+
+    return nullptr;
+}
+
+void resolveAttrof(Semantic *semantic, Node *node) {
+    Node *found = findAttr(semantic, node);
+
+    if (found == nullptr) {
+        semantic->reportError({node}, Error{node->region, "Could not find attribute"});
+        return;
+    }
+
+    semantic->resolveTypes(found);
+    node->resolved = found;
+    node->typeInfo = found->typeInfo;
+}
+
+void resolveHasAttr(Semantic *semantic, Node *node) {
+    auto found = findAttr(semantic, node);
+
+    auto b = new Node();
+    b->type = NodeType::BOOLEAN_LITERAL;
+    b->boolLiteralData.value = found != nullptr;
+    semantic->resolveTypes(b);
+
+    node->resolved = b;
+    node->typeInfo = b->typeInfo;
+}
+
 void resolveFnDecl(Semantic *semantic, Node *node) {
     auto data = &node->fnDeclData;
 
@@ -989,7 +1089,7 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
             auto firstParamType = resolve(polyCameFrom);
 
             cpi_assert(firstParamType->type == NodeType::PARAMETERIZED_TYPE);
-            vector_append(*firstParamType->parameterizedTypeData.typeDecl->typeData.scopedFns, node);
+            vector_append(*firstParamType->parameterizedTypeData.typeDecl->typeData.attributes, node);
         }
 
         return;
@@ -1027,7 +1127,7 @@ void resolveFnDecl(Semantic *semantic, Node *node) {
         while (firstParamType->typeData.kind == NodeTypekind::POINTER) {
             firstParamType = resolve(firstParamType->typeData.pointerTypeData.underlyingType);
         }
-        vector_append(*firstParamType->typeData.scopedFns, node);
+        vector_append(*firstParamType->typeData.attributes, node);
     }
 
     if (data->body.length == 0) {
@@ -1207,7 +1307,7 @@ Node *constantize(Semantic *semantic, Node *node) {
                            && resolvedTypeInfo->typeData.structTypeData.secretArrayElementType->typeData.kind == NodeTypekind::I8;
 
     if (typeKind == NodeTypekind::POINTER
-        || (typeKind == NodeTypekind::STRUCT && !isStringLiteral)
+//        || (typeKind == NodeTypekind::STRUCT && !isStringLiteral)
         || typeKind == NodeTypekind::FN
         || typeKind == NodeTypekind::SYMBOL
         || typeKind == NodeTypekind::DOT) {
@@ -1229,6 +1329,7 @@ Node *constantize(Semantic *semantic, Node *node) {
         }
 
         semantic->resolveTypes(constNode);
+        node->staticValue = constNode;
         return constNode;
     }
 
@@ -1859,7 +1960,15 @@ void resolveType(Semantic *semantic, Node *node) {
         } break;
         case NodeTypekind::DOT: {
             semantic->resolveTypes(node->typeData.dotTypeData);
-            node->typeData = resolve(node->typeData.dotTypeData)->typeData;
+
+            auto resolvedDot = resolve(node->typeData.dotTypeData);
+            if (resolvedDot->type == NodeType::TYPE) {
+                node->typeData = resolvedDot->typeData;
+            }
+            else if (resolvedDot->type == NodeType::PARAMETERIZED_TYPE) {
+                node->type = NodeType::PARAMETERIZED_TYPE;
+                node->parameterizedTypeData = resolvedDot->parameterizedTypeData;
+            }
         } break;
         case NodeTypekind::PARAMETERIZED: {
             cpi_assert(node->typeData.polymorphTypeTypeData.value->type == NodeType::FN_CALL);
@@ -1902,6 +2011,10 @@ Node *makeTemporary(Semantic *semantic, Node *n) {
     return node;
 }
 
+/*
+ * a|foo => foo(a)
+ * a|foo(b, c) => foo(a, b, c)
+ */
 void rewritePipe(Semantic *semantic, Node *node) {
     auto resolvedLhs = resolve(node->binopData.lhs);
     auto resolvedRhs = resolve(node->binopData.rhs);
@@ -1925,6 +2038,70 @@ void rewritePipe(Semantic *semantic, Node *node) {
     else if (resolvedRhs->type == NodeType::FN_CALL) {
         // rhs is fn call
         fnCallNode->fnCallData.fn = resolvedRhs->fnCallData.fn;
+        for (auto param : resolvedRhs->fnCallData.params) {
+            vector_append(fnCallNode->fnCallData.params, param);
+        }
+        for (auto param : resolvedRhs->fnCallData.ctParams) {
+            vector_append(fnCallNode->fnCallData.ctParams, param);
+        }
+    }
+    else {
+        // error
+        cpi_assert(false);
+    }
+
+    semantic->resolveTypes(fnCallNode);
+
+    node->resolved = fnCallNode;
+    node->typeInfo = fnCallNode->typeInfo;
+}
+
+/*
+ * a||foo => #attrof(typeof(a), foo)(a)
+ * a||foo(b, c) => #attrof(typeof(a), foo)(a, b, c)
+ */
+void rewriteAttrPipe(Semantic *semantic, Node *node) {
+    auto resolvedLhs = resolve(node->binopData.lhs);
+    auto resolvedRhs = resolve(node->binopData.rhs);
+
+    semantic->resolveTypes(resolvedLhs);
+
+    auto fnCallNode = new Node(node->region.srcInfo, NodeType::FN_CALL, node->scope);
+    fnCallNode->region = node->region;
+    fnCallNode->fnCallData.hasRuntimeParams = true;
+    vector_append(fnCallNode->fnCallData.params, wrapInValueParam(resolvedLhs, nullptr));
+
+    if (resolvedRhs->type == NodeType::DOT) {
+        semantic->resolveTypes(resolvedRhs);
+        resolvedRhs = resolve(resolvedRhs);
+    }
+
+    if (resolvedRhs->type == NodeType::SYMBOL || resolvedRhs->type == NodeType::FN_DECL) {
+        // rhs is symbol or fn
+        auto typeofA = new Node(node->region.srcInfo, NodeType::TYPEOF, node->scope);
+        typeofA->region = resolvedLhs->region;
+        typeofA->nodeData = resolvedLhs;
+
+        auto attrof = new Node(node->region.srcInfo, NodeType::ATTROF, node->scope);
+        attrof->region = resolvedLhs->region;
+        attrof->attrofData.target = typeofA;
+        attrof->attrofData.attr = resolvedRhs;
+
+        fnCallNode->fnCallData.fn = attrof;
+    }
+    else if (resolvedRhs->type == NodeType::FN_CALL) {
+        // rhs is fn call
+        auto typeofA = new Node(node->region.srcInfo, NodeType::TYPEOF, node->scope);
+        typeofA->region = resolvedLhs->region;
+        typeofA->nodeData = resolvedLhs;
+
+        auto attrof = new Node(node->region.srcInfo, NodeType::ATTROF, node->scope);
+        attrof->region = resolvedLhs->region;
+        attrof->attrofData.target = typeofA;
+        attrof->attrofData.attr = resolvedRhs->fnCallData.fn;
+
+        fnCallNode->fnCallData.fn = attrof;
+
         for (auto param : resolvedRhs->fnCallData.params) {
             vector_append(fnCallNode->fnCallData.params, param);
         }
@@ -1981,6 +2158,11 @@ void rewriteMathEQ(Semantic *semantic, Node *node) {
 void resolveBinop(Semantic *semantic, Node *node) {
     if (node->binopData.type == LexerTokenType::VERTICAL_BAR) {
         rewritePipe(semantic, node);
+        return;
+    }
+
+    if (node->binopData.type == LexerTokenType::DOUBLE_VERTICAL_BAR) {
+        rewriteAttrPipe(semantic, node);
         return;
     }
 
@@ -2110,9 +2292,9 @@ Node *resolveSymbolWithScopeType(Semantic *semantic, int64_t atom, Node *firstPa
         }
     }
 
-    for (auto scope : *resolvedScopeType->typeData.scopedFns) {
-        if (scope->fnDeclData.name->symbolData.atomId == atom) {
-            return scope;
+    for (auto attr : *resolvedScopeType->typeData.attributes) {
+        if (attr->fnDeclData.name->symbolData.atomId == atom) {
+            return attr;
         }
     }
 
@@ -3100,12 +3282,6 @@ void resolveStaticFor(Semantic *semantic, Node *node) {
 }
 
 void resolveForWithNonArrayTarget(Semantic *semantic, Node *node) {
-    // todo(chad): try to find an iterator instead of blindly forging ahead
-//    semantic->reportError({node, node->forData.target}, Error{
-//            node->forData.target->region,
-//            "'for' target is not an array and no iterator found"
-//    });
-
     // target := target
     auto targetDecl = new Node(node->forData.target->region.srcInfo, NodeType::DECL, node->forData.target->scope);
     targetDecl->region = node->forData.target->region;
@@ -3114,11 +3290,17 @@ void resolveForWithNonArrayTarget(Semantic *semantic, Node *node) {
 
     // empty(target)
     auto emptySymbol = new Node(node->region.srcInfo, NodeType::SYMBOL, node->scope);
+    emptySymbol->region = node->forData.target->region;
     emptySymbol->symbolData.atomId = atomTable->insertStr("empty");
+
+    auto emptyAttr = new Node(node->region.srcInfo, NodeType::ATTROF, node->scope);
+    emptyAttr->region = targetDecl->region;
+    emptyAttr->attrofData.target = resolve(node->forData.target->typeInfo);
+    emptyAttr->attrofData.attr = emptySymbol;
 
     auto emptyCall = new Node(targetDecl->region.srcInfo, NodeType::FN_CALL, targetDecl->scope);
     emptyCall->region = targetDecl->region;
-    emptyCall->fnCallData.fn = emptySymbol;
+    emptyCall->fnCallData.fn = emptyAttr;
     vector_append(emptyCall->fnCallData.params, wrapInValueParam(targetDecl, nullptr));
 
     // !empty(target)
@@ -3136,9 +3318,14 @@ void resolveForWithNonArrayTarget(Semantic *semantic, Node *node) {
     auto frontSymbol = new Node(node->region.srcInfo, NodeType::SYMBOL, node->scope);
     frontSymbol->symbolData.atomId = atomTable->insertStr("front");
 
+    auto frontAttr = new Node(node->region.srcInfo, NodeType::ATTROF, node->scope);
+    frontAttr->region = targetDecl->region;
+    frontAttr->attrofData.target = resolve(node->forData.target->typeInfo);
+    frontAttr->attrofData.attr = frontSymbol;
+
     auto frontCall = new Node(targetDecl->region.srcInfo, NodeType::FN_CALL, targetDecl->scope);
     frontCall->region = targetDecl->region;
-    frontCall->fnCallData.fn = frontSymbol;
+    frontCall->fnCallData.fn = frontAttr;
     vector_append(frontCall->fnCallData.params, wrapInValueParam(targetDecl, nullptr));
 
     // it := front(target)
@@ -3156,11 +3343,17 @@ void resolveForWithNonArrayTarget(Semantic *semantic, Node *node) {
 
     // popFront(&target)
     auto popFrontSymbol = new Node(node->region.srcInfo, NodeType::SYMBOL, node->scope);
+    popFrontSymbol->region = targetDecl->region;
     popFrontSymbol->symbolData.atomId = atomTable->insertStr("popFront");
+
+    auto popFrontAttr = new Node(node->region.srcInfo, NodeType::ATTROF, node->scope);
+    popFrontAttr->region = targetDecl->region;
+    popFrontAttr->attrofData.target = resolve(node->forData.target->typeInfo);
+    popFrontAttr->attrofData.attr = popFrontSymbol;
 
     auto popFrontCall = new Node(targetDecl->region.srcInfo, NodeType::FN_CALL, targetDecl->scope);
     popFrontCall->region = targetDecl->region;
-    popFrontCall->fnCallData.fn = popFrontSymbol;
+    popFrontCall->fnCallData.fn = popFrontAttr;
     vector_append(popFrontCall->fnCallData.params, wrapInValueParam(addrOfTarget, nullptr));
 
     vector_append(node->forData.rewritten, targetDecl);
@@ -3768,6 +3961,15 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::LINK: {
             resolveLink(this, node);
+        } break;
+        case NodeType::ATTR: {
+            resolveAttr(this, node);
+        } break;
+        case NodeType::ATTROF: {
+            resolveAttrof(this, node);
+        } break;
+        case NodeType::HASATTR: {
+            resolveHasAttr(this, node);
         } break;
         case NodeType::ENUM_LITERAL:
         case NodeType::PARAMETERIZED_TYPE:

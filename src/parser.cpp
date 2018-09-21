@@ -244,9 +244,9 @@ Node *Parser::parseTopLevel() {
         return parseRun();
     }
 
-    // impl fn decl
-    if (lexer->front.type == LexerTokenType::IMPL) {
-        return parseImplFnDecl();
+    // #attr
+    if (lexer->front.type == LexerTokenType::ATTR) {
+        return parseAttr();
     }
 
     // type definition
@@ -560,18 +560,35 @@ Node *Parser::parseFnDecl() {
     return decl;
 }
 
-Node *Parser::parseImplFnDecl() {
-    expect(LexerTokenType::IMPL, "#impl");
+Node *Parser::parseAttr() {
+    expect(LexerTokenType::ATTR, "#attr");
 
-    this->isCopying = true; // todo(chad): @Hack to keep from inserting the symbol into scope
-    auto fnDecl = parseFnDecl();
-    this->isCopying = false;
+    auto attrDecl = new Node(lexer->srcInfo, NodeType::ATTR, scopes.top());
 
-    fnDecl->fnDeclData.isImpl = true;
+    expect(LexerTokenType::LPAREN, "(");
+    attrDecl->attrData.target = parseType();
+    expect(LexerTokenType::RPAREN, ")");
 
-    vector_append(*this->impls, fnDecl);
+    if (lexer->front.type == LexerTokenType::LCURLY) {
+        popFront(); // '{'
 
-    return fnDecl;
+        scopes.push(new Scope(scopes.top()));
+
+        while (lexer->front.type != LexerTokenType::RCURLY) {
+            vector_append(attrDecl->attrData.stmts, parseScopedStmt());
+        }
+
+        scopes.pop();
+
+        expect(LexerTokenType::RCURLY, "}");
+    }
+    else {
+        vector_append(attrDecl->attrData.stmts, parseScopedStmt());
+    }
+
+    vector_append(*impls, attrDecl);
+
+    return attrDecl;
 }
 
 Node *Parser::parseImport() {
@@ -754,11 +771,6 @@ Node *Parser::parseScopedStmt() {
         return parseFnDecl();
     }
 
-    // impl fn decl
-    if (lexer->front.type == LexerTokenType::IMPL) {
-        return parseImplFnDecl();
-    }
-
     // type definition
     if (lexer->front.type == LexerTokenType::TYPE) {
         return parseTypeDecl();
@@ -772,6 +784,11 @@ Node *Parser::parseScopedStmt() {
     // while
     if (lexer->front.type == LexerTokenType::WHILE) {
         return parseWhile();
+    }
+
+    // #attr
+    if (lexer->front.type == LexerTokenType::ATTR) {
+        return parseAttr();
     }
 
     // puts
@@ -1656,10 +1673,36 @@ Node *Parser::parseIsKind() {
     return type;
 }
 
+Node *Parser::parseAttrof() {
+    auto a = new Node(lexer->srcInfo, NodeType::ATTROF, scopes.top());
+    a->region.start = lexer->front.region.start;
+    popFront(); // '#attrof'
+    expect(LexerTokenType::LPAREN, "(");
+    a->attrofData.target = parseType();
+    expect(LexerTokenType::COMMA, ",");
+    a->attrofData.attr = parseSymbol();
+    a->region.end = lexer->front.region.end;
+    expect(LexerTokenType::RPAREN, ")");
+    return a;
+}
+
+Node *Parser::parseHasAttr() {
+    auto a = new Node(lexer->srcInfo, NodeType::HASATTR, scopes.top());
+    a->region.start = lexer->front.region.start;
+    popFront(); // '#hasattr'
+    expect(LexerTokenType::LPAREN, "(");
+    a->attrofData.target = parseType();
+    expect(LexerTokenType::COMMA, ",");
+    a->attrofData.attr = parseSymbol();
+    a->region.end = lexer->front.region.end;
+    expect(LexerTokenType::RPAREN, ")");
+    return a;
+}
+
 Node *Parser::parseFieldsof() {
     auto type = new Node(lexer->srcInfo, NodeType::FIELDSOF, scopes.top());
     type->region.start = lexer->front.region.start;
-    popFront();
+    popFront(); // '#fieldsof'
     expect(LexerTokenType::LPAREN, "(");
     type->nodeData = parseType();
     type->region.end = lexer->front.region.end;
@@ -1717,6 +1760,10 @@ Node *Parser::parseLvalueOrLiteral() {
 
     if (lexer->front.type == LexerTokenType::ISKIND) {
         return parseIsKind();
+    }
+
+    if (lexer->front.type == LexerTokenType::HASATTR) {
+        return parseHasAttr();
     }
 
     auto saved = lexer->front.region.start;
@@ -1792,6 +1839,8 @@ Node *Parser::parseLvalueOrLiteral() {
         symbol = parseFieldsof();
     } else if (lexer->front.type == LexerTokenType::PANIC) {
         symbol = parsePanic();
+    } else if (lexer->front.type == LexerTokenType::ATTROF) {
+        symbol = parseAttrof();
     } else {
         symbol = parseSymbol();
     }
@@ -2040,6 +2089,7 @@ int8_t Parser::operatorPrecedence(LexerTokenType type) {
             return 4;
 
         case LexerTokenType::VERTICAL_BAR:
+        case LexerTokenType::DOUBLE_VERTICAL_BAR:
             return 5;
 
         default: cpi_assert(false);

@@ -174,6 +174,7 @@ void Lexer::popFront() {
     if (tryEat(&next, "~!", LexerTokenType::BITNOT)) { return; }
     if (tryEat(&next, "!", LexerTokenType::NOT)) { return; }
     if (tryEat(&next, "@", LexerTokenType::AT)) { return; }
+    if (tryEat(&next, "||", LexerTokenType::DOUBLE_VERTICAL_BAR)) { return; }
     if (tryEat(&next, "|", LexerTokenType::VERTICAL_BAR)) { return; }
     if (tryEatKeyword(&next, "#link", LexerTokenType::LINK)) { return; }
     if (tryEatKeyword(&next, "defer", LexerTokenType::DEFER)) { return; }
@@ -187,7 +188,6 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "~shr", LexerTokenType::BITSHR)) { return; }
     if (tryEatKeyword(&next, "mod", LexerTokenType::MOD)) { return; }
     if (tryEatKeyword(&next, "fn", LexerTokenType::FN)) { return; }
-    if (tryEatKeyword(&next, "#impl", LexerTokenType::IMPL)) { return; }
     if (tryEatKeyword(&next, "type", LexerTokenType::TYPE)) { return; }
     if (tryEatKeyword(&next, "struct", LexerTokenType::STRUCT)) { return; }
     if (tryEatKeyword(&next, "union", LexerTokenType::UNION)) { return; }
@@ -213,6 +213,9 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "false", LexerTokenType::FALSE_)) { return; }
     if (tryEatKeyword(&next, "nil", LexerTokenType::NIL)) { return; }
     if (tryEatKeyword(&next, "module", LexerTokenType::MODULE)) { return; }
+    if (tryEatKeyword(&next, "#hasattr", LexerTokenType::HASATTR)) { return; }
+    if (tryEatKeyword(&next, "#attrof", LexerTokenType::ATTROF)) { return; }
+    if (tryEatKeyword(&next, "#attr", LexerTokenType::ATTR)) { return; }
     if (tryEatKeyword(&next, "#import", LexerTokenType::IMPORT)) { return; }
     if (tryEatKeyword(&next, "cast", LexerTokenType::CAST)) { return; }
     if (tryEatKeyword(&next, "Ast", LexerTokenType::EXPOSED_AST)) { return; }
@@ -553,6 +556,7 @@ bool isBinop(LexerTokenType type) {
            || type == LexerTokenType::MUL
            || type == LexerTokenType::DIV
            || type == LexerTokenType::VERTICAL_BAR
+           || type == LexerTokenType::DOUBLE_VERTICAL_BAR
            || type == LexerTokenType::MOD
            || type == LexerTokenType::BITAND
            || type == LexerTokenType::BITOR

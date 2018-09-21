@@ -83,6 +83,9 @@ enum class NodeType {
     UNARY_BITNOT = 46,
     PARAMETERIZED_TYPE = 47,
     ENUM_LITERAL = 48,
+    ATTR = 49,
+    ATTROF = 50,
+    HASATTR = 51,
 };
 
 enum class NodeTypekind: int32_t {
@@ -144,6 +147,7 @@ enum class LexerTokenType : int32_t {
     COMMA,
     SINGLE_QUOTE,
     DOUBLE_QUOTE,
+    DOUBLE_VERTICAL_BAR,
     VERTICAL_BAR,
     AT,
     FN,
@@ -201,9 +205,10 @@ enum class LexerTokenType : int32_t {
     ISKIND,
     DEFER,
     LINK,
-    IMPL,
     MOD,
-    NOTAG,
+    ATTR,
+    ATTROF,
+    HASATTR,
 };
 
 struct SourceInfo {
@@ -266,7 +271,7 @@ struct TypeData {
     NodeTypekind kind;
     Node *name;
 
-    vector_t<Node *> *scopedFns;
+    vector_t<Node *> *attributes;
     Node *polyCameFrom;
     vector_t<Node *> *polyParams;
 
@@ -416,7 +421,7 @@ struct RetData {
 };
 
 struct SymbolData {
-    int64_t atomId;
+    int64_t atomId; // todo(chad): why not uint64_t?
 };
 
 struct ArrayLiteralData {
@@ -466,9 +471,21 @@ struct ImportData {
     Node *alias;
 };
 
+struct AttrData {
+    Node *target;
+    vector_t<Node *> stmts;
+};
+
+struct AttrofData {
+    Node *target;
+    Node *attr;
+};
+
 struct ParameterizedTypeData {
     vector_t<Node *> ctParams;
     Node *typeDecl;
+
+    vector_t<Node *> attributes;
 };
 
 struct EnumLiteralData {
@@ -550,6 +567,8 @@ public:
         ImportData importData;
         ParameterizedTypeData parameterizedTypeData;
         EnumLiteralData enumLiteralData;
+        AttrData attrData;
+        AttrofData attrofData;
     };
 
     Node *staticValue = nullptr;

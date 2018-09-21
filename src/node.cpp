@@ -23,6 +23,12 @@ Node::Node(SourceInfo srcInfo, NodeType type_, Scope *scope_) : Node() {
         case NodeType::ASSIGN: {
             initAssignData(this);
         } break;
+        case NodeType::ATTR: {
+            initAttrData(this);
+        } break;
+        case NodeType::ATTROF: {
+            initAttrofData(this);
+        } break;
         case NodeType::FN_CALL: {
             initFnCallData(this);
         } break;
@@ -58,6 +64,9 @@ Node::Node(SourceInfo srcInfo, NodeType type_, Scope *scope_) : Node() {
         } break;
         case NodeType::END_SCOPE: {
             initEndScopeData(this);
+        } break;
+        case NodeType::PARAMETERIZED_TYPE: {
+            initParameterizedTypeData(this);
         } break;
         case NodeType::TYPE: {
             initTypeData(this);
@@ -106,6 +115,12 @@ void initEndScopeData(Node *node) {
     node->sourceMapStatement = true;
 }
 
+void initParameterizedTypeData(Node *node) {
+    node->parameterizedTypeData.ctParams = vector_init<Node *>(4);
+    node->parameterizedTypeData.typeDecl = nullptr;
+    node->parameterizedTypeData.attributes = vector_init<Node *>(4);
+}
+
 void initImportData(Node *node) {
     node->importData.isFile = false;
     node->importData.target = nullptr;
@@ -113,8 +128,8 @@ void initImportData(Node *node) {
 }
 
 void initTypeData(Node *node) {
-    node->typeData.scopedFns = (vector_t<Node *> *) malloc(sizeof(vector_t<Node *>));
-    *node->typeData.scopedFns = vector_init<Node *>(4);
+    node->typeData.attributes = (vector_t<Node *> *) malloc(sizeof(vector_t<Node *>));
+    *node->typeData.attributes = vector_init<Node *>(4);
 
     node->typeData.name = nullptr;
     node->typeData.polyCameFrom = nullptr;
@@ -184,6 +199,16 @@ void initFnCallData(Node *node) {
 void initAssignData(Node *node) {
     node->assignData.lhs = nullptr;
     node->assignData.rhs = nullptr;
+}
+
+void initAttrData(Node *node) {
+    node->attrData.target = nullptr;
+    node->attrData.stmts = vector_init<Node *>(4);
+}
+
+void initAttrofData(Node *node) {
+    node->attrofData.target = nullptr;
+    node->attrofData.attr = nullptr;
 }
 
 void initDeclData(Node *node) {

@@ -153,7 +153,6 @@ fn runAllTests() {
     assert(topLevel == 123);
 
     assert(testDefer() == 4);
-
     testPipe();
 
     io.printFln("fuckme: %", {fuckme});
@@ -224,16 +223,18 @@ fn testIter3() {
         curr := 0
     }
 
-    #impl fn empty(r: !R/ArrRefRange) {
-        return r.curr >= r.arr.count;
-    }
+    #attr(ArrRefRange) {
+        fn empty(r: !R/ArrRefRange) {
+            return r.curr >= r.arr.count;
+        }
 
-    #impl fn front(r: !R/ArrRefRange) {
-        return r.arr[r.curr];
-    }
+        fn front(r: !R/ArrRefRange) {
+            return r.arr[r.curr];
+        }
 
-    #impl fn popFront(R := typeof(^r))(r: *R/ArrRefRange) {
-        r.curr += 1;
+        fn popFront(R := typeof(^r))(r: *R/ArrRefRange) {
+            r.curr += 1;
+        }
     }
 
     fn iter(T := typeof(arr[0]))(arr: []T) {
@@ -243,9 +244,9 @@ fn testIter3() {
     fn map(f: Ast)(range: !R) {
         #import "buffer";
 
-        b := buffer.make!(typeof(front(range)))();
+        b := buffer.make!(typeof(range||front))();
         for it: range {
-            &b|append(f(it));
+            &b||append(f(it));
         }
         return b.buf|iter;
     }
@@ -253,10 +254,10 @@ fn testIter3() {
     fn filter(f: Ast)(range: !R) {
         #import "buffer";
 
-        b := buffer.make!(typeof(front(range)))();
+        b := buffer.make!(typeof(range||front))();
         for it: range {
             if f(it) {
-                &b|append(it);
+                &b||append(it);
             }
         }
         return b.buf|iter;
@@ -284,16 +285,18 @@ fn testIter2() {
         curr := 0
     }
 
-    #impl fn empty(r: !R/ArrRefRange) {
-        return r.curr >= r.arr.count;
-    }
+    #attr(ArrRefRange) {
+        fn empty(r: !R/ArrRefRange) {
+            return r.curr >= r.arr.count;
+        }
 
-    #impl fn front(r: !R/ArrRefRange) {
-        return &r.arr[r.curr];
-    }
+        fn front(r: !R/ArrRefRange) {
+            return &r.arr[r.curr];
+        }
 
-    #impl fn popFront(R := typeof(^r))(r: *R/ArrRefRange) {
-        r.curr += 1;
+        fn popFront(R := typeof(^r))(r: *R/ArrRefRange) {
+            r.curr += 1;
+        }
     }
 
     arr := []{1, 2, 3};
@@ -312,8 +315,10 @@ fn testPolyImpl() {
         y: T
     }
 
-    #impl fn implTest(t: !T/FooPair) {
-        return 5;
+    #attr(FooPair) {
+        fn implTest(t: !T/FooPair) {
+            return 5;
+        }
     }
 
     type BarPair struct {
@@ -321,8 +326,10 @@ fn testPolyImpl() {
         y: T
     }
 
-    #impl fn implTest(t: !T/BarPair) {
-        return 13;
+    #attr(BarPair) {
+        fn implTest(t: !T/BarPair) {
+            return 13;
+        }
     }
 
     f1: FooPair = {3, 4};
@@ -330,10 +337,10 @@ fn testPolyImpl() {
 
     b: BarPair = {3, 4};
 
-    (f1|implTest == 5)|assert;
-    (f2|implTest == 5)|assert;
+    (f1||implTest == 5)|assert;
+    (f2||implTest == 5)|assert;
 
-    (b|implTest == 13)|assert;
+    (b||implTest == 13)|assert;
 }
 
 fn testPolyRecursion() {
@@ -1088,12 +1095,13 @@ fn testBuffer() {
     f.x = 3;
     f.y = 4;
 
-    &b|set(200, f);
+    &b||set(200, f);
 
-    assert(get(&b, 200).x == 3);
-    assert(get(&b, 200).y == 4);
+    got := &b||get(200);
+    assert(got.x == 3);
+    assert(got.y == 4);
 
-    release(b);
+    b||release;
 }
 
 fn testAnySimple1() {
@@ -1172,15 +1180,17 @@ fn someCheck() { return true; }
 }
 
 fn testIteration(t: !T) {
-    it := t|iter;
+    it := t||iter;
     while !it.empty {
         io.println(it.front);
-        &it|popFront;
+        &it||popFront;
     }
 }
 
 type String []i8
-#impl fn iter(s: String) {
+
+#attr(String)
+fn iter(s: String) {
     type iterator struct {
         empty: bool,
         front: i8 = 0,
@@ -1189,7 +1199,8 @@ type String []i8
         until: i64
     }
 
-    #impl fn popFront(it: *iterator) {
+    #attr(iterator)
+    fn popFront(it: *iterator) {
         it.index += 1;
         if it.index >= it.until {
             it.empty = true;
@@ -1213,24 +1224,26 @@ type String []i8
 }
 
 type I64 i64
-#impl fn iter(i: I64) {
-    type iterator struct {
-        empty: bool,
-        front: i64,
-        until: i64
+
+#attr(I64) {
+    fn iter(i: I64) {
+        type iterator struct {
+            empty: bool,
+            front: i64,
+            until: i64
+        }
+
+        #attr(iterator) {
+            fn popFront(i: *iterator) {
+                i.front += 1;
+                if i.front >= i.until { i.empty = true; }
+            }
+        }
+
+        return cast(iterator) {
+            empty: i == 0,
+            front: 0,
+            until: i
+        };
     }
-
-    #impl fn popFront(i: *iterator) {
-        i.front += 1;
-        if i.front >= i.until { i.empty = true; }
-    }
-
-    s: iterator = {
-        empty: i == 0,
-        front: 0,
-        until: i
-    };
-
-    return s;
 }
-

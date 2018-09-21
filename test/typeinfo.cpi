@@ -33,7 +33,8 @@ type TypeInfoField struct {
     typeInfo: TypeInfo
 }
 
-#impl fn print(f: TypeInfoField) {
+#attr(TypeInfoField)
+fn print(f: TypeInfoField) {
     puts(f.name);
     puts(": ");
     io.print(f.typeInfo);
@@ -83,7 +84,7 @@ fn typeInfo(T: Ast)(recursionCount := 0) {
         fields := buf.make!(TypeInfoField)();
         #for it, i: #fieldsof(T) {
             fieldType := typeInfo!(typeof(t[i]))(recursionCount + 1);
-            &fields|append({it.name|strcpy, fieldType});
+            &fields||append({it.name|strcpy, fieldType});
         }
         ti._struct = fields.buf;
     }
@@ -92,7 +93,7 @@ fn typeInfo(T: Ast)(recursionCount := 0) {
         fields := buf.make!(TypeInfoField)();
         #for it, i: #fieldsof(T) {
             fieldType := typeInfo!(typeof(t[i]))(recursionCount + 1);
-            &fields|append({it.name|strcpy, fieldType});
+            &fields||append({it.name|strcpy, fieldType});
         }
         ti._union = fields.buf;
     }
@@ -106,50 +107,52 @@ fn typeInfo(T: Ast)(recursionCount := 0) {
     return ti;
 }
 
-#impl fn print(t: TypeInfo) {
-    if tagcheck(t._i8) {
-        io.print("i8");
-    }
-    else if tagcheck(t._i16) {
-        io.print("i16");
-    }
-    else if tagcheck(t._i32) {
-        io.print("i32");
-    }
-    else if tagcheck(t._i64) {
-        io.print("i64");
-    }
-    else if tagcheck(t._f32) {
-        io.print("f32");
-    }
-    else if tagcheck(t._f64) {
-        io.print("f64");
-    }
-    else if tagcheck(t._bool) {
-        io.print("bool");
-    }
-    else if tagcheck(t._pointer) {
-        io.printMany({"*", ^t._pointer});
-    }
-    else if tagcheck(t._array) {
-        io.printMany({"[]", ^t._array});
-    }
-    else if tagcheck(t._struct) {
-        io.print("struct{");
-        for field: t._struct {
-            io.print(field);
+#attr(TypeInfo) {
+    fn print(t: TypeInfo) {
+        if tagcheck(t._i8) {
+            io.print("i8");
         }
-        io.print("}");
-    }
-    else if tagcheck(t._union) {
-        io.println("union{");
-        for field: t._union {
-            io.print(field);
+        else if tagcheck(t._i16) {
+            io.print("i16");
         }
-        io.print("}");
-    }
-    else if tagcheck(t._enum) {
-        io.println("enum");
+        else if tagcheck(t._i32) {
+            io.print("i32");
+        }
+        else if tagcheck(t._i64) {
+            io.print("i64");
+        }
+        else if tagcheck(t._f32) {
+            io.print("f32");
+        }
+        else if tagcheck(t._f64) {
+            io.print("f64");
+        }
+        else if tagcheck(t._bool) {
+            io.print("bool");
+        }
+        else if tagcheck(t._pointer) {
+            io.printMany({"*", ^t._pointer});
+        }
+        else if tagcheck(t._array) {
+            io.printMany({"[]", ^t._array});
+        }
+        else if tagcheck(t._struct) {
+            io.print("struct{");
+            for field: t._struct {
+                io.print(field);
+            }
+            io.print("}");
+        }
+        else if tagcheck(t._union) {
+            io.println("union{");
+            for field: t._union {
+                io.print(field);
+            }
+            io.print("}");
+        }
+        else if tagcheck(t._enum) {
+            io.println("enum");
+        }
     }
 }
 

@@ -280,7 +280,7 @@ fn cacheGlyph(tctx: *TextContext, codepoint: i32) {
     cairo.cairo_translate(glyphContext, 0, -cached.extents.yBearing);
     cairo.cairo_show_glyphs(glyphContext, cairoGlyph, 1);
 
-    &tctx.glyphCache|append(cached);
+    &tctx.glyphCache||append(cached);
     return cached;
 }
 
@@ -332,7 +332,7 @@ fn drawLine(tctx: *TextContext, line: i64) {
             cl.high = y + found.extents.yBearing + found.extents.height + 1;
         }
 
-        &cl.glyphs|append({
+        &cl.glyphs||append({
             x + found.extents.xBearing,
             y + found.extents.yBearing,
             cast() (found.extents.width + 1),
@@ -417,7 +417,7 @@ fn demo() {
     while !tctx.done {
         event: sdl.Event;
 
-        while sdl.SDL_PollEvent(&event) != 0 {
+        while sdl.SDL_WaitEvent(&event) != 0 {
             if event._type == sdl.QUIT {
                 tctx.done = true;
             }

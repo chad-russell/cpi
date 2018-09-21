@@ -1132,6 +1132,18 @@ void BytecodeGen::gen(Node *node) {
             gen(node->nodeData);
             node->bytecode =node->nodeData->bytecode;
         } break;
+        case NodeType::ATTROF: {
+            auto resolvedNode = resolve(node);
+
+            gen(resolvedNode);
+            node->bytecode =resolvedNode->bytecode;
+        } break;
+        case NodeType::HASATTR: {
+            auto resolvedNode = resolve(node);
+
+            gen(resolvedNode);
+            node->bytecode =resolvedNode->bytecode;
+        } break;
         case NodeType::ENUM_LITERAL: {
             gen(node->enumLiteralData.value);
             node->bytecode = node->enumLiteralData.value->bytecode;
@@ -1143,6 +1155,7 @@ void BytecodeGen::gen(Node *node) {
         case NodeType::TYPEOF:
         case NodeType::RETURNTYPEOF:
         case NodeType::PARAMETERIZED_TYPE:
+        case NodeType::ATTR:
         case NodeType::IMPORT: {
             // nothing to do!
         } break;
@@ -1324,6 +1337,9 @@ void BytecodeGen::storeValue(Node *node, int64_t offset) {
         } break;
         case NodeType::ENUM_LITERAL: {
             storeValue(node->enumLiteralData.value, offset);
+        } break;
+        case NodeType::HASATTR: {
+            storeValue(resolve(node), offset);
         } break;
         default:
             cpi_assert(false);

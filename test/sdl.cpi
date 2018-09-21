@@ -57,22 +57,24 @@ type Key enum(i32) {
     SHIFT: 225,
 }
 
-#impl fn isalpha(key: Key) {
-    ckey := cast(i32) key;
+#attr(Key) {
+    fn isalpha(key: Key) {
+        ckey := cast(i32) key;
 
-    return (ckey >= 4 and ckey <= 29)
-        or (ckey >= 54 and ckey <= 55);
-}
-
-#impl fn charsFor(key: Key) *i8 {
-    -- todo(chad): should be able to do #for here...
-    for f: #fieldsof(Key) {
-        if f.value == cast(i32) key {
-            return f.name|io.cstr;
-        }
+        return (ckey >= 4 and ckey <= 29)
+            or (ckey >= 54 and ckey <= 55);
     }
 
-    return "\0".data;
+    fn charsFor(key: Key) *i8 {
+        -- todo(chad): should be able to do #for here...
+        for f: #fieldsof(Key) {
+            if f.value == cast(i32) key {
+                return f.name|io.cstr;
+            }
+        }
+
+        return "\0".data;
+    }
 }
 
 fn SDL_Init(flags: i32) i32
@@ -81,6 +83,7 @@ fn SDL_CreateRenderer(window: *Window, index: i32, flags: i32) *Renderer
 fn SDL_RenderSetLogicalSize(renderer: *Renderer, width: i32, height: i32) none
 fn SDL_SetRenderDrawColor(renderer: *Renderer, r: i8, g: i8, b: i8, a: i8) none
 fn SDL_PollEvent(event: *Event) i32
+fn SDL_WaitEvent(event: *Event) i32
 fn SDL_RenderClear(renderer: *Renderer) none
 fn SDL_RenderFillRect(renderer: *Renderer, playerPos: *Rect) none
 fn SDL_RenderPresent(renderer: *Renderer) none

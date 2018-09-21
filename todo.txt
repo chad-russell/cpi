@@ -3,19 +3,16 @@ TODO:
 
     - printing floats
 
-    - difference between
-        - cast() (tctx.windowHeight + 10)
-        - cast() tctx.windowHeight + 10
-
     - support profiling in interpreter
+
+    - ways to deal with nullable/non-nullable pointers
+        - .? operator
 
     - better unions (?)
         - @notag attribute on type decl?
         - @tag to specify which field should get used as the tag?
 
     - build a better debugger backend
-        - the way things are currently evaulated is likely deeply flawed because of things needing storage... sigh....
-        - conditional breakpoints
         - ability to do eval in the context of a particular stack frame (e.g. eval this 3 frames ago)
         - CT arguments should show up as variables in the inspector
         - ability to set variables (where applicable)
