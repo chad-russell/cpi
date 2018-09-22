@@ -147,7 +147,6 @@ enum class LexerTokenType : int32_t {
     COMMA,
     SINGLE_QUOTE,
     DOUBLE_QUOTE,
-    ATTR_VERTICAL_BAR,
     VERTICAL_BAR,
     AT,
     FN,
@@ -422,6 +421,7 @@ struct RetData {
 
 struct SymbolData {
     int64_t atomId; // todo(chad): why not uint64_t?
+    bool isAttr;
 };
 
 struct ArrayLiteralData {

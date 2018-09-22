@@ -244,9 +244,9 @@ fn testIter3() {
     fn map(f: Ast)(range: !R) {
         #import "buffer";
 
-        b := buffer.make!(typeof(range||front))();
+        b := buffer.make!(typeof(range|:front))();
         for it: range {
-            &b||append(f(it));
+            &b|:append(f(it));
         }
         return b.buf|iter;
     }
@@ -254,10 +254,10 @@ fn testIter3() {
     fn filter(f: Ast)(range: !R) {
         #import "buffer";
 
-        b := buffer.make!(typeof(range||front))();
+        b := buffer.make!(typeof(range|:front))();
         for it: range {
             if f(it) {
-                &b||append(it);
+                &b|:append(it);
             }
         }
         return b.buf|iter;
@@ -337,10 +337,10 @@ fn testPolyImpl() {
 
     b: BarPair = {3, 4};
 
-    (f1||implTest == 5)|assert;
-    (f2||implTest == 5)|assert;
+    assert(f1|:implTest == 5);
+    assert(f2|:implTest == 5);
 
-    (b||implTest == 13)|assert;
+    assert(b|:implTest == 13);
 }
 
 fn testPolyRecursion() {
@@ -1095,17 +1095,17 @@ fn testBuffer() {
     f.x = 3;
     f.y = 4;
 
-    &b||set(200, f);
+    &b | :set(200, f);
 
-    got := &b||get(200);
+    got := &b|:get(200);
 
-    -- assert((&b||get(200)).x == 3);
-    -- assert((#attrof(typeof(&b), get)(&b, 200)).x == 3);
+    -- assert((&b|:get(200)).x == 3);
+    assert((#attrof(typeof(&b), get)(&b, 200)).x == 3);
 
     assert(got.x == 3);
     assert(got.y == 4);
 
-    b||release;
+    b|:release;
 }
 
 fn testAnySimple1() {
@@ -1184,10 +1184,10 @@ fn someCheck() { return true; }
 }
 
 fn testIteration(t: !T) {
-    it := t||iter;
+    it := t|:iter;
     while !it.empty {
         io.println(it.front);
-        &it||popFront;
+        &it|:popFront;
     }
 }
 

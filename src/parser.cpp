@@ -742,8 +742,14 @@ Node *Parser::parseModuleDecl() {
 }
 
 Node *Parser::parseSymbol() {
-    LexerToken front = expect(LexerTokenType::SYMBOL, "identifier");
     auto sym = new Node(lexer->srcInfo, NodeType::SYMBOL, scopes.top());
+
+    if (lexer->front.type == LexerTokenType::COLON) {
+        sym->symbolData.isAttr = true;
+        popFront();
+    }
+
+    LexerToken front = expect(LexerTokenType::SYMBOL, "identifier");
     sym->region = front.region;
     sym->symbolData.atomId = atomTable->insert(sym->region);
     return sym;
@@ -2089,7 +2095,6 @@ int8_t Parser::operatorPrecedence(LexerTokenType type) {
             return 4;
 
         case LexerTokenType::VERTICAL_BAR:
-        case LexerTokenType::ATTR_VERTICAL_BAR:
             return 5;
 
         default: cpi_assert(false);

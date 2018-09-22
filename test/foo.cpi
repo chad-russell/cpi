@@ -1,5 +1,5 @@
 fn test(t: !T) {
-    foo(t);
+    t | :foo;
 }
 
 type I32 i32

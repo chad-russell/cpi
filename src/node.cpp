@@ -13,6 +13,10 @@ Node::Node(SourceInfo srcInfo, NodeType type_, Scope *scope_) : Node() {
         case NodeType::FN_DECL: {
             initFnDeclData(this);
         } break;
+        case NodeType::SYMBOL: {
+            this->symbolData.atomId = -1;
+            this->symbolData.isAttr = false;
+        } break;
         case NodeType::DECL_PARAM:
         case NodeType::VALUE_PARAM: {
             initParamData(this);

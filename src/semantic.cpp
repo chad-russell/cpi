@@ -2056,70 +2056,6 @@ void rewritePipe(Semantic *semantic, Node *node) {
     node->typeInfo = fnCallNode->typeInfo;
 }
 
-/*
- * a||foo => #attrof(typeof(a), foo)(a)
- * a||foo(b, c) => #attrof(typeof(a), foo)(a, b, c)
- */
-void rewriteAttrPipe(Semantic *semantic, Node *node) {
-    auto resolvedLhs = resolve(node->binopData.lhs);
-    auto resolvedRhs = resolve(node->binopData.rhs);
-
-    semantic->resolveTypes(resolvedLhs);
-
-    auto fnCallNode = new Node(node->region.srcInfo, NodeType::FN_CALL, node->scope);
-    fnCallNode->region = node->region;
-    fnCallNode->fnCallData.hasRuntimeParams = true;
-    vector_append(fnCallNode->fnCallData.params, wrapInValueParam(resolvedLhs, nullptr));
-
-    if (resolvedRhs->type == NodeType::DOT) {
-        semantic->resolveTypes(resolvedRhs);
-        resolvedRhs = resolve(resolvedRhs);
-    }
-
-    if (resolvedRhs->type == NodeType::SYMBOL || resolvedRhs->type == NodeType::FN_DECL) {
-        // rhs is symbol or fn
-        auto typeofA = new Node(node->region.srcInfo, NodeType::TYPEOF, node->scope);
-        typeofA->region = resolvedLhs->region;
-        typeofA->nodeData = resolvedLhs;
-
-        auto attrof = new Node(node->region.srcInfo, NodeType::ATTROF, node->scope);
-        attrof->region = resolvedLhs->region;
-        attrof->attrofData.target = typeofA;
-        attrof->attrofData.attr = resolvedRhs;
-
-        fnCallNode->fnCallData.fn = attrof;
-    }
-    else if (resolvedRhs->type == NodeType::FN_CALL) {
-        // rhs is fn call
-        auto typeofA = new Node(node->region.srcInfo, NodeType::TYPEOF, node->scope);
-        typeofA->region = resolvedLhs->region;
-        typeofA->nodeData = resolvedLhs;
-
-        auto attrof = new Node(node->region.srcInfo, NodeType::ATTROF, node->scope);
-        attrof->region = resolvedLhs->region;
-        attrof->attrofData.target = typeofA;
-        attrof->attrofData.attr = resolvedRhs->fnCallData.fn;
-
-        fnCallNode->fnCallData.fn = attrof;
-
-        for (auto param : resolvedRhs->fnCallData.params) {
-            vector_append(fnCallNode->fnCallData.params, param);
-        }
-        for (auto param : resolvedRhs->fnCallData.ctParams) {
-            vector_append(fnCallNode->fnCallData.ctParams, param);
-        }
-    }
-    else {
-        // error
-        cpi_assert(false);
-    }
-
-    semantic->resolveTypes(fnCallNode);
-
-    node->resolved = fnCallNode;
-    node->typeInfo = fnCallNode->typeInfo;
-}
-
 void rewriteMathEQ(Semantic *semantic, Node *node) {
     LexerTokenType binopType{};
     switch (node->binopData.type) {
@@ -2158,11 +2094,6 @@ void rewriteMathEQ(Semantic *semantic, Node *node) {
 void resolveBinop(Semantic *semantic, Node *node) {
     if (node->binopData.type == LexerTokenType::VERTICAL_BAR) {
         rewritePipe(semantic, node);
-        return;
-    }
-
-    if (node->binopData.type == LexerTokenType::ATTR_VERTICAL_BAR) {
-        rewriteAttrPipe(semantic, node);
         return;
     }
 
@@ -2283,7 +2214,7 @@ Node *resolveSymbolWithScopeType(Semantic *semantic, int64_t atom, Node *firstPa
     semantic->resolveTypes(firstParam);
 
     auto resolvedScopeType = resolve(firstParam->typeInfo);
-    while (resolvedScopeType->typeData.kind == NodeTypekind::POINTER || resolvedScopeType->typeData.polyCameFrom != nullptr) {
+    while (resolvedScopeType->type == NodeType::TYPE && (resolvedScopeType->typeData.kind == NodeTypekind::POINTER || resolvedScopeType->typeData.polyCameFrom != nullptr)) {
         if (resolvedScopeType->typeData.kind == NodeTypekind::POINTER) {
             resolvedScopeType = resolve(resolvedScopeType->typeData.pointerTypeData.underlyingType);
         }
@@ -2292,7 +2223,16 @@ Node *resolveSymbolWithScopeType(Semantic *semantic, int64_t atom, Node *firstPa
         }
     }
 
-    for (auto attr : *resolvedScopeType->typeData.attributes) {
+    vector_t<Node *> attrs;
+    if (resolvedScopeType->type == NodeType::TYPE) {
+        attrs = *resolvedScopeType->typeData.attributes;
+    }
+    else {
+        cpi_assert(resolvedScopeType->type == NodeType::PARAMETERIZED_TYPE);
+        attrs = resolvedScopeType->parameterizedTypeData.attributes;
+    }
+
+    for (auto attr : attrs) {
         if (attr->fnDeclData.name->symbolData.atomId == atom) {
             return attr;
         }
@@ -2305,25 +2245,30 @@ void resolveFnCall(Semantic *semantic, Node *node) {
     node->sourceMapStatement = true;
     semantic->addLocal(node);
 
-//    Node *resolvedFn = nullptr;
+    Node *resolvedFn = nullptr;
 
     // if the fn is a symbol and there's at least 1 runtime param, look in the scope of the type to find the fn
-//    unsigned long firstParamIndex = 0;
-//    if (resolvedFn == nullptr && node->fnCallData.fn->type == NodeType::SYMBOL && node->fnCallData.params.length > firstParamIndex) {
-//        auto firstParam = vector_at(node->fnCallData.params, firstParamIndex);
-//
-//        resolvedFn = resolveSymbolWithScopeType(semantic, node->fnCallData.fn->symbolData.atomId, firstParam);
-//        if (resolvedFn != nullptr) {
-//            node->fnCallData.fn->resolved = resolvedFn;
-//        }
-//    }
+    unsigned long firstParamIndex = 0;
+    if (resolvedFn == nullptr
+        && node->fnCallData.fn->type == NodeType::SYMBOL
+        && node->fnCallData.fn->symbolData.isAttr
+        && node->fnCallData.params.length > firstParamIndex) {
+
+        auto firstParam = vector_at(node->fnCallData.params, firstParamIndex);
+
+        resolvedFn = resolveSymbolWithScopeType(semantic, node->fnCallData.fn->symbolData.atomId, firstParam);
+        if (resolvedFn != nullptr) {
+            node->fnCallData.fn->resolved = resolvedFn;
+        }
+        else {
+            semantic->reportError({node}, Error{node->fnCallData.fn->region, "Could not resolve attr fn"});
+        }
+    }
 
     // if we haven't found anything, then just do the normal thing
-//    if (resolvedFn == nullptr) {
-//        resolvedFn = node->fnCallData.fn;
-//    }
-
-    auto resolvedFn = resolve(node->fnCallData.fn);
+    if (resolvedFn == nullptr) {
+        resolvedFn = node->fnCallData.fn;
+    }
 
     semantic->resolveTypes(resolvedFn);
     resolvedFn = resolve(resolvedFn);

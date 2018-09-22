@@ -57,12 +57,12 @@ type HashTest struct {
 }
 
 fn hashInsert(TKey := typeof(ht.buckets[0].key), TValue := typeof(ht.buckets[0].value))(ht: !HT, key: TKey, value: TValue) {
-    hash := (key||hasher) mod ht.buckets.count;
+    hash := :hasher(key) mod ht.buckets.count;
 
     if ht.buckets[hash] != nil {
         lastBucket := ht.buckets[hash];
 
-        if lastBucket.key || equals(key) {
+        if lastBucket.key | :equals(key) {
             lastBucket.value = value;
             return;
         }
@@ -70,7 +70,7 @@ fn hashInsert(TKey := typeof(ht.buckets[0].key), TValue := typeof(ht.buckets[0].
         while lastBucket.next != nil {
             lastBucket = cast() lastBucket.next;
 
-            if lastBucket.key || equals(key) {
+            if lastBucket.key | :equals(key) {
                 lastBucket.value = value;
                 return;
             }
@@ -94,18 +94,18 @@ fn hashInsert(TKey := typeof(ht.buckets[0].key), TValue := typeof(ht.buckets[0].
 }
 
 fn hashGet(TKey := typeof(ht.buckets[0].key))(ht: !HT, key: TKey) {
-    hash := (key||hasher) mod ht.buckets.count;
+    hash := :hasher(key) mod ht.buckets.count;
 
     if ht.buckets[hash] != nil {
         lastBucket := ht.buckets[hash];
 
-        if lastBucket.key || equals(key) {
+        if lastBucket.key | :equals(key) {
             return &lastBucket.value;
         }
 
         while lastBucket.next != nil {
             lastBucket = lastBucket.next;
-            if lastBucket.key || equals(key) {
+            if lastBucket.key | :equals(key) {
                 return &lastBucket.value;
             }
         }
@@ -127,7 +127,7 @@ fn test() {
     basic.assert(^hashGet(&h, "bar") == 5);
     basic.assert(^hashGet(&h, "carr") == 13);
 
-    basic.assert(^hashGet(&h2, cast() {2, 3}) || equals("foo"));
-    basic.assert(^hashGet(&h2, cast() {3, 4}) || equals("bar"));
+    basic.assert(^hashGet(&h2, cast() {2, 3}) | :equals("foo"));
+    basic.assert(^hashGet(&h2, cast() {3, 4}) | :equals("bar"));
 }
 

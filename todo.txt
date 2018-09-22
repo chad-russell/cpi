@@ -1,4 +1,7 @@
 TODO:
+    - bug in testBuffer in test.cpi
+        -- assert((&b|:get(200)).x == 3);
+
     - support passing args to main fn
 
     - printing floats
