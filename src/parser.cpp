@@ -2089,7 +2089,7 @@ int8_t Parser::operatorPrecedence(LexerTokenType type) {
             return 4;
 
         case LexerTokenType::VERTICAL_BAR:
-        case LexerTokenType::DOUBLE_VERTICAL_BAR:
+        case LexerTokenType::ATTR_VERTICAL_BAR:
             return 5;
 
         default: cpi_assert(false);

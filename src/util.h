@@ -147,7 +147,7 @@ enum class LexerTokenType : int32_t {
     COMMA,
     SINGLE_QUOTE,
     DOUBLE_QUOTE,
-    DOUBLE_VERTICAL_BAR,
+    ATTR_VERTICAL_BAR,
     VERTICAL_BAR,
     AT,
     FN,

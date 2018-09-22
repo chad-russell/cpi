@@ -1,18 +1,32 @@
 fn test(t: !T) {
-    t||foo;
+    foo(t);
 }
 
 type I32 i32
+type F32 f32
 
 fn main() {
     i: I32 = 13;
     test(i);
 
+    f: F32 = 13.3;
+    test(f);
+
     return 0;
+}
+
+fn foo(t: !T) {
+    puts("hey there! (fallback)\n");
 }
 
 #attr(I32) {
     fn foo(i: I32) {
-        puts("hey there!\n");
+        puts("hey there! (i32)\n");
+    }
+}
+
+#attr(F32) {
+    fn foo(f: F32) {
+        puts("hey there! (f32)\n");
     }
 }

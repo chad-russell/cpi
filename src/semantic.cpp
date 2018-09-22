@@ -2161,7 +2161,7 @@ void resolveBinop(Semantic *semantic, Node *node) {
         return;
     }
 
-    if (node->binopData.type == LexerTokenType::DOUBLE_VERTICAL_BAR) {
+    if (node->binopData.type == LexerTokenType::ATTR_VERTICAL_BAR) {
         rewriteAttrPipe(semantic, node);
         return;
     }
@@ -2305,23 +2305,25 @@ void resolveFnCall(Semantic *semantic, Node *node) {
     node->sourceMapStatement = true;
     semantic->addLocal(node);
 
-    Node *resolvedFn = nullptr;
+//    Node *resolvedFn = nullptr;
 
     // if the fn is a symbol and there's at least 1 runtime param, look in the scope of the type to find the fn
-    unsigned long firstParamIndex = 0;
-    if (resolvedFn == nullptr && node->fnCallData.fn->type == NodeType::SYMBOL && node->fnCallData.params.length > firstParamIndex) {
-        auto firstParam = vector_at(node->fnCallData.params, firstParamIndex);
-
-        resolvedFn = resolveSymbolWithScopeType(semantic, node->fnCallData.fn->symbolData.atomId, firstParam);
-        if (resolvedFn != nullptr) {
-            node->fnCallData.fn->resolved = resolvedFn;
-        }
-    }
+//    unsigned long firstParamIndex = 0;
+//    if (resolvedFn == nullptr && node->fnCallData.fn->type == NodeType::SYMBOL && node->fnCallData.params.length > firstParamIndex) {
+//        auto firstParam = vector_at(node->fnCallData.params, firstParamIndex);
+//
+//        resolvedFn = resolveSymbolWithScopeType(semantic, node->fnCallData.fn->symbolData.atomId, firstParam);
+//        if (resolvedFn != nullptr) {
+//            node->fnCallData.fn->resolved = resolvedFn;
+//        }
+//    }
 
     // if we haven't found anything, then just do the normal thing
-    if (resolvedFn == nullptr) {
-        resolvedFn = node->fnCallData.fn;
-    }
+//    if (resolvedFn == nullptr) {
+//        resolvedFn = node->fnCallData.fn;
+//    }
+
+    auto resolvedFn = resolve(node->fnCallData.fn);
 
     semantic->resolveTypes(resolvedFn);
     resolvedFn = resolve(resolvedFn);

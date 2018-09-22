@@ -1098,6 +1098,10 @@ fn testBuffer() {
     &b||set(200, f);
 
     got := &b||get(200);
+
+    -- assert((&b||get(200)).x == 3);
+    -- assert((#attrof(typeof(&b), get)(&b, 200)).x == 3);
+
     assert(got.x == 3);
     assert(got.y == 4);
 

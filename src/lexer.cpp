@@ -174,7 +174,7 @@ void Lexer::popFront() {
     if (tryEat(&next, "~!", LexerTokenType::BITNOT)) { return; }
     if (tryEat(&next, "!", LexerTokenType::NOT)) { return; }
     if (tryEat(&next, "@", LexerTokenType::AT)) { return; }
-    if (tryEat(&next, "||", LexerTokenType::DOUBLE_VERTICAL_BAR)) { return; }
+    if (tryEat(&next, "|:", LexerTokenType::ATTR_VERTICAL_BAR)) { return; }
     if (tryEat(&next, "|", LexerTokenType::VERTICAL_BAR)) { return; }
     if (tryEatKeyword(&next, "#link", LexerTokenType::LINK)) { return; }
     if (tryEatKeyword(&next, "defer", LexerTokenType::DEFER)) { return; }
@@ -556,7 +556,7 @@ bool isBinop(LexerTokenType type) {
            || type == LexerTokenType::MUL
            || type == LexerTokenType::DIV
            || type == LexerTokenType::VERTICAL_BAR
-           || type == LexerTokenType::DOUBLE_VERTICAL_BAR
+           || type == LexerTokenType::ATTR_VERTICAL_BAR
            || type == LexerTokenType::MOD
            || type == LexerTokenType::BITAND
            || type == LexerTokenType::BITOR
