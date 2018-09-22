@@ -1,32 +1,19 @@
-fn test(t: !T) {
-    t | :foo;
-}
-
-type I32 i32
-type F32 f32
+#import "io";
+#import "buffer";
 
 fn main() {
-    i: I32 = 13;
-    test(i);
+    type foo struct {
+        x: i32,
+        y: i32
+    }
 
-    f: F32 = 13.3;
-    test(f);
+    b := buffer.make!(foo)(0);
+
+    f: foo = {3, 4};
+
+    &b | :set(200, f);
+
+    basic.assert((&b|:get(200)).x == 3);
 
     return 0;
-}
-
-fn foo(t: !T) {
-    puts("hey there! (fallback)\n");
-}
-
-#attr(I32) {
-    fn foo(i: I32) {
-        puts("hey there! (i32)\n");
-    }
-}
-
-#attr(F32) {
-    fn foo(f: F32) {
-        puts("hey there! (f32)\n");
-    }
 }

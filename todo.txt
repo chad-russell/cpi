@@ -1,19 +1,11 @@
 TODO:
-    - bug in testBuffer in test.cpi
-        -- assert((&b|:get(200)).x == 3);
+    - how to add user variables to context?
 
     - support passing args to main fn
 
     - printing floats
 
     - support profiling in interpreter
-
-    - ways to deal with nullable/non-nullable pointers
-        - .? operator
-
-    - better unions (?)
-        - @notag attribute on type decl?
-        - @tag to specify which field should get used as the tag?
 
     - build a better debugger backend
         - ability to do eval in the context of a particular stack frame (e.g. eval this 3 frames ago)
@@ -25,12 +17,19 @@ TODO:
             - use this for step/continue backwards in vscode
         - ctfe debugging (?)
 
-    - how to add user variables to context?
-
     - switch (on enum/union)
 
     - operator overloading?
         +, -, *, /, comparison
+
+    - ways to deal with nullable/non-nullable pointers (?)
+        - .? operator
+
+    - some kind of zig-like error handling (?)
+
+    - better unions (?)
+        - @notag attribute on type decl?
+        - @tag to specify which field should get used as the tag?
 
     - static array sizes?
         - [5]i32

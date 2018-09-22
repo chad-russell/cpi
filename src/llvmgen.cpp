@@ -1307,6 +1307,7 @@ void LlvmGen::gen(Node *node) {
         case NodeType::LINK:
         case NodeType::PARAMETERIZED_TYPE:
         case NodeType::TYPEOF:
+        case NodeType::ATTR:
         case NodeType::MODULE: {
             // nothing to do
         } break;

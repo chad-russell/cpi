@@ -2885,6 +2885,11 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
         return;
     }
 
+    // if this is something along the lines of (a|b).c, then just set the lhs to be the rewritten form of a|b
+    if (lhs->type == NodeType::BINOP && lhs->binopData.type == LexerTokenType::VERTICAL_BAR) {
+        node->dotData.lhs = resolvedLhs;
+    }
+
     semantic->addLocal(node->dotData.lhs);
 
     Node *resolvedLhsTypeInfo;
