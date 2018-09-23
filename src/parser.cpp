@@ -962,11 +962,15 @@ Node *Parser::parseIf() {
 
     auto savedStaticIfScope = this->staticIfScope;
     auto savedImports = this->imports;
-    auto savedImpls = this->impls;
+    auto savedContexts = this->contexts;
+    auto savedContextInits = this->contextInits;
 
     if (isStatic) {
         this->staticIfScope = scopes.top();
         this->imports = &if_->ifData.trueImports;
+        this->impls = &if_->ifData.trueImpls;
+        this->contexts = &if_->ifData.trueContexts;
+        this->contextInits = &if_->ifData.trueContextInits;
     }
 
     expect(LexerTokenType::LCURLY, "{");
@@ -986,6 +990,8 @@ Node *Parser::parseIf() {
     if (isStatic) {
         this->staticIfScope = savedStaticIfScope;
         this->imports = &if_->ifData.falseImports;
+        this->contexts = &if_->ifData.falseContexts;
+        this->contextInits = &if_->ifData.falseContextInits;
     }
 
     if (lexer->front.type == LexerTokenType::ELSE) {
@@ -1032,7 +1038,8 @@ Node *Parser::parseIf() {
     if (isStatic) {
         vector_append(this->staticIfScope->staticIfs, if_);
         this->imports = savedImports;
-        this->impls = savedImpls;
+        this->contexts = savedContexts;
+        this->contextInits = savedContextInits;
     }
 
     return if_;

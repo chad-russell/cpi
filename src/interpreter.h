@@ -535,7 +535,7 @@ int64_t evaluate(Interpreter *fromInterp, SourceInfo srcInfo, Scope *scope, stri
     semantic->lexer = evalLexer;
     semantic->parser = evalParser;
     semantic->addStaticIfs(evalParser->scopes.top());
-    semantic->addImports(*evalParser->imports);
+    semantic->addImports(*evalParser->imports, *evalParser->impls, *evalParser->contexts, *evalParser->contextInits);
 
     auto wrappedRet = new Node(parsed->region.srcInfo, NodeType::RETURN, parsed->scope);
     wrappedRet->nodeData = parsed;

@@ -219,7 +219,7 @@ int main(int argc, char **argv) {
         semantic->contexts = *parser->contexts;
         semantic->contextInits = *parser->contextInits;
         semantic->addStaticIfs(parser->scopes.top());
-        semantic->addImports(*parser->imports);
+        semantic->addImports(*parser->imports, *parser->impls, *parser->contexts, *parser->contextInits);
 
         for (auto ctx : *parser->contexts) {
             semantic->resolveTypes(ctx);

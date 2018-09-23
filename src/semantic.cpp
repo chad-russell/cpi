@@ -864,13 +864,13 @@ void Semantic::addStaticIfs(Scope *targetScope, Scope *importInto) {
         cpi_assert(ifStmt->ifData.condition->staticValue->type == NodeType::BOOLEAN_LITERAL);
 
         if (ifStmt->ifData.condition->staticValue->boolLiteralData.value && ifStmt->ifData.stmts.length > 0) {
-            addImports(ifStmt->ifData.trueImports);
+            addImports(ifStmt->ifData.trueImports, ifStmt->ifData.trueImpls, ifStmt->ifData.trueContexts, ifStmt->ifData.trueContextInits);
 
             addAllFromScopeToScope(this, ifStmt->ifData.ifScope, ii, true);
             addStaticIfs(ifStmt->ifData.ifScope, ifStmt->scope);
         }
         else if (!ifStmt->ifData.condition->staticValue->boolLiteralData.value && ifStmt->ifData.elseStmts.length > 0) {
-            addImports(ifStmt->ifData.falseImports);
+            addImports(ifStmt->ifData.falseImports, ifStmt->ifData.falseImpls, ifStmt->ifData.falseContexts, ifStmt->ifData.falseContextInits);
 
             addAllFromScopeToScope(this, ifStmt->ifData.elseScope, ii, true);
             addStaticIfs(ifStmt->ifData.elseScope, ifStmt->scope);
@@ -878,7 +878,7 @@ void Semantic::addStaticIfs(Scope *targetScope, Scope *importInto) {
     }
 }
 
-void Semantic::addImports(vector_t<Node *> imports) {
+void Semantic::addImports(vector_t<Node *> imports, vector_t<Node *> impls, vector_t<Node *> contexts, vector_t<Node *> contextInits) {
     for (auto import : imports) {
         auto importTarget = resolve(import->importData.target);
 
@@ -896,6 +896,18 @@ void Semantic::addImports(vector_t<Node *> imports) {
         if (!import->importData.isFile) {
             addAllFromScopeToScope(this, importTarget->scope, import->scope, false);
         }
+    }
+
+    for (auto context: contexts) {
+        resolveTypes(context);
+    }
+
+    for (auto contextInit: contextInits) {
+        resolveTypes(contextInit);
+    }
+
+    for (auto impl: impls) {
+        resolveTypes(impl);
     }
 }
 

@@ -5,11 +5,7 @@ type Foo(T: Ast) T
 
 #context f: Foo!(i64)
 
-fn cond() {
-    io.println("cond");
-    return true;
-}
-#if cond() {
+#if os.MAC == false {
     #import "textedit";
 }
 

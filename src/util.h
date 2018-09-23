@@ -407,6 +407,15 @@ struct IfData {
 
     vector_t<Node *> trueImports;
     vector_t<Node *> falseImports;
+
+    vector_t<Node *> trueContexts;
+    vector_t<Node *> falseContexts;
+
+    vector_t<Node *> trueContextInits;
+    vector_t<Node *> falseContextInits;
+
+    vector_t<Node *> trueImpls;
+    vector_t<Node *> falseImpls;
 };
 
 struct WhileData {
