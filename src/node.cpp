@@ -213,6 +213,7 @@ void initFnCallData(Node *node) {
     node->fnCallData.ctParams = vector_init<Node *>(8);
     node->fnCallData.params = vector_init<Node *>(8);
     node->fnCallData.hasRuntimeParams = true;
+    node->fnCallData.skipContext = false;
 }
 
 void initAssignData(Node *node) {

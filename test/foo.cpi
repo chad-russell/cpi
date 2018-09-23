@@ -1,18 +1,14 @@
 #import "os";
-#import "io";
 
-type Foo(T: Ast) T
+#context init := os.WINDOWS == true
 
-#context f: Foo!(i64)
-
-#if os.MAC == false {
-    #import "textedit";
+fn foo() {
+    basic.tmp(13);
+    return 10;
 }
 
+a := foo();
+
 fn main() {
-    context.f = 18;
-
-    io.println(^context);
-
-    return 0;
+    return context.init;
 }

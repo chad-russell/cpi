@@ -137,11 +137,15 @@ Node *Semantic::findExistingPolymorph(Node *polymorph, vector_t<Node *> givenPar
 void addContextParameterForCall(Semantic *semantic, Node *node) {
     auto newParams = vector_init<Node *>(node->fnCallData.params.length + 1);
 
+    auto contextSym = new Node(node->region.srcInfo, NodeType::SYMBOL, node->scope);
+    contextSym->symbolData.atomId = atomTable->insertStr("context");
+
     auto newParam = new Node(node->region.srcInfo, NodeType::SYMBOL, node->scope);
-    newParam->symbolData.atomId = atomTable->insertStr("context");
+    newParam->symbolData.atomId = contextSym->symbolData.atomId;
 
     // if 'context' is not in scope, then create a new one
-    if (node->scope->find(newParam->symbolData.atomId) == nullptr) {
+    auto missingContext = node->scope->find(newParam->symbolData.atomId) == nullptr;
+    if (missingContext) {
         newParam = new Node(node->region.srcInfo, NodeType::CREATE_CONTEXT, node->scope);
     }
 
@@ -902,9 +906,9 @@ void Semantic::addImports(vector_t<Node *> imports, vector_t<Node *> impls, vect
         resolveTypes(context);
     }
 
-    for (auto contextInit: contextInits) {
-        resolveTypes(contextInit);
-    }
+//    for (auto contextInit: contextInits) {
+//        resolveTypes(contextInit);
+//    }
 
     for (auto impl: impls) {
         resolveTypes(impl);
@@ -1397,10 +1401,6 @@ Node *constantize(Semantic *semantic, Node *node) {
     if (copied->type != NodeType::FN_CALL || copied->fnCallData.params.length != 0) {
         auto wrappedFn = new Node(node->region.srcInfo, NodeType::FN_DECL, node->scope);
 
-        if (!noIppFlag) {
-            semantic->parser->addContextParameterForDecl(wrappedFn->fnDeclData.params, node->scope);
-        }
-
         auto savedCurrentFnDecl = semantic->currentFnDecl;
         semantic->currentFnDecl = wrappedFn;
         auto wrappedRet = new Node(node->region.srcInfo, NodeType::RETURN, node->scope);
@@ -1414,6 +1414,7 @@ Node *constantize(Semantic *semantic, Node *node) {
 
         auto fnCall = new Node(node->region.srcInfo, NodeType::FN_CALL, node->scope);
         fnCall->fnCallData.fn = wrappedFn;
+        fnCall->fnCallData.skipContext = true;
 
         copied = fnCall;
         semantic->resolveTypes(copied);
@@ -2253,6 +2254,9 @@ Node *Semantic::deepCopyScopedStmt(Node *node, Scope *scope) {
         copyingParser->scopes.pop();
         copyingParser->scopes.push(scope);
         copyingParser->currentFnDecl = currentFnDecl;
+        copyingParser->contexts = &this->contexts;
+        copyingParser->contextInits = &this->contextInits;
+
         copied = copyingParser->parseScopedStmt();
     }
 
@@ -2274,6 +2278,8 @@ Node *Semantic::deepCopyRvalue(Node *node, Scope *scope) {
     copyingParser->scopes.pop();
     copyingParser->scopes.push(scope);
     copyingParser->currentFnDecl = currentFnDecl;
+    copyingParser->contexts = &this->contexts;
+    copyingParser->contextInits = &this->contextInits;
 
     return copyingParser->parseRvalue();
 }
@@ -2354,7 +2360,10 @@ void resolveFnCall(Semantic *semantic, Node *node) {
 
     if (!noIppFlag) {
         bool shouldAddContextParam = false;
-        if (resolvedFn->type != NodeType::FN_DECL) {
+        if (node->fnCallData.skipContext) {
+            // still false
+        }
+        else if (resolvedFn->type != NodeType::FN_DECL) {
             shouldAddContextParam = true;
         }
         else if (resolvedFn->fnDeclData.name != nullptr && !resolvedFn->fnDeclData.isExternal) {

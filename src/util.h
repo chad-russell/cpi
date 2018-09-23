@@ -358,6 +358,7 @@ struct FnCallData {
     vector_t<Node *> params;
 
     bool hasRuntimeParams;
+    bool skipContext;
 };
 
 struct ArrayIndexData {

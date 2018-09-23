@@ -2178,7 +2178,7 @@ Node *Parser::parseContextInit() {
     expect(LexerTokenType::CONTEXT_INIT, "#contextinit");
 
     auto fn = parseRvalue();
-    vector_append(*this->contextInits, fn);
+//    vector_append(*this->contextInits, fn);
     return fn;
 }
 
