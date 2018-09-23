@@ -1,19 +1,10 @@
-#import "io";
-#import "buffer";
+#context id: i64
+
+fn initId() {
+    context.id = 15;
+}
+#contextinit initId
 
 fn main() {
-    type foo struct {
-        x: i32,
-        y: i32
-    }
-
-    b := buffer.make!(foo)(0);
-
-    f: foo = {3, 4};
-
-    &b | :set(200, f);
-
-    basic.assert((&b|:get(200)).x == 3);
-
-    return 0;
+    return context.id;
 }

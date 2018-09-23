@@ -30,7 +30,7 @@ type Rect(T := typeof(x)) struct {
 type CachedLine struct {
     low: f64,
     high: f64,
-    glyphs: buf.Buffer!(Rect!(f64), basic.tmp, noopFree)
+    glyphs: buf.Buffer!(Rect!(f64))
 }
 
 type TextContext struct {
@@ -49,8 +49,8 @@ type TextContext struct {
     font: []i8,
     eb: *se.EditorBuffer,
 
-    glyphCache: buf.Buffer!(CachedGlyph, mem.malloc, mem.free),
-    lineCache: buf.Buffer!(CachedLine, basic.tmp, noopFree),
+    glyphCache: buf.Buffer!(CachedGlyph),
+    lineCache: buf.Buffer!(CachedLine),
 
     sdlWindow: *sdl.Window,
     sdlSurface: *sdl.Surface,
@@ -146,8 +146,8 @@ fn initCairo(tctx: *TextContext) {
     cairo.cairo_set_font_face(tctx.cairoTextContext, tctx.cairoFont);
     cairo.cairo_set_font_size(tctx.cairoTextContext, cast() FONT_SIZE);
 
-    tctx.glyphCache = buf.make!(CachedGlyph, mem.malloc, mem.free)();
-    tctx.lineCache = buf.make!(CachedLine, basic.tmp, noopFree)();
+    tctx.glyphCache = buf.make!(CachedGlyph)();
+    tctx.lineCache = buf.make!(CachedLine)();
 
     tctx.cairoMouseSurface = cairo.cairo_image_surface_create(cairo.FORMAT_ARGB32, cast() tctx.sdlSurface.w, cast() tctx.sdlSurface.h);
     tctx.cairoMousePattern = cairo.cairo_pattern_create_for_surface(tctx.cairoMouseSurface);
@@ -303,7 +303,7 @@ fn drawLine(tctx: *TextContext, line: i64) {
     glyphInfo := hb.hb_buffer_get_glyph_infos(tctx.hbBuffer, nil);
     glyphPos := hb.hb_buffer_get_glyph_positions(tctx.hbBuffer, nil);
 
-    clGlyphs := buf.make!(Rect!(f64), basic.tmp, noopFree)();
+    clGlyphs := buf.make!(Rect!(f64))();
     cl: CachedLine = {cast() (tctx.windowHeight + 10), 0, clGlyphs};
 
     x: f64 = 5;
@@ -352,7 +352,7 @@ fn drawLine(tctx: *TextContext, line: i64) {
 
 fn drawText(tctx: *TextContext) {
     basic.resetTmp();
-    tctx.lineCache = buf.make!(CachedLine, basic.tmp, noopFree)();
+    tctx.lineCache = buf.make!(CachedLine)();
 
     clear(tctx);
 

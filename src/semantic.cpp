@@ -140,13 +140,12 @@ void addContextParameterForCall(Semantic *semantic, Node *node) {
     auto newParam = new Node(node->region.srcInfo, NodeType::SYMBOL, node->scope);
     newParam->symbolData.atomId = atomTable->insertStr("context");
 
-    // if 'context' is in scope, then pass it. Otherwise create a new one
-    if (node->scope->find(newParam->symbolData.atomId)) {
-        semantic->resolveTypes(newParam);
+    // if 'context' is not in scope, then create a new one
+    if (node->scope->find(newParam->symbolData.atomId) == nullptr) {
+        newParam = new Node(node->region.srcInfo, NodeType::CREATE_CONTEXT, node->scope);
     }
-    else {
-        newParam = semantic->parser->createInitContextCall(node->scope);
-    }
+
+    semantic->resolveTypes(newParam);
 
     auto newWrappedParam = wrapInValueParam(newParam, "context");
     semantic->resolveTypes(newWrappedParam);
@@ -1071,8 +1070,48 @@ void resolveHasAttr(Semantic *semantic, Node *node) {
 
 void resolveContext(Semantic *semantic, Node *node) {
     for (auto decl : node->contextData.decls) {
-        vector_append(semantic->contexts, decl);
+        semantic->resolveTypes(decl);
     }
+}
+
+Node *Semantic::makeContextType() {
+    if (contextType != nullptr) {
+        return contextType;
+    }
+
+    auto ct = new Node(NodeTypekind::STRUCT);
+    initStructTypeData(ct);
+
+    for (auto context: contexts) {
+        for (auto decl: context->contextData.decls) {
+            vector_append(ct->typeData.structTypeData.params, decl);
+        }
+    }
+
+    resolveTypes(ct);
+
+    contextType = ct;
+    return ct;
+}
+
+void resolveCreateContext(Semantic *semantic, Node *node) {
+    // context decl
+    auto contextSym = new Node(node->region.srcInfo, NodeType::SYMBOL, node->scope);
+    contextSym->symbolData.atomId = atomTable->insertStr("context");
+
+    auto contextDecl = new Node(node->region.srcInfo, NodeType::DECL, node->scope);
+    contextDecl->declData.lhs = contextSym;
+    contextDecl->declData.type = semantic->makeContextType();
+    semantic->addLocal(contextDecl);
+    semantic->resolveTypes(contextDecl);
+
+    // addrof context decl
+    auto addrOfContext = new Node(node->region.srcInfo, NodeType::ADDRESS_OF, node->scope);
+    addrOfContext->nodeData = contextDecl;
+    semantic->resolveTypes(addrOfContext);
+
+    node->resolved = addrOfContext;
+    node->typeInfo = addrOfContext->typeInfo;
 }
 
 void resolveFnDecl(Semantic *semantic, Node *node) {
@@ -1856,6 +1895,16 @@ void resolveDecl(Semantic *semantic, Node *node) {
     if (matchedUnion == 1) {
         semantic->reportError({}, Error{node->region, "error assigning struct literal to union - unmatched field name"});
     }
+
+    if (node->declData.initialValue->type == NodeType::CREATE_CONTEXT) {
+        // call all context initializers
+        for (auto init: semantic->contextInits) {
+            auto fnCall = new Node(node->region.srcInfo, NodeType::FN_CALL, node->scope);
+            fnCall->fnCallData.fn = init;
+            vector_append(node->postStmts, fnCall);
+            semantic->resolveTypes(fnCall);
+        }
+    }
 }
 
 void resolveAlias(Semantic *semantic, Node *node) {
@@ -2006,6 +2055,10 @@ void resolveType(Semantic *semantic, Node *node) {
                 p->paramData.value->typeInfo = enumType;
                 p->typeInfo = node;
             }
+        } break;
+        case NodeTypekind::CONTEXT_TYPE: {
+            node->resolved = semantic->makeContextType();
+            node->typeInfo = node->resolved->typeInfo;
         } break;
     }
 }
@@ -2296,15 +2349,13 @@ void resolveFnCall(Semantic *semantic, Node *node) {
             shouldAddContextParam = true;
         }
         else if (resolvedFn->fnDeclData.name != nullptr && !resolvedFn->fnDeclData.isExternal) {
-            auto initContextAtom = atomTable->insertStr("initContext");
-
             if (resolvedFn->fnDeclData.name->type == NodeType::DOT) {
                 auto fnNameAtom = resolvedFn->fnDeclData.name->dotData.rhs->symbolData.atomId;
-                shouldAddContextParam = fnNameAtom != initContextAtom;
+                shouldAddContextParam = true;
             }
             else if (resolvedFn->fnDeclData.name->type == NodeType::SYMBOL) {
                 auto fnNameAtom = resolvedFn->fnDeclData.name->symbolData.atomId;
-                shouldAddContextParam = fnNameAtom != semantic->parser->mainAtom && fnNameAtom != initContextAtom;
+                shouldAddContextParam = fnNameAtom != semantic->parser->mainAtom;
             }
         }
         else if (resolvedFn->fnDeclData.name != nullptr && resolvedFn->fnDeclData.isExternal) {
@@ -3931,6 +3982,9 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::CONTEXT: {
             resolveContext(this, node);
+        } break;
+        case NodeType::CREATE_CONTEXT: {
+            resolveCreateContext(this, node);
         } break;
         case NodeType::ENUM_LITERAL:
         case NodeType::PARAMETERIZED_TYPE:

@@ -181,6 +181,10 @@ fn runAllTests() {
     io.println("\n\n--- TYPEINFO");
     #import "typeinfo";
     typeinfo.test();
+
+    context.id = 3;
+    idC("hello!");
+    assert(context.id == 4);
 }
 
 fn testConversion() {
@@ -1160,6 +1164,11 @@ fn testAnySimple1() {
 
     assert(a._type.STRUCT.params[0]._type.tag == 3);
     assert(a._type.STRUCT.params[0].name[3] == "duck"[3]);
+}
+
+fn idC(t: !T) {
+    context.id += 1;
+    return t;
 }
 
 fn someCheck() { return true; }

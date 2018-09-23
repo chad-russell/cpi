@@ -21,7 +21,10 @@ public:
 
     vector_t<string *> linkLibs = vector_init<string *>(4);
     vector_t<Polymorphed> polymorphs = vector_init<Polymorphed>(32);
+
     vector_t<Node *> contexts = vector_init<Node *>(16);
+    vector_t<Node *> contextInits = vector_init<Node *>(16);
+    Node *contextType = nullptr;
 
     Lexer *lexer = nullptr;
     Parser *parser = nullptr;
@@ -31,6 +34,7 @@ public:
 
     Node *deepCopyScopedStmt(Node *node, Scope *scope);
     Node *deepCopyRvalue(Node *node, Scope *scope);
+    Node *makeContextType();
 
     void reportError(vector<Node *> affectedNodes, Error error);
     void resolveTypes(Node *node);

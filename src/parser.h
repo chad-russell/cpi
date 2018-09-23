@@ -41,6 +41,7 @@ struct Parser {
     vector_t<Node *> *imports;
     vector_t<Node *> *impls;
     vector_t<Node *> *contexts;
+    vector_t<Node *> *contextInits;
 
     Scope *staticIfScope = nullptr;
 
@@ -59,7 +60,6 @@ struct Parser {
     Node *unwindPolish(stack<ShuntingYard> *values);
     void addLocal(Node *local);
 
-    Node *createInitContextCall(Scope *scope);
     void initContext(Node *decl);
     void addBasicImport();
     Node *addImport(string importName, Node *alias);
@@ -109,6 +109,7 @@ struct Parser {
     Node *parseDefer();
     Node *parseLink();
     Node *parseContext();
+    Node *parseContextInit();
 };
 
 #endif // PARSER_H

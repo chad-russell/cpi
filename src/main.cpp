@@ -216,10 +216,16 @@ int main(int argc, char **argv) {
         semantic = new Semantic();
         semantic->lexer = lexer;
         semantic->parser = parser;
+        semantic->contexts = *parser->contexts;
+        semantic->contextInits = *parser->contextInits;
         semantic->addStaticIfs(parser->scopes.top());
         semantic->addImports(*parser->imports, *parser->impls);
 
-        // todo(chad): only need to loop through all top level if this is imported. Otherwise just do the main fn
+        for (auto ctx : *parser->contexts) {
+            semantic->resolveTypes(ctx);
+        }
+        semantic->makeContextType();
+
         for (auto tl : parser->allTopLevel) {
             semantic->resolveTypes(tl);
         }

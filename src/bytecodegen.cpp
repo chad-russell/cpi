@@ -1130,14 +1130,10 @@ void BytecodeGen::gen(Node *node) {
         } break;
         case NodeType::ALIAS: {
             gen(node->nodeData);
-            node->bytecode =node->nodeData->bytecode;
+            node->bytecode = node->nodeData->bytecode;
         } break;
-        case NodeType::ATTROF: {
-            auto resolvedNode = resolve(node);
-
-            gen(resolvedNode);
-            node->bytecode =resolvedNode->bytecode;
-        } break;
+        case NodeType::ATTROF:
+        case NodeType::CREATE_CONTEXT:
         case NodeType::HASATTR: {
             auto resolvedNode = resolve(node);
 

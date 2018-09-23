@@ -215,6 +215,7 @@ void Lexer::popFront() {
     if (tryEatKeyword(&next, "#hasattr", LexerTokenType::HASATTR)) { return; }
     if (tryEatKeyword(&next, "#attrof", LexerTokenType::ATTROF)) { return; }
     if (tryEatKeyword(&next, "#attr", LexerTokenType::ATTR)) { return; }
+    if (tryEatKeyword(&next, "#contextinit", LexerTokenType::CONTEXT_INIT)) { return; }
     if (tryEatKeyword(&next, "#context", LexerTokenType::CONTEXT)) { return; }
     if (tryEatKeyword(&next, "#import", LexerTokenType::IMPORT)) { return; }
     if (tryEatKeyword(&next, "cast", LexerTokenType::CAST)) { return; }

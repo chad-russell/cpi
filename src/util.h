@@ -87,6 +87,7 @@ enum class NodeType {
     ATTROF = 50,
     HASATTR = 51,
     CONTEXT = 52,
+    CREATE_CONTEXT = 53,
 };
 
 enum class NodeTypekind: int32_t {
@@ -114,6 +115,7 @@ enum class NodeTypekind: int32_t {
     AUTOCAST = 21,
     PARAMETERIZED = 22,
     ENUM = 23,
+    CONTEXT_TYPE = 24,
 };
 
 enum class LexerTokenType : int32_t {
@@ -210,6 +212,7 @@ enum class LexerTokenType : int32_t {
     ATTROF,
     HASATTR,
     CONTEXT,
+    CONTEXT_INIT,
 };
 
 struct SourceInfo {

@@ -18,6 +18,9 @@ Parser::Parser(Lexer *lexer_) {
     contexts = (vector_t<Node *> *) malloc(sizeof(vector_t<Node *>));
     *contexts = vector_init<Node *>(16);
 
+    contextInits = (vector_t<Node *> *) malloc(sizeof(vector_t<Node *>));
+    *contextInits = vector_init<Node *>(16);
+
     allTopLevel = vector_init<Node *>(256);
 
     scopes.push(new Scope(nullptr));
@@ -80,36 +83,16 @@ void Parser::scopeInsert(int64_t atomId, Node *node) {
     hash_insert(_scope->symbols, atomId, node);
 }
 
-Node *Parser::createInitContextCall(Scope *scope) {
-    auto fnNameSym = new Node(lexer->srcInfo, NodeType::SYMBOL, scope);
-    fnNameSym->symbolData.atomId = atomTable->insertStr("initContext");
-
-    auto basicSym = new Node(lexer->srcInfo, NodeType::SYMBOL, scope);
-    basicSym->symbolData.atomId = atomTable->insertStr("basic");
-
-    auto basicDotInitContext = new Node(lexer->srcInfo, NodeType::DOT, scope);
-    basicDotInitContext->dotData.lhs = basicSym;
-    basicDotInitContext->dotData.rhs = fnNameSym;
-
-    auto call = new Node(lexer->srcInfo, NodeType::FN_CALL, scope);
-
-    call->fnCallData.fn = basicDotInitContext;
-    call->fnCallData.hasRuntimeParams = true;
-
-    return call;
-}
-
 void Parser::initContext(Node *decl) {
-    auto call = createInitContextCall(scopes.top());
     auto contextSym = new Node(lexer->srcInfo, NodeType::SYMBOL, scopes.top());
-
     contextSym->symbolData.atomId = atomTable->insertStr("context");
+
     auto contextDecl = new Node(lexer->srcInfo, NodeType::DECL, scopes.top());
 
     contextDecl->declData.lhs = contextSym;
-    contextDecl->declData.initialValue = call;
-    addLocal(contextDecl);
+    contextDecl->declData.initialValue = new Node(lexer->srcInfo, NodeType::CREATE_CONTEXT, scopes.top());
 
+    addLocal(contextDecl);
     scopeInsert(contextSym->symbolData.atomId, contextDecl);
 
     vector_append(decl->fnDeclData.body, contextDecl);
@@ -161,6 +144,8 @@ Node *Parser::addImport(string importName, Node *alias) {
     if (!found) {
         auto lexer = new Lexer(path, true);
         auto parser = new Parser(lexer);
+        parser->contexts = this->contexts;
+        parser->contextInits = this->contextInits;
 
         auto fileModule = new Node(lexer->srcInfo, NodeType::MODULE, nullptr);
         fileModule->moduleData.name = new Node(lexer->srcInfo, NodeType::SYMBOL, parser->scopes.top());
@@ -193,18 +178,8 @@ void Parser::addBasicImport() {
 void Parser::addContextParameterForDecl(vector_t<Node *> &currentParams, Scope *scope) {
     auto paramsWithContext = vector_init<Node *>(currentParams.length + 1);
 
-    auto contextSym = new Node(lexer->srcInfo, NodeType::SYMBOL, scope);
-    contextSym->symbolData.atomId = atomTable->insertStr("Context");
-
-    auto basicSym = new Node(lexer->srcInfo, NodeType::SYMBOL, scope);
-    basicSym->symbolData.atomId = atomTable->insertStr("basic");
-
-    auto basicDotContext = new Node(lexer->srcInfo, NodeType::DOT, scope);
-    basicDotContext->dotData.lhs = basicSym;
-    basicDotContext->dotData.rhs = contextSym;
-
     auto ptrToContextSym = new Node(NodeTypekind::POINTER);
-    ptrToContextSym->typeData.pointerTypeData.underlyingType = basicDotContext;
+    ptrToContextSym->typeData.pointerTypeData.underlyingType = new Node(NodeTypekind::CONTEXT_TYPE);
     vector_append(paramsWithContext, wrapInDeclParam(ptrToContextSym, "context", 0));
     for (auto p : currentParams) {
         vector_append(paramsWithContext, p);
@@ -255,6 +230,11 @@ Node *Parser::parseTopLevel() {
     // #context
     if (lexer->front.type == LexerTokenType::CONTEXT) {
         return parseContext();
+    }
+
+    // #contextinit
+    if (lexer->front.type == LexerTokenType::CONTEXT_INIT) {
+        return parseContextInit();
     }
 
     // type definition
@@ -524,8 +504,7 @@ Node *Parser::parseFnDecl() {
 
     // This is *not* an external declaration at this point
     // so as long as it's not the main fn OR the initContext() fn, add `context: *basic.Context` as the first parameter
-    auto initContextAtomId = atomTable->insertStr("initContext");
-    if (decl->fnDeclData.name == nullptr || (decl->fnDeclData.name->symbolData.atomId != mainAtom && decl->fnDeclData.name->symbolData.atomId != initContextAtomId)) {
+    if (decl->fnDeclData.name == nullptr || decl->fnDeclData.name->symbolData.atomId != mainAtom) {
         if (!noIppFlag) {
             addContextParameterForDecl(decl->fnDeclData.params, scopes.top());
         }
@@ -2188,6 +2167,14 @@ Node *Parser::parseContext() {
     vector_append(*this->contexts, context);
 
     return context;
+}
+
+Node *Parser::parseContextInit() {
+    expect(LexerTokenType::CONTEXT_INIT, "#contextinit");
+
+    auto fn = parseRvalue();
+    vector_append(*this->contextInits, fn);
+    return fn;
 }
 
 Node *Parser::parseFnCall() {

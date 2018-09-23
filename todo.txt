@@ -1,6 +1,4 @@
 TODO:
-    - how to add user variables to context?
-
     - support passing args to main fn
 
     - printing floats
