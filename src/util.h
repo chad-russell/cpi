@@ -404,9 +404,6 @@ struct IfData {
     bool isStatic;
     Scope *ifScope;
     Scope *elseScope;
-
-    vector_t<Node *> trueImports;
-    vector_t<Node *> falseImports;
 };
 
 struct WhileData {

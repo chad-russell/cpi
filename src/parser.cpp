@@ -960,7 +960,6 @@ Node *Parser::parseIf() {
     auto savedImpls = this->impls;
 
     if (isStatic) {
-        this->imports = &if_->ifData.trueImports;
         this->staticIfScope = scopes.top();
     }
 
@@ -989,7 +988,6 @@ Node *Parser::parseIf() {
         if_->ifData.elseScope = scopes.top();
 
         if (isStatic) {
-            this->imports = &if_->ifData.falseImports;
             this->staticIfScope = scopes.top();
         }
 
