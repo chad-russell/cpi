@@ -1,11 +1,22 @@
 #import "os";
+#import "io";
 
-#if os.MAC {
-    #import "io";
+type Foo(T: Ast) T
+
+#context f: Foo!(i64)
+
+fn cond() {
+    io.println("cond");
+    return true;
+}
+#if cond() {
+    #import "textedit";
 }
 
 fn main() {
-    io.println("cool");
+    context.f = 18;
+
+    io.println(^context);
 
     return 0;
 }

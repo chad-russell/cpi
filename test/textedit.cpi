@@ -12,6 +12,8 @@ WIDTH     : i32 = 800;
 HEIGHT    : i32 = 350;
 FONT_SIZE : i32 = 20;
 
+#contextinit fn() { io.println("textedit init-ing context"); }
+
 type CachedGlyph struct {
     codepoint: i32,
     extents: cairo.GlyphExtents,
@@ -181,7 +183,7 @@ fn drawMouse(x: i32, y: i32) {
 
     -- Highlight line
     cairo.cairo_save(context.cairo.mouseContext);
-    cairo.cairo_set_source_rgba(context.cairo.mouseContext, 0.2, 0.2, 0.4, 0.9);
+    cairo.cairo_set_source_rgba(context.cairo.mouseContext, 0.0, 0.9, 0.0, 0.9);
 
     line := cast(i64) (y / FONT_SIZE);
 
