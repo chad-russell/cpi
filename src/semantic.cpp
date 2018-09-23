@@ -1080,7 +1080,7 @@ Node *Semantic::makeContextType() {
         }
     }
 
-    resolveTypes(ct);
+//    resolveTypes(ct);
 
     contextType = ct;
     return ct;
@@ -1975,17 +1975,18 @@ void resolveType(Semantic *semantic, Node *node) {
 
             for (auto param : node->typeData.structTypeData.params) {
                 semantic->resolveTypes(param);
-                auto size = typeSize(param->typeInfo);
-                auto align = typeAlign(param->typeInfo);
 
-                if (align > 0) { total += total % align; } // alignment
-
-                param->localOffset = total;
                 param->paramData.index = localIndex;
-
-                total += size;
-
                 localIndex += 1;
+
+//                auto size = typeSize(param->typeInfo);
+//                auto align = typeAlign(param->typeInfo);
+//
+//                if (align > 0) { total += total % align; } // alignment
+//
+                param->localOffset = total;
+
+//                total += size;
             }
         } break;
         case NodeTypekind::SYMBOL: {
@@ -2791,19 +2792,8 @@ Node *findParam(Semantic *semantic, Node *node) {
     }
     else {
         auto sizeSoFar = 0;
-        for (const auto &param : structData.params) {
-            auto paramSize = typeSize(param->paramData.type);
-            auto paramAlign = typeAlign(param->paramData.type);
 
-            // alignment
-            if (sizeSoFar > 0 && paramAlign > 0) {
-                sizeSoFar += sizeSoFar % paramAlign;
-            }
-
-            param->localOffset = sizeSoFar;
-
-            sizeSoFar += paramSize;
-        }
+        vector_append(semantic->structsToSize, structData);
 
         for (auto param : structData.params) {
             if (param->paramData.name != nullptr) {
@@ -3992,5 +3982,25 @@ void Semantic::addLocal(Node *local) {
 
     if (currentFnDecl) {
         vector_append(currentFnDecl->fnDeclData.locals, local);
+    }
+}
+
+void Semantic::sizeStructs() {
+    for (auto structData : this->structsToSize) {
+        auto sizeSoFar = 0;
+
+        for (const auto &param : structData.params) {
+            auto paramSize = typeSize(param->paramData.type);
+            auto paramAlign = typeAlign(param->paramData.type);
+
+            // alignment
+            if (sizeSoFar > 0 && paramAlign > 0) {
+                sizeSoFar += sizeSoFar % paramAlign;
+            }
+
+            param->localOffset = sizeSoFar;
+
+            sizeSoFar += paramSize;
+        }
     }
 }

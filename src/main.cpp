@@ -233,6 +233,7 @@ int main(int argc, char **argv) {
         for (auto tl : parser->allTopLevel) {
             semantic->resolveTypes(tl);
         }
+        semantic->sizeStructs();
         if (semantic->encounteredErrors) { return -1; }
 
         if (interpretFlag != 0 || outputType == OutputType::CAS || outputType == OutputType::CBC || printAsmFlag != 0) {

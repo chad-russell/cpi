@@ -26,6 +26,8 @@ public:
     vector_t<Node *> contextInits = vector_init<Node *>(16);
     Node *contextType = nullptr;
 
+    vector_t<StructTypeData> structsToSize = vector_init<StructTypeData>(256);
+
     Lexer *lexer = nullptr;
     Parser *parser = nullptr;
 
@@ -40,6 +42,7 @@ public:
     void resolveTypes(Node *node);
     void addLocal(Node *local);
     Node *findExistingPolymorph(Node *polymorph, vector_t<Node *> givenParams);
+    void sizeStructs();
 };
 
 bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<Node *> &declParams, vector_t<Node *> &givenParams, bool reportError = true);

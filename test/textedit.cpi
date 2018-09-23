@@ -33,28 +33,25 @@ type CachedLine struct {
     glyphs: buf.Buffer!(Rect!(f64))
 }
 
-type TextContext struct {
-    hbFont: *hb.Font,
-    hbBuffer: *hb.Buffer = nil,
+#context cairo: struct {
+    font: *cairo.FontFace,
 
-    cairoFont: *cairo.FontFace,
+    surface: *cairo.Surface,
+    context: *cairo.Context,
 
-    cairoSurface: *cairo.Surface,
-    cairoContext: *cairo.Context,
+    textSurface: *cairo.Surface,
+    textContext: *cairo.Context,
+    textPattern: *cairo.Pattern,
 
-    cairoTextSurface: *cairo.Surface,
-    cairoTextContext: *cairo.Context,
-    cairoTextPattern: *cairo.Pattern,
+    mouseSurface: *cairo.Surface,
+    mouseContext: *cairo.Context,
+    mousePattern: *cairo.Pattern,
+}
 
-    font: []i8,
-    eb: *se.EditorBuffer,
-
-    glyphCache: buf.Buffer!(CachedGlyph),
-    lineCache: buf.Buffer!(CachedLine),
-
-    sdlWindow: *sdl.Window,
-    sdlSurface: *sdl.Surface,
-    sdlRenderer: *sdl.Renderer,
+#context sdl: struct {
+    window: *sdl.Window,
+    surface: *sdl.Surface,
+    renderer: *sdl.Renderer,
 
     windowWidth: i32,
     windowHeight: i32,
@@ -64,59 +61,69 @@ type TextContext struct {
 
     xScale: f64,
     yScale: f64,
-
-    cairoMouseSurface: *cairo.Surface,
-    cairoMouseContext: *cairo.Context,
-    cairoMousePattern: *cairo.Pattern
 }
 
-fn loadFonts(tctx: *TextContext) {
-    -- tctx.font = "/System/Library/Fonts/Apple Color Emoji.ttc";
-    -- tctx.font = "/Users/chadrussell/Projects/text/Noto-unhinted/NotoColorEmoji.ttf";
-    -- tctx.font = "/Users/chadrussell/Projects/text/emojione-apple.ttc";
-    -- tctx.font = "/Users/chadrussell/Library/Fonts/Roboto-Light.ttf";
-    tctx.font = "/Library/Fonts/Inconsolata.otf";
-    -- tctx.font = "/Users/chadrussell/Projects/text/JFWilwod.ttf";
+#context hb: struct {
+    font: *hb.Font,
+    buffer: *hb.Buffer = nil,
+}
 
-    -- tctx.text = buf.from("Hello");
-    -- tctx.text = buf.from("🙈");
+#context tc: struct {
+    eb: *se.EditorBuffer,
+
+    font: []i8,
+
+    glyphCache: buf.Buffer!(CachedGlyph),
+    lineCache: buf.Buffer!(CachedLine),
+}
+
+fn loadFonts() {
+    -- context.tc.font = "/System/Library/Fonts/Apple Color Emoji.ttc";
+    -- context.tc.font = "/Users/chadrussell/Projects/text/Noto-unhinted/NotoColorEmoji.ttf";
+    -- context.tc.font = "/Users/chadrussell/Projects/text/emojione-apple.ttc";
+    -- context.tc.font = "/Users/chadrussell/Library/Fonts/Roboto-Light.ttf";
+    context.tc.font = "/Library/Fonts/Inconsolata.otf";
+    -- context.tc.font = "/Users/chadrussell/Projects/text/JFWilwod.ttf";
+
+    -- context.tc.text = buf.from("Hello");
+    -- context.tc.text = buf.from("🙈");
 
     -- For CAIRO, load using FreeType
     ftLibrary: ft.Library;
     ft.FT_Init_FreeType(&ftLibrary);
     ftFace: ft.Face;
-    err := ft.FT_New_Face(ftLibrary, tctx.font|io.cstr, 0, &ftFace);
+    err := ft.FT_New_Face(ftLibrary, context.tc.font|io.cstr, 0, &ftFace);
     if err != 0 {
         io.println("error creating freetype font face");
         panic();
     }
-    tctx.cairoFont = cairo.cairo_ft_font_face_create_for_ft_face(ftFace, 0);
+    context.cairo.font = cairo.cairo_ft_font_face_create_for_ft_face(ftFace, 0);
 
     -- For Harfbuzz, load using OpenType (HarfBuzz FT does not support bitmap font)
-    blob := hb.hb_blob_create_from_file(tctx.font|io.cstr);
+    blob := hb.hb_blob_create_from_file(context.tc.font|io.cstr);
     face := hb.hb_face_create(blob, 0);
-    tctx.hbFont = hb.hb_font_create(face);
-    hb.hb_ot_font_set_funcs(tctx.hbFont);
-    hb.hb_font_set_scale(tctx.hbFont, FONT_SIZE * 64, FONT_SIZE * 64);
+    context.hb.font = hb.hb_font_create(face);
+    hb.hb_ot_font_set_funcs(context.hb.font);
+    hb.hb_font_set_scale(context.hb.font, FONT_SIZE * 64, FONT_SIZE * 64);
 
-    tctx.hbBuffer = hb.hb_buffer_create();
+    context.hb.buffer = hb.hb_buffer_create();
 }
 
-fn initCairo(tctx: *TextContext) {
+fn initCairo() {
     sdlRenderFlags: i32 = 6;
-    tctx.sdlRenderer = sdl.SDL_CreateRenderer(tctx.sdlWindow, -1, sdlRenderFlags);
+    context.sdl.renderer = sdl.SDL_CreateRenderer(context.sdl.window, -1, sdlRenderFlags);
 
     -- Compute screen resolution
     -- For instance, on a retina screen, renderer size is twice as window size
-    sdl.SDL_GetWindowSize(tctx.sdlWindow, &tctx.windowWidth, &tctx.windowHeight);
+    sdl.SDL_GetWindowSize(context.sdl.window, &context.sdl.windowWidth, &context.sdl.windowHeight);
 
-    sdl.SDL_GetRendererOutputSize(tctx.sdlRenderer, &tctx.rendererWidth, &tctx.rendererHeight);
+    sdl.SDL_GetRendererOutputSize(context.sdl.renderer, &context.sdl.rendererWidth, &context.sdl.rendererHeight);
 
     -- Create a SDL surface for Cairo to render onto
-    tctx.sdlSurface = sdl.SDL_CreateRGBSurface(
+    context.sdl.surface = sdl.SDL_CreateRGBSurface(
             0,
-            tctx.rendererWidth,
-            tctx.rendererHeight,
+            context.sdl.rendererWidth,
+            context.sdl.rendererHeight,
             32,
             0x00ff0000,
             0x0000ff00,
@@ -125,118 +132,118 @@ fn initCairo(tctx: *TextContext) {
     );
 
     -- Get Cairo surface form SDL2 surface
-    tctx.cairoSurface = cairo.cairo_image_surface_create_for_data(
-            cast() tctx.sdlSurface.pixels,
+    context.cairo.surface = cairo.cairo_image_surface_create_for_data(
+            cast() context.sdl.surface.pixels,
             cairo.FORMAT_RGB24,
-            tctx.sdlSurface.w,
-            tctx.sdlSurface.h,
-            tctx.sdlSurface.pitch);
-    tctx.cairoContext = cairo.cairo_create(tctx.cairoSurface);
+            context.sdl.surface.w,
+            context.sdl.surface.h,
+            context.sdl.surface.pitch);
+    context.cairo.context = cairo.cairo_create(context.cairo.surface);
 
-    tctx.cairoTextSurface = cairo.cairo_image_surface_create(cairo.FORMAT_ARGB32, cast() tctx.sdlSurface.w, cast() tctx.sdlSurface.h);
-    tctx.cairoTextPattern = cairo.cairo_pattern_create_for_surface(tctx.cairoTextSurface);
+    context.cairo.textSurface = cairo.cairo_image_surface_create(cairo.FORMAT_ARGB32, cast() context.sdl.surface.w, cast() context.sdl.surface.h);
+    context.cairo.textPattern = cairo.cairo_pattern_create_for_surface(context.cairo.textSurface);
 
-    tctx.xScale = cast(f64) tctx.rendererWidth / cast(f64) tctx.windowWidth;
-    tctx.yScale = cast(f64) tctx.rendererHeight / cast(f64) tctx.windowHeight;
+    context.sdl.xScale = cast(f64) context.sdl.rendererWidth / cast(f64) context.sdl.windowWidth;
+    context.sdl.yScale = cast(f64) context.sdl.rendererHeight / cast(f64) context.sdl.windowHeight;
 
     -- Get Cairo context from Cairo surface
-    tctx.cairoTextContext = cairo.cairo_create(tctx.cairoTextSurface);
-    cairo.cairo_set_antialias(tctx.cairoTextContext, cairo.Antialias.SUBPIXEL);
-    cairo.cairo_set_source_rgba(tctx.cairoTextContext, 0.0, 0.0, 0.0, 1.0);
-    cairo.cairo_set_font_face(tctx.cairoTextContext, tctx.cairoFont);
-    cairo.cairo_set_font_size(tctx.cairoTextContext, cast() FONT_SIZE);
+    context.cairo.textContext = cairo.cairo_create(context.cairo.textSurface);
+    cairo.cairo_set_antialias(context.cairo.textContext, cairo.Antialias.SUBPIXEL);
+    cairo.cairo_set_source_rgba(context.cairo.textContext, 0.0, 0.0, 0.0, 1.0);
+    cairo.cairo_set_font_face(context.cairo.textContext, context.cairo.font);
+    cairo.cairo_set_font_size(context.cairo.textContext, cast() FONT_SIZE);
 
-    tctx.glyphCache = buf.make!(CachedGlyph)();
-    tctx.lineCache = buf.make!(CachedLine)();
+    context.tc.glyphCache = buf.make!(CachedGlyph)();
+    context.tc.lineCache = buf.make!(CachedLine)();
 
-    tctx.cairoMouseSurface = cairo.cairo_image_surface_create(cairo.FORMAT_ARGB32, cast() tctx.sdlSurface.w, cast() tctx.sdlSurface.h);
-    tctx.cairoMousePattern = cairo.cairo_pattern_create_for_surface(tctx.cairoMouseSurface);
+    context.cairo.mouseSurface = cairo.cairo_image_surface_create(cairo.FORMAT_ARGB32, cast() context.sdl.surface.w, cast() context.sdl.surface.h);
+    context.cairo.mousePattern = cairo.cairo_pattern_create_for_surface(context.cairo.mouseSurface);
 
-    tctx.cairoMouseContext = cairo.cairo_create(tctx.cairoMouseSurface);
+    context.cairo.mouseContext = cairo.cairo_create(context.cairo.mouseSurface);
 
     -- Scale cairo to use screen resolution
-    cairo.cairo_surface_set_device_scale(tctx.cairoTextSurface, tctx.xScale, tctx.yScale);
-    cairo.cairo_surface_set_device_scale(tctx.cairoMouseSurface, tctx.xScale, tctx.yScale);
-    cairo.cairo_surface_set_device_scale(tctx.cairoSurface, tctx.xScale, tctx.yScale);
+    cairo.cairo_surface_set_device_scale(context.cairo.textSurface, context.sdl.xScale, context.sdl.yScale);
+    cairo.cairo_surface_set_device_scale(context.cairo.mouseSurface, context.sdl.xScale, context.sdl.yScale);
+    cairo.cairo_surface_set_device_scale(context.cairo.surface, context.sdl.xScale, context.sdl.yScale);
 }
 
-fn drawMouse(tctx: *TextContext, x: i32, y: i32) {
+fn drawMouse(x: i32, y: i32) {
     -- Clear
-    cairo.cairo_save(tctx.cairoMouseContext);
-    cairo.cairo_set_operator(tctx.cairoMouseContext, cairo.Operator.CAIRO_OPERATOR_CLEAR);
-    cairo.cairo_paint(tctx.cairoMouseContext);
-    cairo.cairo_restore(tctx.cairoMouseContext);
+    cairo.cairo_save(context.cairo.mouseContext);
+    cairo.cairo_set_operator(context.cairo.mouseContext, cairo.Operator.CAIRO_OPERATOR_CLEAR);
+    cairo.cairo_paint(context.cairo.mouseContext);
+    cairo.cairo_restore(context.cairo.mouseContext);
 
     -- Mouse cursor
-    -- cairo.cairo_save(tctx.cairoMouseContext);
-    -- cairo.cairo_set_source_rgba(tctx.cairoMouseContext, 0.9, 0.9, 1, 1);
-    -- cairo.cairo_rectangle(tctx.cairoMouseContext, cast() (x - 10), cast() (y - 10), 20, 20);
-    -- cairo.cairo_fill(tctx.cairoMouseContext);
-    -- cairo.cairo_restore(tctx.cairoMouseContext);
+    -- cairo.cairo_save(context.cairo.MouseContext);
+    -- cairo.cairo_set_source_rgba(context.cairo.MouseContext, 0.9, 0.9, 1, 1);
+    -- cairo.cairo_rectangle(context.cairo.MouseContext, cast() (x - 10), cast() (y - 10), 20, 20);
+    -- cairo.cairo_fill(context.cairo.MouseContext);
+    -- cairo.cairo_restore(context.cairo.MouseContext);
 
     -- Highlight line
-    cairo.cairo_save(tctx.cairoMouseContext);
-    cairo.cairo_set_source_rgba(tctx.cairoMouseContext, 0.2, 0.2, 0.4, 0.9);
+    cairo.cairo_save(context.cairo.mouseContext);
+    cairo.cairo_set_source_rgba(context.cairo.mouseContext, 0.2, 0.2, 0.4, 0.9);
 
     line := cast(i64) (y / FONT_SIZE);
 
     -- single character
-    if line >= 0 and line < tctx.lineCache.buf.count {
-        cl := tctx.lineCache.buf[line];
+    if line >= 0 and line < context.tc.lineCache.buf.count {
+        cl := context.tc.lineCache.buf[line];
         for g: cl.glyphs.buf {
             -- todo(chad): write 'rect contains point' fn
             if g.x <= cast() x and g.y <= cast() y and g.x + g.width >= cast() x and g.y + g.height >= cast() y {
-                cairo.cairo_rectangle(tctx.cairoMouseContext, g.x, g.y, g.width, g.height);
-                cairo.cairo_fill(tctx.cairoMouseContext);
+                cairo.cairo_rectangle(context.cairo.mouseContext, g.x, g.y, g.width, g.height);
+                cairo.cairo_fill(context.cairo.mouseContext);
             }
         }
     }
 
     -- entire line
-    -- cairo.cairo_rectangle(tctx.cairoMouseContext, 0, cl.low - 1, cast() tctx.windowWidth, cl.high - cl.low + 2);
-    -- cairo.cairo_fill(tctx.cairoMouseContext);
+    -- cairo.cairo_rectangle(context.cairo.mouseContext, 0, cl.low - 1, cast() context.tc.windowWidth, cl.high - cl.low + 2);
+    -- cairo.cairo_fill(context.cairo.mouseContext);
 
-    cairo.cairo_restore(tctx.cairoMouseContext);
+    cairo.cairo_restore(context.cairo.mouseContext);
 }
 
-fn clear(tctx: *TextContext) {
+fn clear() {
     -- Fill background
-    cairo.cairo_save(tctx.cairoTextContext);
-    cairo.cairo_set_source_rgb(tctx.cairoTextContext, 0.1739, 0.1867, 0.1433);
-    cairo.cairo_rectangle(tctx.cairoTextContext,
+    cairo.cairo_save(context.cairo.textContext);
+    cairo.cairo_set_source_rgb(context.cairo.textContext, 0.1739, 0.1867, 0.1433);
+    cairo.cairo_rectangle(context.cairo.textContext,
         0, 0,
-        cast() cairo.cairo_image_surface_get_width(tctx.cairoTextSurface), cast() cairo.cairo_image_surface_get_height(tctx.cairoTextSurface));
-    cairo.cairo_fill(tctx.cairoTextContext);
-    cairo.cairo_restore(tctx.cairoTextContext);
+        cast() cairo.cairo_image_surface_get_width(context.cairo.textSurface), cast() cairo.cairo_image_surface_get_height(context.cairo.textSurface));
+    cairo.cairo_fill(context.cairo.textContext);
+    cairo.cairo_restore(context.cairo.textContext);
 }
 
-fn commit(tctx: *TextContext) {
+fn commit() {
     -- Copy the text pattern
-    cairo.cairo_set_source(tctx.cairoContext, tctx.cairoTextPattern);
-    cairo.cairo_paint(tctx.cairoContext);
+    cairo.cairo_set_source(context.cairo.context, context.cairo.textPattern);
+    cairo.cairo_paint(context.cairo.context);
 
     -- Copy the mouse pattern
-    cairo.cairo_set_source(tctx.cairoContext, tctx.cairoMousePattern);
-    cairo.cairo_set_operator(tctx.cairoContext, cairo.Operator.CAIRO_OPERATOR_OVER);
-    cairo.cairo_paint(tctx.cairoContext);
+    cairo.cairo_set_source(context.cairo.context, context.cairo.mousePattern);
+    cairo.cairo_set_operator(context.cairo.context, cairo.Operator.CAIRO_OPERATOR_OVER);
+    cairo.cairo_paint(context.cairo.context);
 
     -- Render SDL2 surface onto SDL2 renderer
-    texture := sdl.SDL_CreateTextureFromSurface(tctx.sdlRenderer, tctx.sdlSurface);
-    sdl.SDL_RenderCopy(tctx.sdlRenderer, texture, nil, nil);
-    sdl.SDL_RenderPresent(tctx.sdlRenderer);
+    texture := sdl.SDL_CreateTextureFromSurface(context.sdl.renderer, context.sdl.surface);
+    sdl.SDL_RenderCopy(context.sdl.renderer, texture, nil, nil);
+    sdl.SDL_RenderPresent(context.sdl.renderer);
 }
 
-fn findGlyph(tctx: *TextContext, codepoint: i32) CachedGlyph {
-    for g: tctx.glyphCache.buf {
+fn findGlyph(codepoint: i32) CachedGlyph {
+    for g: context.tc.glyphCache.buf {
         if g.codepoint == codepoint {
             return g;
         }
     }
 
-    return cacheGlyph(tctx, codepoint);
+    return cacheGlyph(codepoint);
 }
 
-fn cacheGlyph(tctx: *TextContext, codepoint: i32) {
+fn cacheGlyph(codepoint: i32) {
     cairoGlyph := cairo.cairo_glyph_allocate(1);
     defer { cairo.cairo_glyph_free(cairoGlyph); }
 
@@ -256,13 +263,13 @@ fn cacheGlyph(tctx: *TextContext, codepoint: i32) {
     -- Scale cairo to use screen resolution
     xScale: f64;
     yScale: f64;
-    cairo.cairo_surface_get_device_scale(tctx.cairoTextSurface, &xScale, &yScale);
+    cairo.cairo_surface_get_device_scale(context.cairo.textSurface, &xScale, &yScale);
     cairo.cairo_surface_set_device_scale(glyphSurface, xScale, yScale);
 
     -- Get Cairo context from Cairo surface
     glyphContext := cairo.cairo_create(glyphSurface);
 
-    cairo.cairo_set_font_face(glyphContext, tctx.cairoFont);
+    cairo.cairo_set_font_face(glyphContext, context.cairo.font);
     cairo.cairo_set_font_size(glyphContext, cast() FONT_SIZE);
 
     cairo.cairo_glyph_extents(glyphContext, cairoGlyph, 1, &cached.extents);
@@ -278,50 +285,50 @@ fn cacheGlyph(tctx: *TextContext, codepoint: i32) {
     cairo.cairo_translate(glyphContext, 0, -cached.extents.yBearing);
     cairo.cairo_show_glyphs(glyphContext, cairoGlyph, 1);
 
-    &tctx.glyphCache|:append(cached);
+    &context.tc.glyphCache|:append(cached);
     return cached;
 }
 
-fn drawLine(tctx: *TextContext, line: i64) {
+fn drawLine(line: i64) {
     -- Reset HarfBuzz buffer
-    hb.hb_buffer_reset(tctx.hbBuffer);
+    hb.hb_buffer_reset(context.hb.buffer);
 
     -- Set buffer to LTR direction, common script and default language
-    hb.hb_buffer_set_direction(tctx.hbBuffer, hb.HB_DIRECTION_LTR);
-    hb.hb_buffer_set_script(tctx.hbBuffer, hb.HB_SCRIPT_COMMON);
-    hb.hb_buffer_set_language(tctx.hbBuffer, hb.hb_language_get_default());
+    hb.hb_buffer_set_direction(context.hb.buffer, hb.HB_DIRECTION_LTR);
+    hb.hb_buffer_set_script(context.hb.buffer, hb.HB_SCRIPT_COMMON);
+    hb.hb_buffer_set_language(context.hb.buffer, hb.hb_language_get_default());
 
     -- Add text and lay it out
-    lastChar := se.editor_buffer_get_line_length(tctx.eb, line);
-    text := se.editor_buffer_get_text_between_points(tctx.eb, line, 0, line, lastChar);
+    lastChar := se.editor_buffer_get_line_length(context.tc.eb, line);
+    text := se.editor_buffer_get_text_between_points(context.tc.eb, line, 0, line, lastChar);
 
-    hb.hb_buffer_add_utf8(tctx.hbBuffer, text.bytes, -1, 0, -1);
-    hb.hb_shape(tctx.hbFont, tctx.hbBuffer, nil, 0);
+    hb.hb_buffer_add_utf8(context.hb.buffer, text.bytes, -1, 0, -1);
+    hb.hb_shape(context.hb.font, context.hb.buffer, nil, 0);
 
     -- Get buffer data
-    glyphCount := hb.hb_buffer_get_length(tctx.hbBuffer);
-    glyphInfo := hb.hb_buffer_get_glyph_infos(tctx.hbBuffer, nil);
-    glyphPos := hb.hb_buffer_get_glyph_positions(tctx.hbBuffer, nil);
+    glyphCount := hb.hb_buffer_get_length(context.hb.buffer);
+    glyphInfo := hb.hb_buffer_get_glyph_infos(context.hb.buffer, nil);
+    glyphPos := hb.hb_buffer_get_glyph_positions(context.hb.buffer, nil);
 
     clGlyphs := buf.make!(Rect!(f64))();
-    cl: CachedLine = {cast() (tctx.windowHeight + 10), 0, clGlyphs};
+    cl: CachedLine = {cast() (context.sdl.windowHeight + 10), 0, clGlyphs};
 
     x: f64 = 5;
     y: f64 = cast() (cast() FONT_SIZE * (line + 1));
 
     for i: iter.until(cast() glyphCount) {
-        found := findGlyph(tctx, cast() (glyphInfo + i).codepoint);
+        found := findGlyph(cast() (glyphInfo + i).codepoint);
 
-        cairo.cairo_save(tctx.cairoTextContext);
-        cairo.cairo_translate(tctx.cairoTextContext, x, y + found.extents.yBearing);
+        cairo.cairo_save(context.cairo.textContext);
+        cairo.cairo_translate(context.cairo.textContext, x, y + found.extents.yBearing);
 
-        cairo.cairo_set_source(tctx.cairoTextContext, found.pattern);
-        cairo.cairo_rectangle(tctx.cairoTextContext,
+        cairo.cairo_set_source(context.cairo.textContext, found.pattern);
+        cairo.cairo_rectangle(context.cairo.textContext,
             found.extents.xBearing,
             0,
             cast() (found.extents.width + 1),
             cast() (found.extents.height + 1));
-        cairo.cairo_fill(tctx.cairoTextContext);
+        cairo.cairo_fill(context.cairo.textContext);
 
         if y + found.extents.yBearing < cl.low {
             cl.low = y + found.extents.yBearing;
@@ -337,33 +344,33 @@ fn drawLine(tctx: *TextContext, line: i64) {
             cast() (found.extents.height + 1)
         });
 
-        cairo.cairo_restore(tctx.cairoTextContext);
+        cairo.cairo_restore(context.cairo.textContext);
 
         x += found.extents.xAdvance;
     }
 
-    :ensureCapacity(&tctx.lineCache, line + 1);
-    tctx.lineCache.buf[line] = cl;
+    :ensureCapacity(&context.tc.lineCache, line + 1);
+    context.tc.lineCache.buf[line] = cl;
 
-    if tctx.lineCache.buf.count < line + 1 {
-        tctx.lineCache.buf.count = line + 1;
+    if context.tc.lineCache.buf.count < line + 1 {
+        context.tc.lineCache.buf.count = line + 1;
     }
 }
 
-fn drawText(tctx: *TextContext) {
+fn drawText() {
     basic.resetTmp();
-    tctx.lineCache = buf.make!(CachedLine)();
+    context.tc.lineCache = buf.make!(CachedLine)();
 
-    clear(tctx);
+    clear();
 
-    lineCount := se.editor_buffer_get_line_count(tctx.eb);
+    lineCount := se.editor_buffer_get_line_count(context.tc.eb);
 
     for line: iter.until(lineCount) {
-        drawLine(tctx, line);
+        drawLine(line);
     }
 }
 
-fn initSdl(tctx: *TextContext) {
+fn initSdl() {
     err := sdl.SDL_Init(sdl.INIT_VIDEO);
     if err != 0 {
         io.println("failed to init SDL");
@@ -379,43 +386,42 @@ fn initSdl(tctx: *TextContext) {
         panic();
     }
 
-    tctx.sdlWindow = window;
+    context.sdl.window = window;
 }
 
-fn shutdown(tctx: *TextContext) {
-    cairo.cairo_surface_destroy(tctx.cairoTextSurface);
-    cairo.cairo_destroy(tctx.cairoTextContext);
+fn shutdown() {
+    cairo.cairo_surface_destroy(context.cairo.textSurface);
+    cairo.cairo_destroy(context.cairo.textContext);
 
-    cairo.cairo_surface_destroy(tctx.cairoMouseSurface);
-    cairo.cairo_destroy(tctx.cairoMouseContext);
+    cairo.cairo_surface_destroy(context.cairo.mouseSurface);
+    cairo.cairo_destroy(context.cairo.mouseContext);
 
-    cairo.cairo_surface_destroy(tctx.cairoSurface);
-    cairo.cairo_destroy(tctx.cairoContext);
+    cairo.cairo_surface_destroy(context.cairo.surface);
+    cairo.cairo_destroy(context.cairo.context);
 
-    cairo.cairo_font_face_destroy(tctx.cairoFont);
+    cairo.cairo_font_face_destroy(context.cairo.font);
 
-    hb.hb_font_destroy(tctx.hbFont);
+    hb.hb_font_destroy(context.hb.font);
 
-    sdl.SDL_FreeSurface(tctx.sdlSurface);
+    sdl.SDL_FreeSurface(context.sdl.surface);
     sdl.SDL_Quit();
 }
 
 fn demo() {
-    tctx: TextContext;
-    tctx.eb = se.editor_buffer_create(80);
+    context.tc.eb = se.editor_buffer_create(80);
 
-    initSdl(&tctx);
+    initSdl();
 
-    loadFonts(&tctx);
-    initCairo(&tctx);
+    loadFonts();
+    initCairo();
 
-    drawText(&tctx);
-    commit(&tctx);
+    drawText();
+    commit();
 
     event: sdl.Event;
     while sdl.SDL_WaitEvent(&event) != 0 {
         if event._type == sdl.QUIT {
-            shutdown(&tctx);
+            shutdown();
             return;
         }
         else if event._type == sdl.KEYDOWN {
@@ -423,23 +429,23 @@ fn demo() {
             -- io.println(cast(i32) keyboardEvent.keysym.scancode);
 
             if keyboardEvent.keysym.scancode == sdl.Key.BACKSPACE {
-                se.editor_buffer_set_cursor_is_selection(tctx.eb, 1);
-                se.editor_buffer_set_cursor_pos_relative(tctx.eb, -1);
-                se.editor_buffer_delete(tctx.eb);
-                se.editor_buffer_set_cursor_is_selection(tctx.eb, 0);
+                se.editor_buffer_set_cursor_is_selection(context.tc.eb, 1);
+                se.editor_buffer_set_cursor_pos_relative(context.tc.eb, -1);
+                se.editor_buffer_delete(context.tc.eb);
+                se.editor_buffer_set_cursor_is_selection(context.tc.eb, 0);
             }
             else if keyboardEvent.keysym.scancode == sdl.Key.SPACE {
-                se.editor_buffer_insert(tctx.eb, " \0".data);
+                se.editor_buffer_insert(context.tc.eb, " \0".data);
             }
             else if keyboardEvent.keysym.scancode == sdl.Key.ENTER {
-                se.editor_buffer_insert(tctx.eb, "\n\0".data);
+                se.editor_buffer_insert(context.tc.eb, "\n\0".data);
             }
             else if keyboardEvent.keysym.scancode|:isalpha {
-                se.editor_buffer_insert(tctx.eb, :charsFor(keyboardEvent.keysym.scancode));
+                se.editor_buffer_insert(context.tc.eb, :charsFor(keyboardEvent.keysym.scancode));
             }
 
-            drawText(&tctx);
-            commit(&tctx);
+            drawText();
+            commit();
         }
         else if event._type == sdl.MOUSEMOTION {
             mouseEvent := cast(*sdl.MouseMotionEvent) &event;
@@ -448,8 +454,8 @@ fn demo() {
             yMouse: i32;
             sdl.SDL_GetMouseState(&xMouse, &yMouse);
 
-            drawMouse(&tctx, xMouse, yMouse);
-            commit(&tctx);
+            drawMouse(xMouse, yMouse);
+            commit();
         }
     }
 }
