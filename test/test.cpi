@@ -155,8 +155,6 @@ fn runAllTests() {
     assert(testDefer() == 4);
     testPipe();
 
-    io.printFln("fuckme: %", {fuckme});
-
     assert(test2.a == 7);
     assert(test2.test.test2.test.test2.bbb() == test2.test.topLevel);
 
@@ -362,10 +360,6 @@ fn testPolyRecursion() {
 fn testHash() {
     #import "hash";
     hash.test();
-}
-
-fn incrementContextId() {
-    context.id += 1;
 }
 
 fn testPipe() {
@@ -679,13 +673,6 @@ fn poly_inc(n: !T) {
 fn id(t: !T) T {
     return t;
 }
-
-fn idC(t: !T) {
-    io.printFln("id: %", {context.id});
-    return t;
-}
-
-fuckme := idC(3);
 
 fn deref_ct(t: !T) {
     return ^t;
