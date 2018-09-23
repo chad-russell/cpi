@@ -12,8 +12,6 @@ WIDTH     : i32 = 800;
 HEIGHT    : i32 = 350;
 FONT_SIZE : i32 = 20;
 
-fn noopFree(d: *none) { }
-
 type CachedGlyph struct {
     codepoint: i32,
     extents: cairo.GlyphExtents,

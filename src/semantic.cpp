@@ -864,10 +864,14 @@ void Semantic::addStaticIfs(Scope *targetScope, Scope *importInto) {
         cpi_assert(ifStmt->ifData.condition->staticValue->type == NodeType::BOOLEAN_LITERAL);
 
         if (ifStmt->ifData.condition->staticValue->boolLiteralData.value && ifStmt->ifData.stmts.length > 0) {
+            addImports(ifStmt->ifData.trueImports);
+
             addAllFromScopeToScope(this, ifStmt->ifData.ifScope, ii, true);
             addStaticIfs(ifStmt->ifData.ifScope, ifStmt->scope);
         }
         else if (!ifStmt->ifData.condition->staticValue->boolLiteralData.value && ifStmt->ifData.elseStmts.length > 0) {
+            addImports(ifStmt->ifData.falseImports);
+
             addAllFromScopeToScope(this, ifStmt->ifData.elseScope, ii, true);
             addStaticIfs(ifStmt->ifData.elseScope, ifStmt->scope);
         }

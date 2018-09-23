@@ -1,4 +1,6 @@
 TODO:
+    - remove static if support, replace with #ifkind
+
     - support passing args to main fn
 
     - printing floats

@@ -227,6 +227,11 @@ Node *Parser::parseTopLevel() {
         return parseAttr();
     }
 
+    // #if
+    if (lexer->front.type == LexerTokenType::STATIC_IF) {
+        return parseIf();
+    }
+
     // #context
     if (lexer->front.type == LexerTokenType::CONTEXT) {
         return parseContext();
@@ -961,6 +966,7 @@ Node *Parser::parseIf() {
 
     if (isStatic) {
         this->staticIfScope = scopes.top();
+        this->imports = &if_->ifData.trueImports;
     }
 
     expect(LexerTokenType::LCURLY, "{");
@@ -979,6 +985,7 @@ Node *Parser::parseIf() {
 
     if (isStatic) {
         this->staticIfScope = savedStaticIfScope;
+        this->imports = &if_->ifData.falseImports;
     }
 
     if (lexer->front.type == LexerTokenType::ELSE) {

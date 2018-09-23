@@ -1,10 +1,11 @@
-#context id: i64
+#import "os";
 
-fn initId() {
-    context.id = 15;
+#if os.MAC {
+    #import "io";
 }
-#contextinit initId
 
 fn main() {
-    return context.id;
+    io.println("cool");
+
+    return 0;
 }
