@@ -1301,6 +1301,12 @@ void LlvmGen::gen(Node *node) {
                 store((llvm::Value *) node->llvmData, (llvm::Value *) node->llvmLocal);
             }
         } break;
+        case NodeType::CREATE_CONTEXT: {
+            auto resolved = resolve(node);
+
+            gen(resolved);
+            node->llvmData = resolved->llvmData;
+        } break;
         case NodeType::DEFER:
         case NodeType::END_SCOPE:
         case NodeType::IMPORT:
