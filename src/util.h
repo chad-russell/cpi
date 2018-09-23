@@ -407,9 +407,6 @@ struct IfData {
 
     vector_t<Node *> trueImports;
     vector_t<Node *> falseImports;
-
-    vector_t<Node *> trueImpls;
-    vector_t<Node *> falseImpls;
 };
 
 struct WhileData {

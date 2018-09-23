@@ -1171,13 +1171,8 @@ fn idC(t: !T) {
     return t;
 }
 
-fn someCheck() { return true; }
-
-#if someCheck() {
-    #import "test2";
-
-    topLevel := id(123);
-}
+#import "test2";
+topLevel := id(123);
 
 fn testIteration(t: !T) {
     it := t|:iter;

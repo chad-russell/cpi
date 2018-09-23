@@ -252,11 +252,6 @@ Node *Parser::parseTopLevel() {
         return parseImport();
     }
 
-    // if
-    if (lexer->front.type == LexerTokenType::STATIC_IF) {
-        return parseIf();
-    }
-
     // link
     if (lexer->front.type == LexerTokenType::LINK) {
         return parseLink();
@@ -966,7 +961,6 @@ Node *Parser::parseIf() {
 
     if (isStatic) {
         this->imports = &if_->ifData.trueImports;
-        this->impls = &if_->ifData.trueImpls;
         this->staticIfScope = scopes.top();
     }
 
@@ -996,7 +990,6 @@ Node *Parser::parseIf() {
 
         if (isStatic) {
             this->imports = &if_->ifData.falseImports;
-            this->impls = &if_->ifData.falseImpls;
             this->staticIfScope = scopes.top();
         }
 

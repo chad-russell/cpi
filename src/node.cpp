@@ -176,8 +176,6 @@ void initIfData(Node *node) {
     node->ifData.elseScope = nullptr;
     node->ifData.trueImports = vector_init<Node *>(8);
     node->ifData.falseImports = vector_init<Node *>(8);
-    node->ifData.trueImpls = vector_init<Node *>(8);
-    node->ifData.falseImpls = vector_init<Node *>(8);
 }
 
 void initStructLiteralData(Node *node) {

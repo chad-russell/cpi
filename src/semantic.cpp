@@ -864,13 +864,13 @@ void Semantic::addStaticIfs(Scope *targetScope, Scope *importInto) {
         cpi_assert(ifStmt->ifData.condition->staticValue->type == NodeType::BOOLEAN_LITERAL);
 
         if (ifStmt->ifData.condition->staticValue->boolLiteralData.value && ifStmt->ifData.stmts.length > 0) {
-            addImports(ifStmt->ifData.trueImports, ifStmt->ifData.trueImpls);
+            addImports(ifStmt->ifData.trueImports);
 
             addAllFromScopeToScope(this, ifStmt->ifData.ifScope, ii, true);
             addStaticIfs(ifStmt->ifData.ifScope, ifStmt->scope);
         }
         else if (!ifStmt->ifData.condition->staticValue->boolLiteralData.value && ifStmt->ifData.elseStmts.length > 0) {
-            addImports(ifStmt->ifData.falseImports, ifStmt->ifData.falseImpls);
+            addImports(ifStmt->ifData.falseImports);
 
             addAllFromScopeToScope(this, ifStmt->ifData.elseScope, ii, true);
             addStaticIfs(ifStmt->ifData.elseScope, ifStmt->scope);
@@ -878,7 +878,7 @@ void Semantic::addStaticIfs(Scope *targetScope, Scope *importInto) {
     }
 }
 
-void Semantic::addImports(vector_t<Node *> imports, vector_t<Node *> impls) {
+void Semantic::addImports(vector_t<Node *> imports) {
     for (auto import : imports) {
         auto importTarget = resolve(import->importData.target);
 
@@ -896,10 +896,6 @@ void Semantic::addImports(vector_t<Node *> imports, vector_t<Node *> impls) {
         if (!import->importData.isFile) {
             addAllFromScopeToScope(this, importTarget->scope, import->scope, false);
         }
-    }
-
-    for (auto impl: impls) {
-        resolveTypes(impl);
     }
 }
 
