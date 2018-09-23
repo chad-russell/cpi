@@ -86,6 +86,7 @@ enum class NodeType {
     ATTR = 49,
     ATTROF = 50,
     HASATTR = 51,
+    CONTEXT = 52,
 };
 
 enum class NodeTypekind: int32_t {
@@ -208,6 +209,7 @@ enum class LexerTokenType : int32_t {
     ATTR,
     ATTROF,
     HASATTR,
+    CONTEXT,
 };
 
 struct SourceInfo {
@@ -297,6 +299,8 @@ struct ParamData {
     Node *polyLink;
     Node *polyCameFrom;
     bool isAutoPolyParam;
+
+    bool isContext;
 
     int64_t index;
 };
@@ -481,6 +485,10 @@ struct AttrofData {
     Node *attr;
 };
 
+struct ContextData {
+    vector_t<Node *> decls;
+};
+
 struct ParameterizedTypeData {
     vector_t<Node *> ctParams;
     Node *typeDecl;
@@ -569,6 +577,7 @@ public:
         EnumLiteralData enumLiteralData;
         AttrData attrData;
         AttrofData attrofData;
+        ContextData contextData;
     };
 
     Node *staticValue = nullptr;

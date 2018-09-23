@@ -78,6 +78,9 @@ Node::Node(SourceInfo srcInfo, NodeType type_, Scope *scope_) : Node() {
         case NodeType::IMPORT: {
             initImportData(this);
         } break;
+        case NodeType::CONTEXT: {
+            initContextData(this);
+        } break;
         default: {}
     }
 }
@@ -129,6 +132,10 @@ void initImportData(Node *node) {
     node->importData.isFile = false;
     node->importData.target = nullptr;
     node->importData.alias = nullptr;
+}
+
+void initContextData(Node *node) {
+    node->contextData.decls = vector_init<Node *>(16);
 }
 
 void initTypeData(Node *node) {

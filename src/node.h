@@ -44,5 +44,6 @@ void initEndScopeData(Node *node);
 void initParameterizedTypeData(Node *node);
 void initTypeData(Node *node);
 void initImportData(Node *node);
+void initContextData(Node *node);
 
 #endif // NODE_H

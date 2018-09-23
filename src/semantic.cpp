@@ -1069,6 +1069,12 @@ void resolveHasAttr(Semantic *semantic, Node *node) {
     node->typeInfo = b->typeInfo;
 }
 
+void resolveContext(Semantic *semantic, Node *node) {
+    for (auto decl : node->contextData.decls) {
+        vector_append(semantic->contexts, decl);
+    }
+}
+
 void resolveFnDecl(Semantic *semantic, Node *node) {
     auto data = &node->fnDeclData;
 
@@ -3922,6 +3928,9 @@ void Semantic::resolveTypes(Node *node) {
         } break;
         case NodeType::HASATTR: {
             resolveHasAttr(this, node);
+        } break;
+        case NodeType::CONTEXT: {
+            resolveContext(this, node);
         } break;
         case NodeType::ENUM_LITERAL:
         case NodeType::PARAMETERIZED_TYPE:

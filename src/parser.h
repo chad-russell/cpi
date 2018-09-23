@@ -40,6 +40,7 @@ struct Parser {
 
     vector_t<Node *> *imports;
     vector_t<Node *> *impls;
+    vector_t<Node *> *contexts;
 
     Scope *staticIfScope = nullptr;
 
@@ -66,10 +67,10 @@ struct Parser {
 
     void parseRoot();
     Node *parseTopLevel();
+    Node *parseDeclParam();
     vector_t<Node *> parseDeclParams();
     vector_t<Node *> parseValueParams();
     Node *parseFnDecl();
-    Node *parseImplFnDecl();
     Node *parseAttr();
     Node *parseImport();
     Node *parseTypeDecl();
@@ -107,6 +108,7 @@ struct Parser {
     Node *buildDots(stack<Node *> rvalues);
     Node *parseDefer();
     Node *parseLink();
+    Node *parseContext();
 };
 
 #endif // PARSER_H

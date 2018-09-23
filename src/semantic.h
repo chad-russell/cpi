@@ -21,6 +21,7 @@ public:
 
     vector_t<string *> linkLibs = vector_init<string *>(4);
     vector_t<Polymorphed> polymorphs = vector_init<Polymorphed>(32);
+    vector_t<Node *> contexts = vector_init<Node *>(16);
 
     Lexer *lexer = nullptr;
     Parser *parser = nullptr;

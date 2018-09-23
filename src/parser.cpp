@@ -15,6 +15,9 @@ Parser::Parser(Lexer *lexer_) {
     impls = (vector_t<Node *> *) malloc(sizeof(vector_t<Node *>));
     *impls = vector_init<Node *>(16);
 
+    contexts = (vector_t<Node *> *) malloc(sizeof(vector_t<Node *>));
+    *contexts = vector_init<Node *>(16);
+
     allTopLevel = vector_init<Node *>(256);
 
     scopes.push(new Scope(nullptr));
@@ -249,6 +252,11 @@ Node *Parser::parseTopLevel() {
         return parseAttr();
     }
 
+    // #context
+    if (lexer->front.type == LexerTokenType::CONTEXT) {
+        return parseContext();
+    }
+
     // type definition
     if (lexer->front.type == LexerTokenType::TYPE) {
         return parseTypeDecl();
@@ -284,61 +292,67 @@ Node *Parser::parseTopLevel() {
     exit(1);
 }
 
+Node *Parser::parseDeclParam() {
+    auto node = new Node(lexer->srcInfo, NodeType::DECL_PARAM, scopes.top());
+    initParamData(node);
+
+    // lvalue
+    auto name = parseSymbol();
+    node->paramData.name = name;
+
+    if (lexer->front.type != LexerTokenType::COLON && lexer->front.type != LexerTokenType::COLON_EQ) {
+        reportError("expected ':' or ':='");
+    }
+
+    if (lexer->front.type == LexerTokenType::COLON) {
+        popFront();
+
+        if (lexer->front.type == LexerTokenType::NOT) {
+            // fn foo(t: !T) { ... }
+            popFront();
+            node->paramData.isAutoPolyParam = true;
+        }
+        node->paramData.type = parseType();
+
+        if (lexer->front.type == LexerTokenType::DIV) {
+            popFront(); // '/'
+            node->paramData.polyCameFrom = parseSymbol();
+        }
+
+        if (lexer->front.type == LexerTokenType::EQ) {
+            popFront();
+            node->paramData.value = parseRvalue();
+        }
+    }
+    else {
+        expect(LexerTokenType::COLON_EQ, ":=");
+        node->paramData.value = parseRvalue();
+    }
+
+    node->region.start = name->region.start;
+    if (node->paramData.value != nullptr) {
+        node->region.end = node->paramData.value->region.end;
+    } else if (node->paramData.type != nullptr) {
+        node->region.end = node->paramData.type->region.end;
+    } else {
+        node->region.end = name->region.end;
+    }
+
+    return node;
+}
+
 vector_t<Node *> Parser::parseDeclParams() {
     auto params = vector_init<Node *>(10);
 
     while (!lexer->isEmpty() && lexer->front.type != LexerTokenType::RPAREN && lexer->front.type != LexerTokenType::RCURLY) {
-        auto node = new Node(lexer->srcInfo, NodeType::DECL_PARAM, scopes.top());
-        initParamData(node);
-
-        // lvalue
-        auto name = parseSymbol();
-        node->paramData.name = name;
-
-        if (lexer->front.type != LexerTokenType::COLON && lexer->front.type != LexerTokenType::COLON_EQ) {
-            reportError("expected ':' or ':='");
-        }
-
-        if (lexer->front.type == LexerTokenType::COLON) {
-            popFront();
-
-            if (lexer->front.type == LexerTokenType::NOT) {
-                // fn foo(t: !T) { ... }
-                popFront();
-                node->paramData.isAutoPolyParam = true;
-            }
-            node->paramData.type = parseType();
-
-            if (lexer->front.type == LexerTokenType::DIV) {
-                popFront(); // '/'
-                node->paramData.polyCameFrom = parseSymbol();
-            }
-
-            if (lexer->front.type == LexerTokenType::EQ) {
-                popFront();
-                node->paramData.value = parseRvalue();
-            }
-        }
-        else {
-            expect(LexerTokenType::COLON_EQ, ":=");
-            node->paramData.value = parseRvalue();
-        }
+        auto param = parseDeclParam();
 
         // comma (if not RPAREN or RCURLY)
         if (lexer->front.type != LexerTokenType::RPAREN && lexer->front.type != LexerTokenType::RCURLY) {
             expect(LexerTokenType::COMMA, ",");
         }
 
-        node->region.start = name->region.start;
-        if (node->paramData.value != nullptr) {
-            node->region.end = node->paramData.value->region.end;
-        } else if (node->paramData.type != nullptr) {
-            node->region.end = node->paramData.type->region.end;
-        } else {
-            node->region.end = name->region.end;
-        }
-
-        vector_append(params, node);
+        vector_append(params, param);
     }
 
     return params;
@@ -2144,6 +2158,36 @@ Node *Parser::parseArrayIndex() {
     node->region.end = last.region.end;
 
     return node;
+}
+
+Node *Parser::parseContext() {
+    expect(LexerTokenType::CONTEXT, "#context");
+
+    auto context = new Node(lexer->srcInfo, NodeType::CONTEXT, scopes.top());
+
+    if (lexer->front.type == LexerTokenType::LCURLY) {
+        popFront();
+
+        while (lexer->front.type != LexerTokenType::RCURLY) {
+            auto param = parseDeclParam();
+            param->paramData.isContext = true;
+            vector_append(context->contextData.decls, param);
+        }
+
+        expect(LexerTokenType::RCURLY, "}");
+    }
+    else {
+        auto param = parseDeclParam();
+        param->paramData.isContext = true;
+        vector_append(context->contextData.decls, param);
+    }
+
+    context->region.start = vector_at(context->contextData.decls, 0)->region.start;
+    context->region.end = vector_at(context->contextData.decls, context->contextData.decls.length - 1)->region.end;
+
+    vector_append(*this->contexts, context);
+
+    return context;
 }
 
 Node *Parser::parseFnCall() {
