@@ -221,7 +221,7 @@ int main(int argc, char **argv) {
         semantic->addStaticIfs(parser->scopes.top());
         semantic->addImports(*parser->imports, *parser->impls, *parser->contexts, *parser->contextInits);
 
-        for (auto ctx : *parser->contexts) {
+        for (auto ctx : semantic->contexts) {
             semantic->resolveTypes(ctx);
         }
         semantic->makeContextType();

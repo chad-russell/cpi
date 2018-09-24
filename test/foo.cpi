@@ -1,14 +1,13 @@
 #import "os";
 
-#context init := os.WINDOWS == true
-
-fn foo() {
-    basic.tmp(13);
-    return 10;
+#if os.MAC {
+    #import "textedit";
 }
 
-a := foo();
-
 fn main() {
-    return context.init;
+    #import "io";
+
+    io.println(^context);
+
+    return 0;
 }

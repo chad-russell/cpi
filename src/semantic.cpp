@@ -894,6 +894,7 @@ void Semantic::addImports(vector_t<Node *> imports, vector_t<Node *> impls, vect
         if (importTarget->type != NodeType::MODULE) {
             this->resolveTypes(importTarget);
         }
+
         importTarget = resolve(importTarget);
         cpi_assert(importTarget->type == NodeType::MODULE);
 
@@ -903,7 +904,8 @@ void Semantic::addImports(vector_t<Node *> imports, vector_t<Node *> impls, vect
     }
 
     for (auto context: contexts) {
-        resolveTypes(context);
+        vector_append(this->contexts, context);
+//        resolveTypes(context);
     }
 
 //    for (auto contextInit: contextInits) {

@@ -82,8 +82,8 @@ fn loadFonts() {
     -- context.tc.font = "/Users/chadrussell/Projects/text/Noto-unhinted/NotoColorEmoji.ttf";
     -- context.tc.font = "/Users/chadrussell/Projects/text/emojione-apple.ttc";
     -- context.tc.font = "/Users/chadrussell/Library/Fonts/Roboto-Light.ttf";
-    context.tc.font = "/Library/Fonts/Inconsolata.otf";
-    -- context.tc.font = "/Users/chadrussell/Projects/text/JFWilwod.ttf";
+    -- context.tc.font = "/Library/Fonts/Inconsolata.otf";
+    context.tc.font = "/Users/chadrussell/Projects/text/JFWilwod.ttf";
 
     -- context.tc.text = buf.from("Hello");
     -- context.tc.text = buf.from("🙈");
