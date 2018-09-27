@@ -1102,8 +1102,6 @@ Node *Semantic::makeContextType() {
         }
     }
 
-//    resolveTypes(ct);
-
     contextType = ct;
     return ct;
 }
@@ -1402,6 +1400,7 @@ Node *constantize(Semantic *semantic, Node *node) {
 
     if (copied->type != NodeType::FN_CALL || copied->fnCallData.params.length != 0) {
         auto wrappedFn = new Node(node->region.srcInfo, NodeType::FN_DECL, node->scope);
+        wrappedFn->fnDeclData.skipContext = true;
 
         auto savedCurrentFnDecl = semantic->currentFnDecl;
         semantic->currentFnDecl = wrappedFn;
@@ -3839,6 +3838,12 @@ void resolveFieldsof(Semantic *semantic, Node *node) {
 
 void Semantic::resolveTypes(Node *node) {
     if (node == nullptr) { return; }
+
+    // skip any fn calls before we have context information -- but save them to come back later
+    if (node->type == NodeType::FN_DECL && !canContext && !node->fnDeclData.skipContext) {
+        vector_append(postContexts, node);
+        return;
+    }
 
     // DECL_PARAM because it might be polyLinked.....
     if (node->semantic && node->type != NodeType::STRING_LITERAL && node->type != NodeType::DECL_PARAM) {

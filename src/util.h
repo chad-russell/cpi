@@ -326,6 +326,7 @@ struct FnDeclData {
     bool cameFromPolymorph;
     bool isImpl;
     int64_t debugLocalOffset;
+    bool skipContext;
 };
 
 struct DeclData {

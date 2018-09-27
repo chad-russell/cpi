@@ -24,7 +24,10 @@ public:
 
     vector_t<Node *> contexts = vector_init<Node *>(16);
     vector_t<Node *> contextInits = vector_init<Node *>(16);
+
     Node *contextType = nullptr;
+    bool canContext = false;
+    vector_t<Node *> postContexts = vector_init<Node *>(16);
 
     vector_t<StructTypeData> structsToSize = vector_init<StructTypeData>(256);
 

@@ -104,7 +104,7 @@ Node *Parser::addImport(string importName, Node *alias) {
     auto rpath = realpath(concatPath.c_str(), nullptr);
     if (rpath == nullptr) {
         auto home = strdup(getenv("HOME"));
-        rpath = realpath(string(strcat(home, "/.cpi/lib/") + concatPath).c_str(), nullptr);
+        rpath = realpath(string(strcat(home, "/.cpi/include/") + concatPath).c_str(), nullptr);
     }
     if (rpath == nullptr) {
         // this doesn't exist. Might not be an issue (that's for semantic to decide), but definitely don't continue
@@ -788,6 +788,11 @@ Node *Parser::parseScopedStmt() {
     // #attr
     if (lexer->front.type == LexerTokenType::ATTR) {
         return parseAttr();
+    }
+
+    // #context
+    if (lexer->front.type == LexerTokenType::CONTEXT) {
+        return parseContext();
     }
 
     // puts

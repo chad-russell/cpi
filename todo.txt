@@ -1,9 +1,11 @@
 TODO:
-    - remove static if support, replace with #ifkind
+    - ways to deal with nullable/non-nullable pointers (?)
+        - .? operator
+
+    - add #nocontext annotation for fns -- these fns can be used in #if stmts, but not ones with context
+        - need to validate that it doesn't call any fns from within it unless they are external or marked with #nocontext
 
     - support passing args to main fn
-
-    - printing floats
 
     - support profiling in interpreter
 
@@ -22,18 +24,11 @@ TODO:
     - operator overloading?
         +, -, *, /, comparison
 
-    - ways to deal with nullable/non-nullable pointers (?)
-        - .? operator
-
     - some kind of zig-like error handling (?)
 
     - better unions (?)
         - @notag attribute on type decl?
         - @tag to specify which field should get used as the tag?
-
-    - static array sizes?
-        - [5]i32
-        - should this be used to represent string literals?
 
     - disallow modifying constantized values (i.e. any kind of lvalue assignment) for aliases, ctParams, etc
 

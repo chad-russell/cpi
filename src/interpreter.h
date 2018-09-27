@@ -251,7 +251,12 @@ public:
 
         libs = vector_init<void *>(10);
         for (auto lib : externalLibs) {
-            auto path = realpath(string("/usr/local/lib/" + *lib + ".dylib").c_str(), nullptr);
+            auto home = strdup(getenv("HOME"));
+            auto path = realpath(string("/usr/local/lib/cpi/" + *lib + ".dylib").c_str(), nullptr);
+
+            if (path == nullptr) {
+                path = realpath(string("/usr/local/lib/" + *lib + ".dylib").c_str(), nullptr);
+            }
             if (path == nullptr) {
                 path = realpath(string("/usr/lib/" + *lib + ".dylib").c_str(), nullptr);
             }

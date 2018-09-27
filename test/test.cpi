@@ -553,7 +553,7 @@ fn testDefault2() {
 #import "mem";
 
 fn alloc_pair() {
-    return cast(*pair) mem.malloc(sizeof(pair));
+    return cast(*pair) mem.calloc(1, sizeof(pair));
 }
 
 fn testMalloc() {

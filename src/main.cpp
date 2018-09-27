@@ -5,7 +5,6 @@
 #include <sstream>
 #include <chrono>
 #include <stdlib.h>
-
 #include "assembler.h"
 #include "interpreter.h"
 #include "lexer.h"
@@ -224,7 +223,12 @@ int main(int argc, char **argv) {
         for (auto ctx : semantic->contexts) {
             semantic->resolveTypes(ctx);
         }
+        semantic->canContext = true;
         semantic->makeContextType();
+
+        for (auto n: semantic->postContexts) {
+            semantic->resolveTypes(n);
+        }
 
         for (auto impl: *parser->impls) {
             semantic->resolveTypes(impl);
@@ -446,7 +450,7 @@ int main(int argc, char **argv) {
             system("/usr/local/Cellar/llvm/5.0.1/bin/llc --filetype=obj ./output.bc");
 
             ostringstream command;
-            command << "clang -O3 -L .";
+            command << "clang -O3 -L . -L /usr/local/lib/cpi";
             for (auto link : semantic->linkLibs) {
                 // todo(chad): make convenience fn for getting file/dir name from long path
                 lastSlash = 0;
