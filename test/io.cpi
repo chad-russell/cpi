@@ -1,0 +1,263 @@
+#import "mem";
+
+#link "libc";
+
+type File none
+
+SEEK_SET: i32 = 0;
+SEEK_CUR: i32 = 1;
+SEEK_END: i32 = 2;
+
+fn fopen(filename: *i8, mode: *i8) *File
+fn fclose(file: *File) i32
+fn fseek(file: *File, offset: i64, whence: i32) i32
+fn ftell(file: *File) i64
+fn rewind(file: *File) none
+fn fread(ptr: *i8, size: i64, nitems: i64, file: *File) i64
+fn printf(str: *i8) none
+
+fn putchar(c: i8) {
+    ch := ".";
+    ch[0] = c;
+    puts(ch);
+}
+
+fn printIthField(t: !T, idx: i64) {
+    #for field, i: #fieldsof(T) {
+        if i == idx {
+            print(t[i]);
+        }
+    }
+}
+
+fn printF(format: []i8, t: !T) {
+    idx := 0;
+
+    for ch: format {
+        if ch == "%"[0] {
+            printIthField(t, idx);
+            idx += 1;
+        }
+        else {
+            putchar(ch);
+        }
+    }
+}
+
+fn printFln(format: []i8, t: !T) {
+    printF(format, t);
+    puts("\n");
+}
+
+fn printInt(t: !T) {
+    base: T = 10;
+    table := []{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"};
+
+    b: []i8;
+    b.data = cast(*i8) mem.calloc(20, sizeof(i8));
+    defer { mem.free(cast(*none) b.data); }
+
+    n := t;
+    idx := 0;
+
+    while n > base {
+        m := cast(i64) (n mod base);
+        n = n / base;
+        b[idx] = table[m][0];
+        idx = idx + 1;
+    }
+
+    m := cast(i64) (n mod base);
+    n = n / base;
+    b[idx] = table[m][0];
+
+    while idx >= 0 {
+        putchar(b[idx]);
+        idx = idx - 1;
+    }
+}
+
+fn printHex(t: !T) {
+    base := 16;
+    table := []{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"};
+
+    b: []i8;
+    b.data = cast(*i8) mem.calloc(20, sizeof(i8));
+
+    n := t;
+    idx := 0;
+
+    while n > base {
+        m := cast(i64) (n mod base);
+        n = n / base;
+        b[idx] = table[m][0];
+        idx = idx + 1;
+    }
+
+    m := cast(i64) (n mod base);
+    n = n / base;
+    b[idx] = table[m][0];
+
+    puts("0x");
+    while idx >= 0 {
+        putchar(b[idx]);
+        idx = idx - 1;
+    }
+}
+
+fn printArray(t: !T) {
+    -- could be a string, or something else
+    #if #iskind(typeof(t[0]), i8) {
+        puts(t);
+    }
+    else {
+        puts("[]{");
+        for it, i: t {
+            print(it);
+            if i < t.count - 1 { puts(", "); }
+        }
+        puts("}");
+    }
+}
+
+fn printStruct(t: !T) {
+    puts("{");
+
+    #for it, i: #fieldsof(T) {
+        print(it.name);
+        print(": ");
+        print(t[i]);
+        if i < #fieldsof(T).count - 1 { puts(", "); }
+    }
+
+    puts("}");
+}
+
+fn printUnion(t: !T) {
+    puts("{");
+    #for it, i: #fieldsof(T) {
+        if t.tag == cast() it.index {
+            print(it.name);
+            print(": ");
+            print(t[it.index]);
+        }
+    }
+    puts("}");
+}
+
+fn printEnum(t: !T) {
+    #for it: #fieldsof(T) {
+      if cast() it.value == t {
+        printMany({it.name, "(", it.value, ")"});
+      }
+    }
+}
+
+fn printPointer(t: !T) {
+    puts("*(");
+    printHex(cast(i64) t);
+    puts(")");
+}
+
+fn print(t: !T) {
+    #if #iskind(T, i8) {
+        putchar(t);
+    }
+    else #if #iskind(T, i16) or #iskind(T, i32) or #iskind(T, i64) {
+        printInt(t);
+    }
+    else #if #iskind(T, f32) {
+        printF32(t);
+    }
+    else #if #iskind(T, f64) {
+        printF64(t);
+    }
+    else #if #iskind(T, bool) {
+        if t {
+            puts("true");
+        }
+        else {
+            puts("false");
+        }
+    }
+    else #if #iskind(T, *) {
+        printPointer(t);
+    }
+    else #if #iskind(T, []) {
+        printArray(t);
+    }
+    else #if #iskind(T, struct) {
+        printStruct(t);
+    }
+    else #if #iskind(T, union) {
+        printUnion(t);
+    }
+    else #if #iskind(T, enum) {
+        printEnum(t);
+    }
+}
+
+fn printMany(t: !T) {
+    #for it: t {
+        print(it);
+    }
+}
+
+fn printWithSeparator( sep: Ast )(t: !T) {
+    #for it, i: t {
+        print(it);
+        if i < #fieldsof(T).count - 1 {
+            print(sep);
+        }
+    }
+}
+
+fn printWithSpaces(t: !T) {
+    printWithSeparator!(" ")(t);
+}
+
+fn println(s: !T) {
+    print(s); puts("\n");
+}
+
+fn cstr(str: []i8) {
+    r := mem.alloc!(i8)(str.count + 1);
+    mem.memcpy(cast(*none) r, cast(*none) str.data, str.count);
+    return r;
+}
+
+fn readFile(name: []i8) {
+    f := fopen(cstr(name), cstr("r"));
+    if f == nil {
+        println("could not open file\n");
+        panic();
+    }
+
+    err := fseek(f, 0, SEEK_END);
+    if err != 0 {
+        printMany({"fseek error: ", err, "\n"});
+        panic();
+    }
+
+    length := ftell(f);
+    if length == -1 {
+        println("got -1 for file size :(");
+        panic();
+    }
+
+    rewind(f);
+
+    buf := cast(*i8) mem.calloc(length, sizeof(i8));
+    fread(buf, 1, length, f);
+
+    s: []i8;
+    s.data = buf;
+    s.count = length;
+
+    return s;
+}
+
+#link "libcrutch";
+
+fn printF32(f: f32) none
+fn printF64(f: f64) none

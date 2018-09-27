@@ -1,0 +1,51 @@
+type Region struct {
+    data: *i8,
+    count: i64,
+    current: *i8
+}
+
+#context id: i64
+#context region: Region
+
+fn initContext() {
+    #import "mem";
+
+    -- start with 1MB
+    size := 1024 * 1024;
+
+    context.region.count = size;
+    context.region.data = mem.calloc(size, sizeof(i8));
+    context.region.current = context.region.data;
+}
+
+fn heap(allocFn: fn(size: i64) *none, item: !T) {
+    storage := cast(*T) allocFn(sizeof(T));
+    ^storage = item;
+    return storage;
+}
+
+fn tmp(size: i64) *none {
+    if context.region.current == nil {
+        initContext();
+    }
+
+    #import "io";
+    io.printMany({"tmp-allocating ", size, " bytes\n"});
+
+    if context.region.current + size >= context.region.data + context.region.count {
+        panic();
+    }
+
+    p := cast(*none) context.region.current;
+    context.region.current = context.region.current + size;
+
+    return p;
+}
+
+fn resetTmp() {
+  context.region.current = context.region.data;
+}
+
+fn assert(b: bool) {
+    if (b == false) { panic(); }
+}

@@ -1,0 +1,3 @@
+WINDOWS := false;
+LINUX   := false;
+MAC     := true;
