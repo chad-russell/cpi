@@ -49,3 +49,8 @@ fn resetTmp() {
 fn assert(b: bool) {
     if (b == false) { panic(); }
 }
+
+fn init(T: Ast)() {
+    t: T;
+    return t;
+}

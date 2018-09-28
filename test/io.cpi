@@ -58,9 +58,10 @@ fn printInt(t: !T) {
     defer { mem.free(cast(*none) b.data); }
 
     n := t;
+    if n < 0 { n = -n; }
     idx := 0;
 
-    while n > base {
+    while n >= base {
         m := cast(i64) (n mod base);
         n = n / base;
         b[idx] = table[m][0];
@@ -71,6 +72,7 @@ fn printInt(t: !T) {
     n = n / base;
     b[idx] = table[m][0];
 
+    if t < 0 { putchar("-"[0]); }
     while idx >= 0 {
         putchar(b[idx]);
         idx = idx - 1;

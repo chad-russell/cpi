@@ -142,7 +142,7 @@ Node *Parser::addImport(string importName, Node *alias) {
     }
 
     if (!found) {
-        auto lexer = new Lexer(path, true);
+        auto lexer = new Lexer(new string(path), nullptr);
         auto parser = new Parser(lexer);
         parser->contexts = this->contexts;
         parser->contextInits = this->contextInits;
@@ -1803,6 +1803,8 @@ Node *Parser::parseLvalueOrLiteral() {
             symbol->unaryNegData.rewritten->binopData.lhs = new Node(target->region.srcInfo, NodeType::INT_LITERAL, target->scope);
             symbol->unaryNegData.rewritten->binopData.lhs->intLiteralData.value = 0;
             symbol->unaryNegData.rewritten->binopData.rhs = target;
+
+            addLocal(symbol->unaryNegData.rewritten);
 
             addLocal(target);
 

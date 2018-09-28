@@ -42,16 +42,15 @@ Lexer::Lexer(SourceInfo srcInfo, Node *node) {
     this->popFront();
 }
 
-Lexer::Lexer(Lexer *lexer, Node *node) {
-    Lexer(lexer->srcInfo, node);
-}
-
-Lexer::Lexer(string fileName, bool isFile) {
+Lexer::Lexer(string *fileName, string *fileSrc) {
     auto lines = vector_init<unsigned long>(1);
     vector_append(lines, (unsigned long) 0);
 
-    if (isFile) {
-        ifstream t(fileName);
+    if (fileName != nullptr && fileSrc != nullptr) {
+        srcInfo = {fileName, fileSrc, lines};
+    }
+    else if (fileName != nullptr) {
+        ifstream t(*fileName);
         string fileBytes;
 
         t.seekg(0, ios::end);
@@ -61,11 +60,12 @@ Lexer::Lexer(string fileName, bool isFile) {
         fileBytes.assign((istreambuf_iterator<char>(t)),
                          istreambuf_iterator<char>());
 
-        srcInfo = {new string(fileName), new string(fileBytes), lines};
+        srcInfo = {fileName, new string(fileBytes), lines};
     }
-    else {
-        srcInfo = {new string("unknown"), new string(fileName), lines};
+    else if (fileSrc == nullptr) {
+        srcInfo = {nullptr, fileSrc};
     }
+    else { cpi_assert(false); }
 
     lastLoc = {0, 1, 1};
     loc = {0, 1, 1};

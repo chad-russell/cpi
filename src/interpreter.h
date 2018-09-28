@@ -523,7 +523,7 @@ int64_t evaluate(Interpreter *fromInterp, SourceInfo srcInfo, Scope *scope, stri
     auto evalFnDecl = new Node(srcInfo, NodeType::FN_DECL, scope);
     evalFnDecl->fnDeclData.debugLocalOffset = fromInterp->sp - fromInterp->bp;
 
-    auto evalLexer = new Lexer(std::move(code), false);
+    auto evalLexer = new Lexer(nullptr, new string(code));
 
     auto evalParser = new Parser(evalLexer);
     evalParser->isCopying = true;

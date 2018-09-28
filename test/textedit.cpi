@@ -25,6 +25,14 @@ type Rect(T := typeof(x)) struct {
     height: T
 }
 
+#attr(Rect)
+fn contains(T := typeof(r.x))(r: !R/Rect, x: T, y: T) {
+    return r.x <= x
+       and r.x + r.width >= x
+       and r.y <= y
+       and r.y + r.height >= y;
+}
+
 type CachedLine struct {
     low: f64,
     high: f64,
@@ -37,6 +45,10 @@ type Form struct {
     pattern: *cairo.Pattern,
 
     rect: Rect!(f64),
+
+    data: *none,
+
+    render: fn(self: *Form) void,
 }
 
 #context cairo: struct {
@@ -44,6 +56,7 @@ type Form struct {
 
     surface: *cairo.Surface,
     context: *cairo.Context,
+    pattern: *cairo.Pattern,
 }
 
 #context sdl: struct {
@@ -74,8 +87,11 @@ type Form struct {
     glyphCache: buf.Buffer!(CachedGlyph),
     lineCache: buf.Buffer!(CachedLine),
 
-    mouse: Form,
+    mouse: struct{x: i32, y: i32},
+
+    decor: Form,
     text: Form,
+    slider: Form,
 }
 
 fn loadFonts() {
@@ -83,8 +99,8 @@ fn loadFonts() {
     -- context.tc.font = "/Users/chadrussell/Projects/text/Noto-unhinted/NotoColorEmoji.ttf";
     -- context.tc.font = "/Users/chadrussell/Projects/text/emojione-apple.ttc";
     -- context.tc.font = "/Users/chadrussell/Library/Fonts/Roboto-Light.ttf";
-    -- context.tc.font = "/Library/Fonts/Inconsolata.otf";
-    context.tc.font = "/Users/chadrussell/Projects/text/JFWilwod.ttf";
+    context.tc.font = "/Library/Fonts/Inconsolata.otf";
+    -- context.tc.font = "/Users/chadrussell/Projects/text/JFWilwod.ttf";
 
     -- context.tc.text = buf.from("Hello");
     -- context.tc.text = buf.from("🙈");
@@ -140,13 +156,21 @@ fn initCairo() {
             context.sdl.surface.h,
             context.sdl.surface.pitch);
     context.cairo.context = cairo.cairo_create(context.cairo.surface);
-
-    context.tc.text.surface = cairo.cairo_image_surface_create(cairo.FORMAT_ARGB32, cast() context.sdl.surface.w, cast() context.sdl.surface.h);
-    context.tc.text.rect = {0, 20, cast(f64) context.sdl.surface.w, cast(f64) context.sdl.surface.h};
-    context.tc.text.pattern = cairo.cairo_pattern_create_for_surface(context.tc.text.surface);
+    context.cairo.pattern = cairo.cairo_pattern_create_for_surface(context.cairo.surface);
 
     context.sdl.xScale = cast(f64) context.sdl.rendererWidth / cast(f64) context.sdl.windowWidth;
     context.sdl.yScale = cast(f64) context.sdl.rendererHeight / cast(f64) context.sdl.windowHeight;
+
+    sliderHeight := 10 * context.sdl.yScale;
+
+    context.tc.slider.surface = cairo.cairo_image_surface_create(cairo.FORMAT_ARGB32, cast() context.sdl.surface.w, cast() context.sdl.surface.h);
+    context.tc.slider.rect = {0, 0, cast(f64) context.sdl.surface.w / context.sdl.xScale, sliderHeight};
+    context.tc.slider.pattern = cairo.cairo_pattern_create_for_surface(context.tc.slider.surface);
+    context.tc.slider.context = cairo.cairo_create(context.tc.slider.surface);
+
+    context.tc.text.surface = cairo.cairo_image_surface_create(cairo.FORMAT_ARGB32, cast() context.sdl.surface.w, cast() context.sdl.surface.h);
+    context.tc.text.rect = {0, sliderHeight, cast(f64) context.sdl.surface.w, cast(f64) context.sdl.surface.h};
+    context.tc.text.pattern = cairo.cairo_pattern_create_for_surface(context.tc.text.surface);
 
     -- Get Cairo context from Cairo surface
     context.tc.text.context = cairo.cairo_create(context.tc.text.surface);
@@ -158,54 +182,90 @@ fn initCairo() {
     context.tc.glyphCache = buf.make!(CachedGlyph)();
     context.tc.lineCache = buf.make!(CachedLine)();
 
-    context.tc.mouse.surface = cairo.cairo_image_surface_create(cairo.FORMAT_ARGB32, cast() context.sdl.surface.w, cast() context.sdl.surface.h);
-    context.tc.mouse.pattern = cairo.cairo_pattern_create_for_surface(context.tc.mouse.surface);
-
-    context.tc.mouse.context = cairo.cairo_create(context.tc.mouse.surface);
+    context.tc.decor.surface = cairo.cairo_image_surface_create(cairo.FORMAT_ARGB32, cast() context.sdl.surface.w, cast() context.sdl.surface.h);
+    context.tc.decor.rect = {0, sliderHeight, cast(f64) context.sdl.surface.w / context.sdl.xScale, cast(f64) context.sdl.surface.h / context.sdl.yScale};
+    context.tc.decor.pattern = cairo.cairo_pattern_create_for_surface(context.tc.decor.surface);
+    context.tc.decor.context = cairo.cairo_create(context.tc.decor.surface);
 
     -- Scale cairo to use screen resolution
     cairo.cairo_surface_set_device_scale(context.tc.text.surface, context.sdl.xScale, context.sdl.yScale);
-    cairo.cairo_surface_set_device_scale(context.tc.mouse.surface, context.sdl.xScale, context.sdl.yScale);
+    cairo.cairo_surface_set_device_scale(context.tc.decor.surface, context.sdl.xScale, context.sdl.yScale);
     cairo.cairo_surface_set_device_scale(context.cairo.surface, context.sdl.xScale, context.sdl.yScale);
 }
 
-fn drawMouse(x: i32, y: i32) {
+fn drawRect(ctx: *cairo.Context, rect: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1) {
+    cairo.cairo_save(ctx);
+    cairo.cairo_set_source_rgba(ctx, r, g, b, a);
+    cairo.cairo_rectangle(ctx, rect.x, rect.y, rect.width, rect.height);
+    cairo.cairo_fill(ctx);
+    cairo.cairo_restore(ctx);
+}
+
+fn handleMouseMove() {
+    sdl.SDL_GetMouseState(&context.tc.mouse.x, &context.tc.mouse.y);
+
+    if context.mouseDownForm != nil {
+        -- todo(chad): don't always assume it's the slider
+        r := context.tc.slider.rect;
+        drawRect(context.tc.slider.context, r, 0, 0, 0);
+
+        graduations := se.editor_buffer_get_undo_size(context.tc.eb);
+        clamped := cast(i64) (cast(f64) context.tc.mouse.x * cast(f64) graduations / r.width);
+
+        r.x = cast(f64) clamped * r.width / cast() graduations;
+        r.width = 10;
+        drawRect(context.tc.slider.context, r, 1, 0, 1);
+
+        se.editor_buffer_undo(context.tc.eb, clamped);
+
+        drawText();
+        commit();
+    }
+    else if context.tc.decor.rect|contains(cast() context.tc.mouse.x, cast() context.tc.mouse.y) {
+        drawDecorations();
+    }
+}
+
+fn drawDecorations() {
+    -- translate the mouse coordinates to be relative to our mouse form
+    relX := context.tc.mouse.x - cast() context.tc.decor.rect.x;
+    relY := context.tc.mouse.y - cast() context.tc.decor.rect.y;
+
     -- Clear
-    cairo.cairo_save(context.tc.mouse.context);
-    cairo.cairo_set_operator(context.tc.mouse.context, cairo.Operator.CAIRO_OPERATOR_CLEAR);
-    cairo.cairo_paint(context.tc.mouse.context);
-    cairo.cairo_restore(context.tc.mouse.context);
+    cairo.cairo_save(context.tc.decor.context);
+    cairo.cairo_set_operator(context.tc.decor.context, cairo.Operator.CAIRO_OPERATOR_CLEAR);
+    cairo.cairo_paint(context.tc.decor.context);
+    cairo.cairo_restore(context.tc.decor.context);
 
     -- Mouse cursor
-    -- cairo.cairo_save(context.tc.mouse.context);
-    -- cairo.cairo_set_source_rgba(context.tc.mouse.context, 0.9, 0.9, 1, 1);
-    -- cairo.cairo_rectangle(context.tc.mouse.context, cast() (x - 10), cast() (y - 10), 20, 20);
-    -- cairo.cairo_fill(context.tc.mouse.context);
-    -- cairo.cairo_restore(context.tc.mouse.context);
+    -- cairo.cairo_save(context.tc.decor.context);
+    -- cairo.cairo_set_source_rgba(context.tc.decor.context, 0.9, 0.9, 1, 1);
+    -- cairo.cairo_rectangle(context.tc.decor.context, cast() (relX - 10), cast() (relY - 10), 20, 20);
+    -- cairo.cairo_fill(context.tc.decor.context);
+    -- cairo.cairo_restore(context.tc.decor.context);
 
     -- Highlight line
-    cairo.cairo_save(context.tc.mouse.context);
-    cairo.cairo_set_source_rgba(context.tc.mouse.context, 0.0, 0.9, 0.0, 0.9);
+    cairo.cairo_save(context.tc.decor.context);
+    cairo.cairo_set_source_rgba(context.tc.decor.context, 0.0, 0.9, 0.0, 0.9);
 
-    line := cast(i64) (y / FONT_SIZE);
+    line := cast(i64) (relY / FONT_SIZE);
 
     -- single character
     if line >= 0 and line < context.tc.lineCache.buf.count {
         cl := context.tc.lineCache.buf[line];
         for g: cl.glyphs.buf {
-            -- todo(chad): write 'rect contains point' fn
-            if g.x <= cast() x and g.y <= cast() y and g.x + g.width >= cast() x and g.y + g.height >= cast() y {
-                cairo.cairo_rectangle(context.tc.mouse.context, g.x, g.y, g.width, g.height);
-                cairo.cairo_fill(context.tc.mouse.context);
+            if g|contains(cast() relX, cast() relY) {
+                cairo.cairo_rectangle(context.tc.decor.context, g.x, g.y, g.width, g.height);
+                cairo.cairo_fill(context.tc.decor.context);
             }
         }
+
+        -- entire line
+        -- cairo.cairo_rectangle(context.tc.decor.context, 0, cl.low - 1, cast() context.sdl.windowWidth, cl.high - cl.low + 2);
+        -- cairo.cairo_fill(context.tc.decor.context);
     }
 
-    -- entire line
-    -- cairo.cairo_rectangle(context.tc.mouse.context, 0, cl.low - 1, cast() context.tc.windowWidth, cl.high - cl.low + 2);
-    -- cairo.cairo_fill(context.tc.mouse.context);
-
-    cairo.cairo_restore(context.tc.mouse.context);
+    cairo.cairo_restore(context.tc.decor.context);
 }
 
 fn clear() {
@@ -229,12 +289,11 @@ fn drawForm(form: Form) {
 }
 
 fn commit() {
-    -- Copy the text pattern
-    drawForm(context.tc.text);
-
-    -- Copy the mouse pattern
     cairo.cairo_set_operator(context.cairo.context, cairo.Operator.CAIRO_OPERATOR_OVER);
-    drawForm(context.tc.mouse);
+
+    drawForm(context.tc.text);
+    drawForm(context.tc.decor);
+    drawForm(context.tc.slider);
 
     -- Render SDL2 surface onto SDL2 renderer
     texture := sdl.SDL_CreateTextureFromSurface(context.sdl.renderer, context.sdl.surface);
@@ -401,8 +460,8 @@ fn shutdown() {
     cairo.cairo_surface_destroy(context.tc.text.surface);
     cairo.cairo_destroy(context.tc.text.context);
 
-    cairo.cairo_surface_destroy(context.tc.mouse.surface);
-    cairo.cairo_destroy(context.tc.mouse.context);
+    cairo.cairo_surface_destroy(context.tc.decor.surface);
+    cairo.cairo_destroy(context.tc.decor.context);
 
     cairo.cairo_surface_destroy(context.cairo.surface);
     cairo.cairo_destroy(context.cairo.context);
@@ -413,6 +472,18 @@ fn shutdown() {
 
     sdl.SDL_FreeSurface(context.sdl.surface);
     sdl.SDL_Quit();
+}
+
+#context mouseDownForm: *Form
+
+fn handleMouseDown(event: *sdl.MouseButtonEvent) {
+    if context.tc.slider.rect|contains(cast() event.x, cast() event.y) {
+        context.mouseDownForm = &context.tc.slider;
+    }
+}
+
+fn handleMouseUp(event: *sdl.MouseButtonEvent) {
+    context.mouseDownForm = nil;
 }
 
 fn demo() {
@@ -458,12 +529,18 @@ fn demo() {
         else if event._type == sdl.MOUSEMOTION {
             mouseEvent := cast(*sdl.MouseMotionEvent) &event;
 
-            xMouse: i32;
-            yMouse: i32;
-            sdl.SDL_GetMouseState(&xMouse, &yMouse);
-
-            drawMouse(xMouse, yMouse);
-            commit();
+            if !(mouseEvent.xrel == 0 and mouseEvent.yrel == 0) {
+                handleMouseMove();
+                commit();
+            }
+        }
+        else if event._type == sdl.MOUSEBUTTONDOWN {
+            mouseEvent := cast(*sdl.MouseButtonEvent) &event;
+            handleMouseDown(mouseEvent);
+        }
+        else if event._type == sdl.MOUSEBUTTONUP {
+            mouseEvent := cast(*sdl.MouseButtonEvent) &event;
+            handleMouseUp(mouseEvent);
         }
     }
 }

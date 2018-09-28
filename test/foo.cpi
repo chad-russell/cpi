@@ -1,7 +1,7 @@
 #import "io";
 
 fn main() {
-    io.printMany({"I can print floats, like 3.5: ", 3.5, "\n"});
+    io.printInt(-1);
 
     return 0;
 }

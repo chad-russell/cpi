@@ -199,7 +199,7 @@ int main(int argc, char **argv) {
     Interpreter *interp;
 
     if (inputType == InputType::CPI) {
-        auto lexer = new Lexer(inputFile, true);
+        auto lexer = new Lexer(new string(inputFile), nullptr);
         parser = new Parser(lexer);
 
         auto fileModule = new Node(lexer->srcInfo, NodeType::MODULE, parser->scopes.top());

@@ -2239,10 +2239,10 @@ Node *Semantic::deepCopyScopedStmt(Node *node, Scope *scope) {
     else {
         Lexer *copyingLexer;
         if (node->region.srcInfo.source != nullptr && !node->region.srcInfo.source->empty()) {
-            copyingLexer = new Lexer(*node->region.srcInfo.source, false);
+            copyingLexer = new Lexer(node->region.srcInfo.fileName, node->region.srcInfo.source);
         }
         else {
-            copyingLexer = new Lexer(*node->region.srcInfo.fileName, true);
+            copyingLexer = new Lexer(node->region.srcInfo.fileName, nullptr);
         }
 
         copyingLexer->lastLoc = node->region.start;
