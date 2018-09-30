@@ -17,6 +17,7 @@ class Semantic {
 public:
     bool encounteredErrors = false;
     bool lvalueAssignmentContext = false;
+    bool dotContext = false;
     Node *currentFnDecl = nullptr;
 
     vector_t<string *> linkLibs = vector_init<string *>(4);

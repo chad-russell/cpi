@@ -1,5 +1,7 @@
 #link "libc";
 
+MAX := 0x7fffffff;
+
 fn rand() i32
 fn srand(seed: i32) none
 fn time(timer: *none) i64
@@ -10,4 +12,8 @@ fn seed() {
 
 fn fromArray(E := typeof(arr[0]))(arr: []E) {
     return arr[cast() rand() mod arr.count];
+}
+
+fn between(low: f64, high: f64) {
+    return low + (cast(f64) rand() / cast() MAX) * (high - low);
 }

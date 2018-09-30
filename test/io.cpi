@@ -16,6 +16,14 @@ fn rewind(file: *File) none
 fn fread(ptr: *i8, size: i64, nitems: i64, file: *File) i64
 fn printf(str: *i8) none
 
+fn strcpy(str: []i8) {
+    new: []i8;
+    new.count = str.count;
+    new.data = mem.alloc!(i8)(new.count);
+    mem.memcpy(dst: new.data, src: str.data, n: new.count * sizeof(i8));
+    return new;
+}
+
 fn putchar(c: i8) {
     ch := ".";
     ch[0] = c;
@@ -257,6 +265,18 @@ fn readFile(name: []i8) {
     s.count = length;
 
     return s;
+}
+
+fn streq(str1: []i8, str2: []i8) {
+    if str1.count != str2.count { return false; }
+
+    i := 0;
+    while i < str1.count {
+        if str1[i] != str2[i] { return false; }
+        i += 1;
+    }
+
+    return true;
 }
 
 #link "libcrutch";

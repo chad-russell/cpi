@@ -5,6 +5,30 @@ type Buffer(T := typeof(buf[0])) struct {
     buf: []T
 }
 
+type BufferIterator struct {
+    index: i64,
+    buffer: !T/Buffer
+}
+
+-- todo(chad): make this a #attr(Buffer)
+fn iter(b: !B/Buffer) {
+    return cast(BufferIterator) { 0, b };
+}
+
+#attr(BufferIterator) {
+    fn empty(b: !B/BufferIterator) {
+        return b.index >= b.buffer.buf.count;
+    }
+
+    fn front(b: !B/BufferIterator) {
+        return b.buffer.buf[b.index];
+    }
+
+    fn popFront(b: !B/BufferIterator) {
+        b.index += 1;
+    }
+}
+
 fn make(T: Ast)(capacity := 1) {
     buf: []T;
     buf.count = 0;
@@ -22,6 +46,8 @@ fn from(T := typeof(t[0]))(t: []T) {
     mem.memcpy(b.buf.data, t.data, t.count * sizeof(T));
     return b;
 }
+
+#import "io";
 
 #attr(Buffer) {
 fn release(b: !T/Buffer) {
@@ -49,7 +75,7 @@ fn ensureCapacity(b: !T/Buffer, index: i64) {
 }
 
 fn set( T := typeof(^b), E := typeof(b.buf[0]) )(b: *T/Buffer, index: i64, e: E) {
-    ensureCapacity(b, index);
+    ensureCapacity(b, index + 1);
 
     b.buf[index] = e;
     return b.capacity;

@@ -635,18 +635,18 @@ vector<unsigned char> toBytes(T object) {
 }
 
 template<typename T>
-vector<unsigned char> toBytes32(const T object) {
+inline vector<unsigned char> toBytes32(const T object) {
     return toBytes(static_cast<int32_t>(object));
 }
 
 template<typename T>
-vector<unsigned char> toBytes64(const T object) {
+inline vector<unsigned char> toBytes64(const T object) {
     return toBytes(static_cast<int64_t>(object));
 }
 
 template<typename T>
-T bytesTo(const vector<unsigned char> &bytes, int64_t start) {
-    return *(reinterpret_cast<const T *>(&bytes[start]));
+inline T bytesTo(const vector<unsigned char> &bytes, int64_t start) {
+    return *((const T *) &bytes[start]);
 }
 
 template<>

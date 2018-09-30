@@ -994,11 +994,13 @@ void resolveAttr(Semantic *semantic, Node *node) {
     for (auto stmt : node->attrData.stmts) {
         semantic->resolveTypes(stmt);
 
-        if (resolvedTarget->type == NodeType::TYPE) {
-            vector_append(*resolvedTarget->typeData.attributes, stmt);
-        }
-        else if (resolvedTarget->type == NodeType::PARAMETERIZED_TYPE) {
-            vector_append(resolvedTarget->parameterizedTypeData.attributes, stmt);
+        if (stmt->type == NodeType::FN_DECL) {
+            if (resolvedTarget->type == NodeType::TYPE) {
+                vector_append(*resolvedTarget->typeData.attributes, stmt);
+            }
+            else if (resolvedTarget->type == NodeType::PARAMETERIZED_TYPE) {
+                vector_append(resolvedTarget->parameterizedTypeData.attributes, stmt);
+            }
         }
     }
 }
@@ -1584,28 +1586,31 @@ void resolveArrayIndex(Semantic *semantic, Node *node) {
     dataSym->type = NodeType::SYMBOL;
     dataSym->symbolData.atomId = atomTable->insertStr("data");
 
-    auto aCasted = new Node();
-    aCasted->scope = node->scope;
-    aCasted->type = NodeType::DOT;
-    initDotData(aCasted);
-    aCasted->dotData.lhs = node->arrayIndexData.target;
-    aCasted->dotData.rhs = dataSym;
-    semantic->resolveTypes(aCasted);
+    auto aDotData = new Node();
+    aDotData->scope = node->scope;
+    aDotData->type = NodeType::DOT;
+    initDotData(aDotData);
+    aDotData->dotData.lhs = node->arrayIndexData.target;
+    aDotData->dotData.rhs = dataSym;
+    semantic->resolveTypes(aDotData);
 
     auto add = new Node(node->region.srcInfo, NodeType::BINOP, node->scope);
     add->binopData.type = LexerTokenType::ADD;
-    add->binopData.lhs = aCasted;
+    add->binopData.lhs = aDotData;
     add->binopData.rhs = node->arrayIndexData.indexValue;
     add->binopData.rhsScale = typeSize(node->typeInfo);
+    semantic->addLocal(add);
 
-    auto deref = new Node(node->region.srcInfo, NodeType::DEREF, node->scope);
-    deref->nodeData = add;
-
-    semantic->addLocal(deref->nodeData);
-
-    node->resolved = deref;
-
-    semantic->resolveTypes(node->resolved);
+    if (semantic->lvalueAssignmentContext && semantic->dotContext) {
+        semantic->resolveTypes(add);
+        node->resolved = add;
+    }
+    else {
+        auto deref = new Node(node->region.srcInfo, NodeType::DEREF, node->scope);
+        deref->nodeData = add;
+        node->resolved = deref;
+        semantic->resolveTypes(deref);
+    }
 
     node->typeInfo = node->resolved->typeInfo;
     cpi_assert(node->typeInfo != nullptr);
@@ -1726,6 +1731,16 @@ void resolveSymbol(Semantic *semantic, Node *node) {
         s << "undeclared identifier " << atomTable->backwardAtoms[node->symbolData.atomId];
         semantic->reportError({node}, Error{node->region, s.str()});
         return;
+    }
+
+    if (node->resolved->type == NodeType::ALIAS) {
+        auto resolvedAlias = resolve(node->resolved->nodeData);
+        if (resolvedAlias->type == NodeType::STRING_LITERAL) {
+            auto copied = new Node();
+            copied->type = NodeType::STRING_LITERAL;
+            copied->stringLiteralData.value = resolvedAlias->stringLiteralData.value;
+            node->resolved = copied;
+        }
     }
 
     semantic->resolveTypes(node->resolved);
@@ -1906,15 +1921,15 @@ void resolveDecl(Semantic *semantic, Node *node) {
         semantic->reportError({}, Error{node->region, "error assigning struct literal to union - unmatched field name"});
     }
 
-    if (node->declData.initialValue->type == NodeType::CREATE_CONTEXT) {
-        // call all context initializers
-        for (auto init: semantic->contextInits) {
-            auto fnCall = new Node(node->region.srcInfo, NodeType::FN_CALL, node->scope);
-            fnCall->fnCallData.fn = init;
-            vector_append(node->postStmts, fnCall);
-            semantic->resolveTypes(fnCall);
-        }
-    }
+//    if (node->declData.initialValue->type == NodeType::CREATE_CONTEXT) {
+//        // call all context initializers
+//        for (auto init: semantic->contextInits) {
+//            auto fnCall = new Node(node->region.srcInfo, NodeType::FN_CALL, node->scope);
+//            fnCall->fnCallData.fn = init;
+//            vector_append(node->postStmts, fnCall);
+//            semantic->resolveTypes(fnCall);
+//        }
+//    }
 }
 
 void resolveAlias(Semantic *semantic, Node *node) {
@@ -2894,6 +2909,19 @@ void resolveModuleDot(Semantic *semantic, Node *node) {
         return;
     }
 
+    if (found->type == NodeType::ALIAS) {
+        auto resolvedAlias = resolve(found->nodeData);
+        if (resolvedAlias->type == NodeType::STRING_LITERAL) {
+            auto copied = new Node();
+            copied->type = NodeType::STRING_LITERAL;
+            copied->stringLiteralData.value = resolvedAlias->stringLiteralData.value;
+
+            semantic->resolveTypes(copied);
+
+            found = copied;
+        }
+    }
+
     node->resolved = found;
     node->typeInfo = found->typeInfo;
 }
@@ -2926,6 +2954,9 @@ void resolveEnumDot(Semantic *semantic, Node *node) {
 }
 
 void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
+    auto savedDotContext = semantic->dotContext;
+    semantic->dotContext = true;
+
     semantic->resolveTypes(lhs);
 
     auto resolvedLhs = resolve(lhs);
@@ -2933,6 +2964,8 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
 
     if (resolvedLhs->type == NodeType::MODULE) {
         resolveModuleDot(semantic, node);
+
+        semantic->dotContext = savedDotContext;
         return;
     }
 
@@ -2942,16 +2975,22 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
         resolveEnumDot(semantic, node);
         node->typeInfo = resolvedLhs;
 
+        semantic->dotContext = savedDotContext;
         return;
     }
 
     if (resolvedLhs->type == NodeType::TYPE) {
         resolveTypeDot(semantic, node, resolvedLhs);
+
+        semantic->dotContext = savedDotContext;
         return;
     }
 
     // if this is something along the lines of (a|b).c, then just set the lhs to be the rewritten form of a|b
     if (lhs->type == NodeType::BINOP && lhs->binopData.type == LexerTokenType::VERTICAL_BAR) {
+        node->dotData.lhs = resolvedLhs;
+    }
+    if (resolvedLhs->type == NodeType::BINOP) {
         node->dotData.lhs = resolvedLhs;
     }
 
@@ -2968,6 +3007,8 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
 
         if (resolvedLhsTypeInfo->typeData.kind != NodeTypekind::STRUCT) {
             semantic->reportError({node}, Error{node->region, "Invalid dot lhs"});
+
+            semantic->dotContext = savedDotContext;
             return;
         }
     }
@@ -2982,6 +3023,8 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
     else {
         if (resolvedLhs->typeInfo == nullptr) {
             semantic->reportError({node, resolvedLhs}, Error{resolvedLhs->region, "cannot resolve type of lhs of dot operation"});
+
+            semantic->dotContext = savedDotContext;
             return;
         }
 
@@ -2990,6 +3033,8 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
         if (node->resolved != nullptr) {
             semantic->resolveTypes(node->resolved);
             node->typeInfo = node->resolved->typeInfo;
+
+            semantic->dotContext = savedDotContext;
             return;
         }
 
@@ -3027,6 +3072,8 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
             createTagCheck(semantic, node);
         }
     }
+
+    semantic->dotContext = savedDotContext;
 }
 
 void resolveDot(Semantic *semantic, Node *node) {

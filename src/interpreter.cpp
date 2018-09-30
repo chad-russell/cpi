@@ -670,17 +670,16 @@ void Interpreter::interpret() {
 //    }
 
     while ((unsigned long) pc < instructions.size() && !terminated) {
-        if (this->debugging) {
-            runDebugger(this, mp);
-        }
-
-        if (!terminated) {
-            stepCount++;
-            table.at(instructions[pc++])(this);
-        }
+        if (this->debugging) runDebugger(this, mp);
+        if (!terminated) step();
     }
 
     delete mp;
+}
+
+void Interpreter::step() {
+//    stepCount++;
+    table.at(instructions[pc++])(this);
 }
 
 void Interpreter::zsend(string s) {

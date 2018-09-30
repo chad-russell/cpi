@@ -1,8 +1,13 @@
 #link "libc";
 
 fn calloc(count: i64, size: i64) *none
+fn malloc(size: i64) *none
 fn memcpy(dst: *none, src: *none, n: i64) *none
 fn free(ptr: *none) none
+
+fn mallocWithContext(size: i64) {
+    return malloc(size);
+}
 
 fn alloc(T: Ast)(count := 1) {
   return cast(*T) calloc(count, sizeof(T));

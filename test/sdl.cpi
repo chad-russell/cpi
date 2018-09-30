@@ -14,6 +14,14 @@ WINDOWPOS_UNDEFINED: i32 = 536805376;
 WINDOW_SHOWN: i32 = 0x00000004;
 WINDOW_ALLOW_HIGHDPI: i32 = 0x00002000;
 
+PIXEL_FORMAT_ARGB8888: i32 = 0x16362004;
+
+type TextureAccess enum(i32) {
+    STATIC    : 0,
+    STREAMING : 1,
+    TARGET    : 2
+}
+
 type Key enum(i32) {
     a: 4,
     b: 5,
@@ -97,6 +105,9 @@ fn SDL_MapRGB(format: *PixelFormat, r: i8, g: i8, b: i8) i32
 fn SDL_CreateTextureFromSurface(renderer: *Renderer, surface: *Surface) *Texture
 fn SDL_RenderCopy(renderer: *Renderer, texture: *Texture, srcRect: *Rect, dstRect: *Rect) i32
 fn SDL_GetMouseState(x: *i32, y: *i32) u32
+fn SDL_LockTexture(texture: *Texture, rect: *Rect, pixels: **none, pitch: *i32) i32
+fn SDL_UpdateTexture(texture: *Texture, rect: *Rect, pixels: *none, pitch: i32) i32
+fn SDL_CreateTexture(renderer: *Renderer, pixelFormat: i32, textureAccess: TextureAccess, width: i32, height: i32) *Texture
 
 type Window none
 type Renderer none

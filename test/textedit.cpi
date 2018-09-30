@@ -45,10 +45,6 @@ type Form struct {
     pattern: *cairo.Pattern,
 
     rect: Rect!(f64),
-
-    data: *none,
-
-    render: fn(self: *Form) void,
 }
 
 #context cairo: struct {

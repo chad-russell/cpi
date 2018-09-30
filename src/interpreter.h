@@ -277,6 +277,7 @@ public:
         }
     }
 
+    void step();
     void interpret();
     void callIndex(int64_t index);
 
@@ -310,38 +311,41 @@ public:
     T read() {
         auto inst = static_cast<Instruction>(instructions[pc]);
 
-        // RELCONST
-        if (inst == Instruction::RELCONSTI32 || inst == Instruction::RELCONSTI64) {
-            pc += 1;
-            auto consumed = consume<T>();
-            consumed += static_cast<T>(bp);
-            return consumed;
-        }
-
-        // REL
-        if (inst == Instruction::RELI8 || inst == Instruction::RELI16
-            || inst == Instruction::RELI32 || inst == Instruction::RELI64
-            || inst == Instruction::RELF32 || inst == Instruction::RELF64) {
-            pc += 1;
-            auto consumed = consume<int64_t>();
-            return readFromStack<T>(consumed + bp);
-        }
-
-        // CONST
-        if (inst == Instruction::CONSTI8 || inst == Instruction::CONSTI16
-            || inst == Instruction::CONSTI32 || inst == Instruction::CONSTI64
-            || inst == Instruction::CONSTF32 || inst == Instruction::CONSTF64) {
-            pc += 1;
-            return consume<T>();
-        }
-
-        if (inst == Instruction::I64) {
-            pc += 1;
-            auto consumed = consume<int64_t>();
-            auto read = readFromStack<int64_t>(consumed + bp);
-            auto stackData = (int64_t) stack.data();
-            auto offsetRead = read - stackData;
-            return offsetRead;
+        switch (inst) {
+            case Instruction::RELCONSTI32:
+            case Instruction::RELCONSTI64: {
+                pc += 1;
+                auto consumed = consume<T>();
+                consumed += static_cast<T>(bp);
+                return consumed;
+            }
+            case Instruction::RELI8:
+            case Instruction::RELI16:
+            case Instruction::RELI32:
+            case Instruction::RELI64:
+            case Instruction::RELF32:
+            case Instruction::RELF64: {
+                pc += 1;
+                auto consumed = consume<int64_t>();
+                return readFromStack<T>(consumed + bp);
+            }
+            case Instruction::CONSTI8:
+            case Instruction::CONSTI16:
+            case Instruction::CONSTI32:
+            case Instruction::CONSTI64:
+            case Instruction::CONSTF32:
+            case Instruction::CONSTF64: {
+                pc += 1;
+                return consume<T>();
+            }
+            case Instruction::I64: {
+                pc += 1;
+                auto consumed = consume<int64_t>();
+                auto read = readFromStack<int64_t>(consumed + bp);
+                auto stackData = (int64_t) stack.data();
+                auto offsetRead = read - stackData;
+                return offsetRead;
+            }
         }
 
         cpi_assert(false && "unrecognized inst for read<T>");

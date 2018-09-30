@@ -499,9 +499,9 @@ void BytecodeGen::gen(Node *node) {
                     append(node->bytecode, Instruction::RELF64);
                     append(node->bytecode, toBytes(localOffset));
                 } break;
+                case NodeTypekind::STRUCT:
                 case NodeTypekind::ENUM:
-                case NodeTypekind::NONE:
-                case NodeTypekind::STRUCT: {
+                case NodeTypekind::NONE: {
                     // nothing to do
                 } break;
                 default:

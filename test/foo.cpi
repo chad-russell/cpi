@@ -1,7 +1,88 @@
+#import "sdl";
+#import "gui";
+#import "buffer": buf;
 #import "io";
+#import "mem";
+
+type BasicRectFormData struct {
+    color: struct {
+        r: f64,
+        g: f64,
+        b: f64,
+        a: f64 = 1
+    },
+
+    offset: gui.Point!(f64)
+}
+
+fn addBasicRectFormWithColor(rect: gui.Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1) {
+    fn drawRect(form: gui.Form, data: *none) {
+        cData := cast(*BasicRectFormData) form.data;
+
+        rect := form.rect;
+        rect.x += cData.offset.x;
+        rect.y += cData.offset.y;
+
+        form|gui.drawRect(rect, cData.color.r, cData.color.g, cData.color.b);
+    }
+
+    brfd: BasicRectFormData = {color: {r, g, b}, offset: {0, 0}};
+    form := gui.makeForm(rect, mem.heap(brfd));
+
+    &form.receivers|:append({ [mem.mallocWithContext]"draw", drawRect });
+
+    &context.forms|:append(form);
+}
+
+fn mallocWithContext(n: i64) {
+    return mem.malloc(n);
+}
+
+fn loop() {
+    frame := 0;
+
+    event: sdl.Event;
+    while true {
+        while sdl.SDL_PollEvent(&event) != 0 {
+            if event._type == sdl.QUIT {
+                gui.shutdown();
+                return;
+            }
+        }
+
+        #import "math";
+        #import "iter";
+        for i: iter.until(context.forms.buf.count) {
+            data := cast(*BasicRectFormData) context.forms.buf[i].data;
+            data.offset = {math.sin(cast(f64) frame / 10) * 10, math.cos(cast(f64) frame / 10) * 10};
+        }
+
+        gui.clear();
+        gui.drawAllForms();
+
+        io.println("frame");
+        frame += 1;
+    }
+}
 
 fn main() {
-    io.printInt(-1);
+    gui.init();
+
+    rows := 85;
+    cols := 65;
+
+    #import "random";
+    #import "iter";
+    random.seed();
+
+    for i: iter.until(rows) {
+        for j: iter.until(cols) {
+            formRect: gui.Rect!(f64) = {cast(f64) i / cast() rows, cast(f64) j / cast() cols, cast(f64) 1.0 / cast() rows, cast(f64) 1.0 / cast() cols};
+            addBasicRectFormWithColor(formRect, random.between(0, 1), random.between(0, 1), random.between(0, 1));
+        }
+    }
+
+    loop();
 
     return 0;
 }

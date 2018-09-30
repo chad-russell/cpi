@@ -1,0 +1,4 @@
+#link "libc";
+
+fn sin(n: f64) f64
+fn cos(n: f64) f64

@@ -1191,7 +1191,6 @@ Node *Parser::buildDots(stack<Node *> rvalues) {
         rvalues.pop();
 
         top->type = NodeType::ARRAY_INDEX;
-
         top->arrayIndexData.target = buildDots(rvalues);
 
         top->region = {lexer->srcInfo, top->arrayIndexData.target->region.start, top->region.end};
