@@ -103,6 +103,7 @@ fn addSlider(rect: gui.Rect!(f64), id: i64, max: i64) {
     &form.receivers|:append({ [mem.mallocWithContext]"mousemove", mouseMove });
     &form.receivers|:append({ [mem.mallocWithContext]"mouseup", mouseUp });
 
+    &context.mousers|:append(form);
     &context.forms|:append(form);
 }
 
@@ -126,7 +127,7 @@ fn loop() {
                     sdl.SDL_GetMouseState(&context.mouse.x, &context.mouse.y);
 
                     mmd: MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
-                    for form: context.forms.buf {
+                    for form: context.mousers.buf {
                         form|gui.sendMessage(cast() {gui.MOUSEMOVE, &mmd});
                     }
                 }
@@ -135,7 +136,7 @@ fn loop() {
                 mouseEvent := cast(*sdl.MouseButtonEvent) &event;
 
                 mmd: MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
-                for form: context.forms.buf {
+                for form: context.mousers.buf {
                     if form.rect|gui.contains(mmd.x, mmd.y) {
                         form|gui.sendMessage(cast() {gui.MOUSEDOWN, &mmd});
                     }
@@ -145,7 +146,7 @@ fn loop() {
                 mouseEvent := cast(*sdl.MouseButtonEvent) &event;
 
                 mmd: MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
-                for form: context.forms.buf {
+                for form: context.mousers.buf {
                     form|gui.sendMessage(cast() {gui.MOUSEUP, &mmd});
                 }
             }
@@ -176,21 +177,24 @@ fn main() {
     #import "iter";
     random.seed();
 
-    rect : gui.Rect!(f64) = {0, 0, 1, 0.1};
+    rect : gui.Rect!(f64) = {0, 0, 1, 0.05};
     addSlider(rect, 0, 50);
 
-    rect = {0, 0.1, 1, 0.1};
+    rect = {0, 0.05, 1, 0.05};
     addSlider(rect, 1, 50);
 
-    rows := 30;
-    cols := 20;
+    rows := 20;
+    cols := 10;
 
-    for i: iter.until(rows) {
-        for j: iter.until(cols) {
-            formRect: gui.Rect!(f64) = {x: cast(f64) i / cast() rows,
-                                        y: 0.2 + 0.8 * cast(f64) j / cast() cols,
-                                        width: cast(f64) 1.0 / cast() rows,
-                                        height: cast(f64) 0.8 / cast() cols};
+    for row: iter.until(rows) {
+        for col: iter.until(cols) {
+            formRect: gui.Rect!(f64) = {
+                x:      cast(f64) row / cast() rows,
+                y:      0.1 + 0.9 * cast(f64) col / cast() cols,
+                width:  cast(f64) 1.0 / cast() rows,
+                height: cast(f64) 0.9 / cast() cols
+            };
+
             addBasicRectFormWithColor(formRect, random.between(0, 1), random.between(0, 1), random.between(0, 1));
         }
     }

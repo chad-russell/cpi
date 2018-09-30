@@ -43,10 +43,6 @@ type Receiver struct {
 }
 
 type Form struct {
-    surface: *cairo.Surface,
-    context: *cairo.Context,
-    pattern: *cairo.Pattern,
-
     rect: Rect!(f64),
 
     receivers: buf.Buffer!(Receiver),
@@ -57,6 +53,8 @@ type Form struct {
 #context forms: buf.Buffer!(Form)
 #context formDatas: basic.Region
 
+#context mousers: buf.Buffer!(Form)
+
 fn makeForm(r: Rect!(f64), data: !T) {
     xScale := cast(f64) context.sdl.surface.w / context.sdl.xScale;
     yScale := cast(f64) context.sdl.surface.h / context.sdl.yScale;
@@ -64,10 +62,6 @@ fn makeForm(r: Rect!(f64), data: !T) {
     scaled: Rect!(f64) = {r.x * xScale, r.y * yScale, r.width * xScale, r.height * yScale};
 
     f: Form;
-
-    f.surface = context.cairo.surface;
-    f.pattern = context.cairo.pattern;
-    f.context = context.cairo.context;
 
     f.rect = scaled;
     f.receivers = buf.make!(Receiver)();
@@ -116,6 +110,8 @@ fn drawAllForms() {
 }
 
 #context cairo: struct {
+    font: *cairo.FontFace,
+
     surface: *cairo.Surface,
     context: *cairo.Context,
     pattern: *cairo.Pattern,
@@ -205,12 +201,12 @@ fn init() {
 }
 
 fn drawRect(form: Form, rect: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1) {
-    cairo.cairo_save(form.context);
-    defer { cairo.cairo_restore(form.context); }
+    cairo.cairo_save(context.cairo.context);
+    defer { cairo.cairo_restore(context.cairo.context); }
 
-    cairo.cairo_set_source_rgba(form.context, r, g, b, a);
-    cairo.cairo_rectangle(form.context, rect.x, rect.y, rect.width, rect.height);
-    cairo.cairo_fill(form.context);
+    cairo.cairo_set_source_rgba(context.cairo.context, r, g, b, a);
+    cairo.cairo_rectangle(context.cairo.context, rect.x, rect.y, rect.width, rect.height);
+    cairo.cairo_fill(context.cairo.context);
 }
 
 fn commit() {

@@ -7,6 +7,7 @@
 #import "iter";
 #import "se";
 #import "mem";
+#import "gui";
 
 WIDTH     : i32 = 800;
 HEIGHT    : i32 = 350;
@@ -45,14 +46,6 @@ type Form struct {
     pattern: *cairo.Pattern,
 
     rect: Rect!(f64),
-}
-
-#context cairo: struct {
-    font: *cairo.FontFace,
-
-    surface: *cairo.Surface,
-    context: *cairo.Context,
-    pattern: *cairo.Pattern,
 }
 
 #context sdl: struct {
