@@ -4,6 +4,21 @@
 #import "io";
 #import "mem";
 
+#context appState: struct {
+    cosMul: i64,
+    sinMul: i64
+}
+
+#context mouse: struct {
+    x: i32,
+    y: i32
+}
+
+type MouseMessageData struct {
+    x: f64,
+    y: f64
+}
+
 type BasicRectFormData struct {
     color: struct {
         r: f64,
@@ -16,20 +31,77 @@ type BasicRectFormData struct {
 }
 
 fn addBasicRectFormWithColor(rect: gui.Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1) {
-    fn drawRect(form: gui.Form, data: *none) {
-        cData := cast(*BasicRectFormData) form.data;
-
+    fn drawRect(form: gui.Form, formData: *BasicRectFormData, messageData: *none) {
         rect := form.rect;
-        rect.x += cData.offset.x;
-        rect.y += cData.offset.y;
+        rect.x += formData.offset.x;
+        rect.y += formData.offset.y;
 
-        form|gui.drawRect(rect, cData.color.r, cData.color.g, cData.color.b);
+        form|gui.drawRect(rect, formData.color.r, formData.color.g, formData.color.b);
     }
 
     brfd: BasicRectFormData = {color: {r, g, b}, offset: {0, 0}};
-    form := gui.makeForm(rect, mem.heap(brfd));
+    form := gui.makeForm(rect, brfd);
 
     &form.receivers|:append({ [mem.mallocWithContext]"draw", drawRect });
+
+    &context.forms|:append(form);
+}
+
+-- todo(chad): forms should have an id...
+type SliderFormData struct {
+    id: i64,
+
+    max: i64,
+    current: i64 = 0,
+
+    mouseDown := false,
+    grabberRect: gui.Rect!(f64)
+}
+
+fn addSlider(rect: gui.Rect!(f64), id: i64, max: i64) {
+    fn drawRect(form: gui.Form, formData: *SliderFormData, messageData: *none) {
+        -- magenta background
+        form|gui.drawRect(form.rect, 1, 0, 1);
+
+        -- cyan slider-grabber
+        formData.grabberRect = form.rect;
+        formData.grabberRect.x = form.rect.width * cast(f64) formData.current / cast(f64) formData.max;
+        formData.grabberRect.width = form.rect.width / cast() formData.max;
+        form|gui.drawRect(formData.grabberRect, 0, 1, 1);
+    }
+
+    fn mouseDown(form: gui.Form, formData: *SliderFormData, messageData: *MouseMessageData) {
+        if formData.grabberRect|gui.contains(messageData.x, messageData.y) {
+            formData.mouseDown = true;
+        }
+    }
+
+    fn mouseMove(form: gui.Form, formData: *SliderFormData, messageData: *MouseMessageData) {
+        if formData.mouseDown {
+            formData.current = cast(i64) (cast(f64) messageData.x * cast(f64) formData.max / form.rect.width);
+
+            if formData.id == 0 {
+                context.appState.cosMul = formData.current;
+            }
+            else if formData.id == 1 {
+                context.appState.sinMul = formData.current;
+            }
+        }
+    }
+
+    fn mouseUp(form: gui.Form, formData: *SliderFormData, messageData: *MouseMessageData) {
+        formData.mouseDown = false;
+    }
+
+    sfd: SliderFormData;
+    sfd.id = id;
+    sfd.max = max;
+    form := gui.makeForm(rect, sfd);
+
+    &form.receivers|:append({ [mem.mallocWithContext]"draw", drawRect });
+    &form.receivers|:append({ [mem.mallocWithContext]"mousedown", mouseDown });
+    &form.receivers|:append({ [mem.mallocWithContext]"mousemove", mouseMove });
+    &form.receivers|:append({ [mem.mallocWithContext]"mouseup", mouseUp });
 
     &context.forms|:append(form);
 }
@@ -48,19 +120,51 @@ fn loop() {
                 gui.shutdown();
                 return;
             }
+            else if event._type == sdl.MOUSEMOTION {
+                mouseEvent := cast(*sdl.MouseMotionEvent) &event;
+                if !(mouseEvent.xrel == 0 and mouseEvent.yrel == 0) {
+                    sdl.SDL_GetMouseState(&context.mouse.x, &context.mouse.y);
+
+                    mmd: MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
+                    for form: context.forms.buf {
+                        form|gui.sendMessage(cast() {gui.MOUSEMOVE, &mmd});
+                    }
+                }
+            }
+            else if event._type == sdl.MOUSEBUTTONDOWN {
+                mouseEvent := cast(*sdl.MouseButtonEvent) &event;
+
+                mmd: MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
+                for form: context.forms.buf {
+                    if form.rect|gui.contains(mmd.x, mmd.y) {
+                        form|gui.sendMessage(cast() {gui.MOUSEDOWN, &mmd});
+                    }
+                }
+            }
+            else if event._type == sdl.MOUSEBUTTONUP {
+                mouseEvent := cast(*sdl.MouseButtonEvent) &event;
+
+                mmd: MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
+                for form: context.forms.buf {
+                    form|gui.sendMessage(cast() {gui.MOUSEUP, &mmd});
+                }
+            }
         }
 
-        #import "math";
-        #import "iter";
-        for i: iter.until(context.forms.buf.count) {
+        i := 0;
+        while i < context.forms.buf.count {
+            #import "math";
+
             data := cast(*BasicRectFormData) context.forms.buf[i].data;
-            data.offset = {math.sin(cast(f64) frame / 10) * 10, math.cos(cast(f64) frame / 10) * 10};
+            data.offset = {math.sin(cast(f64) frame / 10) * cast() context.appState.sinMul, math.cos(cast(f64) frame / 10) * cast() context.appState.cosMul};
+
+            i += 1;
         }
 
         gui.clear();
         gui.drawAllForms();
 
-        io.println("frame");
+        -- io.println(frame);
         frame += 1;
     }
 }
@@ -68,16 +172,25 @@ fn loop() {
 fn main() {
     gui.init();
 
-    rows := 55;
-    cols := 35;
-
     #import "random";
     #import "iter";
     random.seed();
 
+    rect : gui.Rect!(f64) = {0, 0, 1, 0.1};
+    addSlider(rect, 0, 50);
+
+    rect = {0, 0.1, 1, 0.1};
+    addSlider(rect, 1, 50);
+
+    rows := 30;
+    cols := 20;
+
     for i: iter.until(rows) {
         for j: iter.until(cols) {
-            formRect: gui.Rect!(f64) = {cast(f64) i / cast() rows, cast(f64) j / cast() cols, cast(f64) 1.0 / cast() rows, cast(f64) 1.0 / cast() cols};
+            formRect: gui.Rect!(f64) = {x: cast(f64) i / cast() rows,
+                                        y: 0.2 + 0.8 * cast(f64) j / cast() cols,
+                                        width: cast(f64) 1.0 / cast() rows,
+                                        height: cast(f64) 0.8 / cast() cols};
             addBasicRectFormWithColor(formRect, random.between(0, 1), random.between(0, 1), random.between(0, 1));
         }
     }

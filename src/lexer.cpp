@@ -62,7 +62,7 @@ Lexer::Lexer(string *fileName, string *fileSrc) {
 
         srcInfo = {fileName, new string(fileBytes), lines};
     }
-    else if (fileSrc == nullptr) {
+    else if (fileSrc != nullptr) {
         srcInfo = {nullptr, fileSrc};
     }
     else { cpi_assert(false); }

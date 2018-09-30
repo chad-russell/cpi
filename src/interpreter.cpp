@@ -311,12 +311,12 @@ void debugPrintVar(ostream &target, Interpreter *interp, TypeData td, int64_t of
                 }
             }
             else {
+                // plain old struct
                 auto nvr = interp->nextVarReference;
                 interp->nextVarReference += 1;
 
                 target << "#" << nvr;
 
-                // plain old struct
                 ostringstream extra("");
                 extra << "#" << nvr << ": ";
                 extra << "{";
@@ -367,7 +367,7 @@ void debugPrintVar(Interpreter *interp, int32_t bp, Node *n, ostream &s) {
     }
 
     vector<string> extra;
-    debugPrintVar(s, interp, resolvedTypeinfo->typeData, ((int64_t) interp->stack.data()) + bp + n->localOffset, extra);
+    debugPrintVar(s, interp, resolvedTypeinfo->typeData, ((int64_t) interp->stack_base) + bp + n->localOffset, extra);
     s << endl;
     for (const auto &e : extra) {
         s << e << endl;
@@ -379,7 +379,8 @@ void printVarsInScope(Interpreter *interp, Scope *scope, int32_t bp, ostringstre
         auto bucket = scope->symbols->buckets[i];
         if (bucket != nullptr) {
             if (bucket->value->isLocal || bucket->value->isBytecodeLocal) {
-                s << atomTable->backwardAtoms[bucket->key] << ": ";
+                auto name = atomTable->backwardAtoms[bucket->key];
+                s << name << ": ";
                 debugPrintVar(interp, bp, bucket->value, s);
             }
 
@@ -387,7 +388,8 @@ void printVarsInScope(Interpreter *interp, Scope *scope, int32_t bp, ostringstre
                 bucket = bucket->next;
 
                 if (bucket->value->isLocal || bucket->value->isBytecodeLocal) {
-                    s << atomTable->backwardAtoms[bucket->key] << ": ";
+                    auto name = atomTable->backwardAtoms[bucket->key];
+                    s << name << ": ";
                     debugPrintVar(interp, bp, bucket->value, s);
                 }
             }
@@ -401,7 +403,8 @@ void printVarsInScope(Interpreter *interp, Scope *scope, int32_t bp, ostringstre
             auto p = vector_at(scope->fnScopeParams, i);
             assert(p->type == NodeType::DECL_PARAM);
 
-            s << atomTable->backwardAtoms[p->paramData.name->symbolData.atomId] << ": ";
+            auto name = atomTable->backwardAtoms[p->paramData.name->symbolData.atomId];
+            s << name << ": ";
 
             auto resolvedTypeinfo = resolve(p->paramData.type);
             offset -= typeSize(resolvedTypeinfo);
@@ -546,34 +549,14 @@ void runDebugger(Interpreter *interp, MnemonicPrinter *mp) {
 
                 interp->zsend(s.str());
             } else if (startsWith(&line, "break ")) {
-                int32_t bNum;
-                int read;
-                sscanf(line.c_str(), "break %d%n", &bNum, &read);
+                interp->breakCommands.push_back(line);
 
-                auto rest = line.substr(read + 1);
-
-                auto openSquareIndex = rest.find('[');
-                auto closeSquareIndex = rest.find(']');
-
-                auto fileName = rest.substr(0, openSquareIndex - 1);
-                auto condition = rest.substr(openSquareIndex + 1, closeSquareIndex - (openSquareIndex + 1));
-
-                // find the statement which is on this line
-                for (auto stmt : interp->sourceMap.statements) {
-                    if (stmt.node->region.start.line == (unsigned long) bNum && *stmt.node->region.srcInfo.fileName == fileName) {
-                        bool isConditional = condition.length() > 0;
-                        if (openSquareIndex == string::npos || closeSquareIndex == string::npos) {
-                            isConditional = false;
-                        }
-
-                        Breakpoint bp = {stmt.instIndex, isConditional, condition};
-                        interp->breakpoints.push_back(bp);
-                    }
-                }
+                interp->addBreakpointForCommand(line);
 
                 interp->zsend("");
             } else if (line == "breakRemoveAll") {
                 interp->breakpoints = {};
+                interp->breakCommands = {};
             } else if (line == "location") {
                 ostringstream s("");
 
@@ -1072,6 +1055,33 @@ void Interpreter::dumpStack() {
         cout << static_cast<int32_t>(stack[i]) << ", ";
     }
     cout << endl << endl;
+}
+
+void Interpreter::addBreakpointForCommand(string command) {
+    int32_t bNum;
+    int read;
+    sscanf(command.c_str(), "break %d%n", &bNum, &read);
+
+    auto rest = command.substr(read + 1);
+
+    auto openSquareIndex = rest.find('[');
+    auto closeSquareIndex = rest.find(']');
+
+    auto fileName = rest.substr(0, openSquareIndex - 1);
+    auto condition = rest.substr(openSquareIndex + 1, closeSquareIndex - (openSquareIndex + 1));
+
+    // find the statement which is on this line
+    for (auto stmt : sourceMap.statements) {
+        if (stmt.node->region.start.line == (unsigned long) bNum && *stmt.node->region.srcInfo.fileName == fileName) {
+            bool isConditional = condition.length() > 0;
+            if (openSquareIndex == string::npos || closeSquareIndex == string::npos) {
+                isConditional = false;
+            }
+
+            Breakpoint bp = {stmt.instIndex, isConditional, condition};
+            breakpoints.push_back(bp);
+        }
+    }
 }
 
 void interpretMathAddSI64(Interpreter *interp) {

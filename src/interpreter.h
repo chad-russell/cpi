@@ -6,6 +6,7 @@
 #include <stack>
 #include <dlfcn.h>
 #include <zmq.h>
+#include <stdint.h>
 
 #include "assembler.h"
 #include "semantic.h"
@@ -84,6 +85,8 @@ public:
     hash_t<uint32_t, uint64_t> *fnTable;
     hash_t<string, void *> *externalSymbols;
 
+    Node *contextType = nullptr;
+
     vector<unsigned char> stack = {};
     unsigned char *stack_base;
 
@@ -108,6 +111,7 @@ public:
 
     SourceMap sourceMap;
     vector<Breakpoint> breakpoints = {};
+    vector<string> breakCommands = {};
     bool continuing = false;
     SourceMapStatement stoppedOnStatement;
     bool debugging = false;
@@ -286,6 +290,7 @@ public:
     void interpret();
     void callIndex(int64_t index);
 
+    void addBreakpointForCommand(string command);
     void dumpStack();
     void zsend(string s);
 
@@ -537,12 +542,18 @@ int64_t evaluate(Interpreter *fromInterp, SourceInfo srcInfo, Scope *scope, stri
     // set the srcInfo to the original srcInfo in case there's polymorphs
     evalLexer->srcInfo = srcInfo;
 
+    // SEMANTIC
     auto semantic = new Semantic();
     semantic->currentFnDecl = evalFnDecl;
     semantic->lexer = evalLexer;
     semantic->parser = evalParser;
+    semantic->contextType = fromInterp->contextType;
+    semantic->canContext = true;
     semantic->addStaticIfs(evalParser->scopes.top());
     semantic->addImports(*evalParser->imports, *evalParser->impls, *evalParser->contexts, *evalParser->contextInits);
+
+    semantic->resolveTypes(parsed);
+    // END SEMANTIC
 
     auto wrappedRet = new Node(parsed->region.srcInfo, NodeType::RETURN, parsed->scope);
     wrappedRet->nodeData = parsed;
@@ -588,11 +599,8 @@ int64_t evaluate(Interpreter *fromInterp, SourceInfo srcInfo, Scope *scope, stri
 
     interp->bp = fromInterp->bp;
     interp->sp = fromInterp->bp;
+    interp->contextType = fromInterp->contextType;
 
-    interp->externalFnTable = fromInterp->externalFnTable;
-    for (auto &entry : gen->externalFnTable) {
-        vector_append(interp->externalFnTable, entry);
-    }
     interp->libs = fromInterp->libs;
     interp->instructions = gen->instructions;
     interp->fnTable = gen->fnTable;
@@ -600,7 +608,14 @@ int64_t evaluate(Interpreter *fromInterp, SourceInfo srcInfo, Scope *scope, stri
     interp->sourceMap = gen->sourceMap;
     interp->continuing = true;
     interp->instructions = gen->instructions;
-    interp->fnTable = gen->fnTable;
+    interp->externalFnTable = gen->externalFnTable;
+
+//    interp->debugging = true;
+//    interp->continuing = true;
+//    for (auto command: fromInterp->breakCommands) {
+//        interp->addBreakpointForCommand(command);
+//    }
+
     interp->interpret();
 
     // todo(chad): present the type of the answer appropriately -- don't just assume it's i64

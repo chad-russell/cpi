@@ -2155,20 +2155,28 @@ Node *Parser::parseContext() {
 
     auto context = new Node(lexer->srcInfo, NodeType::CONTEXT, scopes.top());
 
+    Node *param = nullptr;
+
     if (lexer->front.type == LexerTokenType::LCURLY) {
         popFront();
 
         while (lexer->front.type != LexerTokenType::RCURLY) {
-            auto param = parseDeclParam();
+            param = parseDeclParam();
             param->paramData.isContext = true;
+
+            auto debugName = atomTable->backwardAtoms[param->paramData.name->symbolData.atomId];
+
             vector_append(context->contextData.decls, param);
         }
 
         expect(LexerTokenType::RCURLY, "}");
     }
     else {
-        auto param = parseDeclParam();
+        param = parseDeclParam();
         param->paramData.isContext = true;
+
+        auto debugName = atomTable->backwardAtoms[param->paramData.name->symbolData.atomId];
+
         vector_append(context->contextData.decls, param);
     }
 

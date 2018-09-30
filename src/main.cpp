@@ -223,8 +223,10 @@ int main(int argc, char **argv) {
         for (auto ctx : semantic->contexts) {
             semantic->resolveTypes(ctx);
         }
+
         semantic->canContext = true;
         semantic->makeContextType();
+        semantic->resolveTypes(semantic->contextType);
 
         for (auto n: semantic->postContexts) {
             semantic->resolveTypes(n);
@@ -237,7 +239,10 @@ int main(int argc, char **argv) {
         for (auto tl : parser->allTopLevel) {
             semantic->resolveTypes(tl);
         }
+
+        vector_append(semantic->structsToSize, semantic->contextType->typeData.structTypeData);
         semantic->sizeStructs();
+
         if (semantic->encounteredErrors) { return -1; }
 
         if (interpretFlag != 0 || outputType == OutputType::CAS || outputType == OutputType::CBC || printAsmFlag != 0) {

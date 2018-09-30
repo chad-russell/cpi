@@ -903,10 +903,10 @@ void Semantic::addImports(vector_t<Node *> imports, vector_t<Node *> impls, vect
         }
     }
 
-    for (auto context: contexts) {
-        vector_append(this->contexts, context);
+//    for (auto context: contexts) {
+//        vector_append(this->contexts, context);
 //        resolveTypes(context);
-    }
+//    }
 
 //    for (auto contextInit: contextInits) {
 //        resolveTypes(contextInit);
@@ -1100,6 +1100,7 @@ Node *Semantic::makeContextType() {
 
     for (auto context: contexts) {
         for (auto decl: context->contextData.decls) {
+            auto debugName = atomTable->backwardAtoms[decl->declData.lhs->symbolData.atomId];
             vector_append(ct->typeData.structTypeData.params, decl);
         }
     }
@@ -1443,6 +1444,7 @@ Node *constantize(Semantic *semantic, Node *node) {
     interp->fnTable = gen->fnTable;
     interp->sourceMap = gen->sourceMap;
     interp->externalFnTable = gen->externalFnTable;
+    interp->contextType = semantic->contextType;
     auto instructions = gen->instructions;
 
     interp->continuing = true;
@@ -2832,8 +2834,6 @@ Node *findParam(Semantic *semantic, Node *node) {
         foundParam = vector_at(structData.params, node->dotData.rhs->intLiteralData.value);
     }
     else {
-        auto sizeSoFar = 0;
-
         vector_append(semantic->structsToSize, structData);
 
         for (auto param : structData.params) {

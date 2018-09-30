@@ -5,30 +5,6 @@ type Buffer(T := typeof(buf[0])) struct {
     buf: []T
 }
 
-type BufferIterator struct {
-    index: i64,
-    buffer: !T/Buffer
-}
-
--- todo(chad): make this a #attr(Buffer)
-fn iter(b: !B/Buffer) {
-    return cast(BufferIterator) { 0, b };
-}
-
-#attr(BufferIterator) {
-    fn empty(b: !B/BufferIterator) {
-        return b.index >= b.buffer.buf.count;
-    }
-
-    fn front(b: !B/BufferIterator) {
-        return b.buffer.buf[b.index];
-    }
-
-    fn popFront(b: !B/BufferIterator) {
-        b.index += 1;
-    }
-}
-
 fn make(T: Ast)(capacity := 1) {
     buf: []T;
     buf.count = 0;

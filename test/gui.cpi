@@ -7,7 +7,10 @@
 WIDTH   : i32 = 800;
 HEIGHT  : i32 = 350;
 
-DRAW    : []i8 = "draw";
+DRAW     : []i8 = "draw";
+MOUSEDOWN: []i8 = "mousedown";
+MOUSEMOVE: []i8 = "mousemove";
+MOUSEUP  : []i8 = "mouseup";
 
 type Rect(T := typeof(x)) struct {
     x: T,
@@ -36,7 +39,7 @@ type Message struct {
 
 type Receiver struct {
     name: []i8,
-    handle: fn(form: Form, data: *none) none
+    handle: fn(form: Form, formData: *none, messageData: *none) none
 }
 
 type Form struct {
@@ -52,8 +55,9 @@ type Form struct {
 }
 
 #context forms: buf.Buffer!(Form)
+#context formDatas: basic.Region
 
-fn makeForm(r: Rect!(f64), data: *none) {
+fn makeForm(r: Rect!(f64), data: !T) {
     xScale := cast(f64) context.sdl.surface.w / context.sdl.xScale;
     yScale := cast(f64) context.sdl.surface.h / context.sdl.yScale;
 
@@ -67,21 +71,25 @@ fn makeForm(r: Rect!(f64), data: *none) {
 
     f.rect = scaled;
     f.receivers = buf.make!(Receiver)();
-    f.data = data;
+
+    f.data = context.formDatas.current;
+    dataCopy := data;
+    mem.memcpy(context.formDatas.current, &dataCopy, sizeof(T));
+    context.formDatas.current += sizeof(T);
 
     return f;
 }
 
 fn sendMessage(form: Form, message: Message) {
-    for r: form.receivers|buf.iter {
+    for r: form.receivers.buf {
         if io.streq(message.name, r.name) {
-            r.handle(form, message.data);
+            r.handle(form, form.data, message.data);
         }
     }
 }
 
 fn drawAllForms() {
-    for form: context.forms|buf.iter {
+    for form: context.forms.buf {
         sendMessage(form, {DRAW, nil});
     }
 
@@ -178,7 +186,20 @@ fn initCairo() {
     cairo.cairo_surface_set_device_scale(context.cairo.surface, context.sdl.xScale, context.sdl.yScale);
 }
 
+fn initContext() {
+    #import "mem";
+
+    -- start with 1MB
+    -- todo(chad): make this auto-expanding
+    size := 1024 * 1024;
+
+    context.formDatas.count = size;
+    context.formDatas.data = mem.calloc(size, sizeof(i8));
+    context.formDatas.current = context.formDatas.data;
+}
+
 fn init() {
+    initContext();
     initSdl();
     initCairo();
 }
