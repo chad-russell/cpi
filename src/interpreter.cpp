@@ -1121,15 +1121,8 @@ void interpretJump(Interpreter *interp) {
     interp->pc = index;
 }
 
-void interpretStore(Interpreter *interp) {
-    auto storeOffset = interp->read<int64_t>();
-
-    auto readOffset = interp->read<int64_t>();
-
+void storeToFrom(Interpreter *interp, void *to, void *from) {
     auto size = interp->consume<int32_t>();
-
-    auto to = &interp->stack[storeOffset];
-    auto from = &interp->stack[readOffset];
 
     if (to == nullptr) {
         cout << "nil pointer dereference!!" << endl;
@@ -1139,6 +1132,20 @@ void interpretStore(Interpreter *interp) {
     else {
         memcpy(to, from, static_cast<size_t>(size));
     }
+}
+
+void interpretStore(Interpreter *interp) {
+    auto to = interp->stack_base + interp->read<int64_t>();
+    auto from = interp->stack_base + interp->read<int64_t>();
+
+    storeToFrom(interp, to, from);
+}
+
+void interpretStoreRelconstRelconst(Interpreter *interp) {
+    auto to = interp->stack_base + interp->consume<int64_t>() + static_cast<int64_t>(interp->bp);
+    auto from = interp->stack_base + interp->consume<int64_t>() + static_cast<int64_t>(interp->bp);
+
+    storeToFrom(interp, to, from);
 }
 
 void interpretStoreConst(Interpreter *interp) {

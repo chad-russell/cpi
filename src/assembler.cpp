@@ -401,6 +401,7 @@ const vector<string> AssemblyLexer::instructionStrings = {
     // general instructions
     "STORECONST",
     "STORE",
+    "STORE_RELCONST_RELCONST",
     "BUMPSP",
     "JUMPIF",
     "JUMP",

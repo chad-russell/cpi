@@ -56,6 +56,7 @@ void interpretReturn(Interpreter *interp);
 void interpretJumpIf(Interpreter *interp);
 void interpretJump(Interpreter *interp);
 void interpretStore(Interpreter *interp);
+void interpretStoreRelconstRelconst(Interpreter *interp);
 void interpretStoreConst(Interpreter *interp);
 void interpretExit(Interpreter *interp);
 void interpretPanic(Interpreter *interp);
@@ -84,6 +85,8 @@ public:
     hash_t<string, void *> *externalSymbols;
 
     vector<unsigned char> stack = {};
+    unsigned char *stack_base;
+
     int32_t stackSize = 1024;
 
     uint64_t stepCount = 0;
@@ -128,6 +131,7 @@ public:
         for (auto i = 0; i < stackSize; i++) {
             stack.push_back(0);
         }
+        stack_base = &stack[0];
 
         this->fnTable = hash_init<uint32_t, uint64_t>(64);
         this->externalSymbols = hash_init<string, void *>(64);
@@ -234,6 +238,7 @@ public:
                 interpretMathBitwiseshr,
                 interpretStoreConst,
                 interpretStore,
+                interpretStoreRelconstRelconst,
                 interpretBumpSP,
                 interpretJumpIf,
                 interpretJump,
@@ -309,15 +314,14 @@ public:
 
     template <typename T>
     T read() {
-        auto inst = static_cast<Instruction>(instructions[pc]);
+        auto inst = (Instruction) instructions[pc];
+
+        pc += 1;
 
         switch (inst) {
             case Instruction::RELCONSTI32:
             case Instruction::RELCONSTI64: {
-                pc += 1;
-                auto consumed = consume<T>();
-                consumed += static_cast<T>(bp);
-                return consumed;
+                return consume<T>() + static_cast<T>(bp);
             }
             case Instruction::RELI8:
             case Instruction::RELI16:
@@ -325,9 +329,7 @@ public:
             case Instruction::RELI64:
             case Instruction::RELF32:
             case Instruction::RELF64: {
-                pc += 1;
-                auto consumed = consume<int64_t>();
-                return readFromStack<T>(consumed + bp);
+                return readFromStack<T>(consume<int64_t>() + bp);
             }
             case Instruction::CONSTI8:
             case Instruction::CONSTI16:
@@ -335,20 +337,16 @@ public:
             case Instruction::CONSTI64:
             case Instruction::CONSTF32:
             case Instruction::CONSTF64: {
-                pc += 1;
                 return consume<T>();
             }
             case Instruction::I64: {
-                pc += 1;
-                auto consumed = consume<int64_t>();
-                auto read = readFromStack<int64_t>(consumed + bp);
-                auto stackData = (int64_t) stack.data();
-                auto offsetRead = read - stackData;
-                return offsetRead;
+                return readFromStack<int64_t>(consume<int64_t>() + bp) - (int64_t) stack_base;
+            }
+            default: {
+                cpi_assert(false && "unrecognized inst for read<T>");
             }
         }
 
-        cpi_assert(false && "unrecognized inst for read<T>");
         return {};
     }
 

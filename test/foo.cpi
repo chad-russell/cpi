@@ -68,8 +68,8 @@ fn loop() {
 fn main() {
     gui.init();
 
-    rows := 85;
-    cols := 65;
+    rows := 55;
+    cols := 35;
 
     #import "random";
     #import "iter";

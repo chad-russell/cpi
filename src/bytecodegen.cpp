@@ -12,6 +12,17 @@ void append(vector<unsigned char> &instructions, Instruction instruction) {
     append(instructions, static_cast<unsigned char>(instruction));
 }
 
+bool isRel(Instruction inst) {
+    return inst == Instruction::RELCONSTI64 || inst == Instruction::RELCONSTI32;
+}
+
+bool isConst(Instruction inst) {
+    return inst == Instruction::CONSTI8
+           || inst == Instruction::CONSTI16
+           || inst == Instruction::CONSTI32
+           || inst == Instruction::CONSTI64;
+}
+
 void makeStore(vector<unsigned char> &instructions,
                Instruction readInst, int64_t readOffset,
                Instruction writeInst, int64_t writeOffset,
@@ -20,15 +31,23 @@ void makeStore(vector<unsigned char> &instructions,
         return;
     }
 
-    append(instructions, Instruction::STORE);
+    if (isRel(readInst) && isRel(writeInst)) {
+        append(instructions, Instruction::STORE_RELCONST_RELCONST);
+        append(instructions, toBytes(readOffset));
+        append(instructions, toBytes(writeOffset));
+        append(instructions, toBytes(size));
+    }
+    else {
+        append(instructions, Instruction::STORE);
 
-    append(instructions, readInst);
-    append(instructions, toBytes(readOffset));
+        append(instructions, readInst);
+        append(instructions, toBytes(readOffset));
 
-    append(instructions, writeInst);
-    append(instructions, toBytes(writeOffset));
+        append(instructions, writeInst);
+        append(instructions, toBytes(writeOffset));
 
-    append(instructions, toBytes(size));
+        append(instructions, toBytes(size));
+    }
 }
 
 Node *bytecodeResolve(Node *n) {
