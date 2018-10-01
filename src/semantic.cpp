@@ -1331,7 +1331,10 @@ void resolveReturn(Semantic *semantic, Node *node) {
 }
 
 void resolveFloatLiteral(Semantic *semantic, Node *node) {
-    node->typeInfo = new Node(NodeTypekind::FLOAT_LITERAL);
+    if (node->typeInfo == nullptr) {
+        node->typeInfo = new Node(NodeTypekind::FLOAT_LITERAL);
+    }
+
     node->typeInfo->typeData.floatTypeData = node->floatLiteralData.value;
 }
 

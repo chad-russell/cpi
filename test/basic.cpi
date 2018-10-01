@@ -29,9 +29,6 @@ fn tmp(size: i64) *none {
         initContext();
     }
 
-    #import "io";
-    io.printMany({"tmp-allocating ", size, " bytes\n"});
-
     if context.region.current + size >= context.region.data + context.region.count {
         panic();
     }

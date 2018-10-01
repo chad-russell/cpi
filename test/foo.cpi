@@ -1,3 +1,9 @@
+type Form struct {
+    p: f64,
+    b := true
+}
+
 fn main() {
-    return 0;
+    f: Form;
+    return f.b;
 }

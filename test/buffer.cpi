@@ -62,7 +62,6 @@ fn set( T := typeof(^b), E := typeof(b.buf[0]) )(b: *T/Buffer, index: i64, e: E)
 
 fn append( T := typeof(^b), E := typeof(b.buf[0]) )(b: *T/Buffer, e: E) {
     set(b, b.buf.count, e);
-    b.buf.count += 1;
 }
 
 fn appends( T := typeof(^b), E := typeof(b.buf[0]) )(b: *T/Buffer, e: []E) {

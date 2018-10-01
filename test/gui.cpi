@@ -45,16 +45,17 @@ type Receiver struct {
 
 type Form struct {
     rect: Rect!(f64),
-
     receivers: buf.Buffer!(Receiver),
-
-    data: *none
+    data: *none,
 }
 
 #context forms: buf.Buffer!(Form)
+#context drawers: buf.Buffer!(Form)
+#context mousers: buf.Buffer!(Form)
+
 #context formDatas: basic.Region
 
-#context mousers: buf.Buffer!(Form)
+#context messages: buf.Buffer!(Message)
 
 fn makeForm(r: Rect!(f64), data: !T) {
     xScale := cast(f64) context.sdl.surface.w / context.sdl.xScale;
@@ -63,10 +64,7 @@ fn makeForm(r: Rect!(f64), data: !T) {
     scaled: Rect!(f64) = {r.x * xScale, r.y * yScale, r.width * xScale, r.height * yScale};
 
     f: Form;
-
     f.rect = scaled;
-    f.receivers = buf.make!(Receiver)();
-
     f.data = context.formDatas.current;
     dataCopy := data;
     mem.memcpy(context.formDatas.current, &dataCopy, sizeof(T));
@@ -77,8 +75,20 @@ fn makeForm(r: Rect!(f64), data: !T) {
 
 fn sendMessage(form: Form, message: Message) {
     for r: form.receivers.buf {
-        if io.streq(message.name, r.name) {
+        if string.streq(message.name, r.name) {
             r.handle(form, form.data, message.data);
+        }
+    }
+}
+
+fn broadcast(name: []i8, data := nil) {
+    &context.messages|:append({name|string.tmpcpy, data});
+}
+
+fn processMessages() {
+    for message: context.messages.buf {
+        for form: context.forms.buf {
+            sendMessage(form, message);
         }
     }
 }
@@ -89,6 +99,22 @@ fn drawAllForms() {
     }
 
     commit();
+}
+
+fn drawUpdatedForms() {
+    for form: context.drawers.buf {
+        sendMessage(form, {DRAW, nil});
+    }
+
+    commit();
+}
+
+fn setNeedsDraw(form: Form, formData: *none, messageData: *none) {
+    &context.drawers|:append(form);
+}
+
+fn setFormNeedsDraw(form: Form) {
+    &context.drawers|:append(form);
 }
 
 #context sdl: struct {

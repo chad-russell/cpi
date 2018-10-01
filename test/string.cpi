@@ -9,8 +9,29 @@ fn strcpy(s: []i8) {
     return newStr;
 }
 
+fn tmpcpy(s: []i8) {
+    newStr: []i8;
+    newStr.count = s.count;
+    newStr.data = basic.tmp(s.count);
+    mem.memcpy(newStr.data, s.data, s.count * sizeof(i8));
+
+    return newStr;
+}
+
 fn cstr(str: []i8) {
     r := mem.alloc!(i8)(str.count + 1);
     mem.memcpy(cast(*none) r, cast(*none) str.data, str.count);
     return r;
+}
+
+fn streq(str1: []i8, str2: []i8) {
+    if str1.count != str2.count { return false; }
+
+    i := 0;
+    while i < str1.count {
+        if str1[i] != str2[i] { return false; }
+        i += 1;
+    }
+
+    return true;
 }
