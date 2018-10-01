@@ -40,7 +40,7 @@ fn socket(ctx: Ctx, _type: SocketType) {
 }
 
 fn bind(socket: Socket, addr: []i8) {
-    return c.zmq_bind(socket, io.cstr(addr));
+    return c.zmq_bind(socket, string.cstr(addr));
 }
 
 fn recv(socket: Socket, buf: []i8, flags: i32 = 0) {
@@ -52,7 +52,7 @@ fn send(socket: Socket, buf: []i8, flags: i32 = 0) {
 }
 
 fn connect(socket: Socket, addr: []i8) {
-    return c.zmq_connect(socket, io.cstr(addr));
+    return c.zmq_connect(socket, string.cstr(addr));
 }
 
 fn close(socket: Socket) {

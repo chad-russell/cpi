@@ -33,8 +33,8 @@ fn fill_square(pixels: [][]i8, x: i64, y: i64, d: i64, color: Color) {
 fn write_png_file(filename: []i8) {
   #import "io";
 
-  fp := io.fopen(filename|io.cstr, "wb"|io.cstr);
-  pngCtx := png.png_create_write_struct(png.PNG_LIBPNG_VER_STRING|io.cstr, nil, nil, nil);
+  fp := io.fopen(filename|string.cstr, "wb"|string.cstr);
+  pngCtx := png.png_create_write_struct(png.PNG_LIBPNG_VER_STRING|string.cstr, nil, nil, nil);
   info := png.png_create_info_struct(pngCtx);
 
   png.png_init_io(pngCtx, fp);

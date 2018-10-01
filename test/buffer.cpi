@@ -54,6 +54,9 @@ fn set( T := typeof(^b), E := typeof(b.buf[0]) )(b: *T/Buffer, index: i64, e: E)
     ensureCapacity(b, index + 1);
 
     b.buf[index] = e;
+    if b.buf.count <= index {
+        b.buf.count = index + 1;
+    }
     return b.capacity;
 }
 

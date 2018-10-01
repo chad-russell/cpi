@@ -1,0 +1,16 @@
+#import "mem";
+
+fn strcpy(s: []i8) {
+    newStr: []i8;
+    newStr.count = s.count;
+    newStr.data = mem.alloc!(i8)(s.count);
+    mem.memcpy(newStr.data, s.data, s.count * sizeof(i8));
+
+    return newStr;
+}
+
+fn cstr(str: []i8) {
+    r := mem.alloc!(i8)(str.count + 1);
+    mem.memcpy(cast(*none) r, cast(*none) str.data, str.count);
+    return r;
+}

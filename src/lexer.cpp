@@ -505,7 +505,6 @@ const vector<string> Lexer::lexerTokenTypeStrings = {
     "INT_LITERAL",
     "FLOAT_LITERAL",
     "RET",
-    "STRING",
     "BOOLEAN",
     "I8",
     "I16",

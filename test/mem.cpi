@@ -10,11 +10,11 @@ fn mallocWithContext(size: i64) {
 }
 
 fn alloc(T: Ast)(count := 1) {
-  return cast(*T) calloc(count, sizeof(T));
+    return cast(*T) calloc(count, sizeof(T));
 }
 
 fn heap(t: !T) {
-  a := cast(*T) calloc(1, sizeof(T));
-  ^a = t;
-  return a;
+    a := cast(*T) calloc(1, sizeof(T));
+    ^a = t;
+    return a;
 }

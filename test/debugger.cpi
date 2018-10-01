@@ -22,7 +22,7 @@ fn getLine() {
 }
 
 fn main() {
-    -- system("/Users/chadrussell/Projects/cpi/cmake-build-debug/cpi /Users/chadrussell/Projects/cpi/test/foo.cpi --interpret --debug &"|io.cstr);
+    -- system("/Users/chadrussell/Projects/cpi/cmake-build-debug/cpi /Users/chadrussell/Projects/cpi/test/foo.cpi --interpret --debug &"|string.cstr);
 
     ctx := zmq.ctx();
     requester := zmq.socket(ctx, zmq.SocketType.REQ);

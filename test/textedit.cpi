@@ -1,17 +1,26 @@
 #import "sdl";
+#import "gui";
 #import "buffer": buf;
 #import "io";
+#import "mem";
+#import "se";
 #import "cairo";
+#import "iter";
 #import "harfbuzz": hb;
 #import "freetype": ft;
-#import "iter";
-#import "se";
-#import "mem";
-#import "gui";
+#import "string";
 
-WIDTH     : i32 = 800;
-HEIGHT    : i32 = 350;
 FONT_SIZE : i32 = 20;
+
+#context mouse: struct {
+    x: i32,
+    y: i32
+}
+
+type MouseMessageData struct {
+    x: f64,
+    y: f64
+}
 
 type CachedGlyph struct {
     codepoint: i32,
@@ -19,53 +28,10 @@ type CachedGlyph struct {
     pattern: *cairo.Pattern
 }
 
-type Rect(T := typeof(x)) struct {
-    x: T,
-    y: T,
-    width: T,
-    height: T
-}
-
-#attr(Rect)
-fn contains(T := typeof(r.x))(r: !R/Rect, x: T, y: T) {
-    return r.x <= x
-       and r.x + r.width >= x
-       and r.y <= y
-       and r.y + r.height >= y;
-}
-
 type CachedLine struct {
     low: f64,
     high: f64,
-    glyphs: buf.Buffer!(Rect!(f64))
-}
-
-type Form struct {
-    surface: *cairo.Surface,
-    context: *cairo.Context,
-    pattern: *cairo.Pattern,
-
-    rect: Rect!(f64),
-}
-
-#context sdl: struct {
-    window: *sdl.Window,
-    surface: *sdl.Surface,
-    renderer: *sdl.Renderer,
-
-    windowWidth: i32,
-    windowHeight: i32,
-
-    rendererWidth: i32,
-    rendererHeight: i32,
-
-    xScale: f64,
-    yScale: f64,
-}
-
-#context hb: struct {
-    font: *hb.Font,
-    buffer: *hb.Buffer = nil,
+    glyphs: buf.Buffer!(gui.Rect!(f64))
 }
 
 #context tc: struct {
@@ -75,229 +41,11 @@ type Form struct {
 
     glyphCache: buf.Buffer!(CachedGlyph),
     lineCache: buf.Buffer!(CachedLine),
-
-    mouse: struct{x: i32, y: i32},
-
-    decor: Form,
-    text: Form,
-    slider: Form,
 }
 
-fn loadFonts() {
-    -- context.tc.font = "/System/Library/Fonts/Apple Color Emoji.ttc";
-    -- context.tc.font = "/Users/chadrussell/Projects/text/Noto-unhinted/NotoColorEmoji.ttf";
-    -- context.tc.font = "/Users/chadrussell/Projects/text/emojione-apple.ttc";
-    -- context.tc.font = "/Users/chadrussell/Library/Fonts/Roboto-Light.ttf";
-    context.tc.font = "/Library/Fonts/Inconsolata.otf";
-    -- context.tc.font = "/Users/chadrussell/Projects/text/JFWilwod.ttf";
-
-    -- context.tc.text = buf.from("Hello");
-    -- context.tc.text = buf.from("🙈");
-
-    -- For CAIRO, load using FreeType
-    ftLibrary: ft.Library;
-    ft.FT_Init_FreeType(&ftLibrary);
-    ftFace: ft.Face;
-    err := ft.FT_New_Face(ftLibrary, context.tc.font|io.cstr, 0, &ftFace);
-    if err != 0 {
-        io.println("error creating freetype font face");
-        panic();
-    }
-    context.cairo.font = cairo.cairo_ft_font_face_create_for_ft_face(ftFace, 0);
-
-    -- For Harfbuzz, load using OpenType (HarfBuzz FT does not support bitmap font)
-    blob := hb.hb_blob_create_from_file(context.tc.font|io.cstr);
-    face := hb.hb_face_create(blob, 0);
-    context.hb.font = hb.hb_font_create(face);
-    hb.hb_ot_font_set_funcs(context.hb.font);
-    hb.hb_font_set_scale(context.hb.font, FONT_SIZE * 64, FONT_SIZE * 64);
-
-    context.hb.buffer = hb.hb_buffer_create();
-}
-
-fn initCairo() {
-    sdlRenderFlags: i32 = 6;
-    context.sdl.renderer = sdl.SDL_CreateRenderer(context.sdl.window, -1, sdlRenderFlags);
-
-    -- Compute screen resolution
-    -- For instance, on a retina screen, renderer size is twice as window size
-    sdl.SDL_GetWindowSize(context.sdl.window, &context.sdl.windowWidth, &context.sdl.windowHeight);
-
-    sdl.SDL_GetRendererOutputSize(context.sdl.renderer, &context.sdl.rendererWidth, &context.sdl.rendererHeight);
-
-    -- Create a SDL surface for Cairo to render onto
-    context.sdl.surface = sdl.SDL_CreateRGBSurface(
-            0,
-            context.sdl.rendererWidth,
-            context.sdl.rendererHeight,
-            32,
-            0x00ff0000,
-            0x0000ff00,
-            0x000000ff,
-            0
-    );
-
-    -- Get Cairo surface form SDL2 surface
-    context.cairo.surface = cairo.cairo_image_surface_create_for_data(
-            cast() context.sdl.surface.pixels,
-            cairo.FORMAT_RGB24,
-            context.sdl.surface.w,
-            context.sdl.surface.h,
-            context.sdl.surface.pitch);
-    context.cairo.context = cairo.cairo_create(context.cairo.surface);
-    context.cairo.pattern = cairo.cairo_pattern_create_for_surface(context.cairo.surface);
-
-    context.sdl.xScale = cast(f64) context.sdl.rendererWidth / cast(f64) context.sdl.windowWidth;
-    context.sdl.yScale = cast(f64) context.sdl.rendererHeight / cast(f64) context.sdl.windowHeight;
-
-    sliderHeight := 10 * context.sdl.yScale;
-
-    context.tc.slider.surface = cairo.cairo_image_surface_create(cairo.FORMAT_ARGB32, cast() context.sdl.surface.w, cast() context.sdl.surface.h);
-    context.tc.slider.rect = {0, 0, cast(f64) context.sdl.surface.w / context.sdl.xScale, sliderHeight};
-    context.tc.slider.pattern = cairo.cairo_pattern_create_for_surface(context.tc.slider.surface);
-    context.tc.slider.context = cairo.cairo_create(context.tc.slider.surface);
-
-    context.tc.text.surface = cairo.cairo_image_surface_create(cairo.FORMAT_ARGB32, cast() context.sdl.surface.w, cast() context.sdl.surface.h);
-    context.tc.text.rect = {0, sliderHeight, cast(f64) context.sdl.surface.w, cast(f64) context.sdl.surface.h};
-    context.tc.text.pattern = cairo.cairo_pattern_create_for_surface(context.tc.text.surface);
-
-    -- Get Cairo context from Cairo surface
-    context.tc.text.context = cairo.cairo_create(context.tc.text.surface);
-    cairo.cairo_set_antialias(context.tc.text.context, cairo.Antialias.SUBPIXEL);
-    cairo.cairo_set_source_rgba(context.tc.text.context, 0.0, 0.0, 0.0, 1.0);
-    cairo.cairo_set_font_face(context.tc.text.context, context.cairo.font);
-    cairo.cairo_set_font_size(context.tc.text.context, cast() FONT_SIZE);
-
-    context.tc.glyphCache = buf.make!(CachedGlyph)();
-    context.tc.lineCache = buf.make!(CachedLine)();
-
-    context.tc.decor.surface = cairo.cairo_image_surface_create(cairo.FORMAT_ARGB32, cast() context.sdl.surface.w, cast() context.sdl.surface.h);
-    context.tc.decor.rect = {0, sliderHeight, cast(f64) context.sdl.surface.w / context.sdl.xScale, cast(f64) context.sdl.surface.h / context.sdl.yScale};
-    context.tc.decor.pattern = cairo.cairo_pattern_create_for_surface(context.tc.decor.surface);
-    context.tc.decor.context = cairo.cairo_create(context.tc.decor.surface);
-
-    -- Scale cairo to use screen resolution
-    cairo.cairo_surface_set_device_scale(context.tc.text.surface, context.sdl.xScale, context.sdl.yScale);
-    cairo.cairo_surface_set_device_scale(context.tc.decor.surface, context.sdl.xScale, context.sdl.yScale);
-    cairo.cairo_surface_set_device_scale(context.cairo.surface, context.sdl.xScale, context.sdl.yScale);
-}
-
-fn drawRect(ctx: *cairo.Context, rect: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1) {
-    cairo.cairo_save(ctx);
-    cairo.cairo_set_source_rgba(ctx, r, g, b, a);
-    cairo.cairo_rectangle(ctx, rect.x, rect.y, rect.width, rect.height);
-    cairo.cairo_fill(ctx);
-    cairo.cairo_restore(ctx);
-}
-
-fn handleMouseMove() {
-    sdl.SDL_GetMouseState(&context.tc.mouse.x, &context.tc.mouse.y);
-
-    if context.mouseDownForm != nil {
-        -- todo(chad): don't always assume it's the slider
-        r := context.tc.slider.rect;
-        drawRect(context.tc.slider.context, r, 0, 0, 0);
-
-        graduations := se.editor_buffer_get_undo_size(context.tc.eb);
-        clamped := cast(i64) (cast(f64) context.tc.mouse.x * cast(f64) graduations / r.width);
-
-        r.x = cast(f64) clamped * r.width / cast() graduations;
-        r.width = 10;
-        drawRect(context.tc.slider.context, r, 1, 0, 1);
-
-        se.editor_buffer_undo(context.tc.eb, clamped);
-
-        drawText();
-        commit();
-    }
-    else if context.tc.decor.rect|contains(cast() context.tc.mouse.x, cast() context.tc.mouse.y) {
-        drawDecorations();
-    }
-}
-
-fn drawDecorations() {
-    -- translate the mouse coordinates to be relative to our mouse form
-    relX := context.tc.mouse.x - cast() context.tc.decor.rect.x;
-    relY := context.tc.mouse.y - cast() context.tc.decor.rect.y;
-
-    -- Clear
-    cairo.cairo_save(context.tc.decor.context);
-    cairo.cairo_set_operator(context.tc.decor.context, cairo.Operator.CAIRO_OPERATOR_CLEAR);
-    cairo.cairo_paint(context.tc.decor.context);
-    cairo.cairo_restore(context.tc.decor.context);
-
-    -- Mouse cursor
-    -- cairo.cairo_save(context.tc.decor.context);
-    -- cairo.cairo_set_source_rgba(context.tc.decor.context, 0.9, 0.9, 1, 1);
-    -- cairo.cairo_rectangle(context.tc.decor.context, cast() (relX - 10), cast() (relY - 10), 20, 20);
-    -- cairo.cairo_fill(context.tc.decor.context);
-    -- cairo.cairo_restore(context.tc.decor.context);
-
-    -- Highlight line
-    cairo.cairo_save(context.tc.decor.context);
-    cairo.cairo_set_source_rgba(context.tc.decor.context, 0.0, 0.9, 0.0, 0.9);
-
-    line := cast(i64) (relY / FONT_SIZE);
-
-    -- single character
-    if line >= 0 and line < context.tc.lineCache.buf.count {
-        cl := context.tc.lineCache.buf[line];
-        for g: cl.glyphs.buf {
-            if g|contains(cast() relX, cast() relY) {
-                cairo.cairo_rectangle(context.tc.decor.context, g.x, g.y, g.width, g.height);
-                cairo.cairo_fill(context.tc.decor.context);
-            }
-        }
-
-        -- entire line
-        -- cairo.cairo_rectangle(context.tc.decor.context, 0, cl.low - 1, cast() context.sdl.windowWidth, cl.high - cl.low + 2);
-        -- cairo.cairo_fill(context.tc.decor.context);
-    }
-
-    cairo.cairo_restore(context.tc.decor.context);
-}
-
-fn clear() {
-    -- Fill background
-    cairo.cairo_save(context.tc.text.context);
-    cairo.cairo_set_source_rgb(context.tc.text.context, 0.1739, 0.1867, 0.1433);
-    cairo.cairo_rectangle(context.tc.text.context,
-        0, 0,
-        cast() cairo.cairo_image_surface_get_width(context.tc.text.surface), cast() cairo.cairo_image_surface_get_height(context.tc.text.surface));
-    cairo.cairo_fill(context.tc.text.context);
-    cairo.cairo_restore(context.tc.text.context);
-}
-
-fn drawForm(form: Form) {
-    cairo.cairo_save(context.cairo.context);
-    cairo.cairo_translate(context.cairo.context, form.rect.x, form.rect.y);
-    cairo.cairo_set_source(context.cairo.context, form.pattern);
-    cairo.cairo_rectangle(context.cairo.context, 0, 0, form.rect.width, form.rect.height);
-    cairo.cairo_fill(context.cairo.context);
-    cairo.cairo_restore(context.cairo.context);
-}
-
-fn commit() {
-    cairo.cairo_set_operator(context.cairo.context, cairo.Operator.CAIRO_OPERATOR_OVER);
-
-    drawForm(context.tc.text);
-    drawForm(context.tc.decor);
-    drawForm(context.tc.slider);
-
-    -- Render SDL2 surface onto SDL2 renderer
-    texture := sdl.SDL_CreateTextureFromSurface(context.sdl.renderer, context.sdl.surface);
-    sdl.SDL_RenderCopy(context.sdl.renderer, texture, nil, nil);
-    sdl.SDL_RenderPresent(context.sdl.renderer);
-}
-
-fn findGlyph(codepoint: i32) CachedGlyph {
-    for g: context.tc.glyphCache.buf {
-        if g.codepoint == codepoint {
-            return g;
-        }
-    }
-
-    return cacheGlyph(codepoint);
+#context hb: struct {
+    font: *hb.Font,
+    buffer: *hb.Buffer = nil,
 }
 
 fn cacheGlyph(codepoint: i32) {
@@ -320,7 +68,7 @@ fn cacheGlyph(codepoint: i32) {
     -- Scale cairo to use screen resolution
     xScale: f64;
     yScale: f64;
-    cairo.cairo_surface_get_device_scale(context.tc.text.surface, &xScale, &yScale);
+    cairo.cairo_surface_get_device_scale(context.cairo.surface, &xScale, &yScale);
     cairo.cairo_surface_set_device_scale(glyphSurface, xScale, yScale);
 
     -- Get Cairo context from Cairo surface
@@ -346,7 +94,17 @@ fn cacheGlyph(codepoint: i32) {
     return cached;
 }
 
-fn drawLine(line: i64) {
+fn findGlyph(codepoint: i32) CachedGlyph {
+    for g: context.tc.glyphCache.buf {
+        if g.codepoint == codepoint {
+            return g;
+        }
+    }
+
+    return cacheGlyph(codepoint);
+}
+
+fn drawLine(form: gui.Form, formData: *TextEditFormData, line: i64) {
     -- Reset HarfBuzz buffer
     hb.hb_buffer_reset(context.hb.buffer);
 
@@ -367,8 +125,15 @@ fn drawLine(line: i64) {
     glyphInfo := hb.hb_buffer_get_glyph_infos(context.hb.buffer, nil);
     glyphPos := hb.hb_buffer_get_glyph_positions(context.hb.buffer, nil);
 
-    clGlyphs := buf.make!(Rect!(f64))();
-    cl: CachedLine = {cast() (context.sdl.windowHeight + 10), 0, clGlyphs};
+    if glyphCount == 0 { return; }
+
+    -- try to find the cachedLine. If we can't make a new one
+    if context.tc.lineCache.buf.count <= line {
+        cl: CachedLine = {cast() (context.sdl.windowHeight + 10), 0, buf.make!(gui.Rect!(f64))()};
+        &context.tc.lineCache|:set(line, cl);
+        context.tc.lineCache.buf.count = line + 1;
+    }
+    cl := &context.tc.lineCache.buf[line];
 
     x: f64 = 5;
     y: f64 = cast() (cast() FONT_SIZE * (line + 1));
@@ -376,16 +141,16 @@ fn drawLine(line: i64) {
     for i: iter.until(cast() glyphCount) {
         found := findGlyph(cast() (glyphInfo + i).codepoint);
 
-        cairo.cairo_save(context.tc.text.context);
-        cairo.cairo_translate(context.tc.text.context, x, y + found.extents.yBearing);
+        cairo.cairo_save(context.cairo.context);
+        cairo.cairo_translate(context.cairo.context, form.rect.x + x, form.rect.y + y + found.extents.yBearing);
 
-        cairo.cairo_set_source(context.tc.text.context, found.pattern);
-        cairo.cairo_rectangle(context.tc.text.context,
+        cairo.cairo_set_source(context.cairo.context, found.pattern);
+        cairo.cairo_rectangle(context.cairo.context,
             found.extents.xBearing,
             0,
             cast() (found.extents.width + 1),
             cast() (found.extents.height + 1));
-        cairo.cairo_fill(context.tc.text.context);
+        cairo.cairo_fill(context.cairo.context);
 
         if y + found.extents.yBearing < cl.low {
             cl.low = y + found.extents.yBearing;
@@ -394,146 +159,275 @@ fn drawLine(line: i64) {
             cl.high = y + found.extents.yBearing + found.extents.height + 1;
         }
 
-        &cl.glyphs|:append({
+        &cl.glyphs|:set(i, {
             x + found.extents.xBearing,
             y + found.extents.yBearing,
             cast() (found.extents.width + 1),
             cast() (found.extents.height + 1)
         });
 
-        cairo.cairo_restore(context.tc.text.context);
+        cairo.cairo_restore(context.cairo.context);
 
         x += found.extents.xAdvance;
     }
-
-    :ensureCapacity(&context.tc.lineCache, line + 1);
-    context.tc.lineCache.buf[line] = cl;
-
-    if context.tc.lineCache.buf.count < line + 1 {
-        context.tc.lineCache.buf.count = line + 1;
-    }
 }
 
-fn drawText() {
-    context.tc.lineCache = buf.make!(CachedLine)();
-
-    clear();
-
-    lineCount := se.editor_buffer_get_line_count(context.tc.eb);
-
-    for line: iter.until(lineCount) {
-        drawLine(line);
-    }
+type TextEditFormData struct {
+    highlights: buf.Buffer!(gui.Rect!(f64)),
 }
 
-fn initSdl() {
-    err := sdl.SDL_Init(sdl.INIT_VIDEO);
+fn addTextEdit(rect: gui.Rect!(f64)) {
+    fn draw(form: gui.Form, formData: *TextEditFormData, messageData: *none) {
+        -- clear
+        form|gui.drawRect(form.rect, 0.1739, 0.1867, 0.1433);
+
+        lineCount := se.editor_buffer_get_line_count(context.tc.eb);
+
+        for line: iter.until(lineCount) {
+            drawLine(form, formData, line);
+        }
+
+        for highlight: formData.highlights.buf {
+            form|gui.drawRect(highlight, 0, 1, 0);
+        }
+    }
+
+    fn mousemove(form: gui.Form, formData: *TextEditFormData, messageData: *MouseMessageData) {
+        formData.highlights.buf.count = 0;
+
+        -- translate the mouse coordinates to be relative to our mouse form
+        relX := context.mouse.x - cast() form.rect.x;
+        relY := context.mouse.y - cast() form.rect.y;
+
+        -- Mouse cursor
+        -- cursor: gui.Rect!(f64) = {cast() (context.mouse.x - 10), cast() (context.mouse.y - 10), 20, 20};
+        -- &formData.highlights|:append(cursor);
+
+        line := cast(i64) (relY / FONT_SIZE);
+
+        if line >= 0 and line < context.tc.lineCache.buf.count {
+            cl := context.tc.lineCache.buf[line];
+            for g: cl.glyphs.buf {
+                if g|:contains(cast() relX, cast() relY) {
+                    -- single character
+                    charRect: gui.Rect!(f64) = {form.rect.x + g.x, form.rect.y + g.y, g.width, g.height};
+                    &formData.highlights|:append(charRect);
+                }
+            }
+
+            -- entire line
+            -- lineRect: gui.Rect!(f64) = {form.rect.x, form.rect.y + cl.low - 1, cast() context.sdl.windowWidth, cl.high - cl.low + 2};
+            -- &formData.highlights|:append(lineRect);
+        }
+    }
+
+    formData: TextEditFormData;
+    formData.highlights = buf.make!(gui.Rect!(f64))();
+
+    form := gui.makeForm(rect, nil);
+
+    &form.receivers|:append({ gui.DRAW|string.strcpy, draw });
+    &form.receivers|:append({ gui.MOUSEMOVE|string.strcpy, mousemove });
+
+    &context.forms|:append(form);
+    &context.mousers|:append(form);
+}
+
+-- todo(chad): forms should have an id...
+type SliderFormData struct {
+    id: i64,
+
+    max: i64,
+    current: i64 = 0,
+
+    mouseDown := false,
+    grabberRect: gui.Rect!(f64)
+}
+
+fn addSlider(rect: gui.Rect!(f64), id: i64, max: i64) {
+    fn draw(form: gui.Form, formData: *SliderFormData, messageData: *none) {
+        -- magenta background
+        form|gui.drawRect(form.rect, 1, 0, 1);
+
+        -- set the max
+        formData.max = se.editor_buffer_get_undo_size(context.tc.eb);
+
+        -- cyan slider-grabber
+        formData.grabberRect = form.rect;
+        formData.grabberRect.x = form.rect.width * cast(f64) formData.current / cast(f64) formData.max;
+        formData.grabberRect.width = form.rect.width / cast() formData.max;
+        form|gui.drawRect(formData.grabberRect, 0, 1, 1);
+    }
+
+    fn mouseDown(form: gui.Form, formData: *SliderFormData, messageData: *MouseMessageData) {
+        if formData.grabberRect|gui.contains(messageData.x, messageData.y) {
+            formData.mouseDown = true;
+        }
+    }
+
+    fn mouseMove(form: gui.Form, formData: *SliderFormData, messageData: *MouseMessageData) {
+        if formData.mouseDown {
+            oldCurrent := formData.current;
+            formData.current = cast(i64) (cast(f64) messageData.x * cast(f64) formData.max / form.rect.width);
+
+            if oldCurrent != formData.current {
+                se.editor_buffer_undo(context.tc.eb, formData.current);
+            }
+        }
+    }
+
+    fn mouseUp(form: gui.Form, formData: *SliderFormData, messageData: *MouseMessageData) {
+        formData.mouseDown = false;
+    }
+
+    sfd: SliderFormData;
+    sfd.id = id;
+    sfd.max = max;
+    form := gui.makeForm(rect, sfd);
+
+    &form.receivers|:append({ gui.DRAW|string.strcpy, draw });
+    &form.receivers|:append({ gui.MOUSEDOWN|string.strcpy, mouseDown });
+    &form.receivers|:append({ gui.MOUSEMOVE|string.strcpy, mouseMove });
+    &form.receivers|:append({ gui.MOUSEUP|string.strcpy, mouseUp });
+
+    &context.mousers|:append(form);
+    &context.forms|:append(form);
+}
+
+fn loadFonts() {
+    -- context.tc.font = "/System/Library/Fonts/Apple Color Emoji.ttc";
+    -- context.tc.font = "/Users/chadrussell/Projects/text/Noto-unhinted/NotoColorEmoji.ttf";
+    -- context.tc.font = "/Users/chadrussell/Projects/text/emojione-apple.ttc";
+    -- context.tc.font = "/Users/chadrussell/Library/Fonts/Roboto-Light.ttf";
+    context.tc.font = "/Library/Fonts/Inconsolata.otf";
+    -- context.tc.font = "/Users/chadrussell/Projects/text/JFWilwod.ttf";
+
+    -- context.tc.text = buf.from("Hello");
+    -- context.tc.text = buf.from("🙈");
+
+    -- For CAIRO, load using FreeType
+    ftLibrary: ft.Library;
+    ft.FT_Init_FreeType(&ftLibrary);
+    ftFace: ft.Face;
+    err := ft.FT_New_Face(ftLibrary, context.tc.font|string.cstr, 0, &ftFace);
     if err != 0 {
-        io.println("failed to init SDL");
+        io.println("error creating freetype font face");
         panic();
     }
+    context.cairo.font = cairo.cairo_ft_font_face_create_for_ft_face(ftFace, 0);
 
-    window := sdl.SDL_CreateWindow("text"|io.cstr,
-        sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
-        WIDTH, HEIGHT,
-        8196);
-    if window == nil {
-        io.println("failed to create window");
-        panic();
-    }
+    -- For Harfbuzz, load using OpenType (HarfBuzz FT does not support bitmap font)
+    blob := hb.hb_blob_create_from_file(context.tc.font|string.cstr);
+    face := hb.hb_face_create(blob, 0);
+    context.hb.font = hb.hb_font_create(face);
+    hb.hb_ot_font_set_funcs(context.hb.font);
+    hb.hb_font_set_scale(context.hb.font, FONT_SIZE * 64, FONT_SIZE * 64);
 
-    context.sdl.window = window;
+    context.hb.buffer = hb.hb_buffer_create();
 }
 
-fn shutdown() {
-    cairo.cairo_surface_destroy(context.tc.text.surface);
-    cairo.cairo_destroy(context.tc.text.context);
-
-    cairo.cairo_surface_destroy(context.tc.decor.surface);
-    cairo.cairo_destroy(context.tc.decor.context);
-
-    cairo.cairo_surface_destroy(context.cairo.surface);
-    cairo.cairo_destroy(context.cairo.context);
-
-    cairo.cairo_font_face_destroy(context.cairo.font);
-
-    hb.hb_font_destroy(context.hb.font);
-
-    sdl.SDL_FreeSurface(context.sdl.surface);
-    sdl.SDL_Quit();
+fn mallocWithContext(n: i64) {
+    return mem.malloc(n);
 }
 
-#context mouseDownForm: *Form
-
-fn handleMouseDown(event: *sdl.MouseButtonEvent) {
-    if context.tc.slider.rect|contains(cast() event.x, cast() event.y) {
-        context.mouseDownForm = &context.tc.slider;
-    }
-}
-
-fn handleMouseUp(event: *sdl.MouseButtonEvent) {
-    context.mouseDownForm = nil;
-}
-
-fn demo() {
-    context.tc.eb = se.editor_buffer_create(80);
-
-    initSdl();
-
-    loadFonts();
-    initCairo();
-
-    drawText();
-    commit();
+fn loop() {
+    frame := 0;
 
     event: sdl.Event;
-    while sdl.SDL_WaitEvent(&event) != 0 {
-        if event._type == sdl.QUIT {
-            shutdown();
-            return;
-        }
-        else if event._type == sdl.KEYDOWN {
-            keyboardEvent := cast(*sdl.KeyboardEvent) &event;
-            -- io.println(cast(i32) keyboardEvent.keysym.scancode);
+    while true {
+        while sdl.SDL_PollEvent(&event) != 0 {
+            if event._type == sdl.QUIT {
+                gui.shutdown();
+                return;
+            }
+            else if event._type == sdl.MOUSEMOTION {
+                mouseEvent := cast(*sdl.MouseMotionEvent) &event;
+                if !(mouseEvent.xrel == 0 and mouseEvent.yrel == 0) {
+                    sdl.SDL_GetMouseState(&context.mouse.x, &context.mouse.y);
 
-            if keyboardEvent.keysym.scancode == sdl.Key.BACKSPACE {
-                se.editor_buffer_set_cursor_is_selection(context.tc.eb, 1);
-                se.editor_buffer_set_cursor_pos_relative(context.tc.eb, -1);
-                se.editor_buffer_delete(context.tc.eb);
-                se.editor_buffer_set_cursor_is_selection(context.tc.eb, 0);
+                    mmd: MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
+                    for form: context.mousers.buf {
+                        form|gui.sendMessage(cast() {gui.MOUSEMOVE, &mmd});
+                    }
+                }
             }
-            else if keyboardEvent.keysym.scancode == sdl.Key.SPACE {
-                se.editor_buffer_insert(context.tc.eb, " \0".data);
-            }
-            else if keyboardEvent.keysym.scancode == sdl.Key.ENTER {
-                se.editor_buffer_insert(context.tc.eb, "\n\0".data);
-            }
-            else if keyboardEvent.keysym.scancode|:isalpha {
-                se.editor_buffer_insert(context.tc.eb, :charsFor(keyboardEvent.keysym.scancode));
-            }
+            else if event._type == sdl.MOUSEBUTTONDOWN {
+                mouseEvent := cast(*sdl.MouseButtonEvent) &event;
 
-            drawText();
-            commit();
-        }
-        else if event._type == sdl.MOUSEMOTION {
-            mouseEvent := cast(*sdl.MouseMotionEvent) &event;
+                mmd: MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
+                for form: context.mousers.buf {
+                    if form.rect|gui.contains(mmd.x, mmd.y) {
+                        form|gui.sendMessage(cast() {gui.MOUSEDOWN, &mmd});
+                    }
+                }
+            }
+            else if event._type == sdl.MOUSEBUTTONUP {
+                mouseEvent := cast(*sdl.MouseButtonEvent) &event;
 
-            if !(mouseEvent.xrel == 0 and mouseEvent.yrel == 0) {
-                handleMouseMove();
-                commit();
+                mmd: MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
+                for form: context.mousers.buf {
+                    form|gui.sendMessage(cast() {gui.MOUSEUP, &mmd});
+                }
+            }
+            else if event._type == sdl.KEYDOWN {
+                keyboardEvent := cast(*sdl.KeyboardEvent) &event;
+                -- io.println(cast(i32) keyboardEvent.keysym.scancode);
+
+                if keyboardEvent.keysym.scancode == sdl.Key.BACKSPACE {
+                    se.editor_buffer_set_cursor_is_selection(context.tc.eb, 1);
+                    se.editor_buffer_set_cursor_pos_relative(context.tc.eb, -1);
+                    se.editor_buffer_delete(context.tc.eb);
+                    se.editor_buffer_set_cursor_is_selection(context.tc.eb, 0);
+                }
+                else if keyboardEvent.keysym.scancode == sdl.Key.SPACE {
+                    se.editor_buffer_insert(context.tc.eb, " \0".data);
+                }
+                else if keyboardEvent.keysym.scancode == sdl.Key.ENTER {
+                    se.editor_buffer_insert(context.tc.eb, "\n\0".data);
+                }
+                else if keyboardEvent.keysym.scancode|:isalpha {
+                    se.editor_buffer_insert(context.tc.eb, :charsFor(keyboardEvent.keysym.scancode));
+                }
             }
         }
-        else if event._type == sdl.MOUSEBUTTONDOWN {
-            mouseEvent := cast(*sdl.MouseButtonEvent) &event;
-            handleMouseDown(mouseEvent);
-        }
-        else if event._type == sdl.MOUSEBUTTONUP {
-            mouseEvent := cast(*sdl.MouseButtonEvent) &event;
-            handleMouseUp(mouseEvent);
-        }
+
+        gui.clear();
+        gui.drawAllForms();
+
+        -- io.println(frame);
+        frame += 1;
     }
+}
+
+fn init() {
+    context.tc.eb = se.editor_buffer_create(80);
+
+    context.tc.glyphCache = buf.make!(CachedGlyph)();
+    context.tc.lineCache = buf.make!(CachedLine)();
+
+    loadFonts();
 }
 
 fn main() {
-    demo();
+    init();
+    gui.init();
+
+    #import "random";
+    #import "iter";
+    random.seed();
+
+    rect : gui.Rect!(f64) = {0, 0, 1, 0.1};
+    addSlider(rect, 0, 50);
+
+    formRect: gui.Rect!(f64) = {
+        x:      0,
+        y:      0.1,
+        width:  1.0,
+        height: 0.9
+    };
+    addTextEdit(formRect);
+
+    loop();
+
+    return 0;
 }

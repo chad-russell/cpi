@@ -1,5 +1,7 @@
 #link "libsdl2";
+
 #import "io";
+#import "string";
 
 INIT_EVERYTHING: i32 = 29233;
 INIT_VIDEO: i32 = 20;
@@ -77,7 +79,7 @@ type Key enum(i32) {
         -- todo(chad): should be able to do #for here...
         for f: #fieldsof(Key) {
             if f.value == cast(i32) key {
-                return f.name|io.cstr;
+                return f.name|string.cstr;
             }
         }
 

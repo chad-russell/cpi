@@ -1,15 +1,7 @@
 #import "mem";
 #import "iter";
 #import "buffer": buf;
-
-fn strcpy(s: []i8) {
-    newStr: []i8;
-    newStr.count = s.count;
-    newStr.data = mem.alloc!(i8)(s.count);
-    mem.memcpy(newStr.data, s.data, s.count * sizeof(i8));
-
-    return newStr;
-}
+#import "string";
 
 type TypeInfo union {
     _tooDeep: none,
@@ -84,7 +76,7 @@ fn typeInfo(T: Ast)(recursionCount := 0) {
         fields := buf.make!(TypeInfoField)();
         #for it, i: #fieldsof(T) {
             fieldType := typeInfo!(typeof(t[i]))(recursionCount + 1);
-            &fields|:append({it.name|strcpy, fieldType});
+            &fields|:append({it.name|string.strcpy, fieldType});
         }
         ti._struct = fields.buf;
     }
@@ -93,7 +85,7 @@ fn typeInfo(T: Ast)(recursionCount := 0) {
         fields := buf.make!(TypeInfoField)();
         #for it, i: #fieldsof(T) {
             fieldType := typeInfo!(typeof(t[i]))(recursionCount + 1);
-            &fields|:append({it.name|strcpy, fieldType});
+            &fields|:append({it.name|string.strcpy, fieldType});
         }
         ti._union = fields.buf;
     }

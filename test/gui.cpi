@@ -3,6 +3,7 @@
 #import "io";
 #import "cairo";
 #import "mem";
+#import "string";
 
 WIDTH   : i32 = 800;
 HEIGHT  : i32 = 350;
@@ -19,17 +20,17 @@ type Rect(T := typeof(x)) struct {
     height: T
 }
 
-type Point(T := typeof(x)) struct {
-    x: T,
-    y: T,
-}
-
 #attr(Rect)
 fn contains(T := typeof(r.x))(r: !R/Rect, x: T, y: T) {
     return r.x <= x
        and r.x + r.width >= x
        and r.y <= y
        and r.y + r.height >= y;
+}
+
+type Point(T := typeof(x)) struct {
+    x: T,
+    y: T,
 }
 
 type Message struct {
@@ -124,7 +125,7 @@ fn initSdl() {
         panic();
     }
 
-    window := sdl.SDL_CreateWindow("text"|io.cstr,
+    window := sdl.SDL_CreateWindow("text"|string.cstr,
         sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
         WIDTH, HEIGHT,
         8196);

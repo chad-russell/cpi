@@ -1,4 +1,5 @@
 #import "mem";
+#import "string";
 
 #link "libc";
 
@@ -230,14 +231,8 @@ fn println(s: !T) {
     print(s); puts("\n");
 }
 
-fn cstr(str: []i8) {
-    r := mem.alloc!(i8)(str.count + 1);
-    mem.memcpy(cast(*none) r, cast(*none) str.data, str.count);
-    return r;
-}
-
 fn readFile(name: []i8) {
-    f := fopen(cstr(name), cstr("r"));
+    f := fopen(string.cstr(name), string.cstr("r"));
     if f == nil {
         println("could not open file\n");
         panic();
