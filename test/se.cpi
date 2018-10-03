@@ -31,17 +31,67 @@ type LineRope struct {
     right: *LineRope
 }
 
+type Rope struct {
+    byte_weight: i64,
+    total_byte_weight: i64,
+
+    char_weight: i64,
+    total_char_weight: i64,
+
+    line_break_weight: i64,
+    total_line_break_weight: i64,
+
+    is_leaf: i8,
+
+    rc: i32,
+
+    left: *Rope,
+    right: *Rope,
+}
+
+type Vector(T: Ast) struct {
+    length: i64,
+    capacity: i64,
+
+    item_size: i32,
+
+    buf: *T,
+}
+
+type CursorInfo struct {
+    char_pos: i64,
+    row: i64,
+    col: i64,
+
+    is_selection: i8,
+    selection_char_pos: i64,
+    selection_row: i64,
+    selection_col: i64,
+}
+
 type EditorScreen struct {
-    cursorInfos: *none,
+    cursorInfos: *Vector!(CursorInfo),
     text: *none,
     lines: *LineRope
+}
+type EditorScreenPtr *EditorScreen
+
+type CircularBuffer(T: Ast) struct {
+    buf: *T,
+
+    item_size: i32,
+    length: i64,
+    capacity: i64,
+
+    start: i64,
+    next_write_index: i64,
 }
 
 type EditorBuffer struct {
     filePath: **i8,
 
-    globalUndo: *none,
-    undo: *none,
+    globalUndo: *CircularBuffer!(EditorScreenPtr),
+    undo: *CircularBuffer!(EditorScreenPtr),
 
     undoIdx: *i64,
     globalUndoIdx: *i64,
@@ -62,5 +112,7 @@ fn editor_buffer_get_text_between_points(eb: *EditorBuffer, startLine: i64, star
 fn editor_buffer_set_cursor_pos_relative(eb: *EditorBuffer, relative: i64) none
 fn editor_buffer_get_line_count(eb: *EditorBuffer) i64
 fn editor_buffer_get_line_length(eb: *EditorBuffer, line: i64) i64
-fn editor_buffer_get_undo_size(eb: *EditorBuffer) i64
 fn editor_buffer_undo(eb: *EditorBuffer, index: i64) none
+fn editor_buffer_global_undo(eb: *EditorBuffer, index: i64) none
+fn editor_buffer_set_cursor_point_for_cursor_index(eb: *EditorBuffer, index: i64, row: i64, col: i64) none
+fn editor_buffer_free_buf(buf: *Buf) none

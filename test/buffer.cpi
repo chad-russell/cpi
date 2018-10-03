@@ -5,15 +5,19 @@ type Buffer(T := typeof(buf[0])) struct {
     buf: []T
 }
 
+type BufferPointer(T: Ast) *Buffer!(T)
+
 fn make(T: Ast)(capacity := 1) {
     buf: []T;
     buf.count = 0;
     buf.data = mem.alloc!(T)(capacity);
 
-    return cast(Buffer!(T)) {
+    b: Buffer!(T) = {
         capacity: capacity,
         buf: buf
     };
+
+    return mem.heap(b);
 }
 
 fn from(T := typeof(t[0]))(t: []T) {
@@ -26,8 +30,9 @@ fn from(T := typeof(t[0]))(t: []T) {
 #import "io";
 
 #attr(Buffer) {
-fn release(b: !T/Buffer) {
-    mem.free(cast() b.buf.data);
+fn release(T := typeof(^b))(b: *T/Buffer) {
+    mem.free(b.buf.data);
+    mem.free(b);
 }
 
 fn ensureCapacity(b: !T/Buffer, index: i64) {

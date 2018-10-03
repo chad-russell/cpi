@@ -1,0 +1,6 @@
+#link "libc";
+
+CLOCKS_PER_SEC: u64 = 1000000;
+
+-- todo(chad): try changing to u64 and see what happens...
+fn clock() i64

@@ -1,0 +1,411 @@
+#import "sdl";
+#import "buffer": buf;
+#import "io";
+#import "cairo";
+#import "mem";
+#import "string";
+#import "iter";
+
+WIDTH   : i32 = 800;
+HEIGHT  : i32 = 350;
+
+DRAW     : []i8 = "draw";
+MOUSEDOWN: []i8 = "mousedown";
+MOUSEMOVE: []i8 = "mousemove";
+MOUSEUP  : []i8 = "mouseup";
+
+type Color struct {
+    r: f64,
+    g: f64,
+    b: f64,
+    a: f64 = 1.0
+}
+
+type MouseMessageData struct {
+    x: f64,
+    y: f64
+}
+
+type Rect(T := typeof(x)) struct {
+    x: T,
+    y: T,
+    width: T,
+    height: T
+}
+
+#attr(Rect) {
+fn contains(T := typeof(r.x))(r: !R/Rect, x: T, y: T) {
+    return r.x <= x
+       and r.x + r.width >= x
+       and r.y <= y
+       and r.y + r.height >= y;
+}
+
+fn intersects(r1: !R/Rect, r2: R) {
+    -- left edge of r1 within r2
+    if r1.x >= r2.x and r1.x <= r2.x + r2.width {
+        return true;
+    }
+
+    -- right edge of r1 within r2
+    if r1.x + r1.width >= r2.x and r1.x + r1.width <= r2.x + r2.width {
+        return true;
+    }
+
+    -- top edge of r1 within r2
+    if r1.y >= r2.y and r1.y <= r2.y + r2.height {
+        return true;
+    }
+
+    -- bottom edge of r1 within r2
+    if r1.y + r1.height >= r2.y and r1.y + r1.height <= r2.y + r2.height {
+        return true;
+    }
+
+    return false;
+}
+}
+
+type Point(T := typeof(x)) struct {
+    x: T,
+    y: T,
+}
+
+type Message struct {
+    name: []i8,
+    data: *none
+}
+
+type ReceiverHandler fn(form: Form, formData: *none, messageData: *none) none
+
+type Receiver struct {
+    name: []i8,
+    handle: ReceiverHandler
+}
+
+type Layer struct {
+    surface: *cairo.Surface,
+    context: *cairo.Context,
+    pattern: *cairo.Pattern,
+}
+
+type Form struct {
+    rect: Rect!(f64),
+    layer: *Layer,
+    receivers: *buf.Buffer!(Receiver),
+    data: *none,
+}
+
+fn addReceiver(f: Form, name: []i8, handler: ReceiverHandler) {
+    f.receivers|:append({ name|string.strcpy, handler });
+}
+
+fn removeReceiver(f: Form, name: []i8) {
+    count := f.receivers.buf.count;
+    f.receivers.buf.count = 0;
+
+    i := 0;
+    while i < count {
+        it := f.receivers.buf[i];
+        if !string.streq(it.name, name) {
+            f.receivers|:append(it);
+        }
+        i += 1;
+    }
+}
+
+#context forms: *buf.Buffer!(Form)
+#context drawers: *buf.Buffer!(Form)
+#context mousers: *buf.Buffer!(Form)
+#context animators: *buf.Buffer!(Form)
+#context layerables: *buf.Buffer!(Form)
+
+#context formDatas: basic.Region
+
+#context messages: buf.Buffer!(Message)
+
+fn makeLayer(rect: Rect!(f64)) {
+    layerSurface := cairo.cairo_image_surface_create(cairo.FORMAT_ARGB32,
+        cast() rect.width,
+        cast() rect.height);
+
+    layerContext := cairo.cairo_create(layerSurface);
+    layerPattern := cairo.cairo_pattern_create_for_surface(layerSurface);
+
+    cairo.cairo_surface_set_device_scale(layerSurface, context.sdl.xScale, context.sdl.yScale);
+
+    return mem.heap(cast(Layer) {layerSurface, layerContext, layerPattern});
+}
+
+fn makeForm(r: Rect!(f64), data: !T, ownLayer := false) {
+    xScale := cast(f64) context.sdl.surface.w / context.sdl.xScale;
+    yScale := cast(f64) context.sdl.surface.h / context.sdl.yScale;
+
+    scaled: Rect!(f64) = {r.x * xScale, r.y * yScale, r.width * xScale, r.height * yScale};
+
+    f: Form;
+    f.rect = scaled;
+    f.data = context.formDatas.current;
+    f.receivers = buf.make!(Receiver)();
+    if ownLayer {
+        preScaled: Rect!(f64) = {r.x * cast() context.sdl.surface.w, r.y * cast() context.sdl.surface.w,
+                                 r.width * cast() context.sdl.surface.w, r.height * cast() context.sdl.surface.w};
+        f.layer = makeLayer(preScaled);
+    }
+    else {
+        f.layer = &context.cairo.layer;
+    }
+
+    ^(cast(*T) context.formDatas.current) = data;
+    context.formDatas.current += sizeof(T);
+
+    if ownLayer {
+        context.layerables|:append(f);
+    }
+
+    return f;
+}
+
+fn sendMessage(form: Form, message: Message) {
+    for r: form.receivers.buf {
+        if string.streq(message.name, r.name) {
+            r.handle(form, form.data, message.data);
+        }
+    }
+}
+
+fn broadcast(name: []i8, data := nil) {
+    &context.messages|:append({name|string.tmpcpy, data});
+}
+
+fn processMessages() {
+    for message: context.messages.buf {
+        for form: context.forms.buf {
+            sendMessage(form, message);
+        }
+    }
+}
+
+fn drawAllForms() {
+    for form: context.forms.buf {
+        form|clearForm;
+        sendMessage(form, {DRAW, nil});
+    }
+
+    commit();
+}
+
+fn drawUpdatedForms() {
+    cairo.cairo_save(context.cairo.layer.context);
+    defer { cairo.cairo_restore(context.cairo.layer.context); }
+    cairo.cairo_set_operator(context.cairo.layer.context, cairo.Operator.OVER);
+
+    update := false;
+
+    for form: context.drawers.buf {
+        update = true;
+
+        form|clearForm;
+        &context.cairo.layer|clearRect(form.rect);
+
+        sendMessage(form, {DRAW, nil});
+    }
+
+    for form: context.animators.buf {
+        update = true;
+
+        form|clearForm;
+        sendMessage(form, {DRAW, nil});
+    }
+
+    -- todo(chad): make this fast
+    for layerable: context.layerables.buf {
+        for form: context.forms.buf {
+            if layerable.rect|:intersects(form.rect) {
+                update = true;
+
+                -- if it has it's own form then no need to explicitly redraw. Otherwise, redraw
+                if form.layer != &context.cairo.layer {
+                    cairo.cairo_set_source(context.cairo.layer.context, form.layer.pattern);
+                    cairo.cairo_rectangle(context.cairo.layer.context, form.rect.x, form.rect.y, form.rect.width, form.rect.height);
+                    cairo.cairo_fill(context.cairo.layer.context);
+                }
+                else {
+                    form|clearForm;
+                    sendMessage(form, {DRAW, nil});
+                }
+            }
+        }
+    }
+    for layerable: context.layerables.buf {
+        update = true;
+
+        cairo.cairo_set_source(context.cairo.layer.context, layerable.layer.pattern);
+        cairo.cairo_rectangle(context.cairo.layer.context, layerable.rect.x, layerable.rect.y, layerable.rect.width, layerable.rect.height);
+        cairo.cairo_fill(context.cairo.layer.context);
+    }
+
+    -- todo(chad): `if update {` doesn't work... :(
+    if update == true {
+        commit();
+    }
+}
+
+fn setNeedsDraw(form: Form, formData: *none, messageData: *none) {
+    &context.drawers|:append(form);
+}
+
+fn setFormNeedsDraw(form: Form) {
+    &context.drawers|:append(form);
+}
+
+#context sdl: struct {
+    window: *sdl.Window,
+    surface: *sdl.Surface,
+    renderer: *sdl.Renderer,
+
+    texture: *sdl.Texture,
+    pixels: *none,
+    pitch: i32,
+
+    windowWidth: i32,
+    windowHeight: i32,
+
+    rendererWidth: i32,
+    rendererHeight: i32,
+
+    xScale: f64,
+    yScale: f64,
+}
+
+#context cairo: struct {
+    font: *cairo.FontFace,
+    layer: Layer
+}
+
+fn initSdl() {
+    err := sdl.SDL_Init(sdl.INIT_VIDEO);
+    if err != 0 {
+        io.println("failed to init SDL");
+        panic();
+    }
+
+    window := sdl.SDL_CreateWindow("text"|string.cstr,
+        sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
+        WIDTH, HEIGHT,
+        8196);
+    if window == nil {
+        io.println("failed to create window");
+        panic();
+    }
+
+    context.sdl.window = window;
+
+    sdlRenderFlags: i32 = 6;
+    context.sdl.renderer = sdl.SDL_CreateRenderer(context.sdl.window, -1, sdlRenderFlags);
+
+    -- Compute screen resolution
+    -- For instance, on a retina screen, renderer size is twice as window size
+    sdl.SDL_GetWindowSize(context.sdl.window, &context.sdl.windowWidth, &context.sdl.windowHeight);
+
+    sdl.SDL_GetRendererOutputSize(context.sdl.renderer, &context.sdl.rendererWidth, &context.sdl.rendererHeight);
+
+    -- Create a SDL surface for Cairo to render onto
+    context.sdl.surface = sdl.SDL_CreateRGBSurface(
+            0,
+            context.sdl.rendererWidth,
+            context.sdl.rendererHeight,
+            32,
+            0x00ff0000,
+            0x0000ff00,
+            0x000000ff,
+            0xff000000
+    );
+
+    context.sdl.texture = sdl.SDL_CreateTexture(context.sdl.renderer,
+        sdl.PIXEL_FORMAT_ARGB8888,
+        sdl.TextureAccess.STREAMING,
+        context.sdl.rendererWidth, context.sdl.rendererHeight);
+
+    sdl.SDL_LockTexture(context.sdl.texture, nil, &context.sdl.pixels, &context.sdl.pitch);
+
+    context.sdl.xScale = cast(f64) context.sdl.rendererWidth / cast(f64) context.sdl.windowWidth;
+    context.sdl.yScale = cast(f64) context.sdl.rendererHeight / cast(f64) context.sdl.windowHeight;
+}
+
+fn initCairo() {
+    -- Get Cairo surface form SDL2 surface
+    context.cairo.layer.surface = cairo.cairo_image_surface_create_for_data(
+                cast() context.sdl.pixels,
+                cairo.FORMAT_ARGB32,
+                context.sdl.surface.w,
+                context.sdl.surface.h,
+                context.sdl.surface.pitch);
+
+    context.cairo.layer.context = cairo.cairo_create(context.cairo.layer.surface);
+    context.cairo.layer.pattern = cairo.cairo_pattern_create_for_surface(context.cairo.layer.surface);
+
+    cairo.cairo_surface_set_device_scale(context.cairo.layer.surface, context.sdl.xScale, context.sdl.yScale);
+}
+
+fn initContext() {
+    #import "mem";
+
+    -- start with 1MB
+    -- todo(chad): make this auto-expanding
+    size := 1024 * 1024;
+
+    context.formDatas.count = size;
+    context.formDatas.data = mem.calloc(size, sizeof(i8));
+    context.formDatas.current = context.formDatas.data;
+
+    context.forms = buf.make!(Form)();
+    context.drawers = buf.make!(Form)();
+    context.mousers = buf.make!(Form)();
+    context.animators = buf.make!(Form)();
+    context.layerables = buf.make!(Form)();
+}
+
+fn init() {
+    initContext();
+    initSdl();
+    initCairo();
+}
+
+fn drawRect(form: Form, rect: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1) {
+    cairo.cairo_save(form.layer.context);
+    defer { cairo.cairo_restore(form.layer.context); }
+
+    cairo.cairo_set_source_rgba(form.layer.context, r, g, b, a);
+    cairo.cairo_rectangle(form.layer.context, rect.x, rect.y, rect.width, rect.height);
+    cairo.cairo_fill(form.layer.context);
+}
+
+fn commit() {
+    -- Render SDL2 surface onto SDL2 renderer
+    sdl.SDL_UpdateTexture(context.sdl.texture, nil, context.sdl.pixels, context.sdl.pitch);
+    sdl.SDL_RenderCopy(context.sdl.renderer, context.sdl.texture, nil, nil);
+    sdl.SDL_RenderPresent(context.sdl.renderer);
+}
+
+fn shutdown() {
+    cairo.cairo_surface_destroy(context.cairo.layer.surface);
+    cairo.cairo_destroy(context.cairo.layer.context);
+
+    sdl.SDL_FreeSurface(context.sdl.surface);
+    sdl.SDL_Quit();
+}
+
+fn clearRect(layer: *Layer, rect: Rect!(f64)) {
+    cairo.cairo_save(layer.context);
+    defer { cairo.cairo_restore(layer.context); }
+
+    cairo.cairo_set_source_rgba(layer.context, 0, 0, 0, 0);
+    cairo.cairo_set_operator(layer.context, cairo.Operator.SOURCE);
+    cairo.cairo_rectangle(layer.context, rect.x, rect.y, rect.width, rect.height);
+    cairo.cairo_fill(layer.context);
+}
+
+fn clearForm(f: Form) {
+    clearRect(f.layer, f.rect);
+}

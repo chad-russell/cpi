@@ -1,5 +1,6 @@
 #import "sdl";
-#import "gui";
+#import "gui/gui";
+#import "gui/slider";
 #import "buffer": buf;
 #import "io";
 #import "mem";
@@ -9,6 +10,7 @@
 #import "harfbuzz": hb;
 #import "freetype": ft;
 #import "string";
+#import "math";
 
 FONT_SIZE : i32 = 20;
 
@@ -17,11 +19,6 @@ TEXT_UPDATE := "text_update";
 #context mouse: struct {
     x: i32,
     y: i32
-}
-
-type MouseMessageData struct {
-    x: f64,
-    y: f64
 }
 
 type CachedGlyph struct {
@@ -33,7 +30,7 @@ type CachedGlyph struct {
 type CachedLine struct {
     low: f64,
     high: f64,
-    glyphs: buf.Buffer!(gui.Rect!(f64))
+    glyphs: *buf.Buffer!(gui.Rect!(f64))
 }
 
 #context tc: struct {
@@ -41,8 +38,8 @@ type CachedLine struct {
 
     font: []i8,
 
-    glyphCache: buf.Buffer!(CachedGlyph),
-    lineCache: buf.Buffer!(CachedLine),
+    glyphCache: *buf.Buffer!(CachedGlyph),
+    lineCache: *buf.Buffer!(CachedLine),
 }
 
 #context hb: struct {
@@ -70,7 +67,7 @@ fn cacheGlyph(codepoint: i32) {
     -- Scale cairo to use screen resolution
     xScale: f64;
     yScale: f64;
-    cairo.cairo_surface_get_device_scale(context.cairo.surface, &xScale, &yScale);
+    cairo.cairo_surface_get_device_scale(context.cairo.layer.surface, &xScale, &yScale);
     cairo.cairo_surface_set_device_scale(glyphSurface, xScale, yScale);
 
     -- Get Cairo context from Cairo surface
@@ -118,6 +115,7 @@ fn drawLine(form: gui.Form, formData: *TextEditFormData, line: i64) {
     -- Add text and lay it out
     lastChar := se.editor_buffer_get_line_length(context.tc.eb, line);
     text := se.editor_buffer_get_text_between_points(context.tc.eb, line, 0, line, lastChar);
+    defer { se.editor_buffer_free_buf(text); }
 
     hb.hb_buffer_add_utf8(context.hb.buffer, text.bytes, -1, 0, -1);
     hb.hb_shape(context.hb.font, context.hb.buffer, nil, 0);
@@ -144,16 +142,16 @@ fn drawLine(form: gui.Form, formData: *TextEditFormData, line: i64) {
     for i: iter.until(cast() glyphCount) {
         found := findGlyph(cast() (glyphInfo + i).codepoint);
 
-        cairo.cairo_save(context.cairo.context);
-        cairo.cairo_translate(context.cairo.context, form.rect.x + x, form.rect.y + y + found.extents.yBearing);
+        cairo.cairo_save(form.layer.context);
+        cairo.cairo_translate(form.layer.context, form.rect.x + x, form.rect.y + y + found.extents.yBearing);
 
-        cairo.cairo_set_source(context.cairo.context, found.pattern);
-        cairo.cairo_rectangle(context.cairo.context,
+        cairo.cairo_set_source(form.layer.context, found.pattern);
+        cairo.cairo_rectangle(form.layer.context,
             found.extents.xBearing,
             0,
             cast() (found.extents.width + 1),
             cast() (found.extents.height + 1));
-        cairo.cairo_fill(context.cairo.context);
+        cairo.cairo_fill(form.layer.context);
 
         if y + found.extents.yBearing < cl.low {
             cl.low = y + found.extents.yBearing;
@@ -169,17 +167,40 @@ fn drawLine(form: gui.Form, formData: *TextEditFormData, line: i64) {
             cast() (found.extents.height + 1)
         });
 
-        cairo.cairo_restore(context.cairo.context);
+        cairo.cairo_restore(form.layer.context);
 
         x += found.extents.xAdvance;
     }
 }
 
 type TextEditFormData struct {
-    highlights: buf.Buffer!(gui.Rect!(f64)),
+    highlights: *buf.Buffer!(gui.Rect!(f64))
 }
 
-fn addTextEdit(rect: gui.Rect!(f64)) {
+fn cursorIterator() {
+    type CursorIterator struct{
+        current: i64,
+        count: i64
+    }
+
+    #attr(CursorIterator) {
+        fn empty(ci: CursorIterator) {
+            return ci.current >= ci.count;
+        }
+
+        fn front(ci: CursorIterator) {
+            return ^(context.tc.eb.currentScreen.cursorInfos.buf + ci.current);
+        }
+
+        fn popFront(ci: *CursorIterator) {
+            ci.current += 1;
+        }
+    }
+
+    return cast(CursorIterator) { 0, context.tc.eb.currentScreen.cursorInfos.length };
+}
+
+fn makeTextEdit(rect: gui.Rect!(f64)) {
     fn draw(form: gui.Form, formData: *TextEditFormData, messageData: *none) {
         -- clear
         form|gui.drawRect(form.rect, 0.1739, 0.1867, 0.1433);
@@ -195,28 +216,44 @@ fn addTextEdit(rect: gui.Rect!(f64)) {
         }
     }
 
-    fn mousemove(form: gui.Form, formData: *TextEditFormData, messageData: *MouseMessageData) {
+    fn mousemove(form: gui.Form, formData: *TextEditFormData, messageData: *gui.MouseMessageData) {
         formData.highlights.buf.count = 0;
-
-        -- translate the mouse coordinates to be relative to our mouse form
-        relX := context.mouse.x - cast() form.rect.x;
-        relY := context.mouse.y - cast() form.rect.y;
 
         -- Mouse cursor
         -- cursor: gui.Rect!(f64) = {cast() (context.mouse.x - 10), cast() (context.mouse.y - 10), 20, 20};
         -- &formData.highlights|:append(cursor);
 
+        -- y relative to the form
+        relY := context.mouse.y - cast() form.rect.y;
         line := cast(i64) (relY / FONT_SIZE);
 
         if line >= 0 and line < context.tc.lineCache.buf.count {
             cl := context.tc.lineCache.buf[line];
-            for g: cl.glyphs.buf {
-                if g|:contains(cast() relX, cast() relY) {
-                    -- single character
-                    charRect: gui.Rect!(f64) = {form.rect.x + g.x, form.rect.y + g.y, g.width, g.height};
-                    &formData.highlights|:append(charRect);
+            for g, i: cl.glyphs.buf {
+                boundingLeft: gui.Rect!(f64) = {form.rect.x + g.x, form.rect.y + cl.low - 1, g.width/2, cl.high - cl.low};
+                boundingRight: gui.Rect!(f64) = {form.rect.x + g.x + g.width/2, form.rect.y + cl.low - 1, g.width/2, cl.high - cl.low};
 
-                    gui.setFormNeedsDraw(form);
+                if boundingLeft|:contains(cast() context.mouse.x, cast() context.mouse.y) {
+                    -- try to draw *after* the previous glyph
+                    if i > 0 {
+                        clG := cl.glyphs.buf[i - 1];
+                        cursorRect: gui.Rect!(f64) = {form.rect.x + clG.x + clG.width, form.rect.y + cl.low - 1, 2, cl.high - cl.low};
+
+                        &formData.highlights|:append(cursorRect);
+                        gui.setFormNeedsDraw(form);
+                    }
+                    else {
+                        cursorRect: gui.Rect!(f64) = {cl.glyphs.buf[0].x, form.rect.y + cl.low - 1, 2, cl.high - cl.low};
+
+                        &formData.highlights|:append(cursorRect);
+                        gui.setFormNeedsDraw(form);
+                    }
+                }
+                else if boundingRight|:contains(cast() context.mouse.x, cast() context.mouse.y) {
+                        cursorRect: gui.Rect!(f64) = {form.rect.x + g.x + g.width, form.rect.y + cl.low - 1, 2, cl.high - cl.low};
+
+                        &formData.highlights|:append(cursorRect);
+                        gui.setFormNeedsDraw(form);
                 }
             }
 
@@ -226,82 +263,58 @@ fn addTextEdit(rect: gui.Rect!(f64)) {
         }
     }
 
+    fn textUpdate(form: gui.Form, formData: *TextEditFormData, messageData: *none) {
+        formData.highlights.buf.count = 0;
+        form|gui.setFormNeedsDraw;
+    }
+
     formData: TextEditFormData;
     formData.highlights = buf.make!(gui.Rect!(f64))();
 
-    form := gui.makeForm(rect, nil);
+    form := gui.makeForm(rect, formData, true);
 
-    &form.receivers|:append({ gui.DRAW|string.strcpy, draw });
-    &form.receivers|:append({ gui.MOUSEMOVE|string.strcpy, mousemove });
-    &form.receivers|:append({ TEXT_UPDATE|string.strcpy, gui.setNeedsDraw });
+    form|gui.addReceiver(gui.DRAW, draw);
+    form|gui.addReceiver(gui.MOUSEMOVE, mousemove);
+    form|gui.addReceiver(TEXT_UPDATE, textUpdate);
 
     &context.forms|:append(form);
     &context.mousers|:append(form);
+
+    return form;
 }
 
--- todo(chad): forms should have an id...
-type SliderFormData struct {
-    id: i64,
+fn makeCursor(rect: gui.Rect!(f64)) {
+    fn draw(form: gui.Form, formData: *none, messageData: *none) {
+        for cursorInfo: cursorIterator() {
+            cursorRect: gui.Rect!(f64);
+            hasPrevious := false;
 
-    max: i64,
-    current: i64 = 0,
+            if context.tc.lineCache.buf.count > cursorInfo.row {
+                cl := context.tc.lineCache.buf[cursorInfo.row];
+                if cl.glyphs.buf.count >= cursorInfo.col {
+                    hasPrevious = true;
 
-    mouseDown := false,
-    grabberRect: gui.Rect!(f64)
-}
-
-fn addSlider(rect: gui.Rect!(f64), id: i64, max: i64) {
-    fn draw(form: gui.Form, formData: *SliderFormData, messageData: *none) {
-        -- magenta background
-        form|gui.drawRect(form.rect, 1, 0, 1);
-
-        -- set the max
-        formData.max = se.editor_buffer_get_undo_size(context.tc.eb);
-
-        -- cyan slider-grabber
-        formData.grabberRect = form.rect;
-        formData.grabberRect.x = form.rect.width * cast(f64) formData.current / cast(f64) formData.max;
-        formData.grabberRect.width = form.rect.width / cast() formData.max;
-        form|gui.drawRect(formData.grabberRect, 0, 1, 1);
-    }
-
-    fn mouseDown(form: gui.Form, formData: *SliderFormData, messageData: *MouseMessageData) {
-        if formData.grabberRect|gui.contains(messageData.x, messageData.y) {
-            formData.mouseDown = true;
-        }
-    }
-
-    fn mouseMove(form: gui.Form, formData: *SliderFormData, messageData: *MouseMessageData) {
-        if formData.mouseDown {
-            oldCurrent := formData.current;
-            formData.current = cast(i64) (cast(f64) messageData.x * cast(f64) formData.max / form.rect.width);
-
-            if oldCurrent != formData.current {
-                se.editor_buffer_undo(context.tc.eb, formData.current);
-
-                gui.setNeedsDraw(form, nil, nil);
-                gui.broadcast(TEXT_UPDATE);
+                    g := cl.glyphs.buf[cursorInfo.col - 1];
+                    cursorRect = {form.rect.x + g.x + g.width, form.rect.y + cl.low - 1, 2, cl.high - cl.low};
+                }
             }
+            if !hasPrevious {
+                cursorRect = {form.rect.x, form.rect.y + cast() (cast() cursorInfo.row * FONT_SIZE), 2, cast() FONT_SIZE};
+            }
+
+            alpha := (math.sin(cast(f64) context.elapsed / cast(f64) 30000) + 1.0) / 2.0;
+            form|gui.drawRect(cursorRect, 0.9, 0.9, 0.9, alpha);
         }
     }
 
-    fn mouseUp(form: gui.Form, formData: *SliderFormData, messageData: *MouseMessageData) {
-        formData.mouseDown = false;
-    }
+    form := gui.makeForm(rect, nil, true);
 
-    sfd: SliderFormData;
-    sfd.id = id;
-    sfd.max = max;
-    form := gui.makeForm(rect, sfd);
+    form|gui.addReceiver(gui.DRAW, draw);
 
-    &form.receivers|:append({ gui.DRAW|string.strcpy, draw });
-    &form.receivers|:append({ gui.MOUSEDOWN|string.strcpy, mouseDown });
-    &form.receivers|:append({ gui.MOUSEMOVE|string.strcpy, mouseMove });
-    &form.receivers|:append({ gui.MOUSEUP|string.strcpy, mouseUp });
-    &form.receivers|:append({ TEXT_UPDATE|string.strcpy, gui.setNeedsDraw });
-
-    &context.mousers|:append(form);
     &context.forms|:append(form);
+    &context.animators|:append(form);
+
+    return form;
 }
 
 fn loadFonts() {
@@ -340,13 +353,25 @@ fn mallocWithContext(n: i64) {
     return mem.malloc(n);
 }
 
+#context dt: i64
+#context elapsed: i64
+
 fn loop() {
     frame := 0;
 
     gui.drawAllForms();
 
+    #import "time";
+    start := time.clock();
+    lastFrameTime := start;
+
     event: sdl.Event;
     while true {
+        cur := time.clock();
+        context.dt = cur - lastFrameTime;
+        context.elapsed = cur - start;
+        lastFrameTime = time.clock();
+
         -- reset temporary storage
         basic.resetTmp();
 
@@ -364,7 +389,7 @@ fn loop() {
                 if !(mouseEvent.xrel == 0 and mouseEvent.yrel == 0) {
                     sdl.SDL_GetMouseState(&context.mouse.x, &context.mouse.y);
 
-                    mmd: MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
+                    mmd: gui.MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
                     for form: context.mousers.buf {
                         form|gui.sendMessage(cast() {gui.MOUSEMOVE, &mmd});
                     }
@@ -373,9 +398,9 @@ fn loop() {
             else if event._type == sdl.MOUSEBUTTONDOWN {
                 mouseEvent := cast(*sdl.MouseButtonEvent) &event;
 
-                mmd: MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
+                mmd: gui.MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
                 for form: context.mousers.buf {
-                    if form.rect|gui.contains(mmd.x, mmd.y) {
+                    if form.rect|:contains(mmd.x, mmd.y) {
                         form|gui.sendMessage(cast() {gui.MOUSEDOWN, &mmd});
                     }
                 }
@@ -383,7 +408,7 @@ fn loop() {
             else if event._type == sdl.MOUSEBUTTONUP {
                 mouseEvent := cast(*sdl.MouseButtonEvent) &event;
 
-                mmd: MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
+                mmd: gui.MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
                 for form: context.mousers.buf {
                     form|gui.sendMessage(cast() {gui.MOUSEUP, &mmd});
                 }
@@ -405,6 +430,22 @@ fn loop() {
                 }
                 else if keyboardEvent.keysym.scancode == sdl.Key.ENTER {
                     se.editor_buffer_insert(context.tc.eb, "\n\0".data);
+                }
+                else if keyboardEvent.keysym.scancode == sdl.Key.LEFT {
+                    se.editor_buffer_set_cursor_pos_relative(context.tc.eb, -1);
+                }
+                else if keyboardEvent.keysym.scancode == sdl.Key.RIGHT {
+                    se.editor_buffer_set_cursor_pos_relative(context.tc.eb, 1);
+                }
+                else if keyboardEvent.keysym.scancode == sdl.Key.UP {
+                    for ci: iter.withIndex(cursorIterator()) {
+                        se.editor_buffer_set_cursor_point_for_cursor_index(context.tc.eb, ci.index, ci.it.row - 1, ci.it.col);
+                    }
+                }
+                else if keyboardEvent.keysym.scancode == sdl.Key.DOWN {
+                    for ci: iter.withIndex(cursorIterator()) {
+                        se.editor_buffer_set_cursor_point_for_cursor_index(context.tc.eb, ci.index, ci.it.row + 1, ci.it.col);
+                    }
                 }
                 else if keyboardEvent.keysym.scancode|:isalpha {
                     se.editor_buffer_insert(context.tc.eb, :charsFor(keyboardEvent.keysym.scancode));
@@ -429,6 +470,53 @@ fn init() {
     loadFonts();
 }
 
+sliderBackground: gui.Color = {0.4235, 0.4275, 0.4117};
+sliderForeground: gui.Color = {0.8686, 0.7686, 0.7647};
+
+fn makeUndoSlider(rect: gui.Rect!(f64)) {
+    sl := slider.create(rect, 50, sliderBackground, sliderForeground);
+
+    sl|gui.addReceiver(
+        TEXT_UPDATE,
+        fn(form: gui.Form, formData: *slider.SliderFormData, messageData: *none) {
+            -- set the max and the current
+            formData.max = context.tc.eb.undo.length;
+            formData.current = ^context.tc.eb.undoIdx;
+            form|gui.setFormNeedsDraw;
+        }
+    );
+
+    sl|gui.addReceiver(
+        slider.VALUE_UPDATE,
+        fn(form: gui.Form, formData: *slider.SliderFormData, messageData: *gui.MouseMessageData) {
+            gui.broadcast(TEXT_UPDATE);
+            se.editor_buffer_undo(context.tc.eb, formData.current);
+        }
+    );
+}
+
+fn makeGlobalUndoSlider(rect: gui.Rect!(f64)) {
+    sl := slider.create(rect, 50, sliderBackground, sliderForeground);
+
+    sl|gui.addReceiver(
+        TEXT_UPDATE,
+        fn(form: gui.Form, formData: *slider.SliderFormData, messageData: *none) {
+            -- set the max and the current
+            formData.max = context.tc.eb.globalUndo.length;
+            formData.current = ^context.tc.eb.globalUndoIdx;
+            form|gui.setFormNeedsDraw;
+        }
+    );
+
+    sl|gui.addReceiver(
+        slider.VALUE_UPDATE,
+        fn(form: gui.Form, formData: *slider.SliderFormData, messageData: *gui.MouseMessageData) {
+            gui.broadcast(TEXT_UPDATE);
+            se.editor_buffer_global_undo(context.tc.eb, formData.current);
+        }
+    );
+}
+
 fn main() {
     basic.initContext();
 
@@ -439,16 +527,20 @@ fn main() {
     #import "iter";
     random.seed();
 
-    rect : gui.Rect!(f64) = {0, 0, 1, 0.1};
-    addSlider(rect, 0, 50);
+    rect: gui.Rect!(f64) = {0, 0, 1, 0.075};
+    makeGlobalUndoSlider(rect);
+
+    rect = {0, 0.075, 1, 0.075};
+    makeUndoSlider(rect);
 
     formRect: gui.Rect!(f64) = {
         x:      0,
-        y:      0.1,
+        y:      0.15,
         width:  1.0,
         height: 0.9
     };
-    addTextEdit(formRect);
+    makeTextEdit(formRect);
+    makeCursor(formRect);
 
     loop();
 

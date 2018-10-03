@@ -174,7 +174,7 @@ fn print(t: !T) {
     #if #iskind(T, i8) {
         putchar(t);
     }
-    else #if #iskind(T, i16) or #iskind(T, i32) or #iskind(T, i64) {
+    else #if #iskind(T, i16) or #iskind(T, i32) or #iskind(T, i64) or #iskind(T, u8) or #iskind(T, u16) or #iskind(T, u32) or #iskind(T, u64) {
         printInt(t);
     }
     else #if #iskind(T, f32) {

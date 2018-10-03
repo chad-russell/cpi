@@ -1,0 +1,71 @@
+#import "gui/gui";
+#import "string";
+
+VALUE_UPDATE := "value_update";
+
+type SliderFormData struct {
+    max: i64,
+    current: i64 = 0,
+
+    bgColor: gui.Color,
+    fgColor: gui.Color,
+
+    grabberRect: gui.Rect!(f64)
+}
+
+fn draw(form: gui.Form, formData: *SliderFormData, messageData: *none) {
+    -- background
+    form|gui.drawRect(form.rect, formData.bgColor.r, formData.bgColor.g, formData.bgColor.b);
+
+    -- slider-grabber
+    formData.grabberRect = form.rect;
+    formData.grabberRect.x = (form.rect.width - 10) * cast(f64) formData.current / cast(f64) (formData.max - 1);
+    formData.grabberRect.width = 10;
+    form|gui.drawRect(formData.grabberRect, formData.fgColor.r, formData.fgColor.g, formData.fgColor.b);
+}
+
+fn mouseDown(form: gui.Form, formData: *SliderFormData, messageData: *gui.MouseMessageData) {
+    if formData.grabberRect|:contains(messageData.x, messageData.y) {
+        form|gui.addReceiver(gui.MOUSEMOVE|string.strcpy, mouseMove);
+        form|gui.addReceiver(gui.MOUSEUP|string.strcpy, mouseUp);
+    }
+}
+
+type ValueUpdateData struct {
+    old: i64,
+    new: i64,
+    form: gui.Form
+}
+
+fn mouseMove(form: gui.Form, formData: *SliderFormData, messageData: *gui.MouseMessageData) {
+    oldCurrent := formData.current;
+    formData.current = cast(i64) (cast(f64) messageData.x * cast(f64) formData.max / form.rect.width);
+
+    if oldCurrent != formData.current {
+        gui.setFormNeedsDraw(form);
+
+        form|gui.sendMessage(cast() { VALUE_UPDATE, &formData.current });
+    }
+}
+
+fn mouseUp(form: gui.Form, formData: *SliderFormData, messageData: *gui.MouseMessageData) {
+    form|gui.removeReceiver(gui.MOUSEMOVE|string.strcpy);
+    form|gui.removeReceiver(gui.MOUSEUP|string.strcpy);
+}
+
+fn create(rect: gui.Rect!(f64), max: i64, bgColor: gui.Color, fgColor: gui.Color) {
+    sfd: SliderFormData;
+    sfd.max = max;
+    sfd.bgColor = bgColor;
+    sfd.fgColor = fgColor;
+
+    form := gui.makeForm(rect, sfd);
+
+    form|gui.addReceiver(gui.DRAW|string.strcpy, draw);
+    form|gui.addReceiver(gui.MOUSEDOWN|string.strcpy, mouseDown);
+
+    context.mousers|:append(form);
+    context.forms|:append(form);
+
+    return form;
+}

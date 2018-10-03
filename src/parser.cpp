@@ -672,7 +672,9 @@ Node *Parser::parseTypeDecl() {
     typeDecl->typeData.name = typeName;
     typeDecl->region = Region{lexer->srcInfo, saved, typeDecl->region.end};
 
-    maybeAddAutoPolyForTypeDecl(ctParams, typeDecl->typeData.structTypeData.params);
+    if (typeDecl->typeData.kind == NodeTypekind::STRUCT) {
+        maybeAddAutoPolyForTypeDecl(ctParams, typeDecl->typeData.structTypeData.params);
+    }
 
     if (ctParams.length == 0) {
         scopes.pop();
@@ -1653,9 +1655,13 @@ Node *Parser::parseIsKind() {
     expect(LexerTokenType::COMMA, ",");
 
     if (lexer->front.type == LexerTokenType::I8
+        || lexer->front.type == LexerTokenType::U8
         || lexer->front.type == LexerTokenType::I16
+        || lexer->front.type == LexerTokenType::U16
         || lexer->front.type == LexerTokenType::I32
+        || lexer->front.type == LexerTokenType::U32
         || lexer->front.type == LexerTokenType::I64
+        || lexer->front.type == LexerTokenType::U64
         || lexer->front.type == LexerTokenType::F32
         || lexer->front.type == LexerTokenType::F64
         || lexer->front.type == LexerTokenType::BOOLEAN

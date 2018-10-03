@@ -24,3 +24,51 @@ fn range(start: i64, end: i64) {
         r.start += 1;
     }
 }
+
+fn zip(r1: !R1, r2: !R2) {
+    type Zip struct{
+        r1: R1,
+        r2: R2
+    }
+
+    #attr(Zip) {
+        fn empty(z: Zip) {
+            return z.r1|:empty or z.r2|:empty;
+        }
+
+        fn front(z: Zip) {
+            return {first: z.r1|:front, second: z.r2|:front};
+        }
+
+        fn popFront(z: *Zip) {
+            &z.r1|:popFront;
+            &z.r2|:popFront;
+        }
+    }
+
+    return cast(Zip) { r1, r2 };
+}
+
+fn withIndex(r: !R) {
+    type WithIndex struct{
+        r: R,
+        index: i64
+    }
+
+    #attr(WithIndex) {
+        fn empty(wi: WithIndex) {
+            return wi.r|:empty;
+        }
+
+        fn front(wi: WithIndex) {
+            return {it: wi.r|:front, index: wi.index};
+        }
+
+        fn popFront(wi: *WithIndex) {
+            &wi.r|:popFront;
+            wi.index += 1;
+        }
+    }
+
+    return cast(WithIndex) { r, 0 };
+}

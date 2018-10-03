@@ -38,23 +38,23 @@ type GlyphExtents struct {
 }
 
 type Operator enum(i32) {
-    CAIRO_OPERATOR_CLEAR: 0,
+    CLEAR: 0,
 
-    CAIRO_OPERATOR_SOURCE,
-    CAIRO_OPERATOR_OVER,
-    CAIRO_OPERATOR_IN,
-    CAIRO_OPERATOR_OUT,
-    CAIRO_OPERATOR_ATOP,
+    SOURCE: 1,
+    OVER: 2,
+    IN: 3,
+    OUT: 4,
+    ATOP: 5,
 
-    CAIRO_OPERATOR_DEST,
-    CAIRO_OPERATOR_DEST_OVER,
-    CAIRO_OPERATOR_DEST_IN,
-    CAIRO_OPERATOR_DEST_OUT,
-    CAIRO_OPERATOR_DEST_ATOP,
+    DEST: 6,
+    DEST_OVER: 7,
+    DEST_IN: 8,
+    DEST_OUT: 9,
+    DEST_ATOP: 10,
 
-    CAIRO_OPERATOR_XOR,
-    CAIRO_OPERATOR_ADD,
-    CAIRO_OPERATOR_SATURATE
+    XOR: 11,
+    ADD: 12,
+    SATURATE: 13
 }
 
 fn cairo_ft_font_face_create_for_ft_face(face: ft.Face, loadFlags: i32) *FontFace

@@ -3004,6 +3004,12 @@ void resolveDot(Semantic *semantic, Node *node, Node *lhs, Node *rhs) {
     // follow the lhs all the way through pointers, symbols, etc. and assert it's a struct
     if (!semantic->lvalueAssignmentContext) {
         resolvedLhsTypeInfo = resolve(resolvedLhs->typeInfo);
+
+        if (resolvedLhsTypeInfo == nullptr) {
+            semantic->reportError({node}, Error{node->region, "Could not resolve dot"});
+            return;
+        }
+
         while (resolvedLhsTypeInfo->typeData.kind == NodeTypekind::POINTER) {
             resolvedLhsTypeInfo = resolve(resolvedLhsTypeInfo->typeData.pointerTypeData.underlyingType);
         }
