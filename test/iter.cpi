@@ -49,6 +49,29 @@ fn zip(r1: !R1, r2: !R2) {
     return cast(Zip) { r1, r2 };
 }
 
+fn byRef(T := typeof(arr[0]))(arr: []T) {
+    type ByRef struct {
+        target: []T,
+        current := 0
+    }
+
+    #attr(ByRef) {
+        fn empty(b: ByRef) {
+            return b.current >= b.target.count;
+        }
+
+        fn front(b: ByRef) {
+            return &b.target[b.current];
+        }
+
+        fn popFront(b: *ByRef) {
+            b.current += 1;
+        }
+    }
+
+    return cast(ByRef) { arr };
+}
+
 fn withIndex(r: !R) {
     type WithIndex struct{
         r: R,

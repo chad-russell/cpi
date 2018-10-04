@@ -1091,6 +1091,7 @@ fn testBuffer() {
     got := &b|:get(200);
 
     assert((&b|:get(200)).x == 3);
+    assert((:get(b, 200)).x == 3);
     assert((#attrof(typeof(&b), get)(&b, 200)).x == 3);
 
     assert(got.x == 3);

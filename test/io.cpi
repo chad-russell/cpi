@@ -9,6 +9,8 @@ SEEK_SET: i32 = 0;
 SEEK_CUR: i32 = 1;
 SEEK_END: i32 = 2;
 
+ENDL := "\n";
+
 fn fopen(filename: *i8, mode: *i8) *File
 fn fclose(file: *File) i32
 fn fseek(file: *File, offset: i64, whence: i32) i32
@@ -16,14 +18,6 @@ fn ftell(file: *File) i64
 fn rewind(file: *File) none
 fn fread(ptr: *i8, size: i64, nitems: i64, file: *File) i64
 fn printf(str: *i8) none
-
-fn strcpy(str: []i8) {
-    new: []i8;
-    new.count = str.count;
-    new.data = mem.alloc!(i8)(new.count);
-    mem.memcpy(dst: new.data, src: str.data, n: new.count * sizeof(i8));
-    return new;
-}
 
 fn putchar(c: i8) {
     ch := ".";
@@ -171,6 +165,11 @@ fn printPointer(t: !T) {
 }
 
 fn print(t: !T) {
+    #if #hasattr(T, print) {
+        t|:print;
+        return;
+    }
+
     #if #iskind(T, i8) {
         putchar(t);
     }

@@ -213,6 +213,7 @@ enum class LexerTokenType : int32_t {
     HASATTR,
     CONTEXT,
     CONTEXT_INIT,
+    TYPE_STMT,
 };
 
 struct SourceInfo {

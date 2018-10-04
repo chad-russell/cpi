@@ -1780,6 +1780,11 @@ Node *Parser::parseLvalueOrLiteral() {
         return parseHasAttr();
     }
 
+    if (lexer->front.type == LexerTokenType::TYPE_STMT) {
+        lexer->popFront();
+        return parseType();
+    }
+
     auto saved = lexer->front.region.start;
     Node *symbol = nullptr;
 

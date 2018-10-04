@@ -1,4 +1,8 @@
 TODO:
+    - #attr param should be inferred based on fn args
+
+    -- mulitple + and - with pointers does not work!!
+
     - relative import directories don't really work if you're already inside a directory
         - e.g. #import "foo/foo", and foo/foo.cpi has #import "bar"
         - would want this to be "foo/bar"

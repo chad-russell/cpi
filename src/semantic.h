@@ -32,6 +32,9 @@ public:
 
     vector_t<StructTypeData> structsToSize = vector_init<StructTypeData>(256);
 
+    bool canRun = false;
+    vector_t<Node *> runLaters = vector_init<Node *>(16);
+
     Lexer *lexer = nullptr;
     Parser *parser = nullptr;
 
@@ -53,5 +56,6 @@ bool assignParams(Semantic *semantic, Node *errorReportTarget, const vector_t<No
 Node *constantize(Semantic *semantic, Node *node);
 bool typesMatch(Node *desired, Node *actual, Semantic *semantic, bool reportError = true);
 void maybeStructDefault(Semantic *semantic, Node *rhs, Node *lhsType);
+Node *resolveSymbolWithScopeType(Semantic *semantic, int64_t atom, Node *firstParam);
 
 #endif // SEMANTIC_H

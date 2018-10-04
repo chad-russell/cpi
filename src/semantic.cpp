@@ -1013,46 +1013,27 @@ Node *findAttr(Semantic *semantic, Node *node) {
 
     auto resolvedTarget = resolve(node->attrofData.target);
 
-    vector_t<Node *> attributes;
-    if (resolvedTarget->type == NodeType::TYPE) {
-        while (resolvedTarget->typeData.kind == NodeTypekind::POINTER) {
-            resolvedTarget = resolvedTarget->typeData.pointerTypeData.underlyingType;
+    while (resolvedTarget->type == NodeType::TYPE && (resolvedTarget->typeData.kind == NodeTypekind::POINTER || resolvedTarget->typeData.polyCameFrom != nullptr)) {
+        if (resolvedTarget->typeData.kind == NodeTypekind::POINTER) {
+            resolvedTarget = resolve(resolvedTarget->typeData.pointerTypeData.underlyingType);
         }
-
-        attributes = *resolvedTarget->typeData.attributes;
+        else {
+            resolvedTarget = resolve(resolvedTarget->typeData.polyCameFrom);
+        }
     }
-    else if (resolvedTarget->type == NodeType::PARAMETERIZED_TYPE) {
-        attributes = resolvedTarget->parameterizedTypeData.attributes;
+
+    vector_t<Node *> attrs;
+    if (resolvedTarget->type == NodeType::TYPE) {
+        attrs = *resolvedTarget->typeData.attributes;
     }
     else {
-        cpi_assert(false);
+        cpi_assert(resolvedTarget->type == NodeType::PARAMETERIZED_TYPE);
+        attrs = resolvedTarget->parameterizedTypeData.attributes;
     }
 
-    for (auto attr : attributes) {
-        if (attr->type == NodeType::FN_DECL) {
-            auto fnNameAtomId = attr->fnDeclData.name->symbolData.atomId;
-
-            if (fnNameAtomId == attrAtomId) {
-                return attr;
-            }
-        }
-
-        // todo(chad): handle other node types too
-    }
-
-    if (resolvedTarget->type == NodeType::TYPE && resolvedTarget->typeData.polyCameFrom != nullptr) {
-        attributes = resolvedTarget->typeData.polyCameFrom->parameterizedTypeData.attributes;
-
-        for (auto attr : attributes) {
-            if (attr->type == NodeType::FN_DECL) {
-                auto fnNameAtomId = attr->fnDeclData.name->symbolData.atomId;
-
-                if (fnNameAtomId == attrAtomId) {
-                    return attr;
-                }
-            }
-
-            // todo(chad): handle other node types too
+    for (auto attr : attrs) {
+        if (attr->fnDeclData.name->symbolData.atomId == attrAtomId) {
+            return attr;
         }
     }
 
@@ -1370,7 +1351,6 @@ Node *constantize(Semantic *semantic, Node *node) {
                            && resolvedTypeInfo->typeData.structTypeData.secretArrayElementType->typeData.kind == NodeTypekind::I8;
 
     if (typeKind == NodeTypekind::POINTER
-//        || (typeKind == NodeTypekind::STRUCT && !isStringLiteral)
         || typeKind == NodeTypekind::FN
         || typeKind == NodeTypekind::SYMBOL
         || typeKind == NodeTypekind::DOT) {
@@ -1517,6 +1497,9 @@ Node *constantize(Semantic *semantic, Node *node) {
         auto staticValue = interp->readFromStack<float>(copied->localOffset);
         staticNode->type = NodeType::FLOAT_LITERAL;
         staticNode->floatLiteralData.value = staticValue;
+    }
+    else if (resolvedTypeInfo->typeData.kind == NodeTypekind::NONE) {
+        staticNode->type = NodeType::NIL_LITERAL;
     }
 
     semantic->resolveTypes(staticNode);
@@ -2309,6 +2292,9 @@ Node *resolveSymbolWithScopeType(Semantic *semantic, int64_t atom, Node *firstPa
     semantic->resolveTypes(firstParam);
 
     auto resolvedScopeType = resolve(firstParam->typeInfo);
+    if (resolvedScopeType == nullptr) {
+        semantic->reportError({firstParam}, Error{firstParam->region, "Expected a type"});
+    }
     while (resolvedScopeType->type == NodeType::TYPE && (resolvedScopeType->typeData.kind == NodeTypekind::POINTER || resolvedScopeType->typeData.polyCameFrom != nullptr)) {
         if (resolvedScopeType->typeData.kind == NodeTypekind::POINTER) {
             resolvedScopeType = resolve(resolvedScopeType->typeData.pointerTypeData.underlyingType);
@@ -3680,6 +3666,11 @@ void resolvePuts(Semantic *semantic, Node *node) {
 }
 
 void resolveRun(Semantic *semantic, Node *node) {
+    if (!semantic->canRun) {
+        vector_append(semantic->runLaters, node);
+        return;
+    }
+
     semantic->resolveTypes(node->nodeData);
 
     cpi_assert(node->nodeData->type == NodeType::FN_CALL);

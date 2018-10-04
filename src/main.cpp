@@ -236,12 +236,18 @@ int main(int argc, char **argv) {
             semantic->resolveTypes(impl);
         }
 
-        for (auto tl : parser->allTopLevel) {
+        for (auto tl: parser->allTopLevel) {
             semantic->resolveTypes(tl);
         }
 
         vector_append(semantic->structsToSize, semantic->contextType->typeData.structTypeData);
         semantic->sizeStructs();
+
+        semantic->canRun = true;
+        for (auto r: semantic->runLaters) {
+            r->semantic = false;
+            semantic->resolveTypes(r);
+        }
 
         if (semantic->encounteredErrors) { return -1; }
 

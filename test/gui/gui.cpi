@@ -42,27 +42,30 @@ fn contains(T := typeof(r.x))(r: !R/Rect, x: T, y: T) {
 }
 
 fn intersects(r1: !R/Rect, r2: R) {
+    xIntercept := false;
+    yIntercept := false;
+
     -- left edge of r1 within r2
-    if r1.x >= r2.x and r1.x <= r2.x + r2.width {
-        return true;
+    if r1.x > r2.x and r1.x < r2.x + r2.width {
+        xIntercept = true;
     }
 
     -- right edge of r1 within r2
-    if r1.x + r1.width >= r2.x and r1.x + r1.width <= r2.x + r2.width {
-        return true;
+    if r1.x + r1.width > r2.x and r1.x + r1.width < r2.x + r2.width {
+        xIntercept = true;
     }
 
     -- top edge of r1 within r2
-    if r1.y >= r2.y and r1.y <= r2.y + r2.height {
-        return true;
+    if r1.y > r2.y and r1.y < r2.y + r2.height {
+        yIntercept = true;
     }
 
     -- bottom edge of r1 within r2
-    if r1.y + r1.height >= r2.y and r1.y + r1.height <= r2.y + r2.height {
-        return true;
+    if r1.y + r1.height > r2.y and r1.y + r1.height < r2.y + r2.height {
+        yIntercept = true;
     }
 
-    return false;
+    return xIntercept and yIntercept;
 }
 }
 
@@ -76,7 +79,7 @@ type Message struct {
     data: *none
 }
 
-type ReceiverHandler fn(form: Form, formData: *none, messageData: *none) none
+type ReceiverHandler fn(formId: i64, formData: *none, messageData: *none) none
 
 type Receiver struct {
     name: []i8,
@@ -96,18 +99,23 @@ type Form struct {
     data: *none,
 }
 
-fn addReceiver(f: Form, name: []i8, handler: ReceiverHandler) {
-    f.receivers|:append({ name|string.strcpy, handler });
+fn addReceiver(formId: i64, name: []i8, handler: ReceiverHandler) {
+    context.forms.buf[formId].receivers|:append({ name|string.strcpy, handler });
 }
 
-fn removeReceiver(f: Form, name: []i8) {
+fn removeReceiver(formId: i64, name: []i8) {
+    f := &context.forms.buf[formId];
+
     count := f.receivers.buf.count;
     f.receivers.buf.count = 0;
 
     i := 0;
     while i < count {
         it := f.receivers.buf[i];
-        if !string.streq(it.name, name) {
+        if string.streq(it.name, name) {
+            mem.free(it.name.data);
+        }
+        else {
             f.receivers|:append(it);
         }
         i += 1;
@@ -115,10 +123,9 @@ fn removeReceiver(f: Form, name: []i8) {
 }
 
 #context forms: *buf.Buffer!(Form)
-#context drawers: *buf.Buffer!(Form)
-#context mousers: *buf.Buffer!(Form)
-#context animators: *buf.Buffer!(Form)
-#context layerables: *buf.Buffer!(Form)
+#context drawers: *buf.Buffer!(i64)
+#context mousers: *buf.Buffer!(i64)
+#context animators: *buf.Buffer!(i64)
 
 #context formDatas: basic.Region
 
@@ -141,7 +148,12 @@ fn makeForm(r: Rect!(f64), data: !T, ownLayer := false) {
     xScale := cast(f64) context.sdl.surface.w / context.sdl.xScale;
     yScale := cast(f64) context.sdl.surface.h / context.sdl.yScale;
 
-    scaled: Rect!(f64) = {r.x * xScale, r.y * yScale, r.width * xScale, r.height * yScale};
+    scaled: Rect!(f64) = {
+        r.x * xScale,
+        r.y * yScale,
+        r.width * xScale,
+        r.height * yScale
+    };
 
     f: Form;
     f.rect = scaled;
@@ -159,17 +171,18 @@ fn makeForm(r: Rect!(f64), data: !T, ownLayer := false) {
     ^(cast(*T) context.formDatas.current) = data;
     context.formDatas.current += sizeof(T);
 
-    if ownLayer {
-        context.layerables|:append(f);
-    }
+    &context.forms|:append(f);
+    id := context.forms.buf.count - 1;
 
-    return f;
+    return id;
 }
 
-fn sendMessage(form: Form, message: Message) {
+fn sendMessage(formId: i64, message: Message) {
+    form := &context.forms.buf[formId];
+
     for r: form.receivers.buf {
         if string.streq(message.name, r.name) {
-            r.handle(form, form.data, message.data);
+            r.handle(formId, form.data, message.data);
         }
     }
 }
@@ -180,69 +193,62 @@ fn broadcast(name: []i8, data := nil) {
 
 fn processMessages() {
     for message: context.messages.buf {
-        for form: context.forms.buf {
-            sendMessage(form, message);
+        for id: iter.until(context.forms.buf.count) {
+            sendMessage(id, message);
         }
     }
 }
 
+fn drawForm(formId: i64) {
+    form := &context.forms.buf[formId];
+
+    formId|clearForm;
+    sendMessage(formId, {DRAW, nil});
+
+    if form.layer != &context.cairo.layer {
+        cairo.cairo_set_source(context.cairo.layer.context, form.layer.pattern);
+        cairo.cairo_rectangle(context.cairo.layer.context, form.rect.x, form.rect.y, form.rect.width, form.rect.height);
+        cairo.cairo_fill(context.cairo.layer.context);
+    }
+}
+
 fn drawAllForms() {
-    for form: context.forms.buf {
-        form|clearForm;
-        sendMessage(form, {DRAW, nil});
+    for form: iter.until(context.forms.buf.count) {
+        drawForm(form);
     }
 
     commit();
 }
 
 fn drawUpdatedForms() {
-    cairo.cairo_save(context.cairo.layer.context);
-    defer { cairo.cairo_restore(context.cairo.layer.context); }
-    cairo.cairo_set_operator(context.cairo.layer.context, cairo.Operator.OVER);
-
     update := false;
 
     for form: context.drawers.buf {
         update = true;
-
-        form|clearForm;
-        &context.cairo.layer|clearRect(form.rect);
-
-        sendMessage(form, {DRAW, nil});
+        drawForm(form);
     }
 
-    for form: context.animators.buf {
+    for animatorId: context.animators.buf {
         update = true;
 
-        form|clearForm;
-        sendMessage(form, {DRAW, nil});
-    }
+        for coveringId: iter.until(context.forms.buf.count) {
+            covering := &context.forms.buf[coveringId];
+            animator := &context.forms.buf[animatorId];
 
-    -- todo(chad): make this fast
-    for layerable: context.layerables.buf {
-        for form: context.forms.buf {
-            if layerable.rect|:intersects(form.rect) {
-                update = true;
-
+            if animator.rect|:intersects(covering.rect) {
                 -- if it has it's own form then no need to explicitly redraw. Otherwise, redraw
-                if form.layer != &context.cairo.layer {
-                    cairo.cairo_set_source(context.cairo.layer.context, form.layer.pattern);
-                    cairo.cairo_rectangle(context.cairo.layer.context, form.rect.x, form.rect.y, form.rect.width, form.rect.height);
+                if covering.layer != &context.cairo.layer {
+                    cairo.cairo_set_source(context.cairo.layer.context, covering.layer.pattern);
+                    cairo.cairo_rectangle(context.cairo.layer.context, animator.rect.x, animator.rect.y, animator.rect.width, animator.rect.height);
                     cairo.cairo_fill(context.cairo.layer.context);
                 }
                 else {
-                    form|clearForm;
-                    sendMessage(form, {DRAW, nil});
+                    drawForm(coveringId);
                 }
             }
         }
-    }
-    for layerable: context.layerables.buf {
-        update = true;
 
-        cairo.cairo_set_source(context.cairo.layer.context, layerable.layer.pattern);
-        cairo.cairo_rectangle(context.cairo.layer.context, layerable.rect.x, layerable.rect.y, layerable.rect.width, layerable.rect.height);
-        cairo.cairo_fill(context.cairo.layer.context);
+        drawForm(animatorId);
     }
 
     -- todo(chad): `if update {` doesn't work... :(
@@ -251,12 +257,12 @@ fn drawUpdatedForms() {
     }
 }
 
-fn setNeedsDraw(form: Form, formData: *none, messageData: *none) {
-    &context.drawers|:append(form);
+fn setNeedsDraw(formId: i64, formData: *none, messageData: *none) {
+    &context.drawers|:append(formId);
 }
 
-fn setFormNeedsDraw(form: Form) {
-    &context.drawers|:append(form);
+fn setFormNeedsDraw(formId: i64) {
+    &context.drawers|:append(formId);
 }
 
 #context sdl: struct {
@@ -360,10 +366,9 @@ fn initContext() {
     context.formDatas.current = context.formDatas.data;
 
     context.forms = buf.make!(Form)();
-    context.drawers = buf.make!(Form)();
-    context.mousers = buf.make!(Form)();
-    context.animators = buf.make!(Form)();
-    context.layerables = buf.make!(Form)();
+    context.drawers = buf.make!(i64)();
+    context.mousers = buf.make!(i64)();
+    context.animators = buf.make!(i64)();
 }
 
 fn init() {
@@ -372,7 +377,9 @@ fn init() {
     initCairo();
 }
 
-fn drawRect(form: Form, rect: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1) {
+fn drawRect(formId: i64, rect: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1) {
+    form := &context.forms.buf[formId];
+
     cairo.cairo_save(form.layer.context);
     defer { cairo.cairo_restore(form.layer.context); }
 
@@ -406,6 +413,7 @@ fn clearRect(layer: *Layer, rect: Rect!(f64)) {
     cairo.cairo_fill(layer.context);
 }
 
-fn clearForm(f: Form) {
-    clearRect(f.layer, f.rect);
+fn clearForm(formId: i64) {
+    form := &context.forms.buf[formId];
+    clearRect(form.layer, form.rect);
 }
