@@ -88,3 +88,7 @@ fn cairo_image_surface_get_width(surface: *Surface) i32
 fn cairo_image_surface_get_height(surface: *Surface) i32
 fn cairo_glyph_extents(cr: *Context, glyphs: *Glyph, numGlyphs: i32, extents: *GlyphExtents) none
 fn cairo_set_operator(cr: *Context, operator: Operator) none
+fn cairo_set_line_width(cr: *Context, w: f64) none
+fn cairo_move_to(cr: *Context, x: f64, y: f64) none
+fn cairo_line_to(cr: *Context, x: f64, y: f64) none
+fn cairo_stroke(cr: *Context) none

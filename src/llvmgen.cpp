@@ -1206,9 +1206,13 @@ void LlvmGen::gen(Node *node) {
 
             if (node->typeInfo->typeData.kind == NodeTypekind::INT_LITERAL
                 || node->typeInfo->typeData.kind == NodeTypekind::I8
+                || node->typeInfo->typeData.kind == NodeTypekind::U8
                 || node->typeInfo->typeData.kind == NodeTypekind::I16
+                || node->typeInfo->typeData.kind == NodeTypekind::U16
                 || node->typeInfo->typeData.kind == NodeTypekind::I32
-                || node->typeInfo->typeData.kind == NodeTypekind::I64) {
+                || node->typeInfo->typeData.kind == NodeTypekind::U32
+                || node->typeInfo->typeData.kind == NodeTypekind::I64
+                || node->typeInfo->typeData.kind == NodeTypekind::U64) {
                 node->llvmData = builder.CreateNeg(rvalueFor(node->unaryNegData.target));
             } else if (node->typeInfo->typeData.kind == NodeTypekind::FLOAT_LITERAL
                        || node->typeInfo->typeData.kind == NodeTypekind::F32

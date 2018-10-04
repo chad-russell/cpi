@@ -19,6 +19,8 @@ void interpretMathAdd(Interpreter *interp);
 
 void interpretMathAddSI64(Interpreter *interp);
 
+void interpretMathSubSI64(Interpreter *interp);
+
 template <typename T>
 void interpretMathSub(Interpreter *interp);
 
@@ -200,6 +202,7 @@ public:
                 interpretMathAdd<int64_t>,
                 interpretMathAddSI64,
                 interpretMathSub<int64_t>,
+                interpretMathSubSI64,
                 interpretMathMul<int64_t>,
                 interpretMathDiv<uint64_t>,
                 interpretMathDiv<int64_t>,

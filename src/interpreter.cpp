@@ -893,15 +893,27 @@ void interpretConvert(Interpreter *interp) {
         case NodeTypekind::I8: {
             interpretConvertFrom<int8_t>(fromAddr, toAddr, toType);
         } break;
+        case NodeTypekind::U8: {
+            interpretConvertFrom<uint8_t>(fromAddr, toAddr, toType);
+        } break;
         case NodeTypekind::I16: {
             interpretConvertFrom<int16_t>(fromAddr, toAddr, toType);
+        } break;
+        case NodeTypekind::U16: {
+            interpretConvertFrom<uint16_t>(fromAddr, toAddr, toType);
         } break;
         case NodeTypekind::I32: {
             interpretConvertFrom<int32_t>(fromAddr, toAddr, toType);
         } break;
+        case NodeTypekind::U32: {
+            interpretConvertFrom<uint32_t>(fromAddr, toAddr, toType);
+        } break;
         case NodeTypekind::INT_LITERAL: // todo(chad): why are there still INT_LITERAL types at this point?
         case NodeTypekind::I64: {
             interpretConvertFrom<int64_t>(fromAddr, toAddr, toType);
+        } break;
+        case NodeTypekind::U64: {
+            interpretConvertFrom<uint64_t>(fromAddr, toAddr, toType);
         } break;
         case NodeTypekind::FLOAT_LITERAL:
         case NodeTypekind::F32: {
@@ -1089,6 +1101,15 @@ void interpretMathAddSI64(Interpreter *interp) {
     auto b = interp->read<int64_t>();
     auto c = interp->consume<int32_t>();
     auto result = a + b * c;
+    auto storeOffset = interp->consume<int64_t>();
+    interp->copyToStack(result, interp->bp + storeOffset);
+}
+
+void interpretMathSubSI64(Interpreter *interp) {
+    auto a = interp->read<int64_t>();
+    auto b = interp->read<int64_t>();
+    auto c = interp->consume<int32_t>();
+    auto result = a - b * c;
     auto storeOffset = interp->consume<int64_t>();
     interp->copyToStack(result, interp->bp + storeOffset);
 }

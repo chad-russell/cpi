@@ -1136,13 +1136,17 @@ void Parser::possiblyInsertDeferreds(Node *node, bool isReturn) {
     if (isReturn) {
         while (!scope->isFunctionScope) {
             for (auto i = static_cast<int64_t>(scope->deferredStmts.length - 1); i >= 0; i--) {
-                vector_append(node->preStmts, vector_at(scope->deferredStmts, static_cast<unsigned long>(i)));
+                auto stmt = vector_at(scope->deferredStmts, static_cast<unsigned long>(i));
+                stmt->isDeferred = true;
+                vector_append(node->preStmts, stmt);
             }
             scope = scope->parent;
         }
     }
     for (auto i = static_cast<int64_t>(scope->deferredStmts.length - 1); i >= 0; i--) {
-        vector_append(node->preStmts, vector_at(scope->deferredStmts, static_cast<unsigned long>(i)));
+        auto stmt = vector_at(scope->deferredStmts, static_cast<unsigned long>(i));
+        stmt->isDeferred = true;
+        vector_append(node->preStmts, stmt);
     }
 }
 

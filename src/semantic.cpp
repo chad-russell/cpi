@@ -3898,7 +3898,10 @@ void Semantic::resolveTypes(Node *node) {
     }
     node->semantic = true;
 
-    for (auto stmt : node->preStmts) {
+    for (auto &stmt : node->preStmts) {
+        if (stmt->isDeferred) {
+            stmt = deepCopyScopedStmt(stmt, stmt->scope);
+        }
         resolveTypes(stmt);
     }
     for (auto stmt : node->postStmts) {

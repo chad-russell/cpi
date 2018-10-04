@@ -324,7 +324,7 @@ const vector<string> AssemblyLexer::tokenTypeStrings = {
     "EQI32", "NEQI32", "UGTI32", "SGTI32", "UGEI32", "SGEI32", "ULTI32", "SLTI32", "ULEI32", "SLEI32",
 
     // I64 math
-    "ADDI64", "SUBI64", "MULI64", "UDIVI64", "SDIVI64", "UREMI64", "SREMI64",
+    "ADDI64", "ADD_S_I64", "SUBI64", "SUB_S_I64", "MULI64", "UDIVI64", "SDIVI64", "UREMI64", "SREMI64",
     "EQI64", "NEQI64", "UGTI64", "SGTI64", "UGEI64", "SGEI64", "ULTI64", "SLTI64", "ULEI64", "SLEI64",
 
     // F32 math
@@ -384,7 +384,7 @@ const vector<string> AssemblyLexer::instructionStrings = {
     "EQI32", "NEQI32", "UGTI32", "SGTI32", "UGEI32", "SGEI32", "ULTI32", "SLTI32", "ULEI32", "SLEI32",
 
     // I64 math
-    "ADDI64", "ADD_S_I64", "SUBI64", "MULI64", "UDIVI64", "SDIVI64", "UREMI64", "SREMI64",
+    "ADDI64", "ADD_S_I64", "SUBI64", "SUB_S_I64", "MULI64", "UDIVI64", "SDIVI64", "UREMI64", "SREMI64",
     "EQI64", "NEQI64", "UGTI64", "SGTI64", "UGEI64", "SGEI64", "ULTI64", "SLTI64", "ULEI64", "SLEI64",
 
     // F32 math
@@ -544,6 +544,17 @@ void MnemonicPrinter::step() {
         instructionString.append(" ");
         readTypeAndIntOrFloat();
         instructionString.append(" ");
+    } else if (startsWith(&inst, "STORE_RELCONST_RELCONST")) {
+        instructionString.append(inst);
+        instructionString.append(" ");
+
+        instructionString.append(to_string(consume<int64_t>()));
+        instructionString.append(" ");
+
+        instructionString.append(to_string(consume<int64_t>()));
+        instructionString.append(" ");
+
+        instructionString.append(to_string(consume<int32_t>()));
     } else if (startsWith(&inst, "STORE")) {
         instructionString.append(inst);
         instructionString.append(" ");

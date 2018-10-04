@@ -456,9 +456,13 @@ bool isNumericType(Node *type) {
     switch (type->typeData.kind) {
         case NodeTypekind::INT_LITERAL:
         case NodeTypekind::I8:
+        case NodeTypekind::U8:
         case NodeTypekind::I16:
+        case NodeTypekind::U16:
         case NodeTypekind::I32:
+        case NodeTypekind::U32:
         case NodeTypekind::I64:
+        case NodeTypekind::U64:
         case NodeTypekind::FLOAT_LITERAL:
         case NodeTypekind::F32:
         case NodeTypekind::F64:

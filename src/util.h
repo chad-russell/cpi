@@ -600,6 +600,7 @@ public:
     bool tagCheck = false;
     bool llvmGen = false;
     bool sourceMapStatement = false;
+    bool isDeferred = false;
 
     uint32_t genId = 0;
 

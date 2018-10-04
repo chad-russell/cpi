@@ -144,6 +144,27 @@ fn makeLayer(rect: Rect!(f64)) {
     return mem.heap(cast(Layer) {layerSurface, layerContext, layerPattern});
 }
 
+fn makeFormNonScaled(r: Rect!(f64), data: !T, ownLayer := false) {
+    f: Form;
+    f.rect = r;
+    f.data = context.formDatas.current;
+    f.receivers = buf.make!(Receiver)();
+    if ownLayer {
+        f.layer = makeLayer(r);
+    }
+    else {
+        f.layer = &context.cairo.layer;
+    }
+
+    ^(cast(*T) context.formDatas.current) = data;
+    context.formDatas.current += sizeof(T);
+
+    &context.forms|:append(f);
+    id := context.forms.buf.count - 1;
+
+    return id;
+}
+
 fn makeForm(r: Rect!(f64), data: !T, ownLayer := false) {
     xScale := cast(f64) context.sdl.surface.w / context.sdl.xScale;
     yScale := cast(f64) context.sdl.surface.h / context.sdl.yScale;
@@ -160,9 +181,13 @@ fn makeForm(r: Rect!(f64), data: !T, ownLayer := false) {
     f.data = context.formDatas.current;
     f.receivers = buf.make!(Receiver)();
     if ownLayer {
-        preScaled: Rect!(f64) = {r.x * cast() context.sdl.surface.w, r.y * cast() context.sdl.surface.w,
-                                 r.width * cast() context.sdl.surface.w, r.height * cast() context.sdl.surface.w};
-        f.layer = makeLayer(preScaled);
+        layerRect: Rect!(f64) = {
+            0,
+            0,
+            r.width * cast() context.sdl.surface.w,
+            r.height * cast() context.sdl.surface.h
+        };
+        f.layer = makeLayer(layerRect);
     }
     else {
         f.layer = &context.cairo.layer;
@@ -205,8 +230,19 @@ fn drawForm(formId: i64) {
     formId|clearForm;
     sendMessage(formId, {DRAW, nil});
 
+    -- findme1
     if form.layer != &context.cairo.layer {
-        cairo.cairo_set_source(context.cairo.layer.context, form.layer.pattern);
+        cairo.cairo_save(context.cairo.layer.context);
+        defer { cairo.cairo_restore(context.cairo.layer.context); }
+
+        -- cairo.cairo_save(form.layer.context);
+        -- defer { cairo.cairo_restore(form.layer.context); }
+        -- cairo.cairo_set_source_rgba(form.layer.context, 0.6, 0.7, 0.8, 1);
+        -- cairo.cairo_rectangle(form.layer.context, 0, 0, form.rect.width, form.rect.height);
+        -- cairo.cairo_fill(form.layer.context);
+
+        cairo.cairo_set_source_surface(context.cairo.layer.context, form.layer.surface, form.rect.x, form.rect.y);
+        -- cairo.cairo_set_source_rgb(context.cairo.layer.context, 0.4, 0.5, 0.6);
         cairo.cairo_rectangle(context.cairo.layer.context, form.rect.x, form.rect.y, form.rect.width, form.rect.height);
         cairo.cairo_fill(context.cairo.layer.context);
     }
@@ -308,7 +344,7 @@ fn initSdl() {
     context.sdl.window = window;
 
     sdlRenderFlags: i32 = 6;
-    context.sdl.renderer = sdl.SDL_CreateRenderer(context.sdl.window, -1, sdlRenderFlags);
+    context.sdl.renderer = sdl.SDL_CreateRenderer(context.sdl.window, -1, 0);
 
     -- Compute screen resolution
     -- For instance, on a retina screen, renderer size is twice as window size
@@ -384,7 +420,12 @@ fn drawRect(formId: i64, rect: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1) {
     defer { cairo.cairo_restore(form.layer.context); }
 
     cairo.cairo_set_source_rgba(form.layer.context, r, g, b, a);
-    cairo.cairo_rectangle(form.layer.context, rect.x, rect.y, rect.width, rect.height);
+    if form.layer == &context.cairo.layer {
+        cairo.cairo_rectangle(form.layer.context, rect.x, rect.y, rect.width, rect.height);
+    }
+    else {
+        cairo.cairo_rectangle(form.layer.context, 0, 0, rect.width, rect.height);
+    }
     cairo.cairo_fill(form.layer.context);
 }
 
@@ -409,7 +450,12 @@ fn clearRect(layer: *Layer, rect: Rect!(f64)) {
 
     cairo.cairo_set_source_rgba(layer.context, 0, 0, 0, 0);
     cairo.cairo_set_operator(layer.context, cairo.Operator.SOURCE);
-    cairo.cairo_rectangle(layer.context, rect.x, rect.y, rect.width, rect.height);
+    if layer == &context.cairo.layer {
+        cairo.cairo_rectangle(layer.context, rect.x, rect.y, rect.width, rect.height);
+    }
+    else {
+        cairo.cairo_rectangle(layer.context, 0, 0, rect.width, rect.height);
+    }
     cairo.cairo_fill(layer.context);
 }
 

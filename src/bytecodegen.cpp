@@ -262,11 +262,11 @@ void BytecodeGen::gen(Node *node) {
         return;
     }
 
-    if (node->genId >= genId) {
+    if (node->genId >= genId && !node->isDeferred) {
         return;
     }
 
-    // when forcing, don't run the risk of adding double bytecode
+    // never run the risk of adding double bytecode
     node->bytecode = {};
 
     if (this->debugLocalOffset != 0 && !node->debugBytecodeAdjusted) {
@@ -706,7 +706,12 @@ void BytecodeGen::gen(Node *node) {
                         }
                     } break;
                     case LexerTokenType::SUB: {
-                        binopHelper("SUB", node);
+                        if (scale > 1) {
+                            binopHelper("SUB_S_", node, scale);
+                        }
+                        else {
+                            binopHelper("SUB", node);
+                        }
                     } break;
                     case LexerTokenType::MUL: {
                         binopHelper("MUL", node);

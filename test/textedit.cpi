@@ -65,10 +65,7 @@ fn cacheGlyph(codepoint: i32) {
     cached.pattern = cairo.cairo_pattern_create_for_surface(glyphSurface);
 
     -- Scale cairo to use screen resolution
-    xScale: f64;
-    yScale: f64;
-    cairo.cairo_surface_get_device_scale(context.cairo.layer.surface, &xScale, &yScale);
-    cairo.cairo_surface_set_device_scale(glyphSurface, xScale, yScale);
+    cairo.cairo_surface_set_device_scale(glyphSurface, context.sdl.xScale, context.sdl.yScale);
 
     -- Get Cairo context from Cairo surface
     glyphContext := cairo.cairo_create(glyphSurface);
@@ -118,12 +115,10 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64) {
     lastChar := se.editor_buffer_get_line_length(context.tc.eb, line);
 
     text := se.editor_buffer_get_text_between_points(context.tc.eb, line, 0, line, lastChar);
+    defer { se.editor_buffer_free_buf(text); }
 
     hb.hb_buffer_add_utf8(context.hb.buffer, text.bytes, -1, 0, -1);
     hb.hb_shape(context.hb.font, context.hb.buffer, nil, 0);
-
-    -- todo(chad): this doesn't work as a defer { } block... :(
-    se.editor_buffer_free_buf(text);
 
     -- Get buffer data
     glyphCount := hb.hb_buffer_get_length(context.hb.buffer);
@@ -148,7 +143,7 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64) {
         found := findGlyph(cast() (glyphInfo + i).codepoint);
 
         cairo.cairo_save(form.layer.context);
-        cairo.cairo_translate(form.layer.context, form.rect.x + x, form.rect.y + y + found.extents.yBearing);
+        cairo.cairo_translate(form.layer.context, x, y + found.extents.yBearing);
 
         cairo.cairo_set_source(form.layer.context, found.pattern);
         cairo.cairo_rectangle(form.layer.context,
@@ -301,31 +296,36 @@ fn makeCursor(parentId: i64) {
 
             parent := context.forms.buf[^formData];
 
+            width: f64 = 20.0;
+
             if context.tc.lineCache.buf.count > cursorInfo.row {
                 cl := context.tc.lineCache.buf[cursorInfo.row];
                 if cl.glyphs.buf.count >= cursorInfo.col {
                     hasPrevious = true;
 
                     g := cl.glyphs.buf[cursorInfo.col - 1];
-                    form.rect = {parent.rect.x + g.x + g.width, parent.rect.y + cl.low - 1, 1, cl.high - cl.low};
+                    form.rect = {parent.rect.x + g.x + g.width, parent.rect.y + cl.low - 1, width, cl.high - cl.low};
                 }
             }
             if !hasPrevious {
-                form.rect = {parent.rect.x, parent.rect.y + cast() (cast() cursorInfo.row * FONT_SIZE), 1, cast() FONT_SIZE};
+                form.rect = {parent.rect.x, parent.rect.y + cast() (cast() cursorInfo.row * FONT_SIZE), width, cast() FONT_SIZE};
             }
 
             #import "time";
-            cur := time.clock();
-            elapsed := cur - context.start;
-            el := cast(f64) elapsed / 1000000.0;
+            elapsedSeconds := cast(f64) context.elapsed / cast() time.CLOCKS_PER_SEC;
 
-            -- alpha := (math.sin(el * 40) + 1.0) / 2.0;
-            alpha := (math.sin(cast(f64) context.frame / cast(f64) 6.0) + 1.0) / 2.0;
-            formId|gui.drawRect(form.rect, 0.9, 0.9, 0.9, alpha);
+            alpha := (math.sin(elapsedSeconds * 15) + 1.0) / 2.0;
+
+            -- formId|gui.drawRect(form.rect, 0.9, 0.9, 0.9, alpha);
+            cairo.cairo_set_source_rgba(form.layer.context, 0.9, 0.9, 0.9, alpha);
+            cairo.cairo_set_line_width(form.layer.context, form.rect.width);
+            cairo.cairo_move_to(form.layer.context, form.rect.x, form.rect.y);
+            cairo.cairo_line_to(form.layer.context, form.rect.x, form.rect.y + form.rect.height);
+            cairo.cairo_stroke(form.layer.context);
         }
     }
 
-    formId := gui.makeForm({0, 0, 1, cast(f64) FONT_SIZE}, parentId, true);
+    formId := gui.makeFormNonScaled({0, 0, 1, cast(f64) FONT_SIZE}, parentId, true);
 
     formId|gui.addReceiver(gui.DRAW, draw);
 
@@ -379,6 +379,7 @@ fn processEvents() {
         if event._type == sdl.QUIT {
             gui.shutdown();
             context.quit = true;
+            io.printFln("% frames", {context.frame});
             return;
         }
         else if event._type == sdl.MOUSEMOTION {
@@ -452,9 +453,10 @@ fn processEvents() {
     }
 }
 
-#context frame: i64
-#context start: i64
-#context dt: i64
+#context frame: u64
+#context start: u64
+#context dt: u64
+#context elapsed: u64
 
 fn loop() {
     context.frame = 0;
@@ -468,7 +470,8 @@ fn loop() {
     while true and context.quit == false {
         cur := time.clock();
         context.dt = cur - lastFrameTime;
-        lastFrameTime = time.clock();
+        context.elapsed = cur - context.start;
+        lastFrameTime = cur;
 
         -- reset temporary storage
         basic.resetTmp();
@@ -563,11 +566,11 @@ fn main() {
         x:      0,
         y:      0.15,
         width:  1.0,
-        height: 0.9
+        height: 0.85
     };
 
     textEditorId := makeTextEdit(formRect);
-    makeCursor(textEditorId);
+    -- makeCursor(textEditorId);
 
     loop();
 

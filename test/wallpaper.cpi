@@ -63,12 +63,9 @@ fn write_png_file(filename: []i8) {
 
   faceColors := []{blue, red, orange, yellow, green, white};
 
-  -- todo(chad): hack to get around parser issue
-  type i8Array []i8
-
   pixels: [][]i8;
   pixels.count = cast() height;
-  pixels.data = mem.alloc!(i8Array)(pixels.count);
+  pixels.data = mem.alloc!(#type []i8)(pixels.count);
 
   for row: iter.range(0, cast() height) {
     pixelRow: []i8;
