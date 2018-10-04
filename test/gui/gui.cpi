@@ -88,8 +88,7 @@ type Receiver struct {
 
 type Layer struct {
     surface: *cairo.Surface,
-    context: *cairo.Context,
-    pattern: *cairo.Pattern,
+    context: *cairo.Context
 }
 
 type Form struct {
@@ -137,20 +136,27 @@ fn makeLayer(rect: Rect!(f64)) {
         cast() rect.height);
 
     layerContext := cairo.cairo_create(layerSurface);
-    layerPattern := cairo.cairo_pattern_create_for_surface(layerSurface);
 
     cairo.cairo_surface_set_device_scale(layerSurface, context.sdl.xScale, context.sdl.yScale);
 
-    return mem.heap(cast(Layer) {layerSurface, layerContext, layerPattern});
+    return mem.heap(cast(Layer) {layerSurface, layerContext});
 }
 
 fn makeFormNonScaled(r: Rect!(f64), data: !T, ownLayer := false) {
+    scaled: Rect!(f64) = {
+        r.x * cast() context.sdl.xScale,
+        r.y * cast() context.sdl.yScale,
+        r.width * cast() context.sdl.xScale,
+        r.height * cast() context.sdl.yScale,
+    };
+
     f: Form;
-    f.rect = r;
+    f.rect = scaled;
     f.data = context.formDatas.current;
     f.receivers = buf.make!(Receiver)();
+
     if ownLayer {
-        f.layer = makeLayer(r);
+        f.layer = makeLayer(scaled);
     }
     else {
         f.layer = &context.cairo.layer;
@@ -230,19 +236,11 @@ fn drawForm(formId: i64) {
     formId|clearForm;
     sendMessage(formId, {DRAW, nil});
 
-    -- findme1
     if form.layer != &context.cairo.layer {
         cairo.cairo_save(context.cairo.layer.context);
         defer { cairo.cairo_restore(context.cairo.layer.context); }
 
-        -- cairo.cairo_save(form.layer.context);
-        -- defer { cairo.cairo_restore(form.layer.context); }
-        -- cairo.cairo_set_source_rgba(form.layer.context, 0.6, 0.7, 0.8, 1);
-        -- cairo.cairo_rectangle(form.layer.context, 0, 0, form.rect.width, form.rect.height);
-        -- cairo.cairo_fill(form.layer.context);
-
         cairo.cairo_set_source_surface(context.cairo.layer.context, form.layer.surface, form.rect.x, form.rect.y);
-        -- cairo.cairo_set_source_rgb(context.cairo.layer.context, 0.4, 0.5, 0.6);
         cairo.cairo_rectangle(context.cairo.layer.context, form.rect.x, form.rect.y, form.rect.width, form.rect.height);
         cairo.cairo_fill(context.cairo.layer.context);
     }
@@ -274,7 +272,7 @@ fn drawUpdatedForms() {
             if animator.rect|:intersects(covering.rect) {
                 -- if it has it's own form then no need to explicitly redraw. Otherwise, redraw
                 if covering.layer != &context.cairo.layer {
-                    cairo.cairo_set_source(context.cairo.layer.context, covering.layer.pattern);
+                    cairo.cairo_set_source_surface(context.cairo.layer.context, covering.layer.surface, covering.rect.x, covering.rect.y);
                     cairo.cairo_rectangle(context.cairo.layer.context, animator.rect.x, animator.rect.y, animator.rect.width, animator.rect.height);
                     cairo.cairo_fill(context.cairo.layer.context);
                 }
@@ -385,7 +383,6 @@ fn initCairo() {
                 context.sdl.surface.pitch);
 
     context.cairo.layer.context = cairo.cairo_create(context.cairo.layer.surface);
-    context.cairo.layer.pattern = cairo.cairo_pattern_create_for_surface(context.cairo.layer.surface);
 
     cairo.cairo_surface_set_device_scale(context.cairo.layer.surface, context.sdl.xScale, context.sdl.yScale);
 }

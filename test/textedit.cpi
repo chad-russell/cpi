@@ -304,7 +304,7 @@ fn makeCursor(parentId: i64) {
                     hasPrevious = true;
 
                     g := cl.glyphs.buf[cursorInfo.col - 1];
-                    form.rect = {parent.rect.x + g.x + g.width, parent.rect.y + cl.low - 1, width, cl.high - cl.low};
+                    form.rect = {parent.rect.x + g.x + g.width, parent.rect.y + cl.low - 1, width, cast() FONT_SIZE};
                 }
             }
             if !hasPrevious {
@@ -317,15 +317,16 @@ fn makeCursor(parentId: i64) {
             alpha := (math.sin(elapsedSeconds * 15) + 1.0) / 2.0;
 
             -- formId|gui.drawRect(form.rect, 0.9, 0.9, 0.9, alpha);
+
             cairo.cairo_set_source_rgba(form.layer.context, 0.9, 0.9, 0.9, alpha);
-            cairo.cairo_set_line_width(form.layer.context, form.rect.width);
-            cairo.cairo_move_to(form.layer.context, form.rect.x, form.rect.y);
-            cairo.cairo_line_to(form.layer.context, form.rect.x, form.rect.y + form.rect.height);
+            cairo.cairo_set_line_width(form.layer.context, 10);
+            cairo.cairo_move_to(form.layer.context, 0, 0);
+            cairo.cairo_line_to(form.layer.context, 0, 100);
             cairo.cairo_stroke(form.layer.context);
         }
     }
 
-    formId := gui.makeFormNonScaled({0, 0, 1, cast(f64) FONT_SIZE}, parentId, true);
+    formId := gui.makeFormNonScaled({0, 0, 1.5, cast(f64) FONT_SIZE}, parentId, true);
 
     formId|gui.addReceiver(gui.DRAW, draw);
 
@@ -570,7 +571,7 @@ fn main() {
     };
 
     textEditorId := makeTextEdit(formRect);
-    -- makeCursor(textEditorId);
+    makeCursor(textEditorId);
 
     loop();
 
