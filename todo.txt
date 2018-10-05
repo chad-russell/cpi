@@ -1,6 +1,8 @@
 TODO:
     - #attr param should be inferred based on fn args
 
+    - get rid of automatic basic import
+
     -- mulitple + and - with pointers does not work!!
 
     - relative import directories don't really work if you're already inside a directory

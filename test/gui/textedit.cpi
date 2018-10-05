@@ -463,7 +463,7 @@ fn make(rect: gui.Rect!(f64)) {
     formData: TextEditFormData;
     formData.highlights = buf.make!(gui.Rect!(f64))();
 
-    formId := gui.makeForm(rect, formData, true);
+    formId := gui.makeForm(rect, formData, ownLayer: true);
 
     formId|gui.addReceiver(gui.DRAW, draw);
     formId|gui.addReceiver(gui.MOUSEMOVE, mousemove);

@@ -1,7 +1,12 @@
 fn main() {
-    defer { puts("goodbye\n"); }
+    fbaz := []{
+        {omg: 1},
+    };
 
-    if false { return 3; }
+    #import "io";
+    io.println(&fbaz[0].omg);
+    io.println(&fbaz[0].omg);
+    io.println(&fbaz[0].omg);
 
     return 0;
 }

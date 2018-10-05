@@ -1593,8 +1593,10 @@ Node *Parser::parseArrayLiteral() {
     while (lexer->front.type != LexerTokenType::RCURLY) {
         expect(LexerTokenType::COMMA, ",");
 
-        auto elem = parseRvalue();
-        vector_append(lit->arrayLiteralData.elements, elem);
+        if (lexer->front.type != LexerTokenType::RCURLY) {
+            auto elem = parseRvalue();
+            vector_append(lit->arrayLiteralData.elements, elem);
+        }
     }
     expect(LexerTokenType::RCURLY, "}");
 

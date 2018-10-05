@@ -1589,7 +1589,7 @@ void resolveArrayIndex(Semantic *semantic, Node *node) {
     add->binopData.rhsScale = typeSize(node->typeInfo);
     semantic->addLocal(add);
 
-    if (semantic->lvalueAssignmentContext && semantic->dotContext) {
+    if ((semantic->lvalueAssignmentContext || semantic->addressOfContext) && semantic->dotContext) {
         semantic->resolveTypes(add);
         node->resolved = add;
     }
@@ -1863,12 +1863,17 @@ void maybeStructDefault(Semantic *semantic, Node *rhs, Node *lhsType) {
 }
 
 void resolveDecl(Semantic *semantic, Node *node) {
+    auto savedAddressOf = semantic->addressOfContext;
+    semantic->addressOfContext = false;
+
     semantic->resolveTypes(node->declData.type);
     semantic->resolveTypes(node->declData.initialValue);
 
     if (node->declData.initialValue != nullptr && node->declData.initialValue->typeInfo == nullptr) {
         semantic->reportError({node, node->declData.initialValue},
                               Error{node->declData.initialValue->region, "could not resolve type of initial value for this declaration"});
+
+        semantic->addressOfContext = savedAddressOf ;
         return;
     }
 
@@ -1901,6 +1906,7 @@ void resolveDecl(Semantic *semantic, Node *node) {
     node->typeInfo = makeTypeConcrete(node->declData.type);
 
     if (node->declData.initialValue == nullptr) {
+        semantic->addressOfContext = savedAddressOf ;
         return;
     }
 
@@ -1909,23 +1915,20 @@ void resolveDecl(Semantic *semantic, Node *node) {
         semantic->reportError({}, Error{node->region, "error assigning struct literal to union - unmatched field name"});
     }
 
-//    if (node->declData.initialValue->type == NodeType::CREATE_CONTEXT) {
-//        // call all context initializers
-//        for (auto init: semantic->contextInits) {
-//            auto fnCall = new Node(node->region.srcInfo, NodeType::FN_CALL, node->scope);
-//            fnCall->fnCallData.fn = init;
-//            vector_append(node->postStmts, fnCall);
-//            semantic->resolveTypes(fnCall);
-//        }
-//    }
+    semantic->addressOfContext = savedAddressOf;
 }
 
 void resolveAlias(Semantic *semantic, Node *node) {
+    auto savedAddressOf = semantic->addressOfContext;
+    semantic->addressOfContext = false;
+
     resolveDecl(semantic, node);
 
     node->nodeData = constantize(semantic, resolve(node->declData.initialValue));
     semantic->resolveTypes(node->nodeData);
     node->typeInfo = node->nodeData->typeInfo;
+
+    semantic->addressOfContext = savedAddressOf;
 }
 
 Node *resolveParameterizedType(Semantic *semantic, Node *pt, Node *fnCall) {
@@ -2784,6 +2787,11 @@ void resolveDeref(Semantic *semantic, Node *node) {
 }
 
 void resolveAddressOf(Semantic *semantic, Node *node) {
+    auto savedAddressOf = semantic->addressOfContext;
+    if (node->nodeData->type != NodeType::SYMBOL) {
+        semantic->addressOfContext = true;
+    }
+
     semantic->resolveTypes(node->nodeData);
     auto pointerTypeInfo = new Node(NodeTypekind::POINTER);
     pointerTypeInfo->typeData.pointerTypeData.underlyingType = node->nodeData->typeInfo;
@@ -2797,6 +2805,8 @@ void resolveAddressOf(Semantic *semantic, Node *node) {
     if (node->nodeData->type == NodeType::ARRAY_INDEX) {
         node->resolved = resolve(node->nodeData)->nodeData;
     }
+
+    semantic->addressOfContext = savedAddressOf;
 }
 
 Node *findParam(Semantic *semantic, Node *node) {

@@ -17,6 +17,7 @@ class Semantic {
 public:
     bool encounteredErrors = false;
     bool lvalueAssignmentContext = false;
+    bool addressOfContext = false;
     bool dotContext = false;
     Node *currentFnDecl = nullptr;
 
