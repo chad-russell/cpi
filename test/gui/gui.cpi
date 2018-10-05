@@ -115,19 +115,12 @@ type Form struct {
     rect: Rect!(f64),
     layer: *Layer,
     receivers: buf.Buffer!(Receiver),
-    delegate: *Form,
+    delegate: i64 = -1,
     data: *none,
 }
 
 fn addReceiver(formId: i64, name: []i8, handler: ReceiverHandler) {
     (&(context.forms.buf[formId].receivers))|:append({ name|string.strcpy, handler });
-
-    io.println("----");
-    io.println((&(context.forms.buf[formId].receivers)));
-    io.println((&(context.forms.buf[formId].receivers)));
-    io.println((&(context.forms.buf[formId].receivers)));
-    io.println((&(context.forms.buf[formId].receivers)));
-    io.println("----");
 }
 
 fn removeReceiver(formId: i64, name: []i8) {
@@ -238,14 +231,30 @@ fn makeForm(r: Rect!(f64), data: !T, ownLayer := false) {
     return id;
 }
 
-fn sendMessage(formId: i64, message: Message) {
+fn sendMessage(formId: i64, message: Message, bypassDelegate := false) {
     form := &context.forms.buf[formId];
 
+    if form.delegate != -1 and bypassDelegate == false {
+        delegateForm := &context.forms.buf[form.delegate];
+
+        if handleMessage(form.delegate, delegateForm.data, message) {
+            return;
+        }
+    }
+
+    handleMessage(formId, form, message);
+}
+
+fn handleMessage(formId: i64, form: *Form, message: Message) {
+    handled := false;
     for r: form.receivers.buf {
         if string.streq(message.name, r.name) {
+            handled = true;
             r.handle(formId, form.data, message.data);
         }
     }
+
+    return handled;
 }
 
 fn broadcast(name: []i8, data := nil) {
@@ -263,15 +272,22 @@ fn processMessages() {
 fn drawForm(formId: i64) {
     form := &context.forms.buf[formId];
 
-    formId|clearForm;
-    sendMessage(formId, {DRAW, nil});
+    realId := formId;
+    realForm := form;
+    if form.delegate != -1 {
+        realId = form.delegate;
+        realForm := &context.forms.buf[realId];
+    }
 
-    if form.layer != &context.cairo.layer {
+    realId|clearForm;
+    sendMessage(realId, {DRAW, nil});
+
+    if realForm.layer != &context.cairo.layer {
         cairo.cairo_save(context.cairo.layer.context);
         defer { cairo.cairo_restore(context.cairo.layer.context); }
 
-        cairo.cairo_set_source_surface(context.cairo.layer.context, form.layer.surface, form.rect.x, form.rect.y);
-        cairo.cairo_rectangle(context.cairo.layer.context, form.rect.x, form.rect.y, form.rect.width, form.rect.height);
+        cairo.cairo_set_source_surface(context.cairo.layer.context, realForm.layer.surface, realForm.rect.x, realForm.rect.y);
+        cairo.cairo_rectangle(context.cairo.layer.context, realForm.rect.x, realForm.rect.y, realForm.rect.width, realForm.rect.height);
         cairo.cairo_fill(context.cairo.layer.context);
     }
 }
@@ -287,9 +303,9 @@ fn drawAllForms() {
 fn drawUpdatedForms() {
     update := false;
 
-    for form: context.drawers.buf {
+    for formId: context.drawers.buf {
         update = true;
-        drawForm(form);
+        drawForm(formId);
     }
 
     for animatorId: context.animators.buf {

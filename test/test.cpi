@@ -185,6 +185,48 @@ fn runAllTests() {
     context.id = 3;
     idC("hello!");
     assert(context.id == 4);
+
+    testAddressOfDotsAndIndexesCombo();
+}
+
+fn testAddressOfDotsAndIndexesCombo() {
+    foo := []{
+        {
+            bar: {
+                baz: 111,
+                qux: []{
+                    {omg: 771},
+                    {omg: 772},
+                    {omg: 773},
+                }
+            }
+        },
+        {
+            bar: {
+                baz: 222,
+                qux: []{
+                    {omg: 881},
+                    {omg: 882},
+                    {omg: 883},
+                }
+            }
+        },
+        {
+            bar: {
+                baz: 333,
+                qux: []{
+                    {omg: 991},
+                    {omg: 992},
+                    {omg: 993},
+                }
+            }
+        },
+    };
+
+    a := &foo[1].bar.qux[1].omg;
+    ^a = 18;
+
+    assert(foo[1].bar.qux[1].omg == 18);
 }
 
 fn testConversion() {

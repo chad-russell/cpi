@@ -9,11 +9,20 @@ fn draw(formId: i64, formData: *ScrollFormData, messageData: *none) {
     form := &context.forms.buf[formId];
     content := &context.forms.buf[formData.contentId];
 
-    io.println("drawing sort of");
+    savedLayer := content.layer;
+    content.layer = form.layer;
+
+    formData.contentId|gui.sendMessage({gui.DRAW, nil}, bypassDelegate: true);
+
+    content.layer = savedLayer;
 }
 
 fn make(rect: gui.Rect!(f64), contentFormId: i64) {
-    formId := gui.makeForm(rect, cast(*ScrollFormData) &{contentFormId});
+    formId := gui.makeForm(rect, cast(ScrollFormData) {contentFormId}, true);
+    form := &context.forms.buf[formId];
+
+    contentForm := &context.forms.buf[contentFormId];
+    contentForm.delegate = formId;
 
     formId|gui.addReceiver(gui.DRAW, draw);
 }

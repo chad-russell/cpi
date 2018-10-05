@@ -1,12 +1,3 @@
 fn main() {
-    fbaz := []{
-        {omg: 1},
-    };
-
-    #import "io";
-    io.println(&fbaz[0].omg);
-    io.println(&fbaz[0].omg);
-    io.println(&fbaz[0].omg);
-
     return 0;
 }
