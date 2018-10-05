@@ -1,0 +1,19 @@
+#import "gui/gui";
+#import "io";
+
+type ScrollFormData struct {
+    contentId: i64
+}
+
+fn draw(formId: i64, formData: *ScrollFormData, messageData: *none) {
+    form := &context.forms.buf[formId];
+    content := &context.forms.buf[formData.contentId];
+
+    io.println("drawing sort of");
+}
+
+fn make(rect: gui.Rect!(f64), contentFormId: i64) {
+    formId := gui.makeForm(rect, cast(*ScrollFormData) &{contentFormId});
+
+    formId|gui.addReceiver(gui.DRAW, draw);
+}

@@ -5,12 +5,13 @@
 
 INIT_EVERYTHING: i32 = 29233;
 INIT_VIDEO: i32 = 20;
-QUIT: i32 = 256;
 
-KEYDOWN: i32 = 0x300;
-MOUSEMOTION: i32 = 0x400;
-MOUSEBUTTONDOWN: i32 = 0x401;
-MOUSEBUTTONUP: i32 = 0x402;
+QUIT: u32 = 256;
+KEYDOWN: u32 = 0x300;
+MOUSEMOTION: u32 = 0x400;
+MOUSEBUTTONDOWN: u32 = 0x401;
+MOUSEBUTTONUP: u32 = 0x402;
+MOUSEWHEEL: u32 = 0x403;
 
 WINDOWPOS_UNDEFINED: i32 = 536805376;
 WINDOW_SHOWN: i32 = 0x00000004;
@@ -179,7 +180,7 @@ type Surface struct {
 }
 
 type Event struct {
-    _type: i32,
+    _type: u32,
     data: Event56
 }
 
@@ -196,7 +197,7 @@ type Event56 struct {
 }
 
 type MouseMotionEvent struct {
-    _type: i32,
+    _type: u32,
     timestamp: u32,
     windowID: u32,
     which: u32,
@@ -207,8 +208,23 @@ type MouseMotionEvent struct {
     yrel: i32
 }
 
+type Direction enum(u32) {
+    NORMAL: 0,
+    FLIPPED: 1
+}
+
+type MouseWheelEvent struct {
+    _type: u32,
+    timestamp: u32,
+    windowID: u32,
+    which: u32,
+    x: i32,
+    y: i32,
+    direction: Direction
+}
+
 type MouseButtonEvent struct {
-    _type: i32,
+    _type: u32,
     timestamp: u32,
     windowID: u32,
     which: u32,
@@ -221,7 +237,7 @@ type MouseButtonEvent struct {
 }
 
 type KeyboardEvent struct {
-    _type: i32,
+    _type: u32,
     timestamp: i32,
     windowId: i32,
     state: i8,

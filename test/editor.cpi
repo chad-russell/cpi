@@ -1,0 +1,19 @@
+#import "gui/gui";
+#import "gui/textedit";
+#import "gui/scroll";
+
+fn main() {
+    basic.initContext();
+
+    gui.init();
+
+    textEditId := textedit.init();
+    textEditForm := context.forms.buf[textEditId];
+
+    scroll.make(textEditForm.rect, textEditId);
+
+    gui.loop();
+
+    return 0;
+}
+

@@ -16,18 +16,24 @@ type SliderFormData struct {
 fn draw(formId: i64, formData: *SliderFormData, messageData: *none) {
     form := &context.forms.buf[formId];
 
+    localRect: gui.Rect!(f64) = {0, 0, form.rect.width, form.rect.height};
+
     -- background
-    formId|gui.drawRect(form.rect, formData.bgColor.r, formData.bgColor.g, formData.bgColor.b);
+    formId|gui.drawRect(localRect, formData.bgColor.r, formData.bgColor.g, formData.bgColor.b);
 
     -- slider-grabber
-    formData.grabberRect = form.rect;
+    formData.grabberRect = localRect;
     formData.grabberRect.x = (form.rect.width - 10) * cast(f64) formData.current / cast(f64) (formData.max - 1);
     formData.grabberRect.width = 10;
     formId|gui.drawRect(formData.grabberRect, formData.fgColor.r, formData.fgColor.g, formData.fgColor.b);
 }
 
 fn mouseDown(formId: i64, formData: *SliderFormData, messageData: *gui.MouseMessageData) {
-    if formData.grabberRect|:contains(messageData.x, messageData.y) {
+    form := context.forms.buf[formId];
+    localX := messageData.x - form.rect.x;
+    localY := messageData.y - form.rect.y;
+
+    if formData.grabberRect|:contains(localX, localY) {
         formId|gui.addReceiver(gui.MOUSEMOVE, mouseMove);
         formId|gui.addReceiver(gui.MOUSEUP, mouseUp);
     }

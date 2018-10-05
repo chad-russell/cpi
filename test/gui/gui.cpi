@@ -5,14 +5,17 @@
 #import "mem";
 #import "string";
 #import "iter";
+#import "time";
 
 WIDTH   : i32 = 800;
 HEIGHT  : i32 = 350;
 
-DRAW     : []i8 = "draw";
-MOUSEDOWN: []i8 = "mousedown";
-MOUSEMOVE: []i8 = "mousemove";
-MOUSEUP  : []i8 = "mouseup";
+DRAW        := "draw";
+MOUSEDOWN   := "mousedown";
+MOUSEMOVE   := "mousemove";
+MOUSEUP     := "mouseup";
+MOUSESCROLL := "mousescroll";
+KEYDOWN     := "keydown";
 
 type Color struct {
     r: f64,
@@ -21,9 +24,24 @@ type Color struct {
     a: f64 = 1.0
 }
 
+#context mouse: struct {
+    x: i32,
+    y: i32
+}
+
 type MouseMessageData struct {
     x: f64,
     y: f64
+}
+
+type MouseScrollMessageData struct {
+    x: f64,
+    y: f64,
+    flipped := false
+}
+
+type KeyboardMessageData struct {
+    scancode: sdl.Key
 }
 
 type Rect(T := typeof(x)) struct {
@@ -124,6 +142,8 @@ fn removeReceiver(formId: i64, name: []i8) {
 #context forms: *buf.Buffer!(Form)
 #context drawers: *buf.Buffer!(i64)
 #context mousers: *buf.Buffer!(i64)
+#context texters: *buf.Buffer!(i64)
+#context scrollers: *buf.Buffer!(i64)
 #context animators: *buf.Buffer!(i64)
 
 #context formDatas: basic.Region
@@ -401,6 +421,8 @@ fn initContext() {
     context.forms = buf.make!(Form)();
     context.drawers = buf.make!(i64)();
     context.mousers = buf.make!(i64)();
+    context.texters = buf.make!(i64)();
+    context.scrollers = buf.make!(i64)();
     context.animators = buf.make!(i64)();
 }
 
@@ -408,6 +430,8 @@ fn init() {
     initContext();
     initSdl();
     initCairo();
+
+    context.quit = false;
 }
 
 fn drawRect(formId: i64, rect: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1) {
@@ -418,10 +442,10 @@ fn drawRect(formId: i64, rect: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1) {
 
     cairo.cairo_set_source_rgba(form.layer.context, r, g, b, a);
     if form.layer == &context.cairo.layer {
-        cairo.cairo_rectangle(form.layer.context, rect.x, rect.y, rect.width, rect.height);
+        cairo.cairo_rectangle(form.layer.context, form.rect.x + rect.x, form.rect.y + rect.y, rect.width, rect.height);
     }
     else {
-        cairo.cairo_rectangle(form.layer.context, 0, 0, rect.width, rect.height);
+        cairo.cairo_rectangle(form.layer.context, rect.x, rect.y, rect.width, rect.height);
     }
     cairo.cairo_fill(form.layer.context);
 }
@@ -459,4 +483,105 @@ fn clearRect(layer: *Layer, rect: Rect!(f64)) {
 fn clearForm(formId: i64) {
     form := &context.forms.buf[formId];
     clearRect(form.layer, form.rect);
+}
+
+#context quit: bool
+
+fn processEvents() {
+    event: sdl.Event;
+
+    while sdl.SDL_PollEvent(&event) != 0 {
+        if event._type == sdl.QUIT {
+            shutdown();
+            context.quit = true;
+            io.printFln("% frames/sec", {cast(f64) context.frame / (cast(f64) context.elapsed / cast(f64) time.CLOCKS_PER_SEC)});
+            return;
+        }
+        else if event._type == sdl.MOUSEMOTION {
+            mouseEvent := cast(*sdl.MouseMotionEvent) &event;
+            if !(mouseEvent.xrel == 0 and mouseEvent.yrel == 0) {
+                sdl.SDL_GetMouseState(&context.mouse.x, &context.mouse.y);
+
+                mmd: MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
+                for formId: context.mousers.buf {
+                    formId|sendMessage(cast() {MOUSEMOVE, &mmd});
+                }
+            }
+        }
+        else if event._type == sdl.MOUSEWHEEL {
+            mouseEvent := cast(*sdl.MouseWheelEvent) &event;
+
+            msd: MouseScrollMessageData = {x: cast() mouseEvent.x, y: cast() mouseEvent.y, flipped: mouseEvent.direction == sdl.Direction.FLIPPED};
+            for formId: context.scrollers.buf {
+                formId|sendMessage(cast() {MOUSESCROLL, &msd});
+            }
+        }
+        else if event._type == sdl.MOUSEBUTTONDOWN {
+            mouseEvent := cast(*sdl.MouseButtonEvent) &event;
+
+            mmd: MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
+            for formId: context.mousers.buf {
+                form := &context.forms.buf[formId];
+                if form.rect|:contains(mmd.x, mmd.y) {
+                    formId|sendMessage(cast() {MOUSEDOWN, &mmd});
+                }
+            }
+        }
+        else if event._type == sdl.MOUSEBUTTONUP {
+            mouseEvent := cast(*sdl.MouseButtonEvent) &event;
+
+            mmd: MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
+            for formId: context.mousers.buf {
+                formId|sendMessage(cast() {MOUSEUP, &mmd});
+            }
+        }
+        else if event._type == sdl.KEYDOWN {
+            keyboardEvent := cast(*sdl.KeyboardEvent) &event;
+            -- io.println(cast(i32) keyboardEvent.keysym.scancode);
+
+            kd: KeyboardMessageData = {scancode: keyboardEvent.keysym.scancode};
+            for formId: context.texters.buf {
+                formId|sendMessage(cast() {KEYDOWN, &kd});
+            }
+        }
+    }
+}
+
+#context frame: u64
+#context start: u64
+#context dt: u64
+#context elapsed: u64
+
+fn loop() {
+    context.frame = 0;
+
+    drawAllForms();
+
+    #import "time";
+    context.start = time.clock();
+    lastFrameTime := context.start;
+
+    while true and context.quit == false {
+        cur := time.clock();
+        context.dt = cur - lastFrameTime;
+        context.elapsed = cur - context.start;
+        lastFrameTime = cur;
+
+        -- reset temporary storage
+        basic.resetTmp();
+
+        -- reset messages
+        context.drawers.buf.count = 0;
+        context.messages.buf.count = 0;
+
+        processEvents();
+
+        processMessages();
+        drawUpdatedForms();
+
+        -- io.println(context.frame);
+        -- io.println("-------");
+
+        context.frame += 1;
+    }
 }

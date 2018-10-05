@@ -1,7 +1,8 @@
-fn draw() {
-    #import "io";
-    #import "buffer";
+#import "io";
+#import "buffer";
+#import "mem";
 
+fn draw() {
     shades := " .-:;+=xX$& ";
     limit := shades.count - 1;
 
@@ -11,8 +12,7 @@ fn draw() {
 
         buf := buffer.make!(i8)(64);
         defer {
-            #import "mem";
-            mem.free(buf.buf.data);
+            buf|:release;
         }
 
         r := cast(f32) row / 12.0 - 1.0;
@@ -34,9 +34,9 @@ fn draw() {
                 i += 1;
             }
 
-            &buf|buffer.append(shades[i]);
+            &buf|:append(shades[i]);
         }
 
-        buf.buf | io.println;
+        buf.buf|io.println;
     }
 }
