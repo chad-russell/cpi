@@ -10,7 +10,7 @@ fn main() {
     textEditId := textedit.init();
     textEditForm := context.forms.buf[textEditId];
 
-    scroll.make(textEditForm.rect, textEditId);
+    scroll.takeover(textEditForm.rect, textEditId);
 
     gui.loop();
 

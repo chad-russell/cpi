@@ -40,7 +40,7 @@ fn init() {
     };
 
     textEditorId := make(formRect);
-    makeCursor(textEditorId);
+    -- makeCursor(textEditorId);
 
     return textEditorId;
 }
@@ -168,7 +168,7 @@ fn findGlyph(codepoint: i32) CachedGlyph {
     return cacheGlyph(codepoint);
 }
 
-fn drawLine(formId: i64, formData: *TextEditFormData, line: i64) {
+fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, startLine: i64) {
     form := &context.forms.buf[formId];
 
     -- Reset HarfBuzz buffer
@@ -205,7 +205,7 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64) {
     cl.glyphs.buf.count = 0;
 
     x: f64 = 5;
-    y: f64 = cast() (cast() FONT_SIZE * (line + 1));
+    y: f64 = cast() (cast() FONT_SIZE * ((line - startLine) + 1));
 
     for i: iter.until(cast() glyphCount) {
         found := findGlyph(cast() (glyphInfo + i).codepoint);
@@ -243,7 +243,10 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64) {
 
 -- todo(chad): make highlights not a pointer
 type TextEditFormData struct {
-    highlights: *buf.Buffer!(gui.Rect!(f64))
+    highlights: *buf.Buffer!(gui.Rect!(f64)),
+
+    color: gui.Color = {0, 0, 0, 0},
+    setColor := false
 }
 
 fn cursorIterator() {
@@ -349,27 +352,41 @@ fn loadFonts() {
 }
 
 fn make(rect: gui.Rect!(f64)) {
-    fn draw(formId: i64, formData: *TextEditFormData, messageData: *none) {
+    #import "random";
+    random.seed();
+
+    -- todo(chad): actually take the messageData rect into account
+    fn draw(formId: i64, formData: *TextEditFormData, messageData: *gui.Rect!(f64)) {
         form := &context.forms.buf[formId];
 
-        localRect := {0, 0, form.rect.width, form.rect.height};
-
         -- clear
+        localRect := {0, 0, form.rect.width, form.rect.height};
         formId|gui.drawRect(localRect, 0.1739, 0.1867, 0.1433);
 
-        lineCount := se.editor_buffer_get_line_count(context.tc.eb);
+        startLine := cast(i64) messageData.y / cast(i64) FONT_SIZE;
+        endLine := startLine + (cast(i64) messageData.height + 1) / cast(i64) FONT_SIZE;
 
-        for line: iter.until(lineCount) {
-            drawLine(formId, formData, line);
+        if startLine < 0 { startLine = 0; }
+
+        maxLine := se.editor_buffer_get_line_count(context.tc.eb);
+        if endLine > maxLine {
+            endLine = maxLine;
+        }
+
+        for line: iter.range(startLine, endLine) {
+            drawLine(formId, formData, line, startLine);
         }
 
         for highlight: formData.highlights.buf {
             formId|gui.drawRect(highlight, 0, 1, 0);
         }
+
         formData.highlights.buf.count = 0;
     }
 
     fn mousemove(formId: i64, formData: *TextEditFormData, messageData: *gui.MouseMessageData) {
+        return;
+
         form := &context.forms.buf[formId];
 
         localX := messageData.x - form.rect.x;
@@ -381,8 +398,7 @@ fn make(rect: gui.Rect!(f64)) {
         -- gui.setFormNeedsDraw(formId);
 
         -- y relative to the form
-        relY := context.mouse.y - cast() form.rect.y;
-        line := cast(i64) (relY / FONT_SIZE);
+        line := cast(i64) (cast() localY / FONT_SIZE);
 
         if line >= 0 and line < context.tc.lineCache.buf.count {
             cl := context.tc.lineCache.buf[line];
@@ -390,7 +406,7 @@ fn make(rect: gui.Rect!(f64)) {
                 boundingLeft: gui.Rect!(f64) = {form.rect.x + g.x, form.rect.y + cl.low - 1, g.width/2, cl.high - cl.low};
                 boundingRight: gui.Rect!(f64) = {form.rect.x + g.x + g.width/2, form.rect.y + cl.low - 1, g.width/2, cl.high - cl.low};
 
-                if boundingLeft|:contains(cast() context.mouse.x, cast() context.mouse.y) {
+                if boundingLeft|:contains(messageData.x, messageData.y) {
                     -- try to draw *after* the previous glyph
                     if i > 0 {
                         clG := cl.glyphs.buf[i - 1];
@@ -406,7 +422,7 @@ fn make(rect: gui.Rect!(f64)) {
                         gui.setFormNeedsDraw(formId);
                     }
                 }
-                else if boundingRight|:contains(cast() context.mouse.x, cast() context.mouse.y) {
+                else if boundingRight|:contains(messageData.x, messageData.y) {
                         cursorRect: gui.Rect!(f64) = {g.x + g.width, cl.low - 1, 2, cl.high - cl.low};
 
                         formData.highlights|:append(cursorRect);

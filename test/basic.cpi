@@ -47,7 +47,7 @@ fn assert(b: bool) {
     if (b == false) { panic(); }
 }
 
-fn init(T: Ast)() {
+fn default(T: Ast)() {
     t: T;
     return t;
 }

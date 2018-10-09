@@ -51,6 +51,11 @@ type Rect(T := typeof(x)) struct {
     height: T
 }
 
+type Point(T := typeof(x)) struct {
+    x: T,
+    y: T
+}
+
 #attr(Rect) {
 fn contains(T := typeof(r.x))(r: !R/Rect, x: T, y: T) {
     return r.x <= x
@@ -87,11 +92,6 @@ fn intersects(r1: !R/Rect, r2: R) {
 }
 }
 
-type Point(T := typeof(x)) struct {
-    x: T,
-    y: T,
-}
-
 type Message struct {
     name: []i8,
     data: *none
@@ -113,9 +113,8 @@ type Layer struct {
 -- then that view should get precedence when it comes to passing key/mouse/etc. events
 type Form struct {
     rect: Rect!(f64),
-    layer: *Layer,
+    layer: Layer,
     receivers: buf.Buffer!(Receiver),
-    delegate: i64 = -1,
     data: *none,
 }
 
@@ -162,7 +161,7 @@ fn makeLayer(rect: Rect!(f64)) {
 
     cairo.cairo_surface_set_device_scale(layerSurface, context.sdl.xScale, context.sdl.yScale);
 
-    return mem.heap(cast(Layer) {layerSurface, layerContext});
+    return cast(Layer) {layerSurface, layerContext};
 }
 
 fn makeFormNonScaled(r: Rect!(f64), data: !T, ownLayer := false) {
@@ -182,7 +181,7 @@ fn makeFormNonScaled(r: Rect!(f64), data: !T, ownLayer := false) {
         f.layer = makeLayer(scaled);
     }
     else {
-        f.layer = &context.cairo.layer;
+        f.layer = context.cairo.layer;
     }
 
     ^(cast(*T) context.formDatas.current) = data;
@@ -219,7 +218,7 @@ fn makeForm(r: Rect!(f64), data: !T, ownLayer := false) {
         f.layer = makeLayer(layerRect);
     }
     else {
-        f.layer = &context.cairo.layer;
+        f.layer = context.cairo.layer;
     }
 
     ^(cast(*T) context.formDatas.current) = data;
@@ -231,30 +230,14 @@ fn makeForm(r: Rect!(f64), data: !T, ownLayer := false) {
     return id;
 }
 
-fn sendMessage(formId: i64, message: Message, bypassDelegate := false) {
+fn sendMessage(formId: i64, message: Message) {
     form := &context.forms.buf[formId];
 
-    if form.delegate != -1 and bypassDelegate == false {
-        delegateForm := &context.forms.buf[form.delegate];
-
-        if handleMessage(form.delegate, delegateForm.data, message) {
-            return;
-        }
-    }
-
-    handleMessage(formId, form, message);
-}
-
-fn handleMessage(formId: i64, form: *Form, message: Message) {
-    handled := false;
     for r: form.receivers.buf {
         if string.streq(message.name, r.name) {
-            handled = true;
             r.handle(formId, form.data, message.data);
         }
     }
-
-    return handled;
 }
 
 fn broadcast(name: []i8, data := nil) {
@@ -274,15 +257,15 @@ fn drawForm(formId: i64) {
 
     realId := formId;
     realForm := form;
-    if form.delegate != -1 {
-        realId = form.delegate;
-        realForm := &context.forms.buf[realId];
-    }
 
     realId|clearForm;
-    sendMessage(realId, {DRAW, nil});
 
-    if realForm.layer != &context.cairo.layer {
+    m: Message;
+    m.name = DRAW;
+    m.data = &form.rect;
+    sendMessage(realId, m);
+
+    if realForm.layer.context != context.cairo.layer.context {
         cairo.cairo_save(context.cairo.layer.context);
         defer { cairo.cairo_restore(context.cairo.layer.context); }
 
@@ -317,7 +300,7 @@ fn drawUpdatedForms() {
 
             if animator.rect|:intersects(covering.rect) {
                 -- if it has it's own form then no need to explicitly redraw. Otherwise, redraw
-                if covering.layer != &context.cairo.layer {
+                if covering.layer.context != context.cairo.layer.context {
                     cairo.cairo_set_source_surface(context.cairo.layer.context, covering.layer.surface, covering.rect.x, covering.rect.y);
                     cairo.cairo_rectangle(context.cairo.layer.context, animator.rect.x, animator.rect.y, animator.rect.width, animator.rect.height);
                     cairo.cairo_fill(context.cairo.layer.context);
@@ -467,7 +450,7 @@ fn drawRect(formId: i64, rect: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1) {
     defer { cairo.cairo_restore(form.layer.context); }
 
     cairo.cairo_set_source_rgba(form.layer.context, r, g, b, a);
-    if form.layer == &context.cairo.layer {
+    if form.layer.context == context.cairo.layer.context {
         cairo.cairo_rectangle(form.layer.context, form.rect.x + rect.x, form.rect.y + rect.y, rect.width, rect.height);
     }
     else {
@@ -491,13 +474,13 @@ fn shutdown() {
     sdl.SDL_Quit();
 }
 
-fn clearRect(layer: *Layer, rect: Rect!(f64)) {
+fn clearRect(layer: Layer, rect: Rect!(f64)) {
     cairo.cairo_save(layer.context);
     defer { cairo.cairo_restore(layer.context); }
 
     cairo.cairo_set_source_rgba(layer.context, 0, 0, 0, 0);
     cairo.cairo_set_operator(layer.context, cairo.Operator.SOURCE);
-    if layer == &context.cairo.layer {
+    if layer.context == context.cairo.layer.context {
         cairo.cairo_rectangle(layer.context, rect.x, rect.y, rect.width, rect.height);
     }
     else {

@@ -1,28 +1,194 @@
 #import "gui/gui";
 #import "io";
+#import "iter";
+#import "string";
+#import "buffer": buf;
+#import "cairo";
 
-type ScrollFormData struct {
-    contentId: i64
+type CachedLayer struct {
+    rect: gui.Rect!(f64),
+    layer: gui.Layer
 }
 
-fn draw(formId: i64, formData: *ScrollFormData, messageData: *none) {
-    form := &context.forms.buf[formId];
-    content := &context.forms.buf[formData.contentId];
-
-    savedLayer := content.layer;
-    content.layer = form.layer;
-
-    formData.contentId|gui.sendMessage({gui.DRAW, nil}, bypassDelegate: true);
-
-    content.layer = savedLayer;
+type FormData struct {
+    contentId: i64,
+    savedDrawFn: fn(formId: i64, formData: *none, messageData: *none) none,
+    savedMouseMoveFn: fn(formId: i64, formData: *none, messageData: *none) none,
+    layerCache: buf.Buffer!(CachedLayer),
+    scrollOffset: gui.Point!(f64)
 }
 
-fn make(rect: gui.Rect!(f64), contentFormId: i64) {
-    formId := gui.makeForm(rect, cast(ScrollFormData) {contentFormId}, true);
+#context scrollDatas: buf.Buffer!(FormData)
+
+fn takeover(rect: gui.Rect!(f64), formId: i64) {
     form := &context.forms.buf[formId];
 
-    contentForm := &context.forms.buf[contentFormId];
-    contentForm.delegate = formId;
+    fd: FormData;
+    fd.contentId = formId;
 
-    formId|gui.addReceiver(gui.DRAW, draw);
+    for r: form.receivers.buf|iter.byRef {
+        if string.streq(gui.DRAW, r.name) {
+            fd.savedDrawFn = r.handle;
+            r.handle = draw;
+        }
+        else if string.streq(gui.MOUSEMOVE, r.name) {
+            fd.savedMouseMoveFn = r.handle;
+            r.handle = mousemove;
+        }
+    }
+
+    &context.scrollDatas|:append(fd);
+
+    gui.addReceiver(formId, gui.MOUSESCROLL, handleScroll);
+    -- gui.addReceiver(formId, gui.MOUSEMOVE, mouseMove); -- todo(chad): only if it's not already there
+
+    -- todo(chad): only add to these if they aren't already there
+    &context.scrollers|:append(formId);
+    -- &context.mousers|:append(formId);
+}
+
+fn mousemove(formId: i64, formData: *none, messageData: *gui.MouseMessageData) {
+    fd := findFormData(formId);
+
+    messageData.x += fd.scrollOffset.x;
+    messageData.y += fd.scrollOffset.y;
+
+    -- io.println(^messageData);
+
+    -- todo(chad): only call this if it actually has one...
+    fd.savedMouseMoveFn(formId, formData, messageData);
+}
+
+fn handleScroll(formId: i64, formData: *none, messageData: *gui.MouseScrollMessageData) {
+    fd := findFormData(formId);
+
+    -- fd.scrollOffset.x -= messageData.x;
+    if messageData.flipped == true {
+        fd.scrollOffset.y += messageData.y;
+    }
+    else {
+        fd.scrollOffset.y -= messageData.y;
+    }
+
+    if fd.scrollOffset.y < 0 {
+        fd.scrollOffset.y = 0;
+    }
+
+    gui.setFormNeedsDraw(formId);
+}
+
+fn rectFor(x: f64, y: f64, width: f64, height: f64, fd: *FormData) {
+    rX: f64 = 0;
+    rY: f64 = 0;
+
+    -- if rX > x {
+        -- while rX > x {
+            -- rX -= width;
+        -- }
+    -- }
+    -- else if rX < x {
+        -- while rX + width < x {
+            -- rX += width;
+        -- }
+    -- }
+
+    if rY > y {
+        while rY - height > y {
+            rY -= height;
+        }
+    }
+    else if rY < y {
+        while rY < y {
+            rY += height;
+        }
+    }
+
+    return cast(gui.Rect) {rX, rY, width, height};
+}
+
+fn findFormData(formId: i64) *FormData {
+    if false { return nil; }
+
+    for data: context.scrollDatas.buf|iter.byRef {
+        if data.contentId == formId {
+            return data;
+        }
+    }
+
+    return nil;
+}
+
+fn drawChunk(fd: *FormData, formId: i64, formData: *none, chunkRect: gui.Rect!(f64)) {
+    tmpLayer: gui.Layer;
+
+    form := &context.forms.buf[formId];
+
+    found := false;
+    for cl: fd.layerCache.buf {
+        if cl.rect.x == chunkRect.x and cl.rect.y == chunkRect.y
+            and cl.rect.width == chunkRect.width
+            and cl.rect.height == chunkRect.height {
+                found = true;
+                tmpLayer = cl.layer;
+            }
+    }
+    if found == false {
+        scaled: gui.Rect!(f64) = {
+            chunkRect.x * cast() context.sdl.xScale,
+            chunkRect.y * cast() context.sdl.yScale,
+            chunkRect.width * cast() context.sdl.xScale,
+            chunkRect.height * cast() context.sdl.yScale,
+        };
+
+        cl: CachedLayer = {chunkRect, gui.makeLayer(scaled)};
+        &fd.layerCache|:append(cl);
+        tmpLayer = cl.layer;
+    }
+
+    cr := chunkRect;
+
+    savedLayer := form.layer;
+    form.layer = tmpLayer;
+    -- todo(chad): only do this when it actually needs to be drawn, not on every damn scroll event!!
+    fd.savedDrawFn(formId, formData, &cr);
+    form.layer = savedLayer;
+
+    -- draw into the real layer
+    cairo.cairo_set_source_surface(form.layer.context, tmpLayer.surface, cr.x - fd.scrollOffset.x, cr.y - fd.scrollOffset.y);
+    cairo.cairo_rectangle(form.layer.context, cr.x - fd.scrollOffset.x, cr.y - fd.scrollOffset.y, form.rect.width, form.rect.height);
+    cairo.cairo_fill(form.layer.context);
+}
+
+fn draw(formId: i64, formData: *none, messageData: *none) {
+    found := false;
+
+    fd := findFormData(formId);
+
+    if fd == nil { return; }
+
+    form := &context.forms.buf[formId];
+
+    cairo.cairo_set_source_rgba(form.layer.context, 0, 0, 0, 0);
+    cairo.cairo_set_source_rgb(form.layer.context, 0, 0, 0);
+    cairo.cairo_paint(form.layer.context);
+
+    -- rect for top left
+    topLeft := rectFor(fd.scrollOffset.x,
+        fd.scrollOffset.y,
+        form.rect.width,
+        form.rect.height,
+        fd);
+    drawChunk(fd, formId, formData, topLeft);
+
+    -- rect for top right
+    topLeft.x += topLeft.width;
+    drawChunk(fd, formId, formData, topLeft);
+
+    -- rect for bottom right
+    topLeft.y -= topLeft.height;
+    drawChunk(fd, formId, formData, topLeft);
+
+    -- rect for bottom left
+    topLeft.x -= topLeft.width;
+    drawChunk(fd, formId, formData, topLeft);
 }
