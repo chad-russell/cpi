@@ -53,8 +53,6 @@ fn mousemove(formId: i64, formData: *none, messageData: *gui.MouseMessageData) {
     messageData.x += fd.scrollOffset.x;
     messageData.y += fd.scrollOffset.y;
 
-    -- io.println(^messageData);
-
     -- todo(chad): only call this if it actually has one...
     fd.savedMouseMoveFn(formId, formData, messageData);
 }
@@ -62,7 +60,7 @@ fn mousemove(formId: i64, formData: *none, messageData: *gui.MouseMessageData) {
 fn handleScroll(formId: i64, formData: *none, messageData: *gui.MouseScrollMessageData) {
     fd := findFormData(formId);
 
-    -- fd.scrollOffset.x -= messageData.x;
+    fd.scrollOffset.x -= messageData.x;
     if messageData.flipped == true {
         fd.scrollOffset.y += messageData.y;
     }
@@ -73,6 +71,9 @@ fn handleScroll(formId: i64, formData: *none, messageData: *gui.MouseScrollMessa
     if fd.scrollOffset.y < 0 {
         fd.scrollOffset.y = 0;
     }
+    if fd.scrollOffset.x < 0 {
+        fd.scrollOffset.x = 0;
+    }
 
     gui.setFormNeedsDraw(formId);
 }
@@ -81,16 +82,16 @@ fn rectFor(x: f64, y: f64, width: f64, height: f64, fd: *FormData) {
     rX: f64 = 0;
     rY: f64 = 0;
 
-    -- if rX > x {
-        -- while rX > x {
-            -- rX -= width;
-        -- }
-    -- }
-    -- else if rX < x {
-        -- while rX + width < x {
-            -- rX += width;
-        -- }
-    -- }
+    if rX > x {
+        while rX > x {
+            rX -= width;
+        }
+    }
+    else if rX < x {
+        while rX + width < x {
+            rX += width;
+        }
+    }
 
     if rY > y {
         while rY - height > y {
@@ -159,7 +160,7 @@ fn drawChunk(fd: *FormData, formId: i64, formData: *none, chunkRect: gui.Rect!(f
     cairo.cairo_fill(form.layer.context);
 }
 
-fn draw(formId: i64, formData: *none, messageData: *none) {
+fn draw(formId: i64, formData: *none, messageData: *gui.Rect!(f64)) {
     found := false;
 
     fd := findFormData(formId);
@@ -172,23 +173,27 @@ fn draw(formId: i64, formData: *none, messageData: *none) {
     cairo.cairo_set_source_rgb(form.layer.context, 0, 0, 0);
     cairo.cairo_paint(form.layer.context);
 
-    -- rect for top left
-    topLeft := rectFor(fd.scrollOffset.x,
+    -- rect for bottom left
+    bottomLeft := rectFor(fd.scrollOffset.x,
         fd.scrollOffset.y,
         form.rect.width,
         form.rect.height,
         fd);
-    drawChunk(fd, formId, formData, topLeft);
-
-    -- rect for top right
-    topLeft.x += topLeft.width;
-    drawChunk(fd, formId, formData, topLeft);
 
     -- rect for bottom right
-    topLeft.y -= topLeft.height;
-    drawChunk(fd, formId, formData, topLeft);
+    bottomRight := bottomLeft;
+    bottomRight.x += bottomRight.width;
 
-    -- rect for bottom left
+    -- rect for top right
+    topRight := bottomRight;
+    topRight.y -= topRight.height;
+
+    -- rect for top left
+    topLeft := topRight;
     topLeft.x -= topLeft.width;
+
     drawChunk(fd, formId, formData, topLeft);
+    drawChunk(fd, formId, formData, topRight);
+    drawChunk(fd, formId, formData, bottomLeft);
+    drawChunk(fd, formId, formData, bottomRight);
 }

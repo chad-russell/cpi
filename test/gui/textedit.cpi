@@ -168,7 +168,7 @@ fn findGlyph(codepoint: i32) CachedGlyph {
     return cacheGlyph(codepoint);
 }
 
-fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, startLine: i64) {
+fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Rect!(f64)) {
     form := &context.forms.buf[formId];
 
     -- Reset HarfBuzz buffer
@@ -204,8 +204,8 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, startLine: i64)
     cl := &context.tc.lineCache.buf[line];
     cl.glyphs.buf.count = 0;
 
-    x: f64 = 5;
-    y: f64 = cast() (cast() FONT_SIZE * ((line - startLine) + 1));
+    x: f64 = 5 - offset.x;
+    y: f64 = cast() (cast() FONT_SIZE * (line + 1)) - offset.y;
 
     for i: iter.until(cast() glyphCount) {
         found := findGlyph(cast() (glyphInfo + i).codepoint);
@@ -364,17 +364,16 @@ fn make(rect: gui.Rect!(f64)) {
         formId|gui.drawRect(localRect, 0.1739, 0.1867, 0.1433);
 
         startLine := cast(i64) messageData.y / cast(i64) FONT_SIZE;
-        endLine := startLine + (cast(i64) messageData.height + 1) / cast(i64) FONT_SIZE;
-
         if startLine < 0 { startLine = 0; }
 
+        endLine := startLine + 1 + (cast(i64) messageData.height) / cast(i64) FONT_SIZE;
         maxLine := se.editor_buffer_get_line_count(context.tc.eb);
         if endLine > maxLine {
             endLine = maxLine;
         }
 
         for line: iter.range(startLine, endLine) {
-            drawLine(formId, formData, line, startLine);
+            drawLine(formId, formData, line, messageData);
         }
 
         for highlight: formData.highlights.buf {
