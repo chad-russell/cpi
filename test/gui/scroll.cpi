@@ -15,7 +15,8 @@ type FormData struct {
     savedDrawFn: fn(formId: i64, formData: *none, messageData: *none) none,
     savedMouseMoveFn: fn(formId: i64, formData: *none, messageData: *none) none,
     layerCache: buf.Buffer!(CachedLayer),
-    scrollOffset: gui.Point!(f64)
+    scrollOffset: gui.Point!(f64),
+    effectiveRect: gui.Rect!(f64),
 }
 
 #context scrollDatas: buf.Buffer!(FormData)
@@ -25,6 +26,7 @@ fn takeover(rect: gui.Rect!(f64), formId: i64) {
 
     fd: FormData;
     fd.contentId = formId;
+    fd.effectiveRect = rect;
 
     for r: form.receivers.buf|iter.byRef {
         if string.streq(gui.DRAW, r.name) {
@@ -45,6 +47,8 @@ fn takeover(rect: gui.Rect!(f64), formId: i64) {
     -- todo(chad): only add to these if they aren't already there
     &context.scrollers|:append(formId);
     -- &context.mousers|:append(formId);
+
+    return &context.scrollDatas.buf[context.scrollDatas.buf.count - 1];
 }
 
 fn mousemove(formId: i64, formData: *none, messageData: *gui.MouseMessageData) {
@@ -60,12 +64,12 @@ fn mousemove(formId: i64, formData: *none, messageData: *gui.MouseMessageData) {
 fn handleScroll(formId: i64, formData: *none, messageData: *gui.MouseScrollMessageData) {
     fd := findFormData(formId);
 
-    fd.scrollOffset.x -= messageData.x;
+    fd.scrollOffset.x += messageData.x;
     if messageData.flipped == true {
-        fd.scrollOffset.y += messageData.y;
+        fd.scrollOffset.y -= messageData.y;
     }
     else {
-        fd.scrollOffset.y -= messageData.y;
+        fd.scrollOffset.y += messageData.y;
     }
 
     if fd.scrollOffset.y < 0 {
@@ -74,6 +78,9 @@ fn handleScroll(formId: i64, formData: *none, messageData: *gui.MouseScrollMessa
     if fd.scrollOffset.x < 0 {
         fd.scrollOffset.x = 0;
     }
+
+    formRect := context.forms.buf[formId].rect;
+    fd.effectiveRect = {formRect.x - fd.scrollOffset.x, formRect.y - fd.scrollOffset.y, formRect.width, formRect.height};
 
     gui.setFormNeedsDraw(formId);
 }
@@ -150,7 +157,6 @@ fn drawChunk(fd: *FormData, formId: i64, formData: *none, chunkRect: gui.Rect!(f
 
     savedLayer := form.layer;
     form.layer = tmpLayer;
-    -- todo(chad): only do this when it actually needs to be drawn, not on every damn scroll event!!
     fd.savedDrawFn(formId, formData, &cr);
     form.layer = savedLayer;
 
@@ -168,10 +174,6 @@ fn draw(formId: i64, formData: *none, messageData: *gui.Rect!(f64)) {
     if fd == nil { return; }
 
     form := &context.forms.buf[formId];
-
-    cairo.cairo_set_source_rgba(form.layer.context, 0, 0, 0, 0);
-    cairo.cairo_set_source_rgb(form.layer.context, 0, 0, 0);
-    cairo.cairo_paint(form.layer.context);
 
     -- rect for bottom left
     bottomLeft := rectFor(fd.scrollOffset.x,

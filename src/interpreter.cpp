@@ -56,40 +56,28 @@ void debugPrintVar(ostream &target, Interpreter *interp, TypeData td, int64_t of
             target << td.intTypeData;
         } break;
         case NodeTypekind::I8: {
-            auto p = (char *) offset;
-            if (isValidPtr(p)) {
-                target << *p;
-            }
-            else {
-                target << "ERROR: could not read";
-            }
+            debugPrintIntegerType<char>(target, offset);
+        } break;
+        case NodeTypekind::U8: {
+            debugPrintIntegerType<uint8_t>(target, offset);
         } break;
         case NodeTypekind::I16: {
-            auto p = (int16_t *) offset;
-            if (isValidPtr(p)) {
-                target << *p;
-            }
-            else {
-                target << "ERROR: could not read";
-            }
+            debugPrintIntegerType<int16_t>(target, offset);
+        } break;
+        case NodeTypekind::U16: {
+            debugPrintIntegerType<uint16_t>(target, offset);
         } break;
         case NodeTypekind::I32: {
-            auto p = (int32_t *) offset;
-            if (isValidPtr(p)) {
-                target << *p;
-            }
-            else {
-                target << "ERROR: could not read";
-            }
+            debugPrintIntegerType<int32_t>(target, offset);
+        } break;
+        case NodeTypekind::U32: {
+            debugPrintIntegerType<uint32_t>(target, offset);
         } break;
         case NodeTypekind::I64: {
-            auto p = (int64_t *) offset;
-            if (isValidPtr(p)) {
-                target << *p;
-            }
-            else {
-                target << "ERROR: could not read";
-            }
+            debugPrintIntegerType<int64_t>(target, offset);
+        } break;
+        case NodeTypekind::U64: {
+            debugPrintIntegerType<uint64_t>(target, offset);
         } break;
         case NodeTypekind::ENUM: {
             if (!isValidPtr((void *) offset)) {

@@ -97,11 +97,12 @@ LlvmGen::LlvmGen(const char *fileName) : builder(context), module(llvm::make_uni
 }
 
 void LlvmGen::finalize() {
+    verifyModule(*module, &llvm::errs());
+
     // DO_OPTIMIZE
     for (auto fn : allFns) {
         TheFPM->run(*fn);
     }
-    verifyModule(*module, &llvm::errs());
 }
 
 llvm::Type *LlvmGen::typeFor(Node *node) {

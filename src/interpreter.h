@@ -393,6 +393,19 @@ public:
 
 void interp_destroy(Interpreter *interp);
 
+bool isValidPtr(void *p);
+
+template<typename T>
+void debugPrintIntegerType(ostream &target, int64_t offset) {
+    auto p = (T *) offset;
+    if (isValidPtr(p)) {
+        target << *p;
+    }
+    else {
+        target << "ERROR: could not read";
+    }
+}
+
 template<typename FROM, typename TO>
 void interpretConvertFromTo(void *fromAddr, void *toAddr) {
     FROM from = *((FROM *) fromAddr);
@@ -409,15 +422,28 @@ void interpretConvertFrom(void *fromAddr, void *toAddr, NodeTypekind toType) {
         case NodeTypekind::I8: {
             interpretConvertFromTo<T, int8_t>(fromAddr, toAddr);
         } break;
+        case NodeTypekind::U8: {
+            interpretConvertFromTo<T, uint8_t>(fromAddr, toAddr);
+        } break;
         case NodeTypekind::I16: {
             interpretConvertFromTo<T, int16_t>(fromAddr, toAddr);
+        } break;
+        case NodeTypekind::U16: {
+            interpretConvertFromTo<T, uint16_t>(fromAddr, toAddr);
         } break;
         case NodeTypekind::I32: {
             interpretConvertFromTo<T, int32_t>(fromAddr, toAddr);
         } break;
+        case NodeTypekind::U32: {
+            interpretConvertFromTo<T, uint32_t>(fromAddr, toAddr);
+        } break;
         case NodeTypekind::I64: {
             interpretConvertFromTo<T, int64_t>(fromAddr, toAddr);
         } break;
+        case NodeTypekind::U64: {
+            interpretConvertFromTo<T, uint64_t>(fromAddr, toAddr);
+        } break;
+        case NodeTypekind::FLOAT_LITERAL:
         case NodeTypekind::F32: {
             interpretConvertFromTo<T, float>(fromAddr, toAddr);
         } break;
