@@ -291,6 +291,7 @@ fn drawUpdatedForms() {
         drawForm(formId);
     }
 
+    if context.frame mod 20 == 0 {
     for animatorId: context.animators.buf {
         update = true;
 
@@ -312,6 +313,7 @@ fn drawUpdatedForms() {
         }
 
         drawForm(animatorId);
+    }
     }
 
     -- todo(chad): `if update {` doesn't work... :(
@@ -370,8 +372,9 @@ fn initSdl() {
 
     context.sdl.window = window;
 
-    sdlRenderFlags: i32 = 6;
-    context.sdl.renderer = sdl.SDL_CreateRenderer(context.sdl.window, -1, 0);
+    -- sdlRenderFlags: i32 = 6;
+    sdlRenderFlags: i32 = 0;
+    context.sdl.renderer = sdl.SDL_CreateRenderer(context.sdl.window, -1, sdlRenderFlags);
 
     -- Compute screen resolution
     -- For instance, on a retina screen, renderer size is twice as window size

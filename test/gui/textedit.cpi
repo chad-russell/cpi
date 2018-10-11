@@ -201,8 +201,6 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Re
     glyphInfo := hb.hb_buffer_get_glyph_infos(context.hb.buffer, nil);
     glyphPos := hb.hb_buffer_get_glyph_positions(context.hb.buffer, nil);
 
-    if glyphCount == 0 { return; }
-
     -- try to find the cachedLine. If we can't make a new one
     if context.tc.lineCache.buf.count <= line {
         cl: CachedLine = {cast() (context.sdl.windowHeight + 10), 0, buf.make!(gui.Rect!(f64))()};
@@ -210,6 +208,8 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Re
         context.tc.lineCache.buf.count = line + 1;
     }
     cl := &context.tc.lineCache.buf[line];
+
+    if glyphCount == 0 { return; }
 
     x: f64 = 5 - offset.x;
     y: f64 = cast() (cast() FONT_SIZE * (line + 1)) - offset.y;
@@ -234,15 +234,15 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Re
             cairo.cairo_fill(form.layer.context);
 
             if y + found.extents.yBearing < cl.low {
-                cl.low = y + found.extents.yBearing;
+                cl.low = offset.y + y + found.extents.yBearing;
             }
             if y + found.extents.yBearing + cast() (found.extents.height + 1) > cl.high {
-                cl.high = y + found.extents.yBearing + found.extents.height + 1;
+                cl.high = offset.y + y + found.extents.yBearing + found.extents.height + 1;
             }
 
             &cl.glyphs|:set(i, {
-                x + found.extents.xBearing,
-                y + found.extents.yBearing,
+                offset.x + x + found.extents.xBearing,
+                offset.y + y + found.extents.yBearing,
                 cast() (found.extents.width + 1),
                 cast() (found.extents.height + 1)
             });
@@ -254,9 +254,9 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Re
     }
 }
 
--- todo(chad): make highlights not a pointer
 type TextEditFormData struct {
-    highlights: *buf.Buffer!(gui.Rect!(f64)),
+    highlights: buf.Buffer!(gui.Rect!(f64)),
+    currentMousePoint: struct{row: i64, col: i64},
 }
 
 fn cursorIterator() {
@@ -384,8 +384,16 @@ fn make(rect: gui.Rect!(f64)) {
         }
 
         for highlight: formData.highlights.buf {
-            formId|gui.drawRect(highlight, 0, 1, 0);
+            -- translate into our space
+            highlight.x -= messageData.x;
+            highlight.y -= messageData.y;
+
+            formId|gui.drawRect(highlight, 0.9, 0.9, 0.9, 0.5);
         }
+    }
+
+    fn mousedown(formId: i64, formData: *TextEditFormData, messageData: *gui.MouseMessageData) {
+        se.editor_buffer_set_cursor_point(context.tc.eb, formData.currentMousePoint.row, formData.currentMousePoint.col);
     }
 
     fn mousemove(formId: i64, formData: *TextEditFormData, messageData: *gui.MouseMessageData) {
@@ -398,7 +406,7 @@ fn make(rect: gui.Rect!(f64)) {
 
         -- Mouse cursor
         -- cursor: gui.Rect!(f64) = {cast() (localX - 10), cast() (localY - 10), 20, 20};
-        -- formData.highlights|:append(cursor);
+        -- &formData.highlights|:append(cursor);
         -- gui.setFormNeedsDraw(formId);
 
         -- y relative to the form
@@ -408,36 +416,39 @@ fn make(rect: gui.Rect!(f64)) {
             cl := context.tc.lineCache.buf[line];
 
             for g, i: cl.glyphs.buf {
-                boundingLeft: gui.Rect!(f64) = {form.rect.x + g.x, form.rect.y + cl.low - 1, g.width/2, cl.high - cl.low};
-                boundingRight: gui.Rect!(f64) = {form.rect.x + g.x + g.width/2, form.rect.y + cl.low - 1, g.width/2, cl.high - cl.low};
+                boundingLeft: gui.Rect!(f64) = {form.rect.x + g.x, form.rect.y + cl.low - 1, g.width/2, cast() FONT_SIZE};
+                boundingRight: gui.Rect!(f64) = {form.rect.x + g.x + g.width/2, form.rect.y + cl.low - 1, g.width/2, cast() FONT_SIZE};
 
                 if boundingLeft|:contains(messageData.x, messageData.y) {
-                    -- try to draw *after* the previous glyph
-                    if i > 0 {
-                        clG := cl.glyphs.buf[i - 1];
-                        cursorRect: gui.Rect!(f64) = {clG.x + clG.width, cl.low - 1, 2, cl.high - cl.low};
+                    formData.currentMousePoint = {line, i};
 
-                        formData.highlights|:append(cursorRect);
+                    clG := cl.glyphs.buf[i - 1];
+                    if i > 0 {
+                        cursorRect: gui.Rect!(f64) = {clG.x + clG.width, cl.low - 1, 2, cast() FONT_SIZE};
+
+                        &formData.highlights|:append(cursorRect);
                         gui.setFormNeedsDraw(formId);
                     }
                     else {
-                        cursorRect: gui.Rect!(f64) = {cl.glyphs.buf[0].x, cl.low - 1, 2, cl.high - cl.low};
+                        cursorRect: gui.Rect!(f64) = {cl.glyphs.buf[0].x, cl.low - 1, 2, cast() FONT_SIZE};
 
-                        formData.highlights|:append(cursorRect);
+                        &formData.highlights|:append(cursorRect);
                         gui.setFormNeedsDraw(formId);
                     }
                 }
                 else if boundingRight|:contains(messageData.x, messageData.y) {
-                        cursorRect: gui.Rect!(f64) = {g.x + g.width, cl.low - 1, 2, cl.high - cl.low};
+                    formData.currentMousePoint = {line, i + 1};
 
-                        formData.highlights|:append(cursorRect);
-                        gui.setFormNeedsDraw(formId);
+                    cursorRect: gui.Rect!(f64) = {g.x + g.width, cl.low - 1, 2, cast() FONT_SIZE};
+
+                    &formData.highlights|:append(cursorRect);
+                    gui.setFormNeedsDraw(formId);
                 }
             }
 
             -- entire line
             -- lineRect: gui.Rect!(f64) = {0, cl.low - 1, cast() context.sdl.windowWidth, cl.high - cl.low + 2};
-            -- formData.highlights|:append(lineRect);
+            -- &formData.highlights|:append(lineRect);
         }
     }
 
@@ -482,12 +493,12 @@ fn make(rect: gui.Rect!(f64)) {
     }
 
     formData: TextEditFormData;
-    formData.highlights = buf.make!(gui.Rect!(f64))();
 
     formId := gui.makeForm(rect, formData, ownLayer: true);
 
     formId|gui.addReceiver(gui.DRAW, draw);
     formId|gui.addReceiver(gui.MOUSEMOVE, mousemove);
+    formId|gui.addReceiver(gui.MOUSEDOWN, mousedown);
     formId|gui.addReceiver(gui.KEYDOWN, keydown);
     formId|gui.addReceiver(TEXT_UPDATE, textUpdate);
 
