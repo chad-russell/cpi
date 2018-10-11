@@ -175,7 +175,6 @@ fn makeFormNonScaled(r: Rect!(f64), data: !T, ownLayer := false) {
     f: Form;
     f.rect = scaled;
     f.data = context.formDatas.current;
-    -- f.receivers = buf.make!(Receiver)();
 
     if ownLayer {
         f.layer = makeLayer(scaled);
@@ -207,7 +206,6 @@ fn makeForm(r: Rect!(f64), data: !T, ownLayer := false) {
     f: Form;
     f.rect = scaled;
     f.data = context.formDatas.current;
-    -- f.receivers = buf.make!(Receiver)();
     if ownLayer {
         layerRect: Rect!(f64) = {
             0,
@@ -376,7 +374,7 @@ fn initSdl() {
         panic();
     }
 
-    window := sdl.SDL_CreateWindow("text"|string.cstr,
+    window := sdl.SDL_CreateWindow("editor"|string.cstr,
         sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
         WIDTH, HEIGHT,
         8196);

@@ -19,11 +19,10 @@ FONT_SIZE : i32 = 20;
 sliderBackground: gui.Color = {0.4235, 0.4275, 0.4117};
 sliderForeground: gui.Color = {0.8686, 0.7686, 0.7647};
 
+#context cursor: *gui.Form
+
 fn init() {
     context.tc.eb = se.editor_buffer_create(80);
-
-    context.tc.glyphCache = buf.make!(CachedGlyph)();
-    context.tc.lineCache = buf.make!(CachedLine)();
 
     loadFonts();
 
@@ -43,12 +42,13 @@ fn init() {
     textEditorId := make(formRect);
     textEditor := &context.forms.buf[textEditorId];
 
-    cursorId := makeCursor(formRect);
+    cursorId := makeCursor(textEditor.data, textEditorId);
     cursor := &context.forms.buf[cursorId];
+    context.cursor = cursor;
 
     scrollData := scroll.takeover(textEditor.rect, textEditorId);
 
-    cursor.data = &scrollData.effectiveRect;
+    (cast(*CursorFormData) cursor.data).parentRect = &scrollData.effectiveRect;
 
     return textEditorId;
 }
@@ -113,9 +113,6 @@ type CachedLine struct {
     eb: *se.EditorBuffer,
 
     font: []i8,
-
-    glyphCache: *buf.Buffer!(CachedGlyph),
-    lineCache: *buf.Buffer!(CachedLine),
 }
 
 #context hb: struct {
@@ -123,7 +120,7 @@ type CachedLine struct {
     buffer: *hb.Buffer = nil,
 }
 
-fn cacheGlyph(codepoint: i32) {
+fn cacheGlyph(formData: *TextEditFormData, codepoint: i32) {
     cairoGlyph := cairo.cairo_glyph_allocate(1);
     defer { cairo.cairo_glyph_free(cairoGlyph); }
 
@@ -162,18 +159,18 @@ fn cacheGlyph(codepoint: i32) {
     cairo.cairo_translate(glyphContext, 0, -cached.extents.yBearing);
     cairo.cairo_show_glyphs(glyphContext, cairoGlyph, 1);
 
-    &context.tc.glyphCache|:append(cached);
+    &formData.glyphCache|:append(cached);
     return cached;
 }
 
-fn findGlyph(codepoint: i32) CachedGlyph {
-    for g: context.tc.glyphCache.buf {
+fn findGlyph(formData: *TextEditFormData, codepoint: i32) CachedGlyph {
+    for g: formData.glyphCache.buf {
         if g.codepoint == codepoint {
             return g;
         }
     }
 
-    return cacheGlyph(codepoint);
+    return cacheGlyph(formData, codepoint);
 }
 
 fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Rect!(f64)) {
@@ -202,12 +199,12 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Re
     glyphPos := hb.hb_buffer_get_glyph_positions(context.hb.buffer, nil);
 
     -- try to find the cachedLine. If we can't make a new one
-    if context.tc.lineCache.buf.count <= line {
+    if formData.lineCache.buf.count <= line {
         cl: CachedLine = {cast() (context.sdl.windowHeight + 10), 0, buf.make!(gui.Rect!(f64))()};
-        &context.tc.lineCache|:set(line, cl);
-        context.tc.lineCache.buf.count = line + 1;
+        &formData.lineCache|:set(line, cl);
+        formData.lineCache.buf.count = line + 1;
     }
-    cl := &context.tc.lineCache.buf[line];
+    cl := &formData.lineCache.buf[line];
 
     if glyphCount == 0 { return; }
 
@@ -219,7 +216,7 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Re
     -- just to figure out where to start drawing. Maybe some info in LineCache for every 500 glyphs or something on where the start x position is
     -- for that group of 500, that way we can skip 500 at a time.
     for i: iter.until(cast() glyphCount) {
-        found := findGlyph(cast() (glyphInfo + i).codepoint);
+        found := findGlyph(formData, cast() (glyphInfo + i).codepoint);
 
         if x + found.extents.xAdvance >= 0 {
             cairo.cairo_save(form.layer.context);
@@ -257,6 +254,9 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Re
 type TextEditFormData struct {
     highlights: buf.Buffer!(gui.Rect!(f64)),
     currentMousePoint: struct{row: i64, col: i64},
+
+    glyphCache: buf.Buffer!(CachedGlyph),
+    lineCache: buf.Buffer!(CachedLine),
 }
 
 fn cursorIterator() {
@@ -282,9 +282,17 @@ fn cursorIterator() {
     return cast(CursorIterator) { 0, context.tc.eb.currentScreen.cursorInfos.length };
 }
 
-fn makeCursor(parentRect: gui.Rect!(f64)) {
-    fn draw(formId: i64, formData: *gui.Rect!(f64), messageData: *none) {
+type CursorFormData struct {
+    parentRect: *gui.Rect!(f64),
+    parentId: i64
+}
+
+fn makeCursor(formData: *TextEditFormData, parentId: i64) {
+    fn draw(formId: i64, formData: *CursorFormData, messageData: *none) {
         form := &context.forms.buf[formId];
+
+        parent := &context.forms.buf[formData.parentId];
+        parentData := cast(*TextEditFormData) parent.data;
 
         for cursorInfo: cursorIterator() {
             cursorRect: gui.Rect!(f64);
@@ -292,17 +300,18 @@ fn makeCursor(parentRect: gui.Rect!(f64)) {
 
             width: f64 = 20.0;
 
-            if context.tc.lineCache.buf.count > cursorInfo.row {
-                cl := context.tc.lineCache.buf[cursorInfo.row];
+            if parentData.lineCache.buf.count > cursorInfo.row {
+                cl := parentData.lineCache.buf[cursorInfo.row];
+
                 if cl.glyphs.buf.count >= cursorInfo.col {
                     hasPrevious = true;
 
                     g := cl.glyphs.buf[cursorInfo.col - 1];
-                    form.rect = {formData.x + g.x + g.width, formData.y + cl.low - 1, width, cast() FONT_SIZE};
+                    form.rect = {formData.parentRect.x + g.x + g.width, formData.parentRect.y + cl.low - 1, width, cast() FONT_SIZE};
                 }
             }
             if !hasPrevious {
-                form.rect = {formData.x, formData.y + cast() (cast() cursorInfo.row * FONT_SIZE), width, cast() FONT_SIZE};
+                form.rect = {formData.parentRect.x, formData.parentRect.y + cast() (cast() cursorInfo.row * FONT_SIZE), width, cast() FONT_SIZE};
             }
 
             #import "time";
@@ -318,12 +327,15 @@ fn makeCursor(parentRect: gui.Rect!(f64)) {
         }
     }
 
-    formId := gui.makeFormNonScaled({0, 0, 1.5, cast(f64) FONT_SIZE}, parentRect, true);
+    -- todo(chad): wtf...
+    if false { return 0; }
 
+    parent := &context.forms.buf[parentId];
+    cfd: CursorFormData = {&parent.rect, parentId};
+
+    formId := gui.makeFormNonScaled({0, 0, 1.5, cast(f64) FONT_SIZE}, cfd, true);
     formId|gui.addReceiver(gui.DRAW, draw);
-
     &context.animators|:append(formId);
-
     return formId;
 }
 
@@ -398,6 +410,7 @@ fn make(rect: gui.Rect!(f64)) {
     fn mousemove(formId: i64, formData: *TextEditFormData, messageData: *gui.MouseMessageData) {
         form := &context.forms.buf[formId];
 
+        oldCount := formData.highlights.buf.count;
         formData.highlights.buf.count = 0;
 
         localX := messageData.x - form.rect.x;
@@ -411,8 +424,8 @@ fn make(rect: gui.Rect!(f64)) {
         -- y relative to the form
         line := cast(i64) (cast() localY / FONT_SIZE);
 
-        if line >= 0 and line < context.tc.lineCache.buf.count {
-            cl := context.tc.lineCache.buf[line];
+        if line >= 0 and line < formData.lineCache.buf.count {
+            cl := formData.lineCache.buf[line];
 
             for g, i: cl.glyphs.buf {
                 boundingLeft: gui.Rect!(f64) = {form.rect.x + g.x, form.rect.y + cl.low - 1, g.width/2, cast() FONT_SIZE};
@@ -448,6 +461,9 @@ fn make(rect: gui.Rect!(f64)) {
             -- entire line
             -- lineRect: gui.Rect!(f64) = {0, cl.low - 1, cast() context.sdl.windowWidth, cl.high - cl.low + 2};
             -- &formData.highlights|:append(lineRect);
+        }
+        else if oldCount != formData.highlights.buf.count {
+            gui.setFormNeedsDraw(formId);
         }
     }
 
@@ -488,6 +504,7 @@ fn make(rect: gui.Rect!(f64)) {
     }
 
     fn textUpdate(formId: i64, formData: *TextEditFormData, messageData: *none) {
+        formData.lineCache.buf.count = 0;
         formId|gui.setFormNeedsDraw;
     }
 
