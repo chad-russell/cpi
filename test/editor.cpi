@@ -6,7 +6,7 @@ fn main() {
 
     gui.init();
 
-    textEditId := textedit.init();
+    textedit.init();
 
     gui.loop();
 

@@ -308,7 +308,7 @@ fn makeCursor(parentRect: gui.Rect!(f64)) {
             #import "time";
             elapsedSeconds := cast(f64) context.elapsed / cast() time.CLOCKS_PER_SEC;
 
-            alpha := (math.sin(elapsedSeconds * 15) + 1.0) / 2.0;
+            alpha := (math.sin(elapsedSeconds * 9) + 1.0) / 2.0;
 
             cairo.cairo_set_source_rgba(form.layer.context, 0.9, 0.9, 0.9, alpha);
             cairo.cairo_set_line_width(form.layer.context, 10);
@@ -367,8 +367,7 @@ fn make(rect: gui.Rect!(f64)) {
         form := &context.forms.buf[formId];
 
         -- clear
-        localRect := {0, 0, form.rect.width, form.rect.height};
-        formId|gui.drawRect(localRect, 0.1739, 0.1867, 0.1433);
+        formId|gui.drawRect(^messageData, 0.1739, 0.1867, 0.1433);
 
         startLine := cast(i64) messageData.y / cast(i64) FONT_SIZE;
         if startLine < 0 { startLine = 0; }

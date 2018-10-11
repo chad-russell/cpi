@@ -252,17 +252,22 @@ fn processMessages() {
     }
 }
 
-fn drawForm(formId: i64) {
+fn drawForm(formId: i64, rect: Rect!(f64) = {0, 0, 0, 0}) {
     form := &context.forms.buf[formId];
 
     realId := formId;
     realForm := form;
 
-    realId|clearForm;
+    toClear := rect;
+    if toClear.width == 0 and toClear.height == 0 {
+        toClear = realForm.rect;
+    }
+
+    realId|clearForm(toClear);
 
     m: Message;
     m.name = DRAW;
-    m.data = &form.rect;
+    m.data = &toClear;
     sendMessage(realId, m);
 
     if realForm.layer.context != context.cairo.layer.context {
@@ -270,7 +275,7 @@ fn drawForm(formId: i64) {
         defer { cairo.cairo_restore(context.cairo.layer.context); }
 
         cairo.cairo_set_source_surface(context.cairo.layer.context, realForm.layer.surface, realForm.rect.x, realForm.rect.y);
-        cairo.cairo_rectangle(context.cairo.layer.context, realForm.rect.x, realForm.rect.y, realForm.rect.width, realForm.rect.height);
+        cairo.cairo_rectangle(context.cairo.layer.context, toClear.x, toClear.y, toClear.width, toClear.height);
         cairo.cairo_fill(context.cairo.layer.context);
     }
 }
@@ -288,10 +293,20 @@ fn drawUpdatedForms() {
 
     for formId: context.drawers.buf {
         update = true;
-        drawForm(formId);
+
+        found := false;
+        for animatorId: context.animators.buf {
+            if formId == animatorId {
+                found = true;
+            }
+        }
+
+        if found == false {
+            drawForm(formId);
+        }
     }
 
-    if context.frame mod 20 == 0 {
+    if update or context.frame mod 5 == 0 {
     for animatorId: context.animators.buf {
         update = true;
 
@@ -307,7 +322,7 @@ fn drawUpdatedForms() {
                     cairo.cairo_fill(context.cairo.layer.context);
                 }
                 else {
-                    drawForm(coveringId);
+                    drawForm(coveringId, animator.rect);
                 }
             }
         }
@@ -492,9 +507,9 @@ fn clearRect(layer: Layer, rect: Rect!(f64)) {
     cairo.cairo_fill(layer.context);
 }
 
-fn clearForm(formId: i64) {
+fn clearForm(formId: i64, rect: Rect!(f64)) {
     form := &context.forms.buf[formId];
-    clearRect(form.layer, form.rect);
+    clearRect(form.layer, rect);
 }
 
 #context quit: bool
