@@ -177,7 +177,7 @@ fn findGlyph(formData: *TextEditFormData, codepoint: i32, emoji: bool) CachedGly
     return cacheGlyph(formData, codepoint, emoji);
 }
 
-fn byteInCodepointUtf8(firstByte: u8) {
+fn bytesInCodepointUtf8(firstByte: u8) {
     if (firstByte >= 0 and firstByte <= 191) {
         return 1;
     }
@@ -203,28 +203,30 @@ fn byteInCodepointUtf8(firstByte: u8) {
 }
 
 fn isEmoji(codepoint: u64) {
+    io.printFln("% is emoji?", {codepoint});
+
     -- Emoticons
-    if codepoint >= 0x1F600 and codepoint >= 0x1F64F {
+    if codepoint >= 0x1F600 and codepoint <= 0x1F64F {
         return true;
     }
 
     -- Misc Symbols and Pictographs
-    if codepoint >= 0x1F300 and codepoint >= 0x1F5FF {
+    if codepoint >= 0x1F300 and codepoint <= 0x1F5FF {
         return true;
     }
 
     -- Transport and Map
-    if codepoint >= 0x1F680 and codepoint >= 0x1F6FF {
+    if codepoint >= 0x1F680 and codepoint <= 0x1F6FF {
         return true;
     }
 
     -- Regional country flags
-    if codepoint >= 0x1F1E6 and codepoint >= 0x1F1FF {
+    if codepoint >= 0x1F1E6 and codepoint <= 0x1F1FF {
         return true;
     }
 
     -- Misc symbols
-    if codepoint >= 0x2600 and codepoint >= 0x26FF {
+    if codepoint >= 0x2600 and codepoint <= 0x26FF {
         return true;
     }
 
@@ -240,7 +242,7 @@ fn isEmoji(codepoint: u64) {
 }
 
 fn stateFor(text: *u8) struct{isEmoji: bool, byteLength: i32} {
-    bytes := byteInCodepointUtf8(^text);
+    bytes := bytesInCodepointUtf8(^text);
 
     if bytes == 1 {
         return {false, 1};
@@ -250,7 +252,7 @@ fn stateFor(text: *u8) struct{isEmoji: bool, byteLength: i32} {
     }
     else if bytes == 3 {
         u: u64;
-        pu := cast(*i8) u;
+        pu := cast(*i8) &u;
 
         lastByte := cast(*u8) (pu + 3);
         middleTwoBytes := cast(*i16) (pu + 1);
@@ -302,6 +304,16 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Re
     x: f64 = 5 - offset.x;
     y: f64 = cast() (cast() FONT_SIZE * (line + 1)) - offset.y;
 
+    -- try to find the cachedLine. If we can't make a new one
+    if formData.lineCache.buf.count <= line {
+        cl: CachedLine = {cast() (context.sdl.windowHeight + 10), 0, buf.make!(gui.Rect!(f64))()};
+        &formData.lineCache|:set(line, cl);
+        formData.lineCache.buf.count = line + 1;
+    }
+    cl := &formData.lineCache.buf[line];
+
+    glyphIndex := 0;
+
     front := text.bytes;
     while ^front != "\0"[0] {
         -- Reset HarfBuzz buffer
@@ -332,14 +344,6 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Re
         glyphInfo := hb.hb_buffer_get_glyph_infos(context.hb.buffer, nil);
         glyphPos := hb.hb_buffer_get_glyph_positions(context.hb.buffer, nil);
 
-        -- try to find the cachedLine. If we can't make a new one
-        if formData.lineCache.buf.count <= line {
-            cl: CachedLine = {cast() (context.sdl.windowHeight + 10), 0, buf.make!(gui.Rect!(f64))()};
-            &formData.lineCache|:set(line, cl);
-            formData.lineCache.buf.count = line + 1;
-        }
-        cl := &formData.lineCache.buf[line];
-
         if glyphCount == 0 { return; }
 
         -- todo(chad): @Performance -- I was able to get up past 1k glyphs in release interpreter doing this,
@@ -368,7 +372,7 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Re
                     cl.high = offset.y + y + found.extents.yBearing + found.extents.height + 1;
                 }
 
-                &cl.glyphs|:set(i, {
+                &cl.glyphs|:set(glyphIndex + i, {
                     offset.x + x + found.extents.xBearing,
                     offset.y + y + found.extents.yBearing,
                     cast() (found.extents.width + 1),
@@ -380,6 +384,8 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Re
 
             x += found.extents.xAdvance;
         }
+
+        glyphIndex += cast() glyphCount;
     }
 }
 
@@ -526,8 +532,8 @@ fn make(rect: gui.Rect!(f64)) {
         form := &context.forms.buf[formId];
 
         -- clear
-        -- formId|gui.drawRect(^messageData, 0.1739, 0.1867, 0.1433);
-        formId|gui.drawRect({0, 0, form.rect.width, form.rect.height}, 0.1739, 0.1867, 0.1433);
+        formId|gui.drawRect(^messageData, 0.1739, 0.1867, 0.1433);
+        -- formId|gui.drawRect({0, 0, form.rect.width, form.rect.height}, 0.1739, 0.1867, 0.1433);
 
         startLine := cast(i64) messageData.y / cast(i64) FONT_SIZE;
         if startLine < 0 { startLine = 0; }

@@ -340,7 +340,8 @@ void LlvmGen::gen(Node *node) {
                 cpi_assert(nodeTypeToAlloca->type == NodeType::TYPE);
 
                 auto typeToAlloca = typeFor(nodeTypeToAlloca);
-                auto shouldCreateAlloca = nodeTypeToAlloca->typeData.kind != NodeTypekind::NONE;
+                auto shouldCreateAlloca = nodeTypeToAlloca->typeData.kind != NodeTypekind::NONE
+                                          && resolvedLocal->type != NodeType::ALIAS;
 
                 if (shouldCreateAlloca) {
                     if (resolvedLocal->type == NodeType::DECL) {
@@ -638,6 +639,12 @@ void LlvmGen::gen(Node *node) {
                         case LexerTokenType::LE: {
                             node->llvmData = builder.CreateICmpSLE(lhsIntValue, rhsIntValue);
                         } break;
+                        case LexerTokenType::SUB: {
+                            node->llvmData = builder.CreateSub(lhsIntValue, rhsIntValue);
+                        } break;
+                        case LexerTokenType::ADD: {
+                            node->llvmData = builder.CreateAdd(lhsIntValue, rhsIntValue);
+                        } break;
                         default: cpi_assert(false);
                     }
 
@@ -708,12 +715,23 @@ void LlvmGen::gen(Node *node) {
                         }
                     }
                     else {
+                        auto kind = node->binopData.lhs->typeInfo->typeData.kind;
+                        auto isUnsigned = kind == NodeTypekind::U8
+                                          || kind == NodeTypekind::U16
+                                          || kind == NodeTypekind::U32
+                                          || kind == NodeTypekind::U64;
+
                         switch (node->binopData.type) {
                             case LexerTokenType::ADD: {
                                 value = builder.CreateAdd(lhsValue, rhsValue);
                             } break;
                             case LexerTokenType::DIV: {
-                                value = builder.CreateSDiv(lhsValue, rhsValue);
+                                if (isUnsigned) {
+                                    value = builder.CreateUDiv(lhsValue, rhsValue);
+                                }
+                                else {
+                                    value = builder.CreateSDiv(lhsValue, rhsValue);
+                                }
                             } break;
                             case LexerTokenType::SUB: {
                                 value = builder.CreateSub(lhsValue, rhsValue);
@@ -728,16 +746,36 @@ void LlvmGen::gen(Node *node) {
                                 value = builder.CreateICmpNE(lhsValue, rhsValue);
                             } break;
                             case LexerTokenType::LT: {
-                                value = builder.CreateICmpSLT(lhsValue, rhsValue);
+                                if (isUnsigned) {
+                                    value = builder.CreateICmpULT(lhsValue, rhsValue);
+                                }
+                                else {
+                                    value = builder.CreateICmpSLT(lhsValue, rhsValue);
+                                }
                             } break;
                             case LexerTokenType::GT: {
-                                value = builder.CreateICmpSGT(lhsValue, rhsValue);
+                                if (isUnsigned) {
+                                    value = builder.CreateICmpUGT(lhsValue, rhsValue);
+                                }
+                                else {
+                                    value = builder.CreateICmpSGT(lhsValue, rhsValue);
+                                }
                             } break;
                             case LexerTokenType::GE: {
-                                value = builder.CreateICmpSGE(lhsValue, rhsValue);
+                                if (isUnsigned) {
+                                    value = builder.CreateICmpUGE(lhsValue, rhsValue);
+                                }
+                                else {
+                                    value = builder.CreateICmpSGE(lhsValue, rhsValue);
+                                }
                             } break;
                             case LexerTokenType::LE: {
-                                value = builder.CreateICmpSLE(lhsValue, rhsValue);
+                                if (isUnsigned) {
+                                    value = builder.CreateICmpULE(lhsValue, rhsValue);
+                                }
+                                else {
+                                    value = builder.CreateICmpSLE(lhsValue, rhsValue);
+                                }
                             } break;
                             case LexerTokenType::BITAND: {
                                 value = builder.CreateAnd(lhsValue, rhsValue);
@@ -755,7 +793,12 @@ void LlvmGen::gen(Node *node) {
                                 value = builder.CreateAShr(lhsValue, rhsValue);
                             } break;
                             case LexerTokenType::MOD: {
-                                value = builder.CreateSRem(lhsValue, rhsValue);
+                                if (isUnsigned) {
+                                    value = builder.CreateURem(lhsValue, rhsValue);
+                                }
+                                else {
+                                    value = builder.CreateSRem(lhsValue, rhsValue);
+                                }
                             } break;
                             default: cpi_assert(false);
                         }
@@ -1155,26 +1198,46 @@ void LlvmGen::gen(Node *node) {
                     default: cpi_assert(false);
                 }
 
+                auto kind = node->typeInfo->typeData.kind;
+                auto isUnsigned = kind == NodeTypekind::U8
+                                  || kind == NodeTypekind::U16
+                                  || kind == NodeTypekind::U32
+                                  || kind == NodeTypekind::U64;
+
                 if (isFloatType(fromType)) {
                     if (isFloatType(toType)) {
                         node->llvmData = builder.CreateFPCast(llvmFromValue, llvmToType);
                     }
                     else {
-                        node->llvmData = builder.CreateFPToSI(llvmFromValue, llvmToType);
+                        if (isUnsigned) {
+                            node->llvmData = builder.CreateFPToUI(llvmFromValue, llvmToType);
+                        }
+                        else {
+                            node->llvmData = builder.CreateFPToSI(llvmFromValue, llvmToType);
+                        }
                     }
                 }
                 else {
                     if (isFloatType(toType)) {
-                        node->llvmData = builder.CreateSIToFP(llvmFromValue, llvmToType);
+                        if (isUnsigned) {
+                            node->llvmData = builder.CreateUIToFP(llvmFromValue, llvmToType);
+                        }
+                        else {
+                            node->llvmData = builder.CreateSIToFP(llvmFromValue, llvmToType);
+                        }
                     }
                     else {
-                        node->llvmData = builder.CreateIntCast(llvmFromValue, llvmToType, true);
+                        node->llvmData = builder.CreateIntCast(llvmFromValue, llvmToType, !isUnsigned);
                     }
                 }
             }
             else if (fromType->typeData.kind == NodeTypekind::POINTER && toType->typeData.kind == NodeTypekind::I64) {
                 // ptr to int
                 node->llvmData = builder.CreatePtrToInt(rvalueFor(resolvedValue), typeFor(node->typeInfo));
+            }
+            else if (fromType->typeData.kind == NodeTypekind::I64 && toType->typeData.kind == NodeTypekind::POINTER) {
+                // int to ptr
+                node->llvmData = builder.CreateIntToPtr(rvalueFor(resolvedValue), typeFor(node->typeInfo));
             }
             else {
                 node->llvmData = rvalueFor(resolvedValue);

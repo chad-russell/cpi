@@ -1,3 +1,78 @@
+#import "io";
+
+type Utf struct {
+    mask: i8,
+    lead: i8,
+    beg: u32,
+    end: u32,
+    bitsStored: i32
+}
+
+fn bytesInCodepointUtf8(firstByte: u8) {
+    if (firstByte >= 0 and firstByte <= 191) {
+        return 1;
+    }
+
+    if (firstByte >= 245) {
+        return 1;
+    }
+
+    if (firstByte >= 192 and firstByte <= 223) {
+        return 2;
+    }
+
+    if (firstByte >= 224 and firstByte <= 239) {
+        return 3;
+    }
+
+    if (firstByte >= 240 and firstByte <= 244) {
+        return 4;
+    }
+
+    panic();
+    return 0;
+}
+
+fn to_cp(chr: *i8) {
+    utfArr := []Utf{
+        {0b00111111, 0b10000000, 0,       0,        6    },
+        {0b01111111, 0b00000000, 0000,    0177,     7    },
+        {0b00011111, 0b11000000, 0200,    03777,    5    },
+        {0b00001111, 0b11100000, 04000,   0177777,  4    },
+        {0b00000111, 0b11110000, 0200000, 04177777, 3    }
+    };
+
+	bytes := bytesInCodepointUtf8(cast() ^chr);
+	shift := utfArr[0].bitsStored * cast() (bytes - 1);
+
+	chr += 1;
+
+	masked := cast(u32) (^chr ~and utfArr[bytes].mask);
+	io.println(masked);
+	-- codep: u32 = masked ~shl cast() shift;
+
+    -- i := 0;
+    -- while i < bytes {
+        -- shift -= utfArr[0].bitsStored;
+        -- codep = codep ~or cast() ((^chr ~and utfArr[0].mask) ~shl cast() shift);
+
+        -- i += 1;
+        -- chr += 1;
+    -- }
+
+	-- return codep;
+	return 9999;
+}
+
 fn main() {
+    chars := []i8{
+        cast(i8) 0xF0,
+        cast(i8) 0x9D,
+        cast(i8) 0x84,
+        cast(i8) 0x9E
+    };
+
+    io.println(to_cp(chars.data));
+
     return 0;
 }
