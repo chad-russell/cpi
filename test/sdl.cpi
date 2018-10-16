@@ -8,6 +8,7 @@ INIT_VIDEO: i32 = 20;
 
 QUIT: u32 = 256;
 KEYDOWN: u32 = 0x300;
+KEYUP: u32 = 0x301;
 MOUSEMOTION: u32 = 0x400;
 MOUSEBUTTONDOWN: u32 = 0x401;
 MOUSEBUTTONUP: u32 = 0x402;
@@ -53,9 +54,23 @@ type Key enum(i32) {
     y: 28,
     z: 29,
 
+    `1`: 30,
+    `2`: 31,
+    `3`: 32,
+    `4`: 33,
+    `5`: 34,
+    `6`: 35,
+    `7`: 36,
+    `8`: 37,
+    `9`: 38,
+    `0`: 39,
+
     ENTER: 40,
     BACKSPACE: 42,
     SPACE: 44,
+
+    `;`: 51,
+    `'`: 52,
 
     `,`: 54,
     `.`: 55,
@@ -72,7 +87,8 @@ type Key enum(i32) {
     fn isalpha(key: Key) {
         ckey := cast(i32) key;
 
-        return (ckey >= 4 and ckey <= 29)
+        return (ckey >= 4 and ckey <= 39)
+            or (ckey >= 51 and ckey <= 52)
             or (ckey >= 54 and ckey <= 55);
     }
 

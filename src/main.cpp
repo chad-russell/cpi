@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
 
     reusedPolymorphs = 0;
     newPolymorphs = 0;
-    totalFnDeclDuration = 0;
+    totalLines = 0;
 
     atomTable = new AtomTable();
     atomTable->atoms = hash_init<string, int64_t>(1000);
@@ -493,12 +493,15 @@ int main(int argc, char **argv) {
 
     interp_destroy(interp);
 
+    cout << "total lines: " << totalLines << endl;
     cout << "reused " << reusedPolymorphs << " polymorphs, made " << newPolymorphs << " polymorphs." << endl;
 
     chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
     auto duration = chrono::duration_cast<chrono::microseconds>( t2 - t1 ).count();
 
-    cout << "TOTAL DURATION: " << duration << endl;
+    auto durationInSeconds = (double) duration / 1000000;
+    cout << "total duration: " << durationInSeconds << endl;
+    cout << "lines per second: " << (double) totalLines / durationInSeconds << endl;
 
     return 0;
 }

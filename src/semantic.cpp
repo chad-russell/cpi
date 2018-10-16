@@ -9,7 +9,7 @@
 
 int reusedPolymorphs;
 int newPolymorphs;
-long long int totalFnDeclDuration;
+int totalLines;
 
 Node *makeTypeConcrete(Node *typeInfo) {
     auto resolved = resolve(typeInfo);

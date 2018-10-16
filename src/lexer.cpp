@@ -393,6 +393,8 @@ void Lexer::eat() {
     auto frontChar = srcInfo.source->at(loc.byteIndex);
 
     if (frontChar == '\n') {
+        totalLines += 1;
+
         loc.line += 1;
         loc.col = 1;
 

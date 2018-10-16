@@ -665,7 +665,7 @@ void interpretExit(Interpreter *interp) {
 }
 
 void interpretPanic(Interpreter *interp) {
-    cout << "assertion failed!!!" << endl;
+    cout << "PANIC!" << endl;
     printCurrentStmt(interp, cout, true);
     exit(0);
 }

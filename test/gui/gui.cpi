@@ -364,6 +364,7 @@ fn setFormNeedsDraw(formId: i64) {
 
 #context cairo: struct {
     font: *cairo.FontFace,
+    emojiFont: *cairo.FontFace,
     layer: Layer
 }
 
@@ -564,10 +565,16 @@ fn processEvents() {
             keyboardEvent := cast(*sdl.KeyboardEvent) &event;
             -- io.println(cast(i32) keyboardEvent.keysym.scancode);
 
+            -- todo(chad): shift scancode is 225. Make a 'modifierKeys' list in context and add things to it when they get pressed
+
             kd: KeyboardMessageData = {scancode: keyboardEvent.keysym.scancode};
             for formId: context.texters.buf {
                 formId|sendMessage(cast() {KEYDOWN, &kd});
             }
+        }
+        else if event._type == sdl.KEYUP {
+            -- todo(chad): remove from modifierKeys where necessary
+            keyboardEvent := cast(*sdl.KeyboardEvent) &event;
         }
     }
 }

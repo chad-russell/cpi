@@ -111,16 +111,15 @@ type CachedLine struct {
 
 #context tc: struct {
     eb: *se.EditorBuffer,
-
-    font: []i8,
 }
 
 #context hb: struct {
     font: *hb.Font,
+    emojiFont: *hb.Font,
     buffer: *hb.Buffer = nil,
 }
 
-fn cacheGlyph(formData: *TextEditFormData, codepoint: i32) {
+fn cacheGlyph(formData: *TextEditFormData, codepoint: i32, emoji: bool) {
     cairoGlyph := cairo.cairo_glyph_allocate(1);
     defer { cairo.cairo_glyph_free(cairoGlyph); }
 
@@ -143,7 +142,12 @@ fn cacheGlyph(formData: *TextEditFormData, codepoint: i32) {
     -- Get Cairo context from Cairo surface
     glyphContext := cairo.cairo_create(glyphSurface);
 
-    cairo.cairo_set_font_face(glyphContext, context.cairo.font);
+    if emoji {
+        cairo.cairo_set_font_face(glyphContext, context.cairo.emojiFont);
+    }
+    else {
+        cairo.cairo_set_font_face(glyphContext, context.cairo.font);
+    }
     cairo.cairo_set_font_size(glyphContext, cast() FONT_SIZE);
 
     cairo.cairo_glyph_extents(glyphContext, cairoGlyph, 1, &cached.extents);
@@ -163,26 +167,131 @@ fn cacheGlyph(formData: *TextEditFormData, codepoint: i32) {
     return cached;
 }
 
-fn findGlyph(formData: *TextEditFormData, codepoint: i32) CachedGlyph {
+fn findGlyph(formData: *TextEditFormData, codepoint: i32, emoji: bool) CachedGlyph {
     for g: formData.glyphCache.buf {
         if g.codepoint == codepoint {
             return g;
         }
     }
 
-    return cacheGlyph(formData, codepoint);
+    return cacheGlyph(formData, codepoint, emoji);
+}
+
+fn byteInCodepointUtf8(firstByte: u8) {
+    if (firstByte >= 0 and firstByte <= 191) {
+        return 1;
+    }
+
+    if (firstByte >= 245) {
+        return 1;
+    }
+
+    if (firstByte >= 192 and firstByte <= 223) {
+        return 2;
+    }
+
+    if (firstByte >= 224 and firstByte <= 239) {
+        return 3;
+    }
+
+    if (firstByte >= 240 and firstByte <= 244) {
+        return 4;
+    }
+
+    panic();
+    return 0;
+}
+
+fn isEmoji(codepoint: u64) {
+    -- Emoticons
+    if codepoint >= 0x1F600 and codepoint >= 0x1F64F {
+        return true;
+    }
+
+    -- Misc Symbols and Pictographs
+    if codepoint >= 0x1F300 and codepoint >= 0x1F5FF {
+        return true;
+    }
+
+    -- Transport and Map
+    if codepoint >= 0x1F680 and codepoint >= 0x1F6FF {
+        return true;
+    }
+
+    -- Regional country flags
+    if codepoint >= 0x1F1E6 and codepoint >= 0x1F1FF {
+        return true;
+    }
+
+    -- Misc symbols
+    if codepoint >= 0x2600 and codepoint >= 0x26FF {
+        return true;
+    }
+
+            -- 0x2700...0x27BF,   // Dingbats
+            -- 0xFE00...0xFE0F,   // Variation Selectors
+            -- 0x1F900...0x1F9FF,  // Supplemental Symbols and Pictographs
+            -- 127000...127600, // Various asian characters
+            -- 65024...65039, // Variation selector
+            -- 9100...9300, // Misc items
+            -- 8400...8447: // Combining Diacritical Marks for Symbols
+
+    return false;
+}
+
+fn stateFor(text: *u8) struct{isEmoji: bool, byteLength: i32} {
+    bytes := byteInCodepointUtf8(^text);
+
+    if bytes == 1 {
+        return {false, 1};
+    }
+    else if bytes == 2 {
+        return {isEmoji(cast(u64) ^cast(*u16) text), 2};
+    }
+    else if bytes == 3 {
+        u: u64;
+        pu := cast(*i8) u;
+
+        lastByte := cast(*u8) (pu + 3);
+        middleTwoBytes := cast(*i16) (pu + 1);
+
+        ^lastByte = ^(text + 2);
+        ^middleTwoBytes = ^cast(*i16) text;
+
+        return {isEmoji(u), 3};
+    }
+    else if bytes == 4 {
+        return {isEmoji(cast(u64) ^cast(*u32) text), 4};
+    }
+
+    panic();
+    return {false, -1};
+}
+
+fn runInfoForLine(text: *i8) {
+    front := cast(*u8) text;
+
+    initialState := stateFor(front);
+    initialIsEmoji := initialState[0];
+
+    front += cast(i64) initialState[1];
+
+    runLength := 1;
+    while ^front != cast(u8) "\0"[0] {
+        state := stateFor(front);
+        if state[0] != initialIsEmoji {
+            return {initialIsEmoji, cast(*i8) front, cast(i32) (front - cast(*u8) text), runLength};
+        }
+
+        front += cast(i64) state[1];
+        runLength += 1;
+    }
+
+    return {initialIsEmoji, cast(*i8) front, cast(i32) (front - cast(*u8) text), runLength};
 }
 
 fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Rect!(f64)) {
     form := &context.forms.buf[formId];
-
-    -- Reset HarfBuzz buffer
-    hb.hb_buffer_reset(context.hb.buffer);
-
-    -- Set buffer to LTR direction, common script and default language
-    hb.hb_buffer_set_direction(context.hb.buffer, hb.HB_DIRECTION_LTR);
-    hb.hb_buffer_set_script(context.hb.buffer, hb.HB_SCRIPT_COMMON);
-    hb.hb_buffer_set_language(context.hb.buffer, hb.hb_language_get_default());
 
     -- Add text and lay it out
     lastChar := se.editor_buffer_get_line_length(context.tc.eb, line);
@@ -190,64 +299,87 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Re
     text := se.editor_buffer_get_text_between_points(context.tc.eb, line, 0, line, lastChar);
     defer { se.editor_buffer_free_buf(text); }
 
-    hb.hb_buffer_add_utf8(context.hb.buffer, text.bytes, -1, 0, -1);
-    hb.hb_shape(context.hb.font, context.hb.buffer, nil, 0);
-
-    -- Get buffer data
-    glyphCount := hb.hb_buffer_get_length(context.hb.buffer);
-    glyphInfo := hb.hb_buffer_get_glyph_infos(context.hb.buffer, nil);
-    glyphPos := hb.hb_buffer_get_glyph_positions(context.hb.buffer, nil);
-
-    -- try to find the cachedLine. If we can't make a new one
-    if formData.lineCache.buf.count <= line {
-        cl: CachedLine = {cast() (context.sdl.windowHeight + 10), 0, buf.make!(gui.Rect!(f64))()};
-        &formData.lineCache|:set(line, cl);
-        formData.lineCache.buf.count = line + 1;
-    }
-    cl := &formData.lineCache.buf[line];
-
-    if glyphCount == 0 { return; }
-
     x: f64 = 5 - offset.x;
     y: f64 = cast() (cast() FONT_SIZE * (line + 1)) - offset.y;
 
-    -- todo(chad): @Performance -- I was able to get up past 1k glyphs in release interpreter doing this,
-    -- but in theory for high glyph counts it's not the best to walk through each one if we're scrolled very far to the right
-    -- just to figure out where to start drawing. Maybe some info in LineCache for every 500 glyphs or something on where the start x position is
-    -- for that group of 500, that way we can skip 500 at a time.
-    for i: iter.until(cast() glyphCount) {
-        found := findGlyph(formData, cast() (glyphInfo + i).codepoint);
+    front := text.bytes;
+    while ^front != "\0"[0] {
+        -- Reset HarfBuzz buffer
+        hb.hb_buffer_reset(context.hb.buffer);
 
-        if x + found.extents.xAdvance >= 0 {
-            cairo.cairo_save(form.layer.context);
-            cairo.cairo_translate(form.layer.context, x, y + found.extents.yBearing);
+        -- Set buffer to LTR direction, common script and default language
+        hb.hb_buffer_set_direction(context.hb.buffer, hb.HB_DIRECTION_LTR);
+        hb.hb_buffer_set_script(context.hb.buffer, hb.HB_SCRIPT_COMMON);
+        hb.hb_buffer_set_language(context.hb.buffer, hb.hb_language_get_default());
 
-            cairo.cairo_set_source(form.layer.context, found.pattern);
-            cairo.cairo_rectangle(form.layer.context,
-                found.extents.xBearing,
-                0,
-                cast() (found.extents.width + 1),
-                cast() (found.extents.height + 1));
-            cairo.cairo_fill(form.layer.context);
+        runInfo := runInfoForLine(front);
 
-            if y + found.extents.yBearing < cl.low {
-                cl.low = offset.y + y + found.extents.yBearing;
-            }
-            if y + found.extents.yBearing + cast() (found.extents.height + 1) > cl.high {
-                cl.high = offset.y + y + found.extents.yBearing + found.extents.height + 1;
-            }
+        hb.hb_buffer_add_utf8(context.hb.buffer, text.bytes, -1, cast() (front - text.bytes), runInfo[2]);
+        -- hb.hb_buffer_add_utf8(context.hb.buffer, text.bytes, -1, 0, -1);
 
-            &cl.glyphs|:set(i, {
-                offset.x + x + found.extents.xBearing,
-                offset.y + y + found.extents.yBearing,
-                cast() (found.extents.width + 1),
-                cast() (found.extents.height + 1)
-            });
+        front = runInfo[1];
 
-            cairo.cairo_restore(form.layer.context);
+        if runInfo[0] == true {
+            hb.hb_shape(context.hb.emojiFont, context.hb.buffer, nil, 0);
+        }
+        else {
+            hb.hb_shape(context.hb.font, context.hb.buffer, nil, 0);
         }
 
-        x += found.extents.xAdvance;
+        -- Get buffer data
+        glyphCount := hb.hb_buffer_get_length(context.hb.buffer);
+
+        glyphInfo := hb.hb_buffer_get_glyph_infos(context.hb.buffer, nil);
+        glyphPos := hb.hb_buffer_get_glyph_positions(context.hb.buffer, nil);
+
+        -- try to find the cachedLine. If we can't make a new one
+        if formData.lineCache.buf.count <= line {
+            cl: CachedLine = {cast() (context.sdl.windowHeight + 10), 0, buf.make!(gui.Rect!(f64))()};
+            &formData.lineCache|:set(line, cl);
+            formData.lineCache.buf.count = line + 1;
+        }
+        cl := &formData.lineCache.buf[line];
+
+        if glyphCount == 0 { return; }
+
+        -- todo(chad): @Performance -- I was able to get up past 1k glyphs in release interpreter doing this,
+        -- but in theory for high glyph counts it's not the best to walk through each one if we're scrolled very far to the right
+        -- just to figure out where to start drawing. Maybe some info in LineCache for every 500 glyphs or something on where the start x position is
+        -- for that group of 500, that way we can skip 500 at a time.
+        for i: iter.until(cast() glyphCount) {
+            found := findGlyph(formData, cast() (glyphInfo + i).codepoint, runInfo[0]);
+
+            if x + found.extents.xAdvance >= 0 {
+                cairo.cairo_save(form.layer.context);
+                cairo.cairo_translate(form.layer.context, x, y + found.extents.yBearing);
+
+                cairo.cairo_set_source(form.layer.context, found.pattern);
+                cairo.cairo_rectangle(form.layer.context,
+                    found.extents.xBearing,
+                    0,
+                    cast() (found.extents.width + 1),
+                    cast() (found.extents.height + 1));
+                cairo.cairo_fill(form.layer.context);
+
+                if y + found.extents.yBearing < cl.low {
+                    cl.low = offset.y + y + found.extents.yBearing;
+                }
+                if y + found.extents.yBearing + cast() (found.extents.height + 1) > cl.high {
+                    cl.high = offset.y + y + found.extents.yBearing + found.extents.height + 1;
+                }
+
+                &cl.glyphs|:set(i, {
+                    offset.x + x + found.extents.xBearing,
+                    offset.y + y + found.extents.yBearing,
+                    cast() (found.extents.width + 1),
+                    cast() (found.extents.height + 1)
+                });
+
+                cairo.cairo_restore(form.layer.context);
+            }
+
+            x += found.extents.xAdvance;
+        }
     }
 }
 
@@ -340,33 +472,48 @@ fn makeCursor(formData: *TextEditFormData, parentId: i64) {
 }
 
 fn loadFonts() {
-    -- context.tc.font = "/System/Library/Fonts/Apple Color Emoji.ttc";
-    -- context.tc.font = "/Users/chadrussell/Projects/text/Noto-unhinted/NotoColorEmoji.ttf";
-    -- context.tc.font = "/Users/chadrussell/Projects/text/emojione-apple.ttc";
-    -- context.tc.font = "/Users/chadrussell/Library/Fonts/Roboto-Light.ttf";
-    context.tc.font = "/Library/Fonts/Inconsolata.otf";
-    -- context.tc.font = "/Users/chadrussell/Projects/text/JFWilwod.ttf";
+    emojiFont := "/System/Library/Fonts/Apple Color Emoji.ttc";
+    -- font := "/System/Library/Fonts/Apple Color Emoji.ttc";
 
-    -- context.tc.text = buf.from("Hello");
-    -- context.tc.text = buf.from("🙈");
+    -- font := "/Users/chadrussell/Projects/text/Noto-unhinted/NotoColorEmoji.ttf";
+    -- font := "/Users/chadrussell/Projects/text/emojione-apple.ttc";
+    -- font := "/Users/chadrussell/Library/Fonts/Roboto-Light.ttf";
+    font := "/Library/Fonts/Inconsolata.otf";
+    -- font := "/Users/chadrussell/Projects/text/JFWilwod.ttf";
+
+    -- emojiMonkey := "🙈";
 
     -- For CAIRO, load using FreeType
     ftLibrary: ft.Library;
     ft.FT_Init_FreeType(&ftLibrary);
     ftFace: ft.Face;
-    err := ft.FT_New_Face(ftLibrary, context.tc.font|string.cstr, 0, &ftFace);
+
+    err := ft.FT_New_Face(ftLibrary, font|string.cstr, 0, &ftFace);
     if err != 0 {
         io.println("error creating freetype font face");
         panic();
     }
     context.cairo.font = cairo.cairo_ft_font_face_create_for_ft_face(ftFace, 0);
 
+    err = ft.FT_New_Face(ftLibrary, emojiFont|string.cstr, 0, &ftFace);
+    if err != 0 {
+        io.println("error creating freetype emoji font face");
+        panic();
+    }
+    context.cairo.emojiFont = cairo.cairo_ft_font_face_create_for_ft_face(ftFace, 0);
+
     -- For Harfbuzz, load using OpenType (HarfBuzz FT does not support bitmap font)
-    blob := hb.hb_blob_create_from_file(context.tc.font|string.cstr);
+    blob := hb.hb_blob_create_from_file(font|string.cstr);
     face := hb.hb_face_create(blob, 0);
     context.hb.font = hb.hb_font_create(face);
     hb.hb_ot_font_set_funcs(context.hb.font);
     hb.hb_font_set_scale(context.hb.font, FONT_SIZE * 64, FONT_SIZE * 64);
+
+    blob = hb.hb_blob_create_from_file(emojiFont|string.cstr);
+    face = hb.hb_face_create(blob, 0);
+    context.hb.emojiFont = hb.hb_font_create(face);
+    hb.hb_ot_font_set_funcs(context.hb.emojiFont);
+    hb.hb_font_set_scale(context.hb.emojiFont, FONT_SIZE * 64, FONT_SIZE * 64);
 
     context.hb.buffer = hb.hb_buffer_create();
 }
@@ -379,7 +526,8 @@ fn make(rect: gui.Rect!(f64)) {
         form := &context.forms.buf[formId];
 
         -- clear
-        formId|gui.drawRect(^messageData, 0.1739, 0.1867, 0.1433);
+        -- formId|gui.drawRect(^messageData, 0.1739, 0.1867, 0.1433);
+        formId|gui.drawRect({0, 0, form.rect.width, form.rect.height}, 0.1739, 0.1867, 0.1433);
 
         startLine := cast(i64) messageData.y / cast(i64) FONT_SIZE;
         if startLine < 0 { startLine = 0; }
@@ -499,7 +647,12 @@ fn make(rect: gui.Rect!(f64)) {
             }
         }
         else if messageData.scancode|:isalpha {
-            se.editor_buffer_insert(context.tc.eb, :charsFor(messageData.scancode));
+            if messageData.scancode == cast() 8 {
+                se.editor_buffer_insert(context.tc.eb, "🙈\0".data);
+            }
+            else {
+                se.editor_buffer_insert(context.tc.eb, :charsFor(messageData.scancode));
+            }
         }
     }
 

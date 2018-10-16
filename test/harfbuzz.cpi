@@ -43,7 +43,7 @@ fn hb_buffer_set_direction(buf: *Buffer, direction: i32) none
 fn hb_buffer_set_script(buf: *Buffer, script: i32) none
 fn hb_buffer_set_language(buf: *Buffer, language: Language) none
 fn hb_language_get_default() Language
-fn hb_buffer_add_utf8(buffer: *Buffer, text: *i8, textLength: i32, itemOffset: i32, itemLength: i32) none
+fn hb_buffer_add_utf8(buffer: *Buffer, text: *i8, textLength: i32, itemOffset: u32, itemLength: i32) none
 fn hb_shape(font: *Font, buffer: *Buffer, features: *Feature, numFeatures: i32) none
 fn hb_buffer_get_length(buf: *Buffer) i32
 fn hb_buffer_get_glyph_infos(buf: *Buffer, length: *i32) *GlyphInfo

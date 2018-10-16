@@ -19,7 +19,7 @@ extern int noIppFlag;
 
 extern int reusedPolymorphs;
 extern int newPolymorphs;
-extern long long int totalFnDeclDuration;
+extern int totalLines;
 
 const char *readFile(const char *fileName);
 
