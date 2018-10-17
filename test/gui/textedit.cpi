@@ -320,6 +320,8 @@ type TextEditFormData struct {
     highlights: buf.Buffer!(gui.Rect!(f64)),
     currentMousePoint: struct{row: i64, col: i64},
 
+    lastUpdatedFrame: u64,
+
     glyphCache: buf.Buffer!(CachedGlyph),
     lineCache: buf.Buffer!(CachedLine),
 }
@@ -456,11 +458,14 @@ fn make(rect: gui.Rect!(f64)) {
     random.seed();
 
     fn draw(formId: i64, formData: *TextEditFormData, messageData: *gui.Rect!(f64)) {
+        if formData.lastUpdatedFrame < context.frame {
+            return;
+        }
+
         form := &context.forms.buf[formId];
 
         -- clear
-        formId|gui.drawRect(^messageData, 0.1739, 0.1867, 0.1433);
-        -- formId|gui.drawRect({0, 0, form.rect.width, form.rect.height}, 0.1739, 0.1867, 0.1433);
+        formId|gui.drawRect({0, 0, form.rect.width, form.rect.height}, 0.1739, 0.1867, 0.1433);
 
         startLine := cast(i64) messageData.y / cast(i64) FONT_SIZE;
         if startLine < 0 { startLine = 0; }
@@ -583,6 +588,9 @@ fn make(rect: gui.Rect!(f64)) {
             if messageData.scancode == cast() 8 {
                 se.editor_buffer_insert(context.tc.eb, "🙈\0".data);
             }
+            else if messageData.scancode == cast() 21 {
+                se.editor_buffer_insert(context.tc.eb, "é\0".data);
+            }
             else {
                 se.editor_buffer_insert(context.tc.eb, :charsFor(messageData.scancode));
             }
@@ -590,7 +598,7 @@ fn make(rect: gui.Rect!(f64)) {
     }
 
     fn textUpdate(formId: i64, formData: *TextEditFormData, messageData: *none) {
-        formData.lineCache.buf.count = 0;
+        formData.lastUpdatedFrame = context.frame;
         formId|gui.setFormNeedsDraw;
     }
 
