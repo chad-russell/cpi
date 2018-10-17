@@ -119,7 +119,7 @@ type CachedLine struct {
     buffer: *hb.Buffer = nil,
 }
 
-fn cacheGlyph(formData: *TextEditFormData, codepoint: i32, emoji: bool) {
+fn cacheGlyph(formData: *TextEditFormData, codepoint: i32, font: *cairo.FontFace) {
     cairoGlyph := cairo.cairo_glyph_allocate(1);
     defer { cairo.cairo_glyph_free(cairoGlyph); }
 
@@ -142,12 +142,7 @@ fn cacheGlyph(formData: *TextEditFormData, codepoint: i32, emoji: bool) {
     -- Get Cairo context from Cairo surface
     glyphContext := cairo.cairo_create(glyphSurface);
 
-    if emoji {
-        cairo.cairo_set_font_face(glyphContext, context.cairo.emojiFont);
-    }
-    else {
-        cairo.cairo_set_font_face(glyphContext, context.cairo.font);
-    }
+    cairo.cairo_set_font_face(glyphContext, font);
     cairo.cairo_set_font_size(glyphContext, cast() FONT_SIZE);
 
     cairo.cairo_glyph_extents(glyphContext, cairoGlyph, 1, &cached.extents);
@@ -167,14 +162,14 @@ fn cacheGlyph(formData: *TextEditFormData, codepoint: i32, emoji: bool) {
     return cached;
 }
 
-fn findGlyph(formData: *TextEditFormData, codepoint: i32, emoji: bool) CachedGlyph {
+fn findGlyph(formData: *TextEditFormData, codepoint: i32, font: *cairo.FontFace) CachedGlyph {
     for g: formData.glyphCache.buf {
         if g.codepoint == codepoint {
             return g;
         }
     }
 
-    return cacheGlyph(formData, codepoint, emoji);
+    return cacheGlyph(formData, codepoint, font);
 }
 
 fn bytesInCodepointUtf8(firstByte: u8) {
@@ -202,6 +197,35 @@ fn bytesInCodepointUtf8(firstByte: u8) {
     return 0;
 }
 
+fn tryShapeGlyphs(chars: *i8, font: *hb.Font) {
+    -- Reset HarfBuzz buffer
+    hb.hb_buffer_reset(context.hb.buffer);
+
+    -- Set buffer to LTR direction, common script and default language
+    hb.hb_buffer_set_direction(context.hb.buffer, hb.HB_DIRECTION_LTR);
+    hb.hb_buffer_set_script(context.hb.buffer, hb.HB_SCRIPT_COMMON);
+    hb.hb_buffer_set_language(context.hb.buffer, hb.hb_language_get_default());
+
+    hb.hb_buffer_add_utf8(context.hb.buffer, chars, -1, 0, -1);
+    hb.hb_shape(font, context.hb.buffer, nil, 0);
+
+    glyphInfo := hb.hb_buffer_get_glyph_infos(context.hb.buffer, nil);
+    glyphCount := hb.hb_buffer_get_length(context.hb.buffer);
+
+    ch := chars;
+    bytes := 0;
+    i := 0;
+    while i < cast() glyphCount and (glyphInfo + i).codepoint != 0 {
+        i += 1;
+
+        incr := bytesInCodepointUtf8(cast() ^ch);
+        bytes += incr;
+        ch += incr;
+    }
+
+    return {glyphs: i, bytes: bytes, glyphInfo: glyphInfo};
+}
+
 fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Rect!(f64)) {
     form := &context.forms.buf[formId];
 
@@ -226,59 +250,22 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Re
 
     front := text.bytes;
     while ^front != "\0"[0] {
-        -- Reset HarfBuzz buffer
-        hb.hb_buffer_reset(context.hb.buffer);
+        cairoFont := context.cairo.font;
+        run := tryShapeGlyphs(front, context.hb.font);
 
-        -- Set buffer to LTR direction, common script and default language
-        hb.hb_buffer_set_direction(context.hb.buffer, hb.HB_DIRECTION_LTR);
-        hb.hb_buffer_set_script(context.hb.buffer, hb.HB_SCRIPT_COMMON);
-        hb.hb_buffer_set_language(context.hb.buffer, hb.hb_language_get_default());
-
-        isEmoji := false;
-
-        byteCount := bytesInCodepointUtf8(cast() ^front);
-
-        hb.hb_buffer_add_utf8(context.hb.buffer, front, -1, 0, cast() byteCount);
-        hb.hb_shape(context.hb.font, context.hb.buffer, nil, 0);
-
-        -- Get buffer data
-        glyphCount := hb.hb_buffer_get_length(context.hb.buffer);
-        if glyphCount == 0 { return; }
-
-        glyphInfo := hb.hb_buffer_get_glyph_infos(context.hb.buffer, nil);
-
-        if glyphInfo.codepoint == 0 {
-            -- could not find glyph, fall back to emoji
-            isEmoji = true;
-
-            -- Reset HarfBuzz buffer
-            hb.hb_buffer_reset(context.hb.buffer);
-
-            -- Set buffer to LTR direction, common script and default language
-            hb.hb_buffer_set_direction(context.hb.buffer, hb.HB_DIRECTION_LTR);
-            hb.hb_buffer_set_script(context.hb.buffer, hb.HB_SCRIPT_COMMON);
-            hb.hb_buffer_set_language(context.hb.buffer, hb.hb_language_get_default());
-
-            hb.hb_buffer_add_utf8(context.hb.buffer, front, -1, 0, cast() byteCount);
-            hb.hb_shape(context.hb.emojiFont, context.hb.buffer, nil, 0);
-
-            -- Get buffer data
-            glyphCount = hb.hb_buffer_get_length(context.hb.buffer);
-            if glyphCount == 0 { return; }
-
-            glyphInfo = hb.hb_buffer_get_glyph_infos(context.hb.buffer, nil);
+        if run.glyphs == 0 {
+            cairoFont = context.cairo.emojiFont;
+            run = tryShapeGlyphs(front, context.hb.emojiFont);
         }
 
-        glyphPos := hb.hb_buffer_get_glyph_positions(context.hb.buffer, nil);
+        -- Get buffer data
+        glyphCount := run.glyphs;
+        if glyphCount == 0 { return; }
 
-        front += byteCount;
+        front += run.bytes;
 
-        -- todo(chad): @Performance -- I was able to get up past 1k glyphs in release interpreter doing this,
-        -- but in theory for high glyph counts it's not the best to walk through each one if we're scrolled very far to the right
-        -- just to figure out where to start drawing. Maybe some info in LineCache for every 500 glyphs or something on where the start x position is
-        -- for that group of 500, that way we can skip 500 at a time.
         for i: iter.until(cast() glyphCount) {
-            found := findGlyph(formData, cast() (glyphInfo + i).codepoint, isEmoji);
+            found := findGlyph(formData, cast() (run.glyphInfo + i).codepoint, cairoFont);
 
             if x + found.extents.xAdvance >= 0 {
                 cairo.cairo_save(form.layer.context);
@@ -494,6 +481,8 @@ fn make(rect: gui.Rect!(f64)) {
     }
 
     fn mousemove(formId: i64, formData: *TextEditFormData, messageData: *gui.MouseMessageData) {
+        formData.lastUpdatedFrame = context.frame;
+        
         form := &context.forms.buf[formId];
 
         oldCount := formData.highlights.buf.count;
