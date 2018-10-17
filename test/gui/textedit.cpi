@@ -249,6 +249,7 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Re
     glyphIndex := 0;
 
     front := text.bytes;
+
     while ^front != "\0"[0] {
         cairoFont := context.cairo.font;
         run := tryShapeGlyphs(front, context.hb.font);
@@ -448,6 +449,7 @@ fn make(rect: gui.Rect!(f64)) {
         if formData.lastUpdatedFrame < context.frame {
             return;
         }
+        formData.lastUpdatedFrame = context.frame;
 
         form := &context.forms.buf[formId];
 
@@ -482,7 +484,7 @@ fn make(rect: gui.Rect!(f64)) {
 
     fn mousemove(formId: i64, formData: *TextEditFormData, messageData: *gui.MouseMessageData) {
         formData.lastUpdatedFrame = context.frame;
-        
+
         form := &context.forms.buf[formId];
 
         oldCount := formData.highlights.buf.count;
