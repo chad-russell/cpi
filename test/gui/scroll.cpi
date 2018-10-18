@@ -194,6 +194,12 @@ fn draw(formId: i64, formData: *none, messageData: *gui.Rect!(f64)) {
     topLeft := topRight;
     topLeft.x -= topLeft.width;
 
+    io.println(bottomLeft);
+    io.println(bottomRight);
+    io.println(topRight);
+    io.println(topLeft);
+    io.println("-----");
+
     drawChunk(fd, formId, formData, topLeft);
     drawChunk(fd, formId, formData, topRight);
     drawChunk(fd, formId, formData, bottomLeft);

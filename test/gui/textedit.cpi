@@ -106,7 +106,8 @@ type CachedGlyph struct {
 type CachedLine struct {
     low: f64,
     high: f64,
-    glyphs: *buf.Buffer!(gui.Rect!(f64))
+    glyphs: *buf.Buffer!(gui.Rect!(f64)),
+    glyphRun: *buf.Buffer!(CachedGlyph)
 }
 
 #context tc: struct {
@@ -229,78 +230,84 @@ fn tryShapeGlyphs(chars: *i8, font: *hb.Font) {
 fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Rect!(f64)) {
     form := &context.forms.buf[formId];
 
-    -- Add text and lay it out
-    lastChar := se.editor_buffer_get_line_length(context.tc.eb, line);
-
-    text := se.editor_buffer_get_text_between_points(context.tc.eb, line, 0, line, lastChar);
-    defer { se.editor_buffer_free_buf(text); }
-
     x: f64 = 5 - offset.x;
     y: f64 = cast() (cast() FONT_SIZE * (line + 1)) - offset.y;
 
     -- Try to find the cachedLine. Make a new one if it doesn't exist
     if formData.lineCache.buf.count <= line {
-        cl: CachedLine = {cast() (context.sdl.windowHeight + 10), 0, buf.make!(gui.Rect!(f64))()};
+        cl: CachedLine = {cast() (context.sdl.windowHeight + 10), 0, buf.make!(gui.Rect!(f64))(), buf.make!(CachedGlyph)()};
+
         &formData.lineCache|:set(line, cl);
         formData.lineCache.buf.count = line + 1;
     }
     cl := &formData.lineCache.buf[line];
 
     glyphIndex := 0;
+    glyphCount := 0;
 
-    front := text.bytes;
+    if formData.textUpdated == true {
+        cl.glyphRun.buf.count = 0;
 
-    while ^front != "\0"[0] {
-        cairoFont := context.cairo.font;
-        run := tryShapeGlyphs(front, context.hb.font);
+        -- Add text and lay it out
+        lastChar := se.editor_buffer_get_line_length(context.tc.eb, line);
 
-        if run.glyphs == 0 {
-            cairoFont = context.cairo.emojiFont;
-            run = tryShapeGlyphs(front, context.hb.emojiFont);
-        }
+        text := se.editor_buffer_get_text_between_points(context.tc.eb, line, 0, line, lastChar);
+        defer { se.editor_buffer_free_buf(text); }
 
-        -- Get buffer data
-        glyphCount := run.glyphs;
-        if glyphCount == 0 { return; }
+        front := text.bytes;
 
-        front += run.bytes;
+        while ^front != "\0"[0] {
+            cairoFont := context.cairo.font;
+            run := tryShapeGlyphs(front, context.hb.font);
 
-        for i: iter.until(cast() glyphCount) {
-            found := findGlyph(formData, cast() (run.glyphInfo + i).codepoint, cairoFont);
-
-            if x + found.extents.xAdvance >= 0 {
-                cairo.cairo_save(form.layer.context);
-                cairo.cairo_translate(form.layer.context, x, y + found.extents.yBearing);
-
-                cairo.cairo_set_source(form.layer.context, found.pattern);
-                cairo.cairo_rectangle(form.layer.context,
-                    found.extents.xBearing,
-                    0,
-                    cast() (found.extents.width + 1),
-                    cast() (found.extents.height + 1));
-                cairo.cairo_fill(form.layer.context);
-
-                if y + found.extents.yBearing < cl.low {
-                    cl.low = offset.y + y + found.extents.yBearing;
-                }
-                if y + found.extents.yBearing + cast() (found.extents.height + 1) > cl.high {
-                    cl.high = offset.y + y + found.extents.yBearing + found.extents.height + 1;
-                }
-
-                &cl.glyphs|:set(glyphIndex + i, {
-                    offset.x + x + found.extents.xBearing,
-                    offset.y + y + found.extents.yBearing,
-                    cast() (found.extents.width + 1),
-                    cast() (found.extents.height + 1)
-                });
-
-                cairo.cairo_restore(form.layer.context);
+            if run.glyphs == 0 {
+                cairoFont = context.cairo.emojiFont;
+                run = tryShapeGlyphs(front, context.hb.emojiFont);
             }
 
-            x += found.extents.xAdvance;
+            -- Get buffer data
+            if run.glyphs == 0 { return; }
+
+            front += run.bytes;
+
+            for g: iter.until(run.glyphs) {
+                found := findGlyph(formData, cast() (run.glyphInfo + g).codepoint, cairoFont);
+                &cl.glyphRun|:append(found);
+            }
+        }
+    }
+
+    for found, i: cl.glyphRun.buf {
+        if x + found.extents.xAdvance >= 0 {
+            cairo.cairo_save(form.layer.context);
+            cairo.cairo_translate(form.layer.context, x, y + found.extents.yBearing);
+
+            cairo.cairo_set_source(form.layer.context, found.pattern);
+            cairo.cairo_rectangle(form.layer.context,
+                found.extents.xBearing,
+                0,
+                cast() (found.extents.width + 1),
+                cast() (found.extents.height + 1));
+            cairo.cairo_fill(form.layer.context);
+
+            if y + found.extents.yBearing < cl.low {
+                cl.low = offset.y + y + found.extents.yBearing;
+            }
+            if y + found.extents.yBearing + cast() (found.extents.height + 1) > cl.high {
+                cl.high = offset.y + y + found.extents.yBearing + found.extents.height + 1;
+            }
+
+            &cl.glyphs|:set(glyphIndex + i, {
+                offset.x + x + found.extents.xBearing,
+                offset.y + y + found.extents.yBearing,
+                cast() (found.extents.width + 1),
+                cast() (found.extents.height + 1)
+            });
+
+            cairo.cairo_restore(form.layer.context);
         }
 
-        glyphIndex += cast() glyphCount;
+        x += found.extents.xAdvance;
     }
 }
 
@@ -308,10 +315,10 @@ type TextEditFormData struct {
     highlights: buf.Buffer!(gui.Rect!(f64)),
     currentMousePoint: struct{row: i64, col: i64},
 
-    lastUpdatedFrame: u64,
-
     glyphCache: buf.Buffer!(CachedGlyph),
     lineCache: buf.Buffer!(CachedLine),
+
+    textUpdated: bool
 }
 
 fn cursorIterator() {
@@ -446,11 +453,6 @@ fn make(rect: gui.Rect!(f64)) {
     random.seed();
 
     fn draw(formId: i64, formData: *TextEditFormData, messageData: *gui.Rect!(f64)) {
-        if formData.lastUpdatedFrame < context.frame {
-            return;
-        }
-        formData.lastUpdatedFrame = context.frame;
-
         form := &context.forms.buf[formId];
 
         -- clear
@@ -469,6 +471,10 @@ fn make(rect: gui.Rect!(f64)) {
             drawLine(formId, formData, line, messageData);
         }
 
+        if formData.textUpdated == true {
+            formData.textUpdated = false;
+        }
+
         for highlight: formData.highlights.buf {
             -- translate into our space
             highlight.x -= messageData.x;
@@ -483,8 +489,6 @@ fn make(rect: gui.Rect!(f64)) {
     }
 
     fn mousemove(formId: i64, formData: *TextEditFormData, messageData: *gui.MouseMessageData) {
-        formData.lastUpdatedFrame = context.frame;
-
         form := &context.forms.buf[formId];
 
         oldCount := formData.highlights.buf.count;
@@ -589,7 +593,7 @@ fn make(rect: gui.Rect!(f64)) {
     }
 
     fn textUpdate(formId: i64, formData: *TextEditFormData, messageData: *none) {
-        formData.lastUpdatedFrame = context.frame;
+        formData.textUpdated = true;
         formId|gui.setFormNeedsDraw;
     }
 
