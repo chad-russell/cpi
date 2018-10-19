@@ -10,7 +10,7 @@ test/*.ll
 
 test/foo
 test/test
-test/textedit
+test/editor
 test/wallpaper
 
 cmake-build-debug/*

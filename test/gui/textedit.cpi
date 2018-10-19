@@ -242,41 +242,6 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Re
     }
     cl := &formData.lineCache.buf[line];
 
-    glyphIndex := 0;
-    glyphCount := 0;
-
-    if formData.textUpdated == true {
-        cl.glyphRun.buf.count = 0;
-
-        -- Add text and lay it out
-        lastChar := se.editor_buffer_get_line_length(context.tc.eb, line);
-
-        text := se.editor_buffer_get_text_between_points(context.tc.eb, line, 0, line, lastChar);
-        defer { se.editor_buffer_free_buf(text); }
-
-        front := text.bytes;
-
-        while ^front != "\0"[0] {
-            cairoFont := context.cairo.font;
-            run := tryShapeGlyphs(front, context.hb.font);
-
-            if run.glyphs == 0 {
-                cairoFont = context.cairo.emojiFont;
-                run = tryShapeGlyphs(front, context.hb.emojiFont);
-            }
-
-            -- Get buffer data
-            if run.glyphs == 0 { return; }
-
-            front += run.bytes;
-
-            for g: iter.until(run.glyphs) {
-                found := findGlyph(formData, cast() (run.glyphInfo + g).codepoint, cairoFont);
-                &cl.glyphRun|:append(found);
-            }
-        }
-    }
-
     for found, i: cl.glyphRun.buf {
         if x + found.extents.xAdvance >= 0 {
             cairo.cairo_save(form.layer.context);
@@ -297,7 +262,7 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Re
                 cl.high = offset.y + y + found.extents.yBearing + found.extents.height + 1;
             }
 
-            &cl.glyphs|:set(glyphIndex + i, {
+            &cl.glyphs|:set(i, {
                 offset.x + x + found.extents.xBearing,
                 offset.y + y + found.extents.yBearing,
                 cast() (found.extents.width + 1),
@@ -471,16 +436,16 @@ fn make(rect: gui.Rect!(f64)) {
             drawLine(formId, formData, line, messageData);
         }
 
-        if formData.textUpdated == true {
-            formData.textUpdated = false;
-        }
-
         for highlight: formData.highlights.buf {
             -- translate into our space
             highlight.x -= messageData.x;
             highlight.y -= messageData.y;
 
             formId|gui.drawRect(highlight, 0.9, 0.9, 0.9, 0.5);
+        }
+
+        if formData.textUpdated == true {
+            formData.textUpdated = false;
         }
     }
 
@@ -595,6 +560,13 @@ fn make(rect: gui.Rect!(f64)) {
     fn textUpdate(formId: i64, formData: *TextEditFormData, messageData: *none) {
         formData.textUpdated = true;
         formId|gui.setFormNeedsDraw;
+
+        -- repopulate cached lines
+        i := 0;
+        for cl: formData.lineCache.buf|:iter.byRef {
+            repopulateCachedLine(cl, formData, i);
+            i += 1;
+        }
     }
 
     formData: TextEditFormData;
@@ -611,4 +583,40 @@ fn make(rect: gui.Rect!(f64)) {
     &context.texters|:append(formId);
 
     return formId;
+}
+
+fn repopulateCachedLine(cl: *CachedLine, formData: *TextEditFormData, line: i64) {
+    glyphCount := 0;
+
+    if formData.textUpdated == true {
+        cl.glyphRun.buf.count = 0;
+
+        -- Add text and lay it out
+        lastChar := se.editor_buffer_get_line_length(context.tc.eb, line);
+
+        text := se.editor_buffer_get_text_between_points(context.tc.eb, line, 0, line, lastChar);
+        defer { se.editor_buffer_free_buf(text); }
+
+        front := text.bytes;
+
+        while ^front != "\0"[0] {
+            cairoFont := context.cairo.font;
+            run := tryShapeGlyphs(front, context.hb.font);
+
+            if run.glyphs == 0 {
+                cairoFont = context.cairo.emojiFont;
+                run = tryShapeGlyphs(front, context.hb.emojiFont);
+            }
+
+            -- Get buffer data
+            if run.glyphs == 0 { return; }
+
+            front += run.bytes;
+
+            for g: iter.until(run.glyphs) {
+                found := findGlyph(formData, cast() (run.glyphInfo + g).codepoint, cairoFont);
+                &cl.glyphRun|:append(found);
+            }
+        }
+    }
 }
