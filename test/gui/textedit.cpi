@@ -11,6 +11,7 @@
 #import "freetype": ft;
 #import "string";
 #import "io";
+#import "optional";
 
 TEXT_UPDATE := "text_update";
 
@@ -283,7 +284,11 @@ type TextEditFormData struct {
     glyphCache: buf.Buffer!(CachedGlyph),
     lineCache: buf.Buffer!(CachedLine),
 
-    textUpdated: bool
+    textUpdated: bool,
+
+    dragging: bool,
+    mouseDownRect: optional.Optional!(gui.Rect!(f64)),
+    mouseMoveRect: optional.Optional!(gui.Rect!(f64)),
 }
 
 fn cursorIterator() {
@@ -444,13 +449,75 @@ fn make(rect: gui.Rect!(f64)) {
             formId|gui.drawRect(highlight, 0.9, 0.9, 0.9, 0.5);
         }
 
+        if formData.mouseDownRect.hasValue == true and formData.mouseMoveRect.hasValue == true {
+            startX := formData.mouseDownRect.value.x;
+            startY := formData.mouseDownRect.value.y;
+            endX := formData.mouseMoveRect.value.x + formData.mouseMoveRect.value.width;
+            endY := formData.mouseMoveRect.value.y + formData.mouseMoveRect.value.height;
+
+            formId|gui.drawRect({startX, startY, endX - startX, endY - startY}, 0.9, 0.9, 0.9, 0.5);
+        }
+
         if formData.textUpdated == true {
             formData.textUpdated = false;
         }
     }
 
+    fn mouseToPoint(formId: i64, formData: *TextEditFormData, messageData: *gui.MouseMessageData) {
+        form := &context.forms.buf[formId];
+
+        localX := messageData.x - form.rect.x;
+        localY := messageData.y - form.rect.y;
+
+        -- y relative to the form
+        line := cast(i64) (cast() localY / FONT_SIZE);
+
+        if line < 0 or line >= formData.lineCache.buf.count {
+            return optional.no!(gui.Rect!(f64))();
+        }
+
+        cl := formData.lineCache.buf[line];
+
+        for g, i: cl.glyphs.buf {
+            boundingLeft: gui.Rect!(f64) = {form.rect.x + g.x, form.rect.y + cl.low - 1, g.width/2, cast() FONT_SIZE};
+            boundingRight: gui.Rect!(f64) = {form.rect.x + g.x + g.width/2, form.rect.y + cl.low - 1, g.width/2, cast() FONT_SIZE};
+
+            if boundingLeft|:contains(messageData.x, messageData.y) {
+                formData.currentMousePoint = {line, i};
+
+                clG := cl.glyphs.buf[i - 1];
+                if i > 0 {
+                    r: gui.Rect!(f64) = {clG.x + clG.width, cl.low - 1, 2, cast() FONT_SIZE};
+                    return optional.yes(r);
+                }
+                else {
+                    r: gui.Rect!(f64) = {cl.glyphs.buf[0].x, cl.low - 1, 2, cast() FONT_SIZE};
+                    return optional.yes(r);
+                }
+            }
+            else if boundingRight|:contains(messageData.x, messageData.y) {
+                formData.currentMousePoint = {line, i + 1};
+
+                r: gui.Rect!(f64) = {g.x + g.width, cl.low - 1, 2, cast() FONT_SIZE};
+                return optional.yes(r);
+            }
+        }
+
+        return optional.no!(gui.Rect!(f64))();
+    }
+
     fn mousedown(formId: i64, formData: *TextEditFormData, messageData: *gui.MouseMessageData) {
-        se.editor_buffer_set_cursor_point(context.tc.eb, formData.currentMousePoint.row, formData.currentMousePoint.col);
+        formData.dragging = true;
+
+        formData.mouseMoveRect.hasValue = false;
+
+        cursorRect := mouseToPoint(formId, formData, messageData);
+        if cursorRect.hasValue {
+            formData.mouseDownRect = cursorRect;
+            gui.setFormNeedsDraw(formId);
+
+            se.editor_buffer_set_cursor_point(context.tc.eb, formData.currentMousePoint.row, formData.currentMousePoint.col);
+        }
     }
 
     fn mousemove(formId: i64, formData: *TextEditFormData, messageData: *gui.MouseMessageData) {
@@ -459,58 +526,22 @@ fn make(rect: gui.Rect!(f64)) {
         oldCount := formData.highlights.buf.count;
         formData.highlights.buf.count = 0;
 
-        localX := messageData.x - form.rect.x;
-        localY := messageData.y - form.rect.y;
-
-        -- Mouse cursor
-        -- cursor: gui.Rect!(f64) = {cast() (localX - 10), cast() (localY - 10), 20, 20};
-        -- &formData.highlights|:append(cursor);
-        -- gui.setFormNeedsDraw(formId);
-
-        -- y relative to the form
-        line := cast(i64) (cast() localY / FONT_SIZE);
-
-        if line >= 0 and line < formData.lineCache.buf.count {
-            cl := formData.lineCache.buf[line];
-
-            for g, i: cl.glyphs.buf {
-                boundingLeft: gui.Rect!(f64) = {form.rect.x + g.x, form.rect.y + cl.low - 1, g.width/2, cast() FONT_SIZE};
-                boundingRight: gui.Rect!(f64) = {form.rect.x + g.x + g.width/2, form.rect.y + cl.low - 1, g.width/2, cast() FONT_SIZE};
-
-                if boundingLeft|:contains(messageData.x, messageData.y) {
-                    formData.currentMousePoint = {line, i};
-
-                    clG := cl.glyphs.buf[i - 1];
-                    if i > 0 {
-                        cursorRect: gui.Rect!(f64) = {clG.x + clG.width, cl.low - 1, 2, cast() FONT_SIZE};
-
-                        &formData.highlights|:append(cursorRect);
-                        gui.setFormNeedsDraw(formId);
-                    }
-                    else {
-                        cursorRect: gui.Rect!(f64) = {cl.glyphs.buf[0].x, cl.low - 1, 2, cast() FONT_SIZE};
-
-                        &formData.highlights|:append(cursorRect);
-                        gui.setFormNeedsDraw(formId);
-                    }
-                }
-                else if boundingRight|:contains(messageData.x, messageData.y) {
-                    formData.currentMousePoint = {line, i + 1};
-
-                    cursorRect: gui.Rect!(f64) = {g.x + g.width, cl.low - 1, 2, cast() FONT_SIZE};
-
-                    &formData.highlights|:append(cursorRect);
-                    gui.setFormNeedsDraw(formId);
-                }
+        cursorRect := mouseToPoint(formId, formData, messageData);
+        if cursorRect.hasValue {
+            if formData.dragging == true {
+                formData.mouseMoveRect = cursorRect;
             }
-
-            -- entire line
-            -- lineRect: gui.Rect!(f64) = {0, cl.low - 1, cast() context.sdl.windowWidth, cl.high - cl.low + 2};
-            -- &formData.highlights|:append(lineRect);
-        }
-        else if oldCount != formData.highlights.buf.count {
+            &formData.highlights|:append(cursorRect.value);
             gui.setFormNeedsDraw(formId);
         }
+
+        if oldCount != formData.highlights.buf.count {
+            gui.setFormNeedsDraw(formId);
+        }
+    }
+
+    fn mouseup(formId: i64, formData: *TextEditFormData, messageData: *gui.MouseMessageData) {
+        formData.dragging = false;
     }
 
     fn keydown(formId: i64, formData: *TextEditFormData, messageData: *gui.KeyboardMessageData) {
@@ -546,7 +577,8 @@ fn make(rect: gui.Rect!(f64)) {
         }
         else if messageData.scancode|:isalpha {
             if messageData.scancode == cast() 8 {
-                se.editor_buffer_insert(context.tc.eb, "🙈\0".data);
+                -- se.editor_buffer_insert(context.tc.eb, "🙈\0".data);
+                se.editor_buffer_insert(context.tc.eb, "👶🏾\0".data);
             }
             else if messageData.scancode == cast() 21 {
                 se.editor_buffer_insert(context.tc.eb, "é\0".data);
@@ -576,6 +608,7 @@ fn make(rect: gui.Rect!(f64)) {
     formId|gui.addReceiver(gui.DRAW, draw);
     formId|gui.addReceiver(gui.MOUSEMOVE, mousemove);
     formId|gui.addReceiver(gui.MOUSEDOWN, mousedown);
+    formId|gui.addReceiver(gui.MOUSEUP, mouseup);
     formId|gui.addReceiver(gui.KEYDOWN, keydown);
     formId|gui.addReceiver(TEXT_UPDATE, textUpdate);
 
