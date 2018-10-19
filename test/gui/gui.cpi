@@ -544,6 +544,7 @@ fn processEvents() {
         }
         else if event._type == sdl.MOUSEBUTTONDOWN {
             mouseEvent := cast(*sdl.MouseButtonEvent) &event;
+            sdl.SDL_GetMouseState(&context.mouse.x, &context.mouse.y);
 
             mmd: MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
             for formId: context.mousers.buf {
@@ -555,6 +556,7 @@ fn processEvents() {
         }
         else if event._type == sdl.MOUSEBUTTONUP {
             mouseEvent := cast(*sdl.MouseButtonEvent) &event;
+            sdl.SDL_GetMouseState(&context.mouse.x, &context.mouse.y);
 
             mmd: MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
             for formId: context.mousers.buf {

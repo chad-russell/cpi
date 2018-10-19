@@ -240,6 +240,8 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Re
 
         &formData.lineCache|:set(line, cl);
         formData.lineCache.buf.count = line + 1;
+
+        repopulateCachedLine(&formData.lineCache.buf[line], formData, line);
     }
     cl := &formData.lineCache.buf[line];
 
@@ -450,10 +452,10 @@ fn make(rect: gui.Rect!(f64)) {
         }
 
         if formData.mouseDownRect.hasValue == true and formData.mouseMoveRect.hasValue == true {
-            startX := formData.mouseDownRect.value.x;
-            startY := formData.mouseDownRect.value.y;
-            endX := formData.mouseMoveRect.value.x + formData.mouseMoveRect.value.width;
-            endY := formData.mouseMoveRect.value.y + formData.mouseMoveRect.value.height;
+            startX := formData.mouseDownRect.value.x - messageData.x;
+            startY := formData.mouseDownRect.value.y - messageData.y;
+            endX := formData.mouseMoveRect.value.x + formData.mouseMoveRect.value.width - messageData.x;
+            endY := formData.mouseMoveRect.value.y + formData.mouseMoveRect.value.height - messageData.y;
 
             formId|gui.drawRect({startX, startY, endX - startX, endY - startY}, 0.9, 0.9, 0.9, 0.5);
         }
@@ -593,6 +595,10 @@ fn make(rect: gui.Rect!(f64)) {
         formData.textUpdated = true;
         formId|gui.setFormNeedsDraw;
 
+        -- clear selection
+        formData.mouseDownRect.hasValue = false;
+        formData.mouseMoveRect.hasValue = false;
+
         -- repopulate cached lines
         i := 0;
         for cl: formData.lineCache.buf|:iter.byRef {
@@ -621,35 +627,33 @@ fn make(rect: gui.Rect!(f64)) {
 fn repopulateCachedLine(cl: *CachedLine, formData: *TextEditFormData, line: i64) {
     glyphCount := 0;
 
-    if formData.textUpdated == true {
-        cl.glyphRun.buf.count = 0;
+    cl.glyphRun.buf.count = 0;
 
-        -- Add text and lay it out
-        lastChar := se.editor_buffer_get_line_length(context.tc.eb, line);
+    -- Add text and lay it out
+    lastChar := se.editor_buffer_get_line_length(context.tc.eb, line);
 
-        text := se.editor_buffer_get_text_between_points(context.tc.eb, line, 0, line, lastChar);
-        defer { se.editor_buffer_free_buf(text); }
+    text := se.editor_buffer_get_text_between_points(context.tc.eb, line, 0, line, lastChar);
+    defer { se.editor_buffer_free_buf(text); }
 
-        front := text.bytes;
+    front := text.bytes;
 
-        while ^front != "\0"[0] {
-            cairoFont := context.cairo.font;
-            run := tryShapeGlyphs(front, context.hb.font);
+    while ^front != "\0"[0] {
+        cairoFont := context.cairo.font;
+        run := tryShapeGlyphs(front, context.hb.font);
 
-            if run.glyphs == 0 {
-                cairoFont = context.cairo.emojiFont;
-                run = tryShapeGlyphs(front, context.hb.emojiFont);
-            }
+        if run.glyphs == 0 {
+            cairoFont = context.cairo.emojiFont;
+            run = tryShapeGlyphs(front, context.hb.emojiFont);
+        }
 
-            -- Get buffer data
-            if run.glyphs == 0 { return; }
+        -- Get buffer data
+        if run.glyphs == 0 { return; }
 
-            front += run.bytes;
+        front += run.bytes;
 
-            for g: iter.until(run.glyphs) {
-                found := findGlyph(formData, cast() (run.glyphInfo + g).codepoint, cairoFont);
-                &cl.glyphRun|:append(found);
-            }
+        for g: iter.until(run.glyphs) {
+            found := findGlyph(formData, cast() (run.glyphInfo + g).codepoint, cairoFont);
+            &cl.glyphRun|:append(found);
         }
     }
 }

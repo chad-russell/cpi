@@ -38,7 +38,12 @@ fn printF(format: []i8, t: !T) {
 
     for ch: format {
         if ch == "%"[0] {
-            printIthField(t, idx);
+            #if #iskind(T, struct) {
+                printIthField(t, idx);
+            }
+            else {
+                print(t);
+            }
             idx += 1;
         }
         else {

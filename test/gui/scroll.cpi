@@ -14,6 +14,7 @@ type FormData struct {
     contentId: i64,
     savedDrawFn: fn(formId: i64, formData: *none, messageData: *none) none,
     savedMouseMoveFn: fn(formId: i64, formData: *none, messageData: *none) none,
+    savedMouseDownFn: fn(formId: i64, formData: *none, messageData: *none) none,
     layerCache: buf.Buffer!(CachedLayer),
     scrollOffset: gui.Point!(f64),
     effectiveRect: gui.Rect!(f64),
@@ -37,6 +38,10 @@ fn takeover(rect: gui.Rect!(f64), formId: i64) {
             fd.savedMouseMoveFn = r.handle;
             r.handle = mousemove;
         }
+        else if string.streq(gui.MOUSEDOWN, r.name) {
+            fd.savedMouseDownFn = r.handle;
+            r.handle = mousedown;
+        }
     }
 
     &context.scrollDatas|:append(fd);
@@ -59,6 +64,16 @@ fn mousemove(formId: i64, formData: *none, messageData: *gui.MouseMessageData) {
 
     -- todo(chad): only call this if it actually has one...
     fd.savedMouseMoveFn(formId, formData, messageData);
+}
+
+fn mousedown(formId: i64, formData: *none, messageData: *gui.MouseMessageData) {
+    fd := findFormData(formId);
+
+    messageData.x += fd.scrollOffset.x;
+    messageData.y += fd.scrollOffset.y;
+
+    -- todo(chad): only call this if it actually has one...
+    fd.savedMouseDownFn(formId, formData, messageData);
 }
 
 fn handleScroll(formId: i64, formData: *none, messageData: *gui.MouseScrollMessageData) {
