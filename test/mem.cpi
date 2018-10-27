@@ -10,6 +10,8 @@ fn alloc(T: Ast)(count := 1) {
 }
 
 fn heap(t: !T) {
+    allocated += 1;
+
     a := cast(*T) calloc(1, sizeof(T));
     ^a = t;
     return a;

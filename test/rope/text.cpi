@@ -16,7 +16,7 @@ type StringBuf struct {
 }
 
 #attr(StringBuf) {
-fn free(buf: *StringBuf) {
+fn release(buf: *StringBuf) {
     if buf == nil { return; }
 
     if (buf.rc > 0) {
@@ -231,12 +231,12 @@ fn decRc(rn: *Rope) {
 
     rn.rc -= 1;
     if (rn.rc == 0) {
-        free(rn);
+        releaseRope(rn);
     }
 }
 
-
-fn free(rn: *Rope) {
+-- todo(chad): why can we not put this behind #attr(Rope) and just call it release??
+fn releaseRope(rn: *Rope) {
     if (rn == nil) { return; }
     if (rn.rc != 0) { return; }
 
@@ -246,7 +246,7 @@ fn free(rn: *Rope) {
         children(rn).right|decRc;
     }
     else {
-        :free(data(rn));
+        :release(data(rn));
     }
 
     mem.free(rn);
@@ -485,7 +485,7 @@ fn split(rn: *Rope, i: u64, outNewLeft: **Rope, outNewRight: **Rope) {
         }
 
         if !usedRnCopy {
-            free(rnCopy);
+            releaseRope(rnCopy);
         }
     }
 }
@@ -503,8 +503,8 @@ fn makeLeafConcat(left: *Rope, right: *Rope) {
     rn.lineBreakWeight = countNewlines(data(rn).bytes);
     rn.totalLineBreakWeight = rn.lineBreakWeight;
 
-    free(left);
-    free(right);
+    releaseRope(left);
+    releaseRope(right);
 
     return rn;
 }
@@ -566,8 +566,8 @@ fn delete(rn: *Rope, start: u64, end: u64) {
 
     result := concat(splitStartLeft, splitEndRight);
 
-    free(splitEndLeft);
-    free(splitStartRight);
+    releaseRope(splitEndLeft);
+    releaseRope(splitStartRight);
 
     return result;
 }
@@ -583,6 +583,7 @@ fn test() {
     printRope(inserted);
     puts("\n");
     printRope(deleted);
+    puts("\n");
 
     puts("\n");
 }
