@@ -47,15 +47,15 @@ type Rope struct {
     isLeaf: bool,
     rc: i32,
 
-    d: *none
+    d: RopeChildren
 }
 
 fn children(r: *Rope) {
-    return cast(*RopeChildren) r.d;
+    return r.d;
 }
 
 fn data(r: *Rope) {
-    return cast(*StringBuf) r.d;
+    return cast(*StringBuf) r.d.left;
 }
 
 fn countNewlines(s: *i8) u64 {
@@ -260,10 +260,7 @@ fn makeNode(isLeaf: bool, byteWeight: u64, charWeight: u64) {
     rn := mem.alloc!(Rope)(1);
 
     if isLeaf {
-        rn.d = mem.alloc!(StringBuf)();
-    }
-    else {
-        rn.d = mem.alloc!(RopeChildren)();
+        rn.d.left = cast() mem.alloc!(StringBuf)();
     }
 
     rn.rc = 0;
