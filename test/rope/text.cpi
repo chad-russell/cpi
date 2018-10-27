@@ -47,13 +47,15 @@ type Rope struct {
     isLeaf: bool,
     rc: i32,
 
-    d: struct {
-        children: struct {
-            left: *Rope,
-            right: *Rope
-        },
-        buf: *StringBuf
-    }
+    d: *none
+}
+
+fn children(r: *Rope) {
+    return cast(*RopeChildren) r.d;
+}
+
+fn data(r: *Rope) {
+    return cast(*StringBuf) r.d;
 }
 
 fn countNewlines(s: *i8) u64 {
@@ -71,10 +73,10 @@ fn countNewlines(s: *i8) u64 {
 }
 
 fn setRight(target: *Rope, newRight: *Rope) {
-    if (newRight == target.d.children.right) { return; }
+    if (newRight == children(target).right) { return; }
 
-    target.d.children.right|decRc;
-    target.d.children.right = newRight;
+    children(target).right|decRc;
+    children(target).right = newRight;
     newRight|incRc;
 
     totalByteWeight(target);
@@ -83,10 +85,10 @@ fn setRight(target: *Rope, newRight: *Rope) {
 }
 
 fn setLeft(target: *Rope, newLeft: *Rope) {
-    if newLeft == target.d.children.left { return; }
+    if newLeft == children(target).left { return; }
 
-    target.d.children.left|decRc;
-    target.d.children.left = newLeft;
+    children(target).left|decRc;
+    children(target).left = newLeft;
     newLeft|incRc;
 
     target.byteWeight = byteWeight(target);
@@ -112,19 +114,19 @@ fn byteWeight(rn: *Rope) u64 {
         return rn.byteWeight;
     }
 
-    return totalByteLength(rn.d.children.left);
+    return totalByteLength(children(rn).left);
 }
 
 fn totalByteWeight(rn: *Rope) u64 {
     if rn == nil { return 0; }
 
-    if rn.d.children.left != nil and rn.d.children.right != nil {
-        rn.totalByteWeight = rn.d.children.left.totalByteWeight + rn.d.children.right.totalByteWeight;
+    if children(rn).left != nil and children(rn).right != nil {
+        rn.totalByteWeight = children(rn).left.totalByteWeight + children(rn).right.totalByteWeight;
     }
-    else if rn.d.children.left != nil {
-        rn.totalByteWeight = rn.d.children.left.totalByteWeight;
-    } else if rn.d.children.right != nil {
-        rn.totalByteWeight = rn.d.children.right.totalByteWeight;
+    else if children(rn).left != nil {
+        rn.totalByteWeight = children(rn).left.totalByteWeight;
+    } else if children(rn).right != nil {
+        rn.totalByteWeight = children(rn).right.totalByteWeight;
     } else {
         rn.totalByteWeight = 0;
     }
@@ -145,19 +147,19 @@ fn charWeight(rn: *Rope) u64 {
         return rn.charWeight;
     }
 
-    return totalCharLength(rn.d.children.left);
+    return totalCharLength(children(rn).left);
 }
 
 fn totalCharWeight(rn: *Rope) u64 {
     if rn == nil { return 0; }
 
-    if rn.d.children.left != nil and rn.d.children.right != nil {
-        rn.totalCharWeight = rn.d.children.left.totalCharWeight + rn.d.children.right.totalCharWeight;
+    if children(rn).left != nil and children(rn).right != nil {
+        rn.totalCharWeight = children(rn).left.totalCharWeight + children(rn).right.totalCharWeight;
     }
-    else if rn.d.children.left != nil {
-        rn.totalCharWeight = rn.d.children.left.totalCharWeight;
-    } else if rn.d.children.right != nil {
-        rn.totalCharWeight = rn.d.children.right.totalCharWeight;
+    else if children(rn).left != nil {
+        rn.totalCharWeight = children(rn).left.totalCharWeight;
+    } else if children(rn).right != nil {
+        rn.totalCharWeight = children(rn).right.totalCharWeight;
     } else {
         rn.totalCharWeight = 0;
     }
@@ -175,22 +177,22 @@ fn lineBreakWeight(rn: *Rope) u64 {
     if rn == nil { return 0; }
 
     if rn.isLeaf {
-        return countNewlines(rn.d.buf.bytes);
+        return countNewlines(data(rn).bytes);
     }
 
-    return totalLineBreakLength(rn.d.children.left);
+    return totalLineBreakLength(children(rn).left);
 }
 
 fn totalLineBreakWeight(rn: *Rope) u64 {
     if rn == nil { return 0; }
 
-    if rn.d.children.left != nil and rn.d.children.right != nil {
-        rn.totalLineBreakWeight = rn.d.children.left.totalLineBreakWeight + rn.d.children.right.totalLineBreakWeight;
+    if children(rn).left != nil and children(rn).right != nil {
+        rn.totalLineBreakWeight = children(rn).left.totalLineBreakWeight + children(rn).right.totalLineBreakWeight;
     }
-    else if rn.d.children.left != nil {
-        rn.totalLineBreakWeight = rn.d.children.left.totalLineBreakWeight;
-    } else if rn.d.children.right != nil {
-        rn.totalLineBreakWeight = rn.d.children.right.totalLineBreakWeight;
+    else if children(rn).left != nil {
+        rn.totalLineBreakWeight = children(rn).left.totalLineBreakWeight;
+    } else if children(rn).right != nil {
+        rn.totalLineBreakWeight = children(rn).right.totalLineBreakWeight;
     } else {
         rn.totalLineBreakWeight = 0;
     }
@@ -203,15 +205,15 @@ fn printRope(r: *Rope) {
 
     if r.isLeaf {
         s: []i8;
-        s.data = r.d.buf.bytes;
-        s.count = cast() r.d.buf.length;
+        s.data = data(r).bytes;
+        s.count = cast() data(r).length;
 
         io.print(s);
     }
     else {
-        printRope(r.d.children.left);
+        printRope(children(r).left);
         io.print("|");
-        printRope(r.d.children.right);
+        printRope(children(r).right);
     }
 }
 
@@ -240,11 +242,11 @@ fn free(rn: *Rope) {
 
     rn.rc = -1;
     if (!rn.isLeaf) {
-        rn.d.children.left|decRc;
-        rn.d.children.right|decRc;
+        children(rn).left|decRc;
+        children(rn).right|decRc;
     }
     else {
-        :free(rn.d.buf);
+        :free(data(rn));
     }
 
     mem.free(rn);
@@ -258,11 +260,11 @@ fn makeNode(isLeaf: bool, byteWeight: u64, charWeight: u64) {
     rn := mem.alloc!(Rope)(1);
 
     if isLeaf {
-        rn.d.buf = mem.alloc!(StringBuf)();
+        rn.d = mem.alloc!(StringBuf)();
     }
-    -- else {
-        -- rn.d.children = mem.alloc!(RopeChildren)();
-    -- }
+    else {
+        rn.d = mem.alloc!(RopeChildren)();
+    }
 
     rn.rc = 0;
     rn.isLeaf = isLeaf;
@@ -344,11 +346,11 @@ fn makeLeafWithLength(text: []i8, byteLength: u64, charLength: u64, lineHelper: 
     }
 
     rn := makeNode(true, cast() text.count, charLength);
-    rn.d.buf.length = byteLength;
-    rn.d.buf.capacity = byteLength;
-    rn.d.buf.bytes = mem.alloc!(i8)(cast() byteLength);
-    mem.memcpy(dst: rn.d.buf.bytes, src: text.data, cast() byteLength);
-    rn.d.buf.rc = 0;
+    data(rn).length = byteLength;
+    data(rn).capacity = byteLength;
+    data(rn).bytes = mem.alloc!(i8)(cast() byteLength);
+    mem.memcpy(dst: data(rn).bytes, src: text.data, cast() byteLength);
+    data(rn).rc = 0;
 
     type StringBuf struct {
         length: u64,
@@ -378,17 +380,17 @@ fn charAt(rn: *Rope, i: u64) *i8 {
 
         byteOffset := 0;
         for j: iter.until(cast() i) {
-            byteOffset += string.bytesInCodepointUtf8(cast() ^(rn.d.buf.bytes + byteOffset));
+            byteOffset += string.bytesInCodepointUtf8(cast() ^(data(rn).bytes + byteOffset));
         }
 
-        return rn.d.buf.bytes + byteOffset;
+        return data(rn).bytes + byteOffset;
     }
 
     if rn.charWeight - 1 < i {
-        return charAt(rn.d.children.right, i - rn.charWeight);
+        return charAt(children(rn).right, i - rn.charWeight);
     }
-    else if rn.d.children.left != nil {
-        return charAt(rn.d.children.left, i);
+    else if children(rn).left != nil {
+        return charAt(children(rn).left, i);
     }
 
     return nil;
@@ -403,11 +405,11 @@ fn shallowCopy(rn: *Rope) *Rope {
     copy.rc = 0;
 
     if !rn.isLeaf {
-        incRc(rn.d.children.left);
-        incRc(rn.d.children.right);
+        incRc(children(rn).left);
+        incRc(children(rn).right);
     } else {
-        copy.d.buf = rn.d.buf;
-        copy.d.buf.rc += 1;
+        copy.d = rn.d;
+        data(copy).rc += 1;
     }
 
     return copy;
@@ -425,16 +427,16 @@ fn split(rn: *Rope, i: u64, outNewLeft: **Rope, outNewRight: **Rope) {
             byteOffset := 0;
 
             for j: iter.until(cast() i) {
-                byteOffset += string.bytesInCodepointUtf8(cast() ^(rn.d.buf.bytes + byteOffset));
+                byteOffset += string.bytesInCodepointUtf8(cast() ^(data(rn).bytes + byteOffset));
             }
 
             rightSubstring: []i8;
-            rightSubstring.data = rn.d.buf.bytes + byteOffset;
-            rightSubstring.count = cast(i64) rn.d.buf.length - byteOffset;
+            rightSubstring.data = data(rn).bytes + byteOffset;
+            rightSubstring.count = cast(i64) data(rn).length - byteOffset;
             ^outNewRight = makeLeaf(rightSubstring);
 
             newLeftStr: []i8;
-            newLeftStr.data = rn.d.buf.bytes;
+            newLeftStr.data = data(rn).bytes;
             newLeftStr.count = byteOffset;
 
             ^outNewLeft = makeLeaf(newLeftStr);
@@ -449,9 +451,9 @@ fn split(rn: *Rope, i: u64, outNewLeft: **Rope, outNewRight: **Rope) {
 
             newGtLeft: *Rope;
             newGtRight: *Rope;
-            rnCopy.d.children.left|split(i, &newGtLeft, &newGtRight);
+            children(rnCopy).left|split(i, &newGtLeft, &newGtRight);
 
-            ^outNewRight = concat(newGtRight, rn.d.children.right);
+            ^outNewRight = concat(newGtRight, children(rn).right);
 
             rnCopy|setLeft(newGtLeft);
 
@@ -471,7 +473,7 @@ fn split(rn: *Rope, i: u64, outNewLeft: **Rope, outNewRight: **Rope) {
             newGtLeft: *Rope;
             newGtRight: *Rope;
 
-            rn.d.children.right|split(i - rnCopy.charWeight, &newGtLeft, &newGtRight);
+            children(rn).right|split(i - rnCopy.charWeight, &newGtLeft, &newGtRight);
 
             rnCopy|setRight(newGtLeft);
 
@@ -481,8 +483,8 @@ fn split(rn: *Rope, i: u64, outNewLeft: **Rope, outNewRight: **Rope) {
             ^outNewRight = newGtRight;
         }
         else {
-            ^outNewLeft = shallowCopy(rnCopy.d.children.left);
-            ^outNewRight = shallowCopy(rnCopy.d.children.right);
+            ^outNewLeft = shallowCopy(children(rnCopy).left);
+            ^outNewRight = shallowCopy(children(rnCopy).right);
         }
 
         if !usedRnCopy {
@@ -494,14 +496,14 @@ fn split(rn: *Rope, i: u64, outNewLeft: **Rope, outNewRight: **Rope) {
 fn makeLeafConcat(left: *Rope, right: *Rope) {
     rn := makeNode(true, left.byteWeight + right.byteWeight, left.charWeight + right.charWeight);
 
-    rn.d.buf.length = left.d.buf.length + right.d.buf.length;
-    rn.d.buf.capacity = rn.d.buf.length;
-    rn.d.buf.bytes = mem.alloc!(i8)(cast() rn.d.buf.length);
-    mem.memcpy(dst: rn.d.buf.bytes, src: left.d.buf.bytes, cast() left.d.buf.length);
-    mem.memcpy(dst: rn.d.buf.bytes + cast(i64) left.d.buf.length, src: left.d.buf.bytes, cast() left.d.buf.length);
-    rn.d.buf.rc = 0;
+    data(rn).length = data(left).length + data(right).length;
+    data(rn).capacity = data(rn).length;
+    data(rn).bytes = mem.alloc!(i8)(cast() data(rn).length);
+    mem.memcpy(dst: data(rn).bytes, src: data(left).bytes, cast() data(left).length);
+    mem.memcpy(dst: data(rn).bytes + cast(i64) data(left).length, src: data(right).bytes, cast() data(right).length);
+    data(rn).rc = 0;
 
-    rn.lineBreakWeight = countNewlines(rn.d.buf.bytes);
+    rn.lineBreakWeight = countNewlines(data(rn).bytes);
     rn.totalLineBreakWeight = rn.lineBreakWeight;
 
     free(left);
@@ -525,12 +527,12 @@ fn concat(left: *Rope, right: *Rope) {
                 return cat;
             }
         }
-        else if left.d.children.right == nil {
+        else if children(left).right == nil {
             left|setRight(right);
             return left;
         }
-        else if left.d.children.right.isLeaf and left.d.children.right.byteWeight + right.byteWeight < COPY_THRESHOLD {
-            left|setRight(makeLeafConcat(left.d.children.right, right));
+        else if children(left).right.isLeaf and children(left).right.byteWeight + right.byteWeight < COPY_THRESHOLD {
+            left|setRight(makeLeafConcat(children(left).right, right));
             return left;
         }
     }
@@ -546,7 +548,6 @@ fn insert(rn: *Rope, i: u64, text: []i8) {
     insert := makeLeaf(text);
     combinedLeft := concat(splitLeft, insert);
     cat := concat(combinedLeft, splitRight);
-    panic();
 
     return cat;
 }
@@ -578,13 +579,13 @@ fn test() {
     r := makeLeaf("hello, world!");
 
     inserted := r|insert(6, "X ");
-    -- deleted := r|delete(2, 5);
+    deleted := r|delete(2, 5);
 
     printRope(r);
     puts("\n");
     printRope(inserted);
-    -- puts("\n");
-    -- printRope(deleted);
+    puts("\n");
+    printRope(deleted);
 
     puts("\n");
 }
