@@ -163,14 +163,26 @@ ostream &operator<<(ostream &os, NodeTypekind kind) {
         case NodeTypekind::I8: {
             return os << "an i8";
         }
+        case NodeTypekind::U8: {
+            return os << "a u8";
+        }
         case NodeTypekind::I16: {
             return os << "an i8";
+        }
+        case NodeTypekind::U16: {
+            return os << "a u16";
         }
         case NodeTypekind::I32: {
             return os << "an i32";
         }
+        case NodeTypekind::U32: {
+            return os << "a u32";
+        }
         case NodeTypekind::I64: {
             return os << "an i64";
+        }
+        case NodeTypekind::U64: {
+            return os << "a u64";
         }
         case NodeTypekind::FLOAT_LITERAL: {
             return os << "an float literal";

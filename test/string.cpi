@@ -35,3 +35,66 @@ fn streq(str1: []i8, str2: []i8) {
 
     return true;
 }
+
+fn strlen(str: *i8) {
+    front := str;
+
+    len: u64 = 0;
+    while ^front != "\0"[0] {
+        front += 1;
+        len += 1;
+    }
+
+    return len;
+}
+
+fn bytesInCodepointUtf8(firstByte: u8) {
+    if (firstByte >= 0 and firstByte <= 191) {
+        return 1;
+    }
+
+    if (firstByte >= 245) {
+        return 1;
+    }
+
+    if (firstByte >= 192 and firstByte <= 223) {
+        return 2;
+    }
+
+    if (firstByte >= 224 and firstByte <= 239) {
+        return 3;
+    }
+
+    if (firstByte >= 240 and firstByte <= 244) {
+        return 4;
+    }
+
+    panic();
+    return 0;
+}
+
+fn strlenUtf8(str: []i8) {
+    count: u64 = 0;
+
+    c := 0;
+    while c < str.count {
+        c += bytesInCodepointUtf8(cast() str[c]);
+        count += 1;
+    }
+
+    return count;
+}
+
+fn subStr(str: []i8, from: i64, count: i64 = -1) {
+    ns := str;
+
+    ns.data += from;
+    if count == -1 {
+        ns.count -= str.count - from;
+    }
+    else {
+        ns.count -= count;
+    }
+
+    return ns;
+}

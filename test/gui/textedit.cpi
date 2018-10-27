@@ -537,6 +537,11 @@ fn make(rect: gui.Rect!(f64)) {
             gui.setFormNeedsDraw(formId);
         }
 
+        if formData.dragging == true {
+            se.editor_buffer_set_cursor_is_selection(context.tc.eb, 1);
+            se.editor_buffer_set_cursor_point(context.tc.eb, formData.currentMousePoint.row, formData.currentMousePoint.col);
+        }
+
         if oldCount != formData.highlights.buf.count {
             gui.setFormNeedsDraw(formId);
         }
@@ -600,6 +605,8 @@ fn make(rect: gui.Rect!(f64)) {
         formData.mouseMoveRect.hasValue = false;
 
         -- repopulate cached lines
+        -- todo(chad): only repopulate starting with the first changed line
+        -- todo(chad): see todo.txt, the first one
         i := 0;
         for cl: formData.lineCache.buf|:iter.byRef {
             repopulateCachedLine(cl, formData, i);

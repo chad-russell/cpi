@@ -7,8 +7,8 @@
 #import "iter";
 #import "time";
 
-WIDTH   : i32 = 800;
-HEIGHT  : i32 = 350;
+WIDTH   : i32 = 1000;
+HEIGHT  : i32 = 600;
 
 DRAW        := "draw";
 MOUSEDOWN   := "mousedown";

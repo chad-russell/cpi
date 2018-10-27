@@ -1,0 +1,590 @@
+#import "io";
+#import "mem";
+#import "buffer";
+#import "string";
+#import "iter";
+
+SPLIT_THRESHOLD := 2048 * 4;
+COPY_THRESHOLD  := 2048 * 4;
+
+type StringBuf struct {
+    length: u64,
+    capacity: u64,
+    bytes: *i8,
+
+    rc: i32
+}
+
+#attr(StringBuf) {
+fn free(buf: *StringBuf) {
+    if buf == nil { return; }
+
+    if (buf.rc > 0) {
+        buf.rc -= 1;
+    } else {
+        mem.free(buf.bytes);
+    }
+
+    mem.free(buf);
+}
+}
+
+type RopeChildren struct {
+    left: *Rope,
+    right: *Rope
+}
+
+type Rope struct {
+    byteWeight: u64,
+    totalByteWeight: u64,
+
+    charWeight: u64,
+    totalCharWeight: u64,
+
+    lineBreakWeight: u64,
+    totalLineBreakWeight: u64,
+
+    isLeaf: bool,
+    rc: i32,
+
+    d: struct {
+        children: struct {
+            left: *Rope,
+            right: *Rope
+        },
+        buf: *StringBuf
+    }
+}
+
+fn countNewlines(s: *i8) u64 {
+    if s == nil { return 0; }
+
+    count: u64 = 0;
+
+    c := s;
+    while ^c != "\0"[0] {
+        if (^c == "\n"[0]) { count += 1; }
+        c += 1;
+    }
+
+    return count;
+}
+
+fn setRight(target: *Rope, newRight: *Rope) {
+    if (newRight == target.d.children.right) { return; }
+
+    target.d.children.right|decRc;
+    target.d.children.right = newRight;
+    newRight|incRc;
+
+    totalByteWeight(target);
+    totalLineBreakWeight(target);
+    totalCharWeight(target);
+}
+
+fn setLeft(target: *Rope, newLeft: *Rope) {
+    if newLeft == target.d.children.left { return; }
+
+    target.d.children.left|decRc;
+    target.d.children.left = newLeft;
+    newLeft|incRc;
+
+    target.byteWeight = byteWeight(target);
+    totalByteWeight(target);
+
+    target.charWeight = charWeight(target);
+    totalCharWeight(target);
+
+    target.lineBreakWeight = lineBreakWeight(target);
+    totalLineBreakWeight(target);
+}
+
+fn totalByteLength(rn: *Rope) u64 {
+    if rn == nil { return 0; }
+
+    return rn.totalByteWeight;
+}
+
+fn byteWeight(rn: *Rope) u64 {
+    if rn == nil { return 0; }
+
+    if rn.isLeaf {
+        return rn.byteWeight;
+    }
+
+    return totalByteLength(rn.d.children.left);
+}
+
+fn totalByteWeight(rn: *Rope) u64 {
+    if rn == nil { return 0; }
+
+    if rn.d.children.left != nil and rn.d.children.right != nil {
+        rn.totalByteWeight = rn.d.children.left.totalByteWeight + rn.d.children.right.totalByteWeight;
+    }
+    else if rn.d.children.left != nil {
+        rn.totalByteWeight = rn.d.children.left.totalByteWeight;
+    } else if rn.d.children.right != nil {
+        rn.totalByteWeight = rn.d.children.right.totalByteWeight;
+    } else {
+        rn.totalByteWeight = 0;
+    }
+
+    return rn.totalByteWeight;
+}
+
+fn totalCharLength(rn: *Rope) u64 {
+    if rn == nil { return 0; }
+
+    return rn.totalCharWeight;
+}
+
+fn charWeight(rn: *Rope) u64 {
+    if rn == nil { return 0; }
+
+    if rn.isLeaf {
+        return rn.charWeight;
+    }
+
+    return totalCharLength(rn.d.children.left);
+}
+
+fn totalCharWeight(rn: *Rope) u64 {
+    if rn == nil { return 0; }
+
+    if rn.d.children.left != nil and rn.d.children.right != nil {
+        rn.totalCharWeight = rn.d.children.left.totalCharWeight + rn.d.children.right.totalCharWeight;
+    }
+    else if rn.d.children.left != nil {
+        rn.totalCharWeight = rn.d.children.left.totalCharWeight;
+    } else if rn.d.children.right != nil {
+        rn.totalCharWeight = rn.d.children.right.totalCharWeight;
+    } else {
+        rn.totalCharWeight = 0;
+    }
+
+    return rn.totalCharWeight;
+}
+
+fn totalLineBreakLength(rn: *Rope) u64 {
+    if rn == nil { return 0; }
+
+    return rn.totalLineBreakWeight;
+}
+
+fn lineBreakWeight(rn: *Rope) u64 {
+    if rn == nil { return 0; }
+
+    if rn.isLeaf {
+        return countNewlines(rn.d.buf.bytes);
+    }
+
+    return totalLineBreakLength(rn.d.children.left);
+}
+
+fn totalLineBreakWeight(rn: *Rope) u64 {
+    if rn == nil { return 0; }
+
+    if rn.d.children.left != nil and rn.d.children.right != nil {
+        rn.totalLineBreakWeight = rn.d.children.left.totalLineBreakWeight + rn.d.children.right.totalLineBreakWeight;
+    }
+    else if rn.d.children.left != nil {
+        rn.totalLineBreakWeight = rn.d.children.left.totalLineBreakWeight;
+    } else if rn.d.children.right != nil {
+        rn.totalLineBreakWeight = rn.d.children.right.totalLineBreakWeight;
+    } else {
+        rn.totalLineBreakWeight = 0;
+    }
+
+    return rn.totalLineBreakWeight;
+}
+
+fn printRope(r: *Rope) {
+    if r == nil { return; }
+
+    if r.isLeaf {
+        s: []i8;
+        s.data = r.d.buf.bytes;
+        s.count = cast() r.d.buf.length;
+
+        io.print(s);
+    }
+    else {
+        printRope(r.d.children.left);
+        io.print("|");
+        printRope(r.d.children.right);
+    }
+}
+
+fn incRc(rn: *Rope)
+{
+    if rn == nil { return; }
+
+    rn.rc += 1;
+}
+
+fn decRc(rn: *Rope) {
+    if (rn == nil) { return; }
+
+    basic.assert(rn.rc > 0);
+
+    rn.rc -= 1;
+    if (rn.rc == 0) {
+        free(rn);
+    }
+}
+
+
+fn free(rn: *Rope) {
+    if (rn == nil) { return; }
+    if (rn.rc != 0) { return; }
+
+    rn.rc = -1;
+    if (!rn.isLeaf) {
+        rn.d.children.left|decRc;
+        rn.d.children.right|decRc;
+    }
+    else {
+        :free(rn.d.buf);
+    }
+
+    mem.free(rn);
+}
+
+#context ropeId: u64
+
+fn makeNode(isLeaf: bool, byteWeight: u64, charWeight: u64) {
+    context.ropeId += 1;
+
+    rn := mem.alloc!(Rope)(1);
+
+    if isLeaf {
+        rn.d.buf = mem.alloc!(StringBuf)();
+    }
+    -- else {
+        -- rn.d.children = mem.alloc!(RopeChildren)();
+    -- }
+
+    rn.rc = 0;
+    rn.isLeaf = isLeaf;
+
+    rn.byteWeight = byteWeight;
+    rn.totalByteWeight = byteWeight;
+
+    rn.charWeight = charWeight;
+    rn.totalCharWeight = charWeight;
+
+    return rn;
+}
+
+fn makeParent(left: *Rope, right: *Rope) {
+    rn := makeNode(false, byteWeight(left), charWeight(left));
+
+    rn|setLeft(left);
+    rn|setRight(right);
+
+    rn.byteWeight = byteWeight(rn);
+    rn.totalByteWeight = totalByteWeight(rn);
+
+    rn.charWeight = charWeight(rn);
+    rn.totalCharWeight = totalCharWeight(rn);
+
+    rn.lineBreakWeight = lineBreakWeight(rn);
+    rn.totalLineBreakWeight = totalLineBreakWeight(rn);
+
+    return rn;
+}
+
+type LineHelper struct {
+    lines: buffer.Buffer!(u64),
+    leftover: u64
+}
+
+fn countNewlinesLength(str: []i8, i: u64, lineHelper: *LineHelper) {
+    newlineCount: u64 = 0;
+    length: u64 = 0;
+
+    cIdx := 0;
+    while cIdx < str.count {
+        if str[cIdx] == "\n"[0] {
+            if lineHelper != nil {
+                lineLength := lineHelper.leftover + 1;
+                &lineHelper.lines | :append(lineLength);
+                lineHelper.leftover = 0;
+            }
+
+            newlineCount += 1;
+        }
+
+        if lineHelper != nil {
+            lineHelper.leftover += 1;
+        }
+
+        cIdx += string.bytesInCodepointUtf8(cast() str[cIdx]);
+    }
+
+    return newlineCount;
+}
+
+fn makeLeafWithLength(text: []i8, byteLength: u64, charLength: u64, lineHelper: *LineHelper) *Rope {
+    if charLength > cast() SPLIT_THRESHOLD {
+        half := charLength / 2;
+
+        halfIdx: u64 = 0;
+        for i: iter.until(cast() half) {
+            -- todo(chad): should probably allow indexing by a u64...
+            halfIdx += cast() string.bytesInCodepointUtf8(cast() text[cast(i64) halfIdx]);
+        }
+
+        firstHalfByteLength := halfIdx;
+
+        left := makeLeafWithLength(text, firstHalfByteLength, half, lineHelper);
+        right := makeLeafWithLength(string.subStr(text, cast() firstHalfByteLength), byteLength - firstHalfByteLength, charLength - half, lineHelper);
+
+        return makeParent(left, right);
+    }
+
+    rn := makeNode(true, cast() text.count, charLength);
+    rn.d.buf.length = byteLength;
+    rn.d.buf.capacity = byteLength;
+    rn.d.buf.bytes = mem.alloc!(i8)(cast() byteLength);
+    mem.memcpy(dst: rn.d.buf.bytes, src: text.data, cast() byteLength);
+    rn.d.buf.rc = 0;
+
+    type StringBuf struct {
+        length: u64,
+        capacity: u64,
+        bytes: *i8,
+
+        rc: i32
+    }
+
+    rn.lineBreakWeight = countNewlinesLength(text, charLength, lineHelper);
+    rn.totalLineBreakWeight = rn.lineBreakWeight;
+
+    return rn;
+}
+
+fn makeLeaf(text: []i8) {
+    return makeLeafWithLength(text, cast() text.count, string.strlenUtf8(text), nil);
+}
+
+fn charAt(rn: *Rope, i: u64) *i8 {
+    if rn == nil { return nil; }
+
+    if rn.isLeaf {
+        if rn.charWeight - 1 < i {
+            return nil;
+        }
+
+        byteOffset := 0;
+        for j: iter.until(cast() i) {
+            byteOffset += string.bytesInCodepointUtf8(cast() ^(rn.d.buf.bytes + byteOffset));
+        }
+
+        return rn.d.buf.bytes + byteOffset;
+    }
+
+    if rn.charWeight - 1 < i {
+        return charAt(rn.d.children.right, i - rn.charWeight);
+    }
+    else if rn.d.children.left != nil {
+        return charAt(rn.d.children.left, i);
+    }
+
+    return nil;
+}
+
+fn shallowCopy(rn: *Rope) *Rope {
+    if rn == nil { return nil; }
+
+    copy := mem.alloc!(Rope)();
+    mem.memcpy(dst: copy, src: rn, sizeof(Rope));
+
+    copy.rc = 0;
+
+    if !rn.isLeaf {
+        incRc(rn.d.children.left);
+        incRc(rn.d.children.right);
+    } else {
+        copy.d.buf = rn.d.buf;
+        copy.d.buf.rc += 1;
+    }
+
+    return copy;
+}
+
+fn split(rn: *Rope, i: u64, outNewLeft: **Rope, outNewRight: **Rope) {
+    if rn.isLeaf {
+        if i <= 0 {
+            ^outNewLeft = nil;
+            ^outNewRight = shallowCopy(rn);
+        } else if (i >= rn.charWeight) {
+            ^outNewLeft = shallowCopy(rn);
+            ^outNewRight = nil;
+        } else {
+            byteOffset := 0;
+
+            for j: iter.until(cast() i) {
+                byteOffset += string.bytesInCodepointUtf8(cast() ^(rn.d.buf.bytes + byteOffset));
+            }
+
+            rightSubstring: []i8;
+            rightSubstring.data = rn.d.buf.bytes + byteOffset;
+            rightSubstring.count = cast(i64) rn.d.buf.length - byteOffset;
+            ^outNewRight = makeLeaf(rightSubstring);
+
+            newLeftStr: []i8;
+            newLeftStr.data = rn.d.buf.bytes;
+            newLeftStr.count = byteOffset;
+
+            ^outNewLeft = makeLeaf(newLeftStr);
+        }
+    }
+    else {
+        rnCopy := shallowCopy(rn);
+        usedRnCopy := false;
+
+        if i < rnCopy.charWeight {
+            rnCopy|setRight(nil);
+
+            newGtLeft: *Rope;
+            newGtRight: *Rope;
+            rnCopy.d.children.left|split(i, &newGtLeft, &newGtRight);
+
+            ^outNewRight = concat(newGtRight, rn.d.children.right);
+
+            rnCopy|setLeft(newGtLeft);
+
+            ^outNewLeft = rnCopy;
+            usedRnCopy = true;
+
+            outNewLeft.byteWeight = byteWeight(^outNewLeft);
+            outNewLeft.totalByteWeight = totalByteWeight(^outNewLeft);
+
+            outNewLeft.charWeight = charWeight(^outNewLeft);
+            outNewLeft.totalCharWeight = totalCharWeight(^outNewLeft);
+
+            outNewLeft.lineBreakWeight = lineBreakWeight(^outNewLeft);
+            outNewLeft.totalLineBreakWeight = totalLineBreakWeight(^outNewLeft);
+        }
+        else if i > rnCopy.charWeight {
+            newGtLeft: *Rope;
+            newGtRight: *Rope;
+
+            rn.d.children.right|split(i - rnCopy.charWeight, &newGtLeft, &newGtRight);
+
+            rnCopy|setRight(newGtLeft);
+
+            ^outNewLeft = rnCopy;
+            usedRnCopy = true;
+
+            ^outNewRight = newGtRight;
+        }
+        else {
+            ^outNewLeft = shallowCopy(rnCopy.d.children.left);
+            ^outNewRight = shallowCopy(rnCopy.d.children.right);
+        }
+
+        if !usedRnCopy {
+            free(rnCopy);
+        }
+    }
+}
+
+fn makeLeafConcat(left: *Rope, right: *Rope) {
+    rn := makeNode(true, left.byteWeight + right.byteWeight, left.charWeight + right.charWeight);
+
+    rn.d.buf.length = left.d.buf.length + right.d.buf.length;
+    rn.d.buf.capacity = rn.d.buf.length;
+    rn.d.buf.bytes = mem.alloc!(i8)(cast() rn.d.buf.length);
+    mem.memcpy(dst: rn.d.buf.bytes, src: left.d.buf.bytes, cast() left.d.buf.length);
+    mem.memcpy(dst: rn.d.buf.bytes + cast(i64) left.d.buf.length, src: left.d.buf.bytes, cast() left.d.buf.length);
+    rn.d.buf.rc = 0;
+
+    rn.lineBreakWeight = countNewlines(rn.d.buf.bytes);
+    rn.totalLineBreakWeight = rn.lineBreakWeight;
+
+    free(left);
+    free(right);
+
+    return rn;
+}
+
+fn concat(left: *Rope, right: *Rope) {
+    if right == nil {
+        return left;
+    }
+    if left == nil {
+        return right;
+    }
+
+    if right.isLeaf {
+        if left.isLeaf {
+            if left.byteWeight + right.byteWeight < COPY_THRESHOLD {
+                cat := left|makeLeafConcat(right);
+                return cat;
+            }
+        }
+        else if left.d.children.right == nil {
+            left|setRight(right);
+            return left;
+        }
+        else if left.d.children.right.isLeaf and left.d.children.right.byteWeight + right.byteWeight < COPY_THRESHOLD {
+            left|setRight(makeLeafConcat(left.d.children.right, right));
+            return left;
+        }
+    }
+
+    return makeParent(left, right);
+}
+
+fn insert(rn: *Rope, i: u64, text: []i8) {
+    splitLeft: *Rope;
+    splitRight: *Rope;
+    split(rn, i, &splitLeft, &splitRight);
+
+    insert := makeLeaf(text);
+    combinedLeft := concat(splitLeft, insert);
+    cat := concat(combinedLeft, splitRight);
+    panic();
+
+    return cat;
+}
+
+fn delete(rn: *Rope, start: u64, end: u64) {
+    if totalCharLength(rn) == 1 {
+        return makeLeaf("");
+    }
+
+    splitEndLeft: *Rope;
+    splitEndRight: *Rope;
+
+    rn|split(end, &splitEndLeft, &splitEndRight);
+
+    splitStartLeft: *Rope;
+    splitStartRight: *Rope;
+
+    splitEndLeft|split(start, &splitStartLeft, &splitStartRight);
+
+    result := concat(splitStartLeft, splitEndRight);
+
+    free(splitEndLeft);
+    free(splitStartRight);
+
+    return result;
+}
+
+fn test() {
+    r := makeLeaf("hello, world!");
+
+    inserted := r|insert(6, "X ");
+    -- deleted := r|delete(2, 5);
+
+    printRope(r);
+    puts("\n");
+    printRope(inserted);
+    -- puts("\n");
+    -- printRope(deleted);
+
+    puts("\n");
+}

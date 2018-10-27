@@ -1,4 +1,28 @@
 TODO:
+    - bool should be 1 byte, not 4
+
+    - stronly consider getting rid of unions considering we haven't used them yet....
+
+    - #context things should be scoped -- i.e. only in the context of the module they're defined in.
+        - so basically every module provides a struct to go into the master context struct, and the master context struct has
+          fields with the same name as the module.
+
+    - index arrays by unsigned integer types
+
+    - IDEA: what if we use a rope structure for cached glyphs? (or fold the cached glyphs into our existing rope structure somehow?)
+        - there are two 'value's for the leaf nodes:
+             - its horizontal offset when drawing
+             - its byte offset into the document
+        - when insert:
+            - just need to shape from the glyph right before the insert point, through all the inserted text, and through the one just after
+                (pad 1 on either side in case of any combining glyphs or something weird... might need to pad a couple on either side but still)
+        - when delete:
+            - re-shape the glyph right before the beginning of the delete through the glyph right after the end of the delete
+                (i.e. 2 glyphs...)
+        - will need to keep a mapping from codepoints -> glyphs, so when we insert/delete we know where it's actually happening, in shaped glyph space
+            - the 'cluster' property in GlyphInfo should take care of this (?)
+        - when changing fonts, will need to do a full re-shaping
+
     - #attr param should be inferred based on fn args
 
     - get rid of automatic basic import
@@ -9,7 +33,7 @@ TODO:
         - e.g. #import "foo/foo", and foo/foo.cpi has #import "bar"
         - would want this to be "foo/bar"
 
-    - a.b.c := "foo" is valid and does NOT do what you think it should (wait what do you think it should do?)
+    - a.b.c := "foo" is valid and does NOT do what you think it should (wait, what do you think it should do?)
 
     - add #nocontext annotation for fns -- these fns can be used in #if stmts, but not ones with context
         - need to validate that it doesn't call any fns from within it unless they are external or marked with #nocontext

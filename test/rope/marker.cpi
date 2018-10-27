@@ -1,0 +1,16 @@
+#import "mem";
+#import "buffer": buf;
+#import "io";
+#import "string";
+#import "iter";
+
+type Node struct {
+    parent: bool,
+
+}
+
+fn test() {
+
+
+    return 0;
+}
