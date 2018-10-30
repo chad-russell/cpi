@@ -29,11 +29,6 @@ fn release(buf: *StringBuf) {
 }
 }
 
-type RopeChildren struct {
-    left: *Rope,
-    right: *Rope
-}
-
 type Rope struct {
     byteWeight: u64,
     totalByteWeight: u64,
@@ -47,7 +42,10 @@ type Rope struct {
     isLeaf: bool,
     rc: i32,
 
-    d: RopeChildren
+    d: struct {
+        left: *Rope,
+        right: *Rope
+    }
 }
 
 fn children(r: *Rope) {

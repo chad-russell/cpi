@@ -1,0 +1,49 @@
+#import "mem";
+
+type List struct {
+    value: !T,
+    next: *List!(T)
+}
+
+fn of(T := typeof(s[0]))(s: !S) {
+    l := mem.alloc!(List!(T))();
+    orig := l;
+
+    #for _s, i: s {
+        l.value = _s;
+        if i < #fieldsof(S).count - 1 {
+            l.next = mem.alloc!(List!(T))();
+        }
+        l = l.next;
+    }
+
+    return orig;
+}
+
+fn empty(T: Ast)() {
+    return mem.alloc!(List!(T))();
+}
+
+fn iter(T: Ast)(l: *List!(T)) {
+    li: ListIterator!(T);
+    li.front = l;
+    return li;
+}
+
+type ListIterator(T: Ast) struct {
+    front: *List!(T)
+}
+
+#attr(ListIterator) {
+fn empty(l: !T/ListIterator) {
+    return l.front == nil;
+}
+
+fn front(l: !T/ListIterator) {
+    return l.front.value;
+}
+
+fn popFront(T := typeof(^l))(l: *T/ListIterator) {
+    l.front = l.front.next;
+}
+}

@@ -2,8 +2,8 @@
 #import "rope/marker";
 
 fn main() {
-    text.test();
-    -- marker.test();
+    -- text.test();
+    marker.test();
 
     return 0;
 }

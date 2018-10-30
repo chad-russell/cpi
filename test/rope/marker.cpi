@@ -3,14 +3,166 @@
 #import "io";
 #import "string";
 #import "iter";
+#import "list";
+
+type MarkerType enum(u8) {
+    newline,
+    custom
+}
+
+type Marker struct {
+    _type: MarkerType,
+    name: []i8
+}
 
 type Node struct {
     parent: bool,
 
+    weight: u64,
+
+    children: struct {
+        left: *Node,
+        right: *Node
+    }
+}
+
+fn children(n: *Node) {
+    basic.assert(n.parent);
+    return n.children;
+}
+
+fn markers(n: *Node) {
+    return cast(*list.List!(Marker)) n.children.left;
+}
+
+fn weight(n: *Node) u64 {
+    if n == nil { return 0; }
+    return n.weight;
+}
+
+fn makeParent(left: *Node, right: *Node) {
+    p := mem.alloc!(Node)();
+
+    p.parent = true;
+    p.weight = weight(left) + weight(right);
+    p.children = {left, right};
+
+    if left == nil and right != nil {
+        p.children.left = right;
+        p.children.right = nil;
+    }
+
+    if p.children.left == nil {
+        panic();
+    }
+
+    return p;
+}
+
+fn makeChild(markers: *list.List!(Marker), weight: u64 = 0) {
+    p := mem.alloc!(Node)();
+
+    p.parent = false;
+    p.weight = weight;
+    p.children.left = cast() markers;
+
+    return p;
+}
+
+-- todo(chad): when inserting a newline for example -- does the length grow? probably not
+-- i.e. if we have regions [[0,10]] and we add a newline character at 7 (so split at 7) we should probably get [[0,7], [7,10]]
+fn split(n: *Node, at: u64, _type: MarkerType) {
+
+}
+
+fn nodeForCharAt(n: *Node, at: u64) {
+    if n == nil { return n; }
+
+    if n.parent {
+        if n.children.left == nil {
+            return nodeForCharAt(n.children.right, at);
+        }
+        else if n.children.right == nil {
+            return nodeForCharAt(n.children.left, at);
+        }
+
+        if at <= n.children.left.weight {
+            return nodeForCharAt(n.children.left, at);
+        }
+
+        return nodeForCharAt(n.children.right, at - n.children.left.weight);
+    }
+
+    if at > n.weight {
+        return nil;
+    }
+
+    return n;
+}
+
+fn insertText(n: *Node, at: u64, text: []i8) *Node {
+    if n == nil { return n; }
+
+    if n.parent {
+        if at <= n.children.left.weight {
+            return makeParent(insertText(n.children.left, at, text), n.children.right);
+        }
+
+        return makeParent(n.children.left, insertText(n.children.right, at, text));
+    }
+    else if at <= n.weight {
+        return makeChild(markers(n), n.weight + cast() text.count);
+    }
+
+    return makeChild(list.empty!(Marker)(), cast() text.count);
+}
+
+-- todo(chad): does deleting across a region's boundaries change the extents of the region or invalidate it?
+-- If you delete from the middle of one region to the middle of another do they merge?
+-- probably needs to be configurable
+fn deleteText(n: *Node, at: u64, len: u64) {
+
+}
+
+fn printTree(n: *Node, indent := 0) {
+    if n == nil { return; }
+
+    if indent > 0 {
+        for i: iter.until(indent) {
+            io.print("  ");
+        }
+    }
+
+    if n.parent {
+        io.println("*");
+        printTree(n.children.left, indent + 1);
+        printTree(n.children.right, indent + 1);
+    }
+    else {
+        for marker: markers(n)|list.iter!(Marker) {
+            io.print({name: marker.name, weight: n.weight});
+        }
+
+        puts("\n");
+    }
 }
 
 fn test() {
+    p := makeParent(makeParent(
+                        makeChild(list.of!(Marker)({{MarkerType.custom, "f"}}), 8),
+                        makeChild(list.of!(Marker)({{MarkerType.custom, "a"}, {MarkerType.custom, "b"}, {MarkerType.custom, "d"}}), 9)),
+                    makeParent(
+                        makeChild(list.of!(Marker)({{MarkerType.custom, "a"}}), 4),
+                        makeChild(list.of!(Marker)({{MarkerType.custom, "a"}, {MarkerType.custom, "c"}, {MarkerType.custom, "e"}}), 8)));
 
+    printTree(p);
+
+    q := p|insertText(0, "h");
+    printTree(q);
+
+    io.println("------------");
+    io.println("success!");
+    io.println("------------");
 
     return 0;
 }
