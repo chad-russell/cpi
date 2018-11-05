@@ -235,15 +235,15 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Re
     y: f64 = cast() (cast() FONT_SIZE * (line + 1)) - offset.y;
 
     -- Try to find the cachedLine. Make a new one if it doesn't exist
-    if formData.lineCache.buf.count <= line {
-        cl: CachedLine = {cast() (context.sdl.windowHeight + 10), 0, buf.make!(gui.Rect!(f64))(), buf.make!(CachedGlyph)()};
+    -- if formData.lineCache.buf.count <= line {
+        -- cl: CachedLine = {cast() (context.sdl.windowHeight + 10), 0, buf.make!(gui.Rect!(f64))(), buf.make!(CachedGlyph)()};
 
-        &formData.lineCache|:set(line, cl);
-        formData.lineCache.buf.count = line + 1;
+        -- &formData.lineCache|:set(line, cl);
+        -- formData.lineCache.buf.count = line + 1;
 
-        repopulateCachedLine(&formData.lineCache.buf[line], formData, line);
-    }
-    cl := &formData.lineCache.buf[line];
+        -- repopulateCachedLine(&formData.lineCache.buf[line], formData, line);
+    -- }
+    -- cl := &formData.lineCache.buf[line];
 
     for found, i: cl.glyphRun.buf {
         if x + found.extents.xAdvance >= 0 {
@@ -606,7 +606,6 @@ fn make(rect: gui.Rect!(f64)) {
 
         -- repopulate cached lines
         -- todo(chad): only repopulate starting with the first changed line
-        -- todo(chad): see todo.txt, the first one
         i := 0;
         for cl: formData.lineCache.buf|:iter.byRef {
             repopulateCachedLine(cl, formData, i);
@@ -637,30 +636,36 @@ fn repopulateCachedLine(cl: *CachedLine, formData: *TextEditFormData, line: i64)
     cl.glyphRun.buf.count = 0;
 
     -- Add text and lay it out
-    lastChar := se.editor_buffer_get_line_length(context.tc.eb, line);
+    lineLength := se.editor_buffer_get_line_length(context.tc.eb, line);
 
-    text := se.editor_buffer_get_text_between_points(context.tc.eb, line, 0, line, lastChar);
-    defer { se.editor_buffer_free_buf(text); }
+    outOffset: i64;
+    outTotalCount: i64;
+    outStartCharPos: i64;
+    outBufferLength: i64;
 
-    front := text.bytes;
+    infos := se.editor_buffer_get_glyph_infos_between_points(context.tc.eb,
+        line, 0, line, lineLength,
+        &outOffset, &outTotalCount, &outStartCharPos, &outBufferLength);
 
-    while ^front != "\0"[0] {
-        cairoFont := context.cairo.font;
-        run := tryShapeGlyphs(front, context.hb.font);
+    remaining := outTotalCount;
+    if remaining > lineLength {
+        remaining = lineLength;
+    }
 
-        if run.glyphs == 0 {
-            cairoFont = context.cairo.emojiFont;
-            run = tryShapeGlyphs(front, context.hb.emojiFont);
-        }
+    nextCharPos := outStartCharPos;
 
-        -- Get buffer data
-        if run.glyphs == 0 { return; }
+    while remaining > 0 {
+        gi := outOffset;
 
-        front += run.bytes;
-
-        for g: iter.until(run.glyphs) {
-            found := findGlyph(formData, cast() (run.glyphInfo + g).codepoint, cairoFont);
+        while gi < outBufferLength {
+            found := findGlyph(formData, cast() (infos + gi).codepoint, context.cairo.font);
             &cl.glyphRun|:append(found);
+
+            remaining -= 1;
+            nextCharPos += 1;
+            gi += 1;
         }
+
+        infos = se.editor_buffer_get_glyph_infos_starting_at_character(context.tc.eb, nextCharPos, &outOffset, &outBufferLength);
     }
 }

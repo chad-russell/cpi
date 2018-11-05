@@ -19,7 +19,7 @@ type StringBuf struct {
 fn release(buf: *StringBuf) {
     if buf == nil { return; }
 
-    if (buf.rc > 0) {
+    if buf.rc > 0 {
         buf.rc -= 1;
     } else {
         mem.free(buf.bytes);
@@ -63,7 +63,7 @@ fn countNewlines(s: *i8) u64 {
 
     c := s;
     while ^c != "\0"[0] {
-        if (^c == "\n"[0]) { count += 1; }
+        if ^c == "\n"[0] { count += 1; }
         c += 1;
     }
 
@@ -71,7 +71,7 @@ fn countNewlines(s: *i8) u64 {
 }
 
 fn setRight(target: *Rope, newRight: *Rope) {
-    if (newRight == children(target).right) { return; }
+    if newRight == children(target).right { return; }
 
     children(target).right|decRc;
     children(target).right = newRight;
@@ -223,23 +223,23 @@ fn incRc(rn: *Rope)
 }
 
 fn decRc(rn: *Rope) {
-    if (rn == nil) { return; }
+    if rn == nil { return; }
 
     basic.assert(rn.rc > 0);
 
     rn.rc -= 1;
-    if (rn.rc == 0) {
+    if rn.rc == 0 {
         releaseRope(rn);
     }
 }
 
 -- todo(chad): why can we not put this behind #attr(Rope) and just call it release??
 fn releaseRope(rn: *Rope) {
-    if (rn == nil) { return; }
-    if (rn.rc != 0) { return; }
+    if rn == nil { return; }
+    if rn.rc != 0 { return; }
 
     rn.rc = -1;
-    if (!rn.isLeaf) {
+    if !rn.isLeaf {
         children(rn).left|decRc;
         children(rn).right|decRc;
     }
@@ -415,7 +415,7 @@ fn split(rn: *Rope, i: u64, outNewLeft: **Rope, outNewRight: **Rope) {
         if i <= 0 {
             ^outNewLeft = nil;
             ^outNewRight = shallowCopy(rn);
-        } else if (i >= rn.charWeight) {
+        } else if i >= rn.charWeight {
             ^outNewLeft = shallowCopy(rn);
             ^outNewRight = nil;
         } else {

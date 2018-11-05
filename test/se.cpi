@@ -1,5 +1,7 @@
 #link "/Users/chadrussell/Projects/se/cmake-build-release/libse_shared";
 
+#import "harfbuzz": hb;
+
 type Buf struct {
     length: i64,
     capacity: i64,
@@ -9,16 +11,13 @@ type Buf struct {
 }
 
 type LineRope struct {
-    lineLength: u32,
     totalLineLength: u32,
     longestChildLineLength: u32,
 
-    charWeight: u32,
     totalCharWeight: u32,
 
     virtualLineLength: u32,
 
-    virtualNewlineCount: u32,
     totalVirtualNewlineCount: u32,
 
     height: i32,
@@ -32,16 +31,11 @@ type LineRope struct {
 }
 
 type Rope struct {
-    byte_weight: i64,
-    total_byte_weight: i64,
+    totalByteWeight: i64,
+    totalCharWeight: i64,
+    totalLineBreakWeight: i64,
 
-    char_weight: i64,
-    total_char_weight: i64,
-
-    line_break_weight: i64,
-    total_line_break_weight: i64,
-
-    is_leaf: i8,
+    isLeaf: i8,
 
     rc: i32,
 
@@ -116,3 +110,7 @@ fn editor_buffer_undo(eb: *EditorBuffer, index: i64) none
 fn editor_buffer_global_undo(eb: *EditorBuffer, index: i64) none
 fn editor_buffer_set_cursor_point_for_cursor_index(eb: *EditorBuffer, index: i64, row: i64, col: i64) none
 fn editor_buffer_free_buf(buf: *Buf) none
+fn editor_buffer_get_glyph_infos_between_points(eb: *EditorBuffer,
+                                                startLine: i64, startCol: i64, endLine: i64, endCol: i64,
+                                                outOffset: *i64, outTotalCount: *i64, outStartCharPos: *i64, outBufferLength: *i64) *hb.GlyphInfo
+fn editor_buffer_get_glyph_infos_starting_at_character(eb: *EditorBuffer, start: i64, outCount: *i64, outBufferLength: *i64) *hb.GlyphInfo
