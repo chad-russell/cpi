@@ -20,8 +20,6 @@ FONT_SIZE : i32 = 20;
 sliderBackground: gui.Color = {0.4235, 0.4275, 0.4117};
 sliderForeground: gui.Color = {0.8686, 0.7686, 0.7647};
 
-#context cursor: *gui.Form
-
 fn init() {
     context.tc.eb = se.editor_buffer_create(80);
 
@@ -45,7 +43,6 @@ fn init() {
 
     cursorId := makeCursor(textEditor.data, textEditorId);
     cursor := &context.forms.buf[cursorId];
-    context.cursor = cursor;
 
     scrollData := scroll.takeover(textEditor.rect, textEditorId);
 
@@ -107,8 +104,7 @@ type CachedGlyph struct {
 type CachedLine struct {
     low: f64,
     high: f64,
-    glyphs: *buf.Buffer!(gui.Rect!(f64)),
-    glyphRun: *buf.Buffer!(CachedGlyph)
+    glyphs: *buf.Buffer!(gui.Rect!(f64))
 }
 
 #context tc: struct {
@@ -235,17 +231,41 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Re
     y: f64 = cast() (cast() FONT_SIZE * (line + 1)) - offset.y;
 
     -- Try to find the cachedLine. Make a new one if it doesn't exist
-    -- if formData.lineCache.buf.count <= line {
-        -- cl: CachedLine = {cast() (context.sdl.windowHeight + 10), 0, buf.make!(gui.Rect!(f64))(), buf.make!(CachedGlyph)()};
+    if formData.lineCache.buf.count <= line {
+        cl: CachedLine = {cast() (context.sdl.windowHeight + 10), 0, buf.make!(gui.Rect!(f64))()};
 
-        -- &formData.lineCache|:set(line, cl);
-        -- formData.lineCache.buf.count = line + 1;
+        &formData.lineCache|:set(line, cl);
+        formData.lineCache.buf.count = line + 1;
+    }
+    cl := &formData.lineCache.buf[line];
 
-        -- repopulateCachedLine(&formData.lineCache.buf[line], formData, line);
-    -- }
-    -- cl := &formData.lineCache.buf[line];
+    startOfLine := se.editor_buffer_character_position_for_point(context.tc.eb, line, 0);
+    lineLength := se.editor_buffer_get_line_length(context.tc.eb, line);
 
-    for found, i: cl.glyphRun.buf {
+    outOffset: i64;
+    outBufferLength: i64;
+    infos := se.editor_buffer_get_glyph_infos_starting_at_character(context.tc.eb,
+                                                        startOfLine,
+                                                        &outOffset,
+                                                        &outBufferLength);
+    bufferIndex := 0;
+
+    for foundIndex: iter.until(lineLength) {
+        found: CachedGlyph;
+        if outOffset + bufferIndex >= outBufferLength {
+            infos = se.editor_buffer_get_glyph_infos_starting_at_character(context.tc.eb,
+                                                                startOfLine,
+                                                                &outOffset,
+                                                                &outBufferLength);
+            bufferIndex = 0;
+        }
+        if outOffset + bufferIndex >= outBufferLength {
+            panic();
+        }
+        found = findGlyph(formData, (infos + outOffset + bufferIndex).codepoint, context.cairo.font);
+        startOfLine += 1;
+        bufferIndex += 1;
+
         if x + found.extents.xAdvance >= 0 {
             cairo.cairo_save(form.layer.context);
             cairo.cairo_translate(form.layer.context, x, y + found.extents.yBearing);
@@ -265,7 +285,7 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Re
                 cl.high = offset.y + y + found.extents.yBearing + found.extents.height + 1;
             }
 
-            &cl.glyphs|:set(i, {
+            &cl.glyphs|:set(foundIndex, {
                 offset.x + x + found.extents.xBearing,
                 offset.y + y + found.extents.yBearing,
                 cast() (found.extents.width + 1),
@@ -351,7 +371,8 @@ fn makeCursor(formData: *TextEditFormData, parentId: i64) {
             #import "time";
             elapsedSeconds := cast(f64) context.elapsed / cast() time.CLOCKS_PER_SEC;
 
-            alpha := (math.sin(elapsedSeconds * 9) + 1.0) / 2.0;
+            -- alpha := (math.sin(elapsedSeconds * 9) + 1.0) / 2.0;
+            alpha: f64 = 1.0;
 
             cairo.cairo_set_source_rgba(form.layer.context, 0.9, 0.9, 0.9, alpha);
             cairo.cairo_set_line_width(form.layer.context, 10);
@@ -603,14 +624,6 @@ fn make(rect: gui.Rect!(f64)) {
         -- clear selection
         formData.mouseDownRect.hasValue = false;
         formData.mouseMoveRect.hasValue = false;
-
-        -- repopulate cached lines
-        -- todo(chad): only repopulate starting with the first changed line
-        i := 0;
-        for cl: formData.lineCache.buf|:iter.byRef {
-            repopulateCachedLine(cl, formData, i);
-            i += 1;
-        }
     }
 
     formData: TextEditFormData;
@@ -628,44 +641,4 @@ fn make(rect: gui.Rect!(f64)) {
     &context.texters|:append(formId);
 
     return formId;
-}
-
-fn repopulateCachedLine(cl: *CachedLine, formData: *TextEditFormData, line: i64) {
-    glyphCount := 0;
-
-    cl.glyphRun.buf.count = 0;
-
-    -- Add text and lay it out
-    lineLength := se.editor_buffer_get_line_length(context.tc.eb, line);
-
-    outOffset: i64;
-    outTotalCount: i64;
-    outStartCharPos: i64;
-    outBufferLength: i64;
-
-    infos := se.editor_buffer_get_glyph_infos_between_points(context.tc.eb,
-        line, 0, line, lineLength,
-        &outOffset, &outTotalCount, &outStartCharPos, &outBufferLength);
-
-    remaining := outTotalCount;
-    if remaining > lineLength {
-        remaining = lineLength;
-    }
-
-    nextCharPos := outStartCharPos;
-
-    while remaining > 0 {
-        gi := outOffset;
-
-        while gi < outBufferLength {
-            found := findGlyph(formData, cast() (infos + gi).codepoint, context.cairo.font);
-            &cl.glyphRun|:append(found);
-
-            remaining -= 1;
-            nextCharPos += 1;
-            gi += 1;
-        }
-
-        infos = se.editor_buffer_get_glyph_infos_starting_at_character(context.tc.eb, nextCharPos, &outOffset, &outBufferLength);
-    }
 }

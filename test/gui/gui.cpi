@@ -386,8 +386,8 @@ fn initSdl() {
 
     context.sdl.window = window;
 
-    -- sdlRenderFlags: i32 = 6;
-    sdlRenderFlags: i32 = 0;
+    sdlRenderFlags: i32 = 6;
+    -- sdlRenderFlags: i32 = 0;
     context.sdl.renderer = sdl.SDL_CreateRenderer(context.sdl.window, -1, sdlRenderFlags);
 
     -- Compute screen resolution
