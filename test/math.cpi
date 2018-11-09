@@ -12,3 +12,11 @@ fn min(a: !T, b: T) {
     if a <= b { return a; }
     return b;
 }
+
+fn abs(a: !T) {
+    if a < 0 {
+        return -a;
+    }
+
+    return a;
+}

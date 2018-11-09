@@ -1,9 +1,7 @@
-#import "rope/text";
-#import "rope/marker";
+#import "gui/music";
 
 fn main() {
-    -- text.test();
-    marker.test();
+    music.init();
 
     return 0;
 }

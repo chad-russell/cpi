@@ -14,3 +14,9 @@ fn heap(t: !T) {
     ^a = t;
     return a;
 }
+
+fn tmpHeap(t: !T) {
+    a := cast(*T) basic.tmp(sizeof(T));
+    ^a = t;
+    return a;
+}

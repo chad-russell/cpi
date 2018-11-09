@@ -109,49 +109,6 @@ type Layer struct {
     context: *cairo.Context
 }
 
--- todo(chad): delegate should be whatever form 'owns' this -- i.e. if it's embedded in some other view which needs to do translation on events,
--- then that view should get precedence when it comes to passing key/mouse/etc. events
-type Form struct {
-    rect: Rect!(f64),
-    layer: Layer,
-    receivers: buf.Buffer!(Receiver),
-    data: *none,
-}
-
-fn addReceiver(formId: i64, name: []i8, handler: ReceiverHandler) {
-    (&(context.forms.buf[formId].receivers))|:append({ name|string.strcpy, handler });
-}
-
-fn removeReceiver(formId: i64, name: []i8) {
-    f := &context.forms.buf[formId];
-
-    count := f.receivers.buf.count;
-    f.receivers.buf.count = 0;
-
-    i := 0;
-    while i < count {
-        it := f.receivers.buf[i];
-        if string.streq(it.name, name) {
-            mem.free(it.name.data);
-        }
-        else {
-            &f.receivers|:append(it);
-        }
-        i += 1;
-    }
-}
-
-#context forms: *buf.Buffer!(Form)
-#context drawers: *buf.Buffer!(i64)
-#context mousers: *buf.Buffer!(i64)
-#context texters: *buf.Buffer!(i64)
-#context scrollers: *buf.Buffer!(i64)
-#context animators: *buf.Buffer!(i64)
-
-#context formDatas: basic.Region
-
-#context messages: buf.Buffer!(Message)
-
 fn makeLayer(rect: Rect!(f64)) {
     layerSurface := cairo.cairo_image_surface_create(cairo.FORMAT_ARGB32,
         cast() rect.width,
@@ -162,185 +119,6 @@ fn makeLayer(rect: Rect!(f64)) {
     cairo.cairo_surface_set_device_scale(layerSurface, context.sdl.xScale, context.sdl.yScale);
 
     return cast(Layer) {layerSurface, layerContext};
-}
-
-fn makeFormNonScaled(r: Rect!(f64), data: !T, ownLayer := false) {
-    scaled: Rect!(f64) = {
-        r.x * cast() context.sdl.xScale,
-        r.y * cast() context.sdl.yScale,
-        r.width * cast() context.sdl.xScale,
-        r.height * cast() context.sdl.yScale,
-    };
-
-    f: Form;
-    f.rect = scaled;
-    f.data = context.formDatas.current;
-
-    if ownLayer {
-        f.layer = makeLayer(scaled);
-    }
-    else {
-        f.layer = context.cairo.layer;
-    }
-
-    ^(cast(*T) context.formDatas.current) = data;
-    context.formDatas.current += sizeof(T);
-
-    &context.forms|:append(f);
-    id := context.forms.buf.count - 1;
-
-    return id;
-}
-
-fn makeForm(r: Rect!(f64), data: !T, ownLayer := false) {
-    xScale := cast(f64) context.sdl.surface.w / context.sdl.xScale;
-    yScale := cast(f64) context.sdl.surface.h / context.sdl.yScale;
-
-    scaled: Rect!(f64) = {
-        r.x * xScale,
-        r.y * yScale,
-        r.width * xScale,
-        r.height * yScale
-    };
-
-    f: Form;
-    f.rect = scaled;
-    f.data = context.formDatas.current;
-    if ownLayer {
-        layerRect: Rect!(f64) = {
-            0,
-            0,
-            r.width * cast() context.sdl.surface.w,
-            r.height * cast() context.sdl.surface.h
-        };
-        f.layer = makeLayer(layerRect);
-    }
-    else {
-        f.layer = context.cairo.layer;
-    }
-
-    ^(cast(*T) context.formDatas.current) = data;
-    context.formDatas.current += sizeof(T);
-
-    &context.forms|:append(f);
-    id := context.forms.buf.count - 1;
-
-    return id;
-}
-
-fn sendMessage(formId: i64, message: Message) {
-    form := &context.forms.buf[formId];
-
-    for r: form.receivers.buf {
-        if string.streq(message.name, r.name) {
-            r.handle(formId, form.data, message.data);
-        }
-    }
-}
-
-fn broadcast(name: []i8, data := nil) {
-    &context.messages|:append({name|string.tmpcpy, data});
-}
-
-fn processMessages() {
-    for message: context.messages.buf {
-        for id: iter.until(context.forms.buf.count) {
-            sendMessage(id, message);
-        }
-    }
-}
-
-fn drawForm(formId: i64, rect: Rect!(f64) = {0, 0, 0, 0}) {
-    form := &context.forms.buf[formId];
-
-    realId := formId;
-    realForm := form;
-
-    toClear := rect;
-    if toClear.width == 0 and toClear.height == 0 {
-        toClear = realForm.rect;
-    }
-
-    realId|clearForm(toClear);
-
-    m: Message;
-    m.name = DRAW;
-    m.data = &toClear;
-    sendMessage(realId, m);
-
-    if realForm.layer.context != context.cairo.layer.context {
-        cairo.cairo_save(context.cairo.layer.context);
-        defer { cairo.cairo_restore(context.cairo.layer.context); }
-
-        cairo.cairo_set_source_surface(context.cairo.layer.context, realForm.layer.surface, realForm.rect.x, realForm.rect.y);
-        cairo.cairo_rectangle(context.cairo.layer.context, toClear.x, toClear.y, toClear.width, toClear.height);
-        cairo.cairo_fill(context.cairo.layer.context);
-    }
-}
-
-fn drawAllForms() {
-    for form: iter.until(context.forms.buf.count) {
-        drawForm(form);
-    }
-
-    commit();
-}
-
-fn drawUpdatedForms() {
-    update := false;
-
-    for formId: context.drawers.buf {
-        update = true;
-
-        found := false;
-        for animatorId: context.animators.buf {
-            if formId == animatorId {
-                found = true;
-            }
-        }
-
-        if found == false {
-            drawForm(formId);
-        }
-    }
-
-    if update or context.frame mod 5 == 0 {
-    for animatorId: context.animators.buf {
-        update = true;
-
-        for coveringId: iter.until(context.forms.buf.count) {
-            covering := &context.forms.buf[coveringId];
-            animator := &context.forms.buf[animatorId];
-
-            if animator.rect|:intersects(covering.rect) {
-                -- if it has it's own form then no need to explicitly redraw. Otherwise, redraw
-                if covering.layer.context != context.cairo.layer.context {
-                    cairo.cairo_set_source_surface(context.cairo.layer.context, covering.layer.surface, covering.rect.x, covering.rect.y);
-                    cairo.cairo_rectangle(context.cairo.layer.context, animator.rect.x, animator.rect.y, animator.rect.width, animator.rect.height);
-                    cairo.cairo_fill(context.cairo.layer.context);
-                }
-                else {
-                    drawForm(coveringId, animator.rect);
-                }
-            }
-        }
-
-        drawForm(animatorId);
-    }
-    }
-
-    -- todo(chad): `if update {` doesn't work... :(
-    if update == true {
-        commit();
-    }
-}
-
-fn setNeedsDraw(formId: i64, formData: *none, messageData: *none) {
-    &context.drawers|:append(formId);
-}
-
-fn setFormNeedsDraw(formId: i64) {
-    &context.drawers|:append(formId);
 }
 
 #context sdl: struct {
@@ -360,6 +138,10 @@ fn setFormNeedsDraw(formId: i64) {
 
     xScale: f64,
     yScale: f64,
+}
+
+fn windowRect() Rect!(f64) {
+    return {0, 0, cast(f64) context.sdl.rendererWidth, cast(f64) context.sdl.rendererHeight};
 }
 
 #context cairo: struct {
@@ -433,47 +215,31 @@ fn initCairo() {
     cairo.cairo_surface_set_device_scale(context.cairo.layer.surface, context.sdl.xScale, context.sdl.yScale);
 }
 
-fn initContext() {
-    #import "mem";
-
-    -- start with 1MB
-    -- todo(chad): make this auto-expanding
-    size := 1024 * 1024;
-
-    context.formDatas.count = size;
-    context.formDatas.data = mem.calloc(size, sizeof(i8));
-    context.formDatas.current = context.formDatas.data;
-
-    context.forms = buf.make!(Form)();
-    context.drawers = buf.make!(i64)();
-    context.mousers = buf.make!(i64)();
-    context.texters = buf.make!(i64)();
-    context.scrollers = buf.make!(i64)();
-    context.animators = buf.make!(i64)();
-}
-
 fn init() {
-    initContext();
     initSdl();
     initCairo();
 
     context.quit = false;
+
+    context.frame = 0;
+
+    #import "time";
+    context.start = time.clock();
+    context.lastFrameTime := context.start;
 }
 
-fn drawRect(formId: i64, rect: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1) {
-    form := &context.forms.buf[formId];
+fn drawRect(layer: Layer, rect: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1) {
+    cairo.cairo_save(layer.context);
+    defer { cairo.cairo_restore(layer.context); }
 
-    cairo.cairo_save(form.layer.context);
-    defer { cairo.cairo_restore(form.layer.context); }
-
-    cairo.cairo_set_source_rgba(form.layer.context, r, g, b, a);
-    if form.layer.context == context.cairo.layer.context {
-        cairo.cairo_rectangle(form.layer.context, form.rect.x + rect.x, form.rect.y + rect.y, rect.width, rect.height);
+    cairo.cairo_set_source_rgba(layer.context, r, g, b, a);
+    if layer.context == context.cairo.layer.context {
+        cairo.cairo_rectangle(layer.context, rect.x, rect.y, rect.width, rect.height);
     }
     else {
-        cairo.cairo_rectangle(form.layer.context, rect.x, rect.y, rect.width, rect.height);
+        cairo.cairo_rectangle(layer.context, rect.x, rect.y, rect.width, rect.height);
     }
-    cairo.cairo_fill(form.layer.context);
+    cairo.cairo_fill(layer.context);
 }
 
 fn commit() {
@@ -506,12 +272,14 @@ fn clearRect(layer: Layer, rect: Rect!(f64)) {
     cairo.cairo_fill(layer.context);
 }
 
-fn clearForm(formId: i64, rect: Rect!(f64)) {
-    form := &context.forms.buf[formId];
-    clearRect(form.layer, rect);
-}
-
 #context quit: bool
+
+#context mouseMotionEvent: *sdl.MouseMotionEvent
+#context mouseWheelEvent: *sdl.MouseWheelEvent
+#context mouseButtonDownEvent: *sdl.MouseButtonEvent
+#context mouseButtonUpEvent: *sdl.MouseButtonEvent
+#context keyDownEvent: *sdl.KeyboardEvent
+#context keyUpEvent: *sdl.KeyboardEvent
 
 fn processEvents() {
     event: sdl.Event;
@@ -524,98 +292,51 @@ fn processEvents() {
             return;
         }
         else if event._type == sdl.MOUSEMOTION {
-            mouseEvent := cast(*sdl.MouseMotionEvent) &event;
-            if !(mouseEvent.xrel == 0 and mouseEvent.yrel == 0) {
-                sdl.SDL_GetMouseState(&context.mouse.x, &context.mouse.y);
-
-                mmd: MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
-                for formId: context.mousers.buf {
-                    formId|sendMessage(cast() {MOUSEMOVE, &mmd});
-                }
-            }
+            context.mouseMotionEvent = cast() mem.tmpHeap(event);
         }
         else if event._type == sdl.MOUSEWHEEL {
-            mouseEvent := cast(*sdl.MouseWheelEvent) &event;
-
-            msd: MouseScrollMessageData = {x: cast() mouseEvent.x, y: cast() mouseEvent.y, flipped: mouseEvent.direction == sdl.Direction.FLIPPED};
-            for formId: context.scrollers.buf {
-                formId|sendMessage(cast() {MOUSESCROLL, &msd});
-            }
+            context.mouseWheelEvent = cast() mem.tmpHeap(event);
         }
         else if event._type == sdl.MOUSEBUTTONDOWN {
-            mouseEvent := cast(*sdl.MouseButtonEvent) &event;
-            sdl.SDL_GetMouseState(&context.mouse.x, &context.mouse.y);
-
-            mmd: MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
-            for formId: context.mousers.buf {
-                form := &context.forms.buf[formId];
-                if form.rect|:contains(mmd.x, mmd.y) {
-                    formId|sendMessage(cast() {MOUSEDOWN, &mmd});
-                }
-            }
+            context.mouseButtonDownEvent = cast() mem.tmpHeap(event);
         }
         else if event._type == sdl.MOUSEBUTTONUP {
-            mouseEvent := cast(*sdl.MouseButtonEvent) &event;
-            sdl.SDL_GetMouseState(&context.mouse.x, &context.mouse.y);
-
-            mmd: MouseMessageData = {x: cast() context.mouse.x, y: cast() context.mouse.y};
-            for formId: context.mousers.buf {
-                formId|sendMessage(cast() {MOUSEUP, &mmd});
-            }
+            context.mouseButtonUpEvent = cast() mem.tmpHeap(event);
         }
         else if event._type == sdl.KEYDOWN {
-            keyboardEvent := cast(*sdl.KeyboardEvent) &event;
-            -- io.println(cast(i32) keyboardEvent.keysym.scancode);
-
-            -- todo(chad): shift scancode is 225. Make a 'modifierKeys' list in context and add things to it when they get pressed
-
-            kd: KeyboardMessageData = {scancode: keyboardEvent.keysym.scancode};
-            for formId: context.texters.buf {
-                formId|sendMessage(cast() {KEYDOWN, &kd});
-            }
+            context.keyDownEvent = cast() mem.tmpHeap(event);
         }
         else if event._type == sdl.KEYUP {
-            -- todo(chad): remove from modifierKeys where necessary
-            keyboardEvent := cast(*sdl.KeyboardEvent) &event;
+            context.keyUpEvent = cast() mem.tmpHeap(event);
         }
     }
 }
 
 #context frame: u64
 #context start: u64
+#context lastFrameTime: u64
 #context dt: u64
 #context elapsed: u64
 
-fn loop() {
-    context.frame = 0;
+fn tick() {
+    context.frame += 1;
 
-    drawAllForms();
+    cur := time.clock();
+    context.dt = cur - context.lastFrameTime;
+    context.elapsed = cur - context.start;
+    context.lastFrameTime = cur;
 
-    #import "time";
-    context.start = time.clock();
-    lastFrameTime := context.start;
+    basic.resetTmp();
 
-    while true and context.quit == false {
-        cur := time.clock();
-        context.dt = cur - lastFrameTime;
-        context.elapsed = cur - context.start;
-        lastFrameTime = cur;
+    context.mouseMotionEvent = nil;
+    context.mouseWheelEvent = nil;
+    context.mouseButtonDownEvent = nil;
+    context.mouseButtonUpEvent = nil;
+    context.keyDownEvent = nil;
+    context.keyUpEvent = nil;
 
-        -- reset temporary storage
-        basic.resetTmp();
+    processEvents();
 
-        -- reset messages
-        context.drawers.buf.count = 0;
-        context.messages.buf.count = 0;
-
-        processEvents();
-
-        processMessages();
-        drawUpdatedForms();
-
-        -- io.println(context.frame);
-        -- io.println("-------");
-
-        context.frame += 1;
-    }
+    -- io.println(context.frame);
+    -- io.println("-------");
 }

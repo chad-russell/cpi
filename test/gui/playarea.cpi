@@ -1,0 +1,87 @@
+#import "gui/gui";
+#import "gui/graphroll";
+#import "io";
+#import "buffer": buf;
+#import "sdl";
+#import "math";
+
+type PlayAreaFormData struct {
+    playing: bool,
+    playhead: f64,
+    playheadGrabber: f64,
+    draggingPlayhead: bool,
+    graphRolls: buf.Buffer!(graphroll.GraphRollFormData)
+}
+
+fn mouseButtonDown(messageData: *sdl.MouseButtonEvent) {
+    if context.state.playArea.playheadGrabber > 0 {
+        context.state.playArea.draggingPlayhead = true;
+    }
+}
+
+fn mouseButtonUp(messageData: *sdl.MouseButtonEvent) {
+    context.state.playArea.draggingPlayhead = false;
+}
+
+fn mouseMove(messageData: *sdl.MouseMotionEvent) {
+    if context.state.playArea.draggingPlayhead {
+        context.state.playArea.playheadGrabber = cast() messageData.y;
+        context.state.playArea.playhead = cast() messageData.x;
+    }
+    else {
+        if math.abs(cast() messageData.x - context.state.playArea.playhead) < 10 {
+            context.state.playArea.playheadGrabber = cast() messageData.y;
+        }
+        else {
+            context.state.playArea.playheadGrabber = -1;
+        }
+    }
+}
+
+fn keydown(messageData: *sdl.KeyboardEvent) {
+    if messageData.keysym.scancode == sdl.Key.SPACE {
+        context.state.playArea.playing = !context.state.playArea.playing;
+    }
+    else if messageData.keysym.scancode == sdl.Key.LEFT {
+        io.println("left");
+        context.state.playArea.playhead = 0;
+    }
+}
+
+fn processMessages() {
+    if context.keyDownEvent != nil {
+        keydown(context.keyDownEvent);
+    }
+    if context.mouseButtonDownEvent != nil {
+        mouseButtonDown(context.mouseButtonDownEvent);
+    }
+    if context.mouseButtonUpEvent != nil {
+        mouseButtonUp(context.mouseButtonUpEvent);
+    }
+    if context.mouseMotionEvent != nil {
+        mouseMove(context.mouseMotionEvent);
+    }
+}
+
+fn draw(rect: gui.Rect!(f64)) {
+    -- background
+    gui.drawRect(context.cairo.layer, rect, cast() 0.9, cast() 0.8, cast() 0.7);
+
+    -- playhead
+    context.cairo.layer|gui.drawRect({context.state.playArea.playhead, 0, 1, rect.height}, 1, 0.2, 0.2);
+    if context.state.playArea.playing {
+        context.state.playArea.playhead += 1;
+    }
+
+    -- playhead grabber
+    if context.state.playArea.playheadGrabber > 0 {
+        context.cairo.layer|gui.drawRect({
+            context.state.playArea.playhead - 5,
+            context.state.playArea.playheadGrabber - 5,
+            10,
+            10
+        }, 1, 0.2, 0.2);
+    }
+
+    -- todo(chad): graph rolls
+}

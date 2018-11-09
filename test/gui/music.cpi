@@ -1,0 +1,24 @@
+#import "gui/gui";
+#import "gui/playarea";
+#import "gui/graphroll";
+
+#context state: struct {
+    playArea: playarea.PlayAreaFormData
+}
+
+fn init() {
+    basic.initContext();
+
+    gui.init();
+
+    while !context.quit {
+        gui.tick();
+
+        playarea.processMessages();
+        playarea.draw(gui.windowRect());
+
+        gui.commit();
+    }
+
+    return 0;
+}

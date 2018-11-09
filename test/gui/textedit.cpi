@@ -48,7 +48,15 @@ fn init() {
 
     (cast(*CursorFormData) cursor.data).parentRect = &scrollData.effectiveRect;
 
+    stressTest();
+
     return textEditorId;
+}
+
+fn stressTest() {
+    for i: iter.until(2000) {
+        se.editor_buffer_insert(context.tc.eb, "abcdefghijklmnopqrstuvwxyz\n......\n\0".data);
+    }
 }
 
 fn makeUndoSlider(rect: gui.Rect!(f64)) {

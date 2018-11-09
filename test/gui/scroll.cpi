@@ -18,6 +18,7 @@ type FormData struct {
     layerCache: buf.Buffer!(CachedLayer),
     scrollOffset: gui.Point!(f64),
     effectiveRect: gui.Rect!(f64),
+    updateOnlyScroll: bool
 }
 
 #context scrollDatas: buf.Buffer!(FormData)
@@ -97,6 +98,8 @@ fn handleScroll(formId: i64, formData: *none, messageData: *gui.MouseScrollMessa
     formRect := context.forms.buf[formId].rect;
     fd.effectiveRect = {formRect.x - fd.scrollOffset.x, formRect.y - fd.scrollOffset.y, formRect.width, formRect.height};
 
+    fd.updateOnlyScroll = true;
+
     gui.setFormNeedsDraw(formId);
 }
 
@@ -141,7 +144,7 @@ fn findFormData(formId: i64) *FormData {
     return nil;
 }
 
-fn drawChunk(fd: *FormData, formId: i64, formData: *none, chunkRect: gui.Rect!(f64)) {
+fn drawChunk(fd: *FormData, formId: i64, formData: *none, chunkRect: gui.Rect!(f64), updateOnlyScroll: bool) {
     tmpLayer: gui.Layer;
 
     form := &context.forms.buf[formId];
@@ -172,7 +175,9 @@ fn drawChunk(fd: *FormData, formId: i64, formData: *none, chunkRect: gui.Rect!(f
 
     savedLayer := form.layer;
     form.layer = tmpLayer;
-    fd.savedDrawFn(formId, formData, &cr);
+    if updateOnlyScroll == false {
+        fd.savedDrawFn(formId, formData, &cr);
+    }
     form.layer = savedLayer;
 
     -- draw into the real layer
@@ -209,8 +214,10 @@ fn draw(formId: i64, formData: *none, messageData: *gui.Rect!(f64)) {
     topLeft := topRight;
     topLeft.x -= topLeft.width;
 
-    drawChunk(fd, formId, formData, topLeft);
-    drawChunk(fd, formId, formData, topRight);
-    drawChunk(fd, formId, formData, bottomLeft);
-    drawChunk(fd, formId, formData, bottomRight);
+    drawChunk(fd, formId, formData, topLeft, fd.updateOnlyScroll);
+    drawChunk(fd, formId, formData, topRight, fd.updateOnlyScroll);
+    drawChunk(fd, formId, formData, bottomLeft, fd.updateOnlyScroll);
+    drawChunk(fd, formId, formData, bottomRight, fd.updateOnlyScroll);
+
+    fd.updateOnlyScroll = false;
 }
