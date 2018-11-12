@@ -17,6 +17,12 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent) {
     if context.state.playArea.playheadGrabber > 0 {
         context.state.playArea.draggingPlayhead = true;
     }
+
+    for gr, i: context.state.playArea.graphRolls.buf {
+        if gr.rect|:contains(cast(f64) messageData.x, cast(f64) messageData.y) {
+            graphroll.mouseButtonDown(messageData, i);
+        }
+    }
 }
 
 fn mouseButtonUp(messageData: *sdl.MouseButtonEvent) {
@@ -67,6 +73,17 @@ fn draw(rect: gui.Rect!(f64)) {
     -- background
     gui.drawRect(context.cairo.layer, rect, cast() 0.9, cast() 0.8, cast() 0.7);
 
+    -- graph rolls
+    grMarginX := rect.width * 0.01;
+    grMarginY := rect.height * 0.01;
+    grHeight := rect.height * 0.25;
+    grWidth := rect.width * 0.98;
+    y := grMarginY;
+    for gr, grIndex: context.state.playArea.graphRolls.buf {
+        graphroll.draw({grMarginX, y, grWidth, grHeight}, grIndex);
+        y += grHeight + grMarginY;
+    }
+
     -- playhead
     context.cairo.layer|gui.drawRect({context.state.playArea.playhead, 0, 1, rect.height}, 1, 0.2, 0.2);
     if context.state.playArea.playing {
@@ -82,6 +99,4 @@ fn draw(rect: gui.Rect!(f64)) {
             10
         }, 1, 0.2, 0.2);
     }
-
-    -- todo(chad): graph rolls
 }

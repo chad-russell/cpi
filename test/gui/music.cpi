@@ -11,6 +11,11 @@ fn init() {
 
     gui.init();
 
+    -- add a graph roll
+    grfd: graphroll.GraphRollFormData;
+    &context.state.playArea.graphRolls|:append(grfd);
+    &context.state.playArea.graphRolls|:append(grfd);
+
     while !context.quit {
         gui.tick();
 

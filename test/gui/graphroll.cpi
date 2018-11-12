@@ -5,64 +5,22 @@
 #import "math";
 
 type GraphRollFormData struct {
-    notes: buf.Buffer!(gui.Rect!(f64)),
-    playing: bool,
-    playhead: f64,
-    playheadGrabber: f64
+    rect: gui.Rect!(f64),
+    notes: buf.Buffer!(gui.Rect!(f64))
 }
 
--- fn mouseDown(formId: i64, formData: *GraphRollFormData, messageData: *gui.MouseMessageData) {
-    -- form := context.forms.buf[formId];
+fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
+    noteRect: gui.Rect!(f64) = {cast() messageData.x, cast() messageData.y, 10, 10};
+    &context.state.playArea.graphRolls.buf[index].notes|:append(noteRect);
+}
 
-    -- localX := messageData.x - form.rect.x;
-    -- localY := messageData.y - form.rect.y;
+fn draw(rect: gui.Rect!(f64), index: i64) {
+    -- background
+    gui.drawRect(context.cairo.layer, rect, 0.6, 0.6, 0.9);
 
-    -- noteRect: gui.Rect!(f64) = {localX, localY, 10, 10};
-    -- &formData.notes|:append(noteRect);
+    for note: context.state.playArea.graphRolls.buf[index].notes.buf {
+        gui.drawRect(context.cairo.layer, note, 0.8, 0.8, 0.2);
+    }
 
-    -- formId|gui.setNeedsDraw(formData, nil);
--- }
-
--- fn mouseMove(formId: i64, formData: *GraphRollFormData, messageData: *gui.MouseMessageData) {
-    -- form := context.forms.buf[formId];
-
-    -- localX := messageData.x - form.rect.x;
-    -- localY := messageData.y - form.rect.y;
-
-    -- if math.abs(localX - formData.playhead) < 10 {
-        -- formData.playheadGrabber = localY;
-    -- }
-    -- else {
-        -- formData.playheadGrabber = -1;
-    -- }
--- }
-
--- fn keydown(formId: i64, formData: *GraphRollFormData, messageData: *gui.KeyboardMessageData) {
-    -- if messageData.scancode == sdl.Key.SPACE {
-        -- formData.playing = !formData.playing;
-    -- }
-    -- else if messageData.scancode == sdl.Key.LEFT {
-        -- formData.playhead = 0;
-    -- }
--- }
-
--- fn create() {
-    -- fd: GraphRollFormData;
-
-    -- formId := gui.makeForm({0, 0, 1, 1}, fd);
-
-    -- formId|gui.addReceiver(gui.DRAW, draw);
-    -- formId|gui.addReceiver(gui.MOUSEDOWN, mouseDown);
-    -- formId|gui.addReceiver(gui.MOUSEMOVE, mouseMove);
-    -- formId|gui.addReceiver(gui.KEYDOWN, keydown);
-
-    -- context.mousers|:append(formId);
-    -- context.texters|:append(formId);
-    -- context.animators|:append(formId);
-
-    -- return formId;
--- }
-
--- fn init() {
-    -- create();
--- }
+    context.state.playArea.graphRolls.buf[index].rect = rect;
+}

@@ -141,7 +141,7 @@ fn makeLayer(rect: Rect!(f64)) {
 }
 
 fn windowRect() Rect!(f64) {
-    return {0, 0, cast(f64) context.sdl.rendererWidth, cast(f64) context.sdl.rendererHeight};
+    return {0, 0, cast(f64) context.sdl.windowWidth, cast(f64) context.sdl.windowHeight};
 }
 
 #context cairo: struct {
