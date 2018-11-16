@@ -95,3 +95,15 @@ fn withIndex(r: !R) {
 
     return cast(WithIndex) { r, 0 };
 }
+
+fn filter(f: Ast)(range: !R) {
+    #import "buffer";
+
+    b := buffer.make!(typeof(range|:front))();
+    for it: range {
+        if f(it) {
+            &b|:append(it);
+        }
+    }
+    return b.buf|iter;
+}

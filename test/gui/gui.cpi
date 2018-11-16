@@ -25,8 +25,8 @@ type Color struct {
 }
 
 #context mouse: struct {
-    x: i32,
-    y: i32
+    x: f64,
+    y: f64
 }
 
 type MouseMessageData struct {
@@ -56,12 +56,13 @@ type Point(T := typeof(x)) struct {
     y: T
 }
 
-#attr(Rect) {
 fn contains(T := typeof(r.x))(r: !R/Rect, x: T, y: T) {
-    return r.x <= x
-       and r.x + r.width >= x
-       and r.y <= y
-       and r.y + r.height >= y;
+    er := r;
+
+    return er.x <= x
+       and er.x + er.width >= x
+       and er.y <= y
+       and er.y + er.height >= y;
 }
 
 fn intersects(r1: !R/Rect, r2: R) {
@@ -89,7 +90,6 @@ fn intersects(r1: !R/Rect, r2: R) {
     }
 
     return xIntercept and yIntercept;
-}
 }
 
 type Message struct {
@@ -215,6 +215,11 @@ fn initCairo() {
     cairo.cairo_surface_set_device_scale(context.cairo.layer.surface, context.sdl.xScale, context.sdl.yScale);
 }
 
+#context arrowCursor: *sdl.Cursor
+#context arrowCursorWE: *sdl.Cursor
+#context arrowCursorNS: *sdl.Cursor
+#context arrowCursorHand: *sdl.Cursor
+
 fn init() {
     initSdl();
     initCairo();
@@ -226,6 +231,11 @@ fn init() {
     #import "time";
     context.start = time.clock();
     context.lastFrameTime := context.start;
+
+    context.arrowCursor = sdl.SDL_CreateSystemCursor(sdl.CursorType.ARROW);
+    context.arrowCursorWE = sdl.SDL_CreateSystemCursor(sdl.CursorType.SIZEWE);
+    context.arrowCursorNS = sdl.SDL_CreateSystemCursor(sdl.CursorType.SIZENS);
+    context.arrowCursorHand = sdl.SDL_CreateSystemCursor(sdl.CursorType.HAND);
 }
 
 fn drawRect(layer: Layer, rect: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1) {
@@ -233,13 +243,38 @@ fn drawRect(layer: Layer, rect: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1) 
     defer { cairo.cairo_restore(layer.context); }
 
     cairo.cairo_set_source_rgba(layer.context, r, g, b, a);
-    if layer.context == context.cairo.layer.context {
-        cairo.cairo_rectangle(layer.context, rect.x, rect.y, rect.width, rect.height);
-    }
-    else {
-        cairo.cairo_rectangle(layer.context, rect.x, rect.y, rect.width, rect.height);
-    }
+    cairo.cairo_rectangle(layer.context, rect.x, rect.y, rect.width, rect.height);
     cairo.cairo_fill(layer.context);
+}
+
+fn drawOutline(layer: Layer, rect: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1, lineWidth: f64 = 1) {
+    cairo.cairo_save(layer.context);
+    defer { cairo.cairo_restore(layer.context); }
+
+    cairo.cairo_set_source_rgba(layer.context, r, g, b, a);
+
+    cairo.cairo_set_line_width(layer.context, lineWidth);
+
+    cairo.cairo_move_to(layer.context, rect.x, rect.y);
+    cairo.cairo_line_to(layer.context, rect.x + rect.width, rect.y);
+    cairo.cairo_line_to(layer.context, rect.x + rect.width, rect.y + rect.height);
+    cairo.cairo_line_to(layer.context, rect.x, rect.y + rect.height);
+
+    cairo.cairo_stroke(layer.context);
+}
+
+fn drawLine(layer: Layer, startX: f64, startY: f64, endX: f64, endY: f64, r: f64, g: f64, b: f64, a: f64 = 1, lineWidth: f64 = 1) {
+    cairo.cairo_save(layer.context);
+    defer { cairo.cairo_restore(layer.context); }
+
+    cairo.cairo_set_source_rgba(layer.context, r, g, b, a);
+
+    cairo.cairo_set_line_width(layer.context, lineWidth);
+
+    cairo.cairo_move_to(layer.context, startX, startY);
+    cairo.cairo_line_to(layer.context, endX, endY);
+
+    cairo.cairo_stroke(layer.context);
 }
 
 fn commit() {
@@ -280,6 +315,10 @@ fn clearRect(layer: Layer, rect: Rect!(f64)) {
 #context mouseButtonUpEvent: *sdl.MouseButtonEvent
 #context keyDownEvent: *sdl.KeyboardEvent
 #context keyUpEvent: *sdl.KeyboardEvent
+#context modifierKeys: struct {
+    shift: bool,
+    ctrl: bool
+}
 
 fn processEvents() {
     event: sdl.Event;
@@ -293,6 +332,13 @@ fn processEvents() {
         }
         else if event._type == sdl.MOUSEMOTION {
             context.mouseMotionEvent = cast() mem.tmpHeap(event);
+
+            x: i32;
+            y: i32;
+            sdl.SDL_GetMouseState(&x, &y);
+
+            context.mouse.x = cast() x;
+            context.mouse.y = cast() y;
         }
         else if event._type == sdl.MOUSEWHEEL {
             context.mouseWheelEvent = cast() mem.tmpHeap(event);
@@ -305,9 +351,23 @@ fn processEvents() {
         }
         else if event._type == sdl.KEYDOWN {
             context.keyDownEvent = cast() mem.tmpHeap(event);
+
+            if context.keyDownEvent.keysym.scancode == sdl.Key.CTRL {
+                context.modifierKeys.ctrl = true;
+            }
+            if context.keyDownEvent.keysym.scancode == sdl.Key.SHIFT {
+                context.modifierKeys.shift = true;
+            }
         }
         else if event._type == sdl.KEYUP {
             context.keyUpEvent = cast() mem.tmpHeap(event);
+
+            if context.keyUpEvent.keysym.scancode == sdl.Key.CTRL {
+                context.modifierKeys.ctrl = false;
+            }
+            if context.keyUpEvent.keysym.scancode == sdl.Key.SHIFT {
+                context.modifierKeys.shift = false;
+            }
         }
     }
 }

@@ -3,24 +3,296 @@
 #import "buffer": buf;
 #import "sdl";
 #import "math";
+#import "iter";
+
+type Note struct {
+    rect: gui.Rect!(f64),
+    selected: bool
+}
 
 type GraphRollFormData struct {
     rect: gui.Rect!(f64),
-    notes: buf.Buffer!(gui.Rect!(f64))
+    notes: buf.Buffer!(Note),
+
+    selecting: bool,
+    selectStartX: f64,
+    selectStartY: f64,
+
+    draggingNotes: bool,
+    dragStartX: f64,
+    dragStartY: f64,
+
+    mouseInResizeArea: bool,
+    resizingNotes: bool,
+    resizeStartX: f64,
+
+    xResolution: f64 = 10,
+    yResolution: f64 = 10,
+}
+
+fn selectArea(state: GraphRollFormData) gui.Rect!(f64) {
+    startX := state.selectStartX;
+    startY := state.selectStartY;
+    endX := context.mouse.x;
+    endY := context.mouse.y;
+
+    if startX > endX {
+        startX = context.mouse.x;
+        endX = state.selectStartX;
+    }
+
+    if startY > endY {
+        startY = context.mouse.y;
+        endY = state.selectStartY;
+    }
+
+    return {
+        startX,
+        startY,
+        endX - startX,
+        endY - startY
+    };
+}
+
+fn effectiveRect(note: Note, state: GraphRollFormData) gui.Rect!(f64) {
+    offsetX: f64 = 0;
+    offsetY: f64 = 0;
+
+    resizeX: f64 = 0;
+
+    if note.selected == true and state.draggingNotes == true {
+        offsetX = context.mouse.x - state.dragStartX;
+        offsetY = context.mouse.y - state.dragStartY;
+    }
+
+    if note.selected == true and state.resizingNotes == true {
+        resizeX = context.mouse.x - state.resizeStartX;
+    }
+
+    relativeY := note.rect.y - state.rect.y;
+
+    hs := &context.state.playArea.horizontalScroller;
+    scaleX := hs.rect.width / (hs.right - hs.left);
+
+    scrollOffsetX := hs.left;
+
+    return {
+        (note.rect.x - scrollOffsetX) * scaleX + offsetX,
+        state.rect.y + quantize(relativeY, state.yResolution) + quantize(offsetY, state.yResolution),
+        (note.rect.width) * state.xResolution * scaleX + resizeX,
+        note.rect.height * state.yResolution
+    };
 }
 
 fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
-    noteRect: gui.Rect!(f64) = {cast() messageData.x, cast() messageData.y, 10, 10};
-    &context.state.playArea.graphRolls.buf[index].notes|:append(noteRect);
+    state := &context.state.playArea.graphRolls.buf[index];
+
+    if messageData.button == sdl.MouseButton.LEFT {
+        didClickNote := false;
+        noteClicked: *Note = nil;
+
+        -- possibly select existing notes
+        i := 0;
+        for note: state.notes.buf|iter.byRef {
+            if effectiveRect(^note, ^state)|gui.contains(cast() messageData.x, cast() messageData.y) {
+                didClickNote = true;
+                noteClicked = note;
+
+                i += 1;
+            }
+        }
+
+        if didClickNote == true {
+            if context.modifierKeys.ctrl == false and noteClicked.selected == false {
+                -- clear all selected notes
+                for note: state.notes.buf|iter.byRef {
+                    note.selected = false;
+                }
+            }
+
+            noteClicked.selected = !context.modifierKeys.shift;
+            if noteClicked.selected == true {
+                if state.mouseInResizeArea == true {
+                    state.resizingNotes = true;
+                    state.resizeStartX = context.mouse.x;
+                }
+                else {
+                    state.draggingNotes = true;
+                    state.dragStartX = cast() messageData.x;
+                    state.dragStartY = cast() messageData.y;
+                }
+            }
+
+            return;
+        }
+        else if context.modifierKeys.ctrl == true {
+            -- box select
+            state.selecting = true;
+            state.selectStartX = cast() messageData.x;
+            state.selectStartY = cast() messageData.y;
+
+            return;
+        }
+
+        if context.modifierKeys.shift {
+            for note: state.notes.buf|iter.byRef {
+                note.selected = false;
+            }
+            return;
+        }
+
+        for note: state.notes.buf|iter.byRef {
+            note.selected = false;
+        }
+
+        -- add a new one
+        hs := &context.state.playArea.horizontalScroller;
+        scaleX := hs.rect.width / (hs.right - hs.left);
+
+        noteRect: gui.Rect!(f64) = {cast() messageData.x / scaleX + hs.left, cast() messageData.y, 3, 1};
+        &context.state.playArea.graphRolls.buf[index].notes|:append({noteRect, false});
+    }
+    else if messageData.button == sdl.MouseButton.RIGHT {
+        toDelete := false;
+        i := 0;
+        for note: state.notes.buf|iter.byRef {
+            if effectiveRect(^note, ^state)|gui.contains(cast() messageData.x, cast() messageData.y) {
+                if context.modifierKeys.shift == false {
+                    note.selected = true;
+                    toDelete = true;
+                }
+            }
+
+            i += 1;
+        }
+
+        if toDelete == true {
+            writeIndex := 0;
+            readIndex := 0;
+            while readIndex < state.notes.buf.count {
+                if state.notes.buf[readIndex].selected == false {
+                    state.notes.buf[writeIndex] = state.notes.buf[readIndex];
+                    writeIndex += 1;
+                }
+
+                readIndex += 1;
+            }
+
+            state.notes.buf.count = writeIndex;
+        }
+    }
+}
+
+fn mouseButtonUp(messageData: *sdl.MouseButtonEvent, index: i64) {
+    state := &context.state.playArea.graphRolls.buf[index];
+
+    hs := &context.state.playArea.horizontalScroller;
+    scaleX := hs.rect.width / (hs.right - hs.left);
+
+    -- noteRect: gui.Rect!(f64) = {cast() messageData.x / scaleX + hs.left, cast() messageData.y, 3, 1};
+
+    if state.draggingNotes == true {
+        for note: state.notes.buf|iter.byRef {
+            if note.selected == true {
+                er := effectiveRect(^note, ^state);
+                note.rect.x = er.x;
+                note.rect.y = er.y;
+            }
+        }
+
+        state.draggingNotes = false;
+    }
+
+    if state.resizingNotes == true {
+        for note: state.notes.buf|iter.byRef {
+            if note.selected == true {
+                note.rect.width += (context.mouse.x - state.resizeStartX) / state.yResolution;
+            }
+        }
+
+        state.resizingNotes = false;
+    }
+
+    state.selecting = false;
+}
+
+fn mouseMove(messageData: *sdl.MouseMotionEvent, index: i64) {
+    state := &context.state.playArea.graphRolls.buf[index];
+
+    if state.resizingNotes == true {
+        return;
+    }
+
+    if state.selecting == false {
+        for note: state.notes.buf {
+            er := effectiveRect(note, ^state);
+
+            endRect: gui.Rect!(f64) = {
+                er.x + er.width - 3,
+                er.y,
+                3,
+                er.height
+            };
+
+            if endRect|gui.contains(context.mouse.x, context.mouse.y) {
+                sdl.SDL_SetCursor(context.arrowCursorWE);
+                state.mouseInResizeArea = true;
+                return;
+            }
+        }
+
+        sdl.SDL_SetCursor(context.arrowCursor);
+        state.mouseInResizeArea = false;
+
+        return;
+    }
+
+    if context.modifierKeys.ctrl == false {
+        state.selecting = false;
+        return;
+    }
+
+    if state.selecting == true {
+        for note: state.notes.buf|iter.byRef {
+            if effectiveRect(^note, ^state)|gui.intersects(selectArea(^state)) {
+                note.selected = !context.modifierKeys.shift;
+            }
+        }
+    }
+}
+
+fn quantize(origY: f64, size: f64) {
+    return math.floor(origY / size) * size;
 }
 
 fn draw(rect: gui.Rect!(f64), index: i64) {
+    state := &context.state.playArea.graphRolls.buf[index];
+    state.rect = rect;
+
     -- background
     gui.drawRect(context.cairo.layer, rect, 0.6, 0.6, 0.9);
 
-    for note: context.state.playArea.graphRolls.buf[index].notes.buf {
-        gui.drawRect(context.cairo.layer, note, 0.8, 0.8, 0.2);
+    -- outline
+    gui.drawOutline(context.cairo.layer, rect, 0.2, 0.2, 0.2, lineWidth: 1.5);
+
+    y := rect.y + state.yResolution;
+    while y < rect.y + rect.height {
+        gui.drawLine(context.cairo.layer, 0, y, rect.width, y, 0.2, 0.2, 0.2, lineWidth: 0.5);
+        y += state.yResolution;
     }
 
-    context.state.playArea.graphRolls.buf[index].rect = rect;
+    -- notes
+    for note: state.notes.buf {
+        if note.selected {
+            gui.drawRect(context.cairo.layer, effectiveRect(note, ^state), 1, 1, 0.5);
+        }
+        else {
+            gui.drawRect(context.cairo.layer, effectiveRect(note, ^state), 0.8, 0.8, 0.2);
+        }
+    }
+
+    -- select area
+    if state.selecting {
+        gui.drawRect(context.cairo.layer, selectArea(^state), 0.9, 0.9, 0.9, 0.2);
+    }
 }

@@ -1,25 +1,36 @@
 #import "gui/gui";
 #import "gui/graphroll";
+#import "gui/scroller";
 #import "io";
 #import "buffer": buf;
 #import "sdl";
 #import "math";
 
+grabberRadius: f64 = 15;
+grabberMaxSize: f64 = 10;
+
 type PlayAreaFormData struct {
+    compositionLength: f64,
     playing: bool,
     playhead: f64,
     playheadGrabber: f64,
     draggingPlayhead: bool,
-    graphRolls: buf.Buffer!(graphroll.GraphRollFormData)
+    graphRolls: buf.Buffer!(graphroll.GraphRollFormData),
+    horizontalScroller: scroller.Data
 }
 
 fn mouseButtonDown(messageData: *sdl.MouseButtonEvent) {
     if context.state.playArea.playheadGrabber > 0 {
         context.state.playArea.draggingPlayhead = true;
+        return;
+    }
+
+    if context.state.playArea.horizontalScroller.rect|gui.contains(context.mouse.x, context.mouse.y) {
+        scroller.mouseButtonDown(messageData, &context.state.playArea.horizontalScroller);
     }
 
     for gr, i: context.state.playArea.graphRolls.buf {
-        if gr.rect|:contains(cast(f64) messageData.x, cast(f64) messageData.y) {
+        if gr.rect|gui.contains(context.mouse.x, context.mouse.y) {
             graphroll.mouseButtonDown(messageData, i);
         }
     }
@@ -27,19 +38,35 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent) {
 
 fn mouseButtonUp(messageData: *sdl.MouseButtonEvent) {
     context.state.playArea.draggingPlayhead = false;
+
+    scroller.mouseButtonUp(&context.state.playArea.horizontalScroller);
+
+    for gr, i: context.state.playArea.graphRolls.buf {
+        if gr.rect|gui.contains(cast(f64) messageData.x, cast(f64) messageData.y) {
+            graphroll.mouseButtonUp(messageData, i);
+        }
+    }
 }
 
 fn mouseMove(messageData: *sdl.MouseMotionEvent) {
-    if context.state.playArea.draggingPlayhead {
+    if context.state.playArea.draggingPlayhead == true {
         context.state.playArea.playheadGrabber = cast() messageData.y;
         context.state.playArea.playhead = cast() messageData.x;
+        return;
+    }
+
+    scroller.mouseMove(&context.state.playArea.horizontalScroller);
+
+    if math.abs(cast() messageData.x - context.state.playArea.playhead) < grabberRadius {
+        context.state.playArea.playheadGrabber = cast() messageData.y;
     }
     else {
-        if math.abs(cast() messageData.x - context.state.playArea.playhead) < 10 {
-            context.state.playArea.playheadGrabber = cast() messageData.y;
-        }
-        else {
-            context.state.playArea.playheadGrabber = -1;
+        context.state.playArea.playheadGrabber = -1;
+
+        for gr, i: context.state.playArea.graphRolls.buf {
+            if gr.rect|gui.contains(cast(f64) messageData.x, cast(f64) messageData.y) {
+                graphroll.mouseMove(messageData, i);
+            }
         }
     }
 }
@@ -73,15 +100,18 @@ fn draw(rect: gui.Rect!(f64)) {
     -- background
     gui.drawRect(context.cairo.layer, rect, cast() 0.9, cast() 0.8, cast() 0.7);
 
+    y: f64 = 0;
+
+    -- scroll/resize bar
+    srHeight: f64 = 25;
+    scroller.drawHorizontal({0, y, rect.width, srHeight}, &context.state.playArea.horizontalScroller);
+    y += srHeight;
+
     -- graph rolls
-    grMarginX := rect.width * 0.01;
-    grMarginY := rect.height * 0.01;
     grHeight := rect.height * 0.25;
-    grWidth := rect.width * 0.98;
-    y := grMarginY;
     for gr, grIndex: context.state.playArea.graphRolls.buf {
-        graphroll.draw({grMarginX, y, grWidth, grHeight}, grIndex);
-        y += grHeight + grMarginY;
+        graphroll.draw({0, y, rect.width, grHeight}, grIndex);
+        y += grHeight;
     }
 
     -- playhead
@@ -92,11 +122,14 @@ fn draw(rect: gui.Rect!(f64)) {
 
     -- playhead grabber
     if context.state.playArea.playheadGrabber > 0 {
+        xDist: f64 = math.abs(context.mouse.x - context.state.playArea.playhead);
+        grabberSize := math.min((xDist-15)*(xDist-15)/15, grabberMaxSize);
+
         context.cairo.layer|gui.drawRect({
-            context.state.playArea.playhead - 5,
-            context.state.playArea.playheadGrabber - 5,
-            10,
-            10
+            context.state.playArea.playhead - grabberSize/2,
+            context.state.playArea.playheadGrabber - grabberSize/2,
+            grabberSize,
+            grabberSize
         }, 1, 0.2, 0.2);
     }
 }

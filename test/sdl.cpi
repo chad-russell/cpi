@@ -20,6 +20,23 @@ WINDOW_ALLOW_HIGHDPI: i32 = 0x00002000;
 
 PIXEL_FORMAT_ARGB8888: i32 = 0x16362004;
 
+type Cursor none
+
+type CursorType enum(i32) {
+    ARROW: 0,
+    IBEAM,
+    WAIT,
+    CROSSHAIR,
+    WAITARROW,
+    SIZENWSE,
+    SIZENESW,
+    SIZEWE,
+    SIZENS,
+    SIZEALL,
+    NO,
+    HAND,
+}
+
 type TextureAccess enum(i32) {
     STATIC    : 0,
     STREAMING : 1,
@@ -80,6 +97,7 @@ type Key enum(i32) {
     DOWN: 81,
     UP: 82,
 
+    CTRL: 224,
     SHIFT: 225,
 }
 
@@ -127,6 +145,8 @@ fn SDL_GetMouseState(x: *i32, y: *i32) u32
 fn SDL_LockTexture(texture: *Texture, rect: *Rect, pixels: **none, pitch: *i32) i32
 fn SDL_UpdateTexture(texture: *Texture, rect: *Rect, pixels: *none, pitch: i32) i32
 fn SDL_CreateTexture(renderer: *Renderer, pixelFormat: i32, textureAccess: TextureAccess, width: i32, height: i32) *Texture
+fn SDL_CreateSystemCursor(cursor: CursorType) *Cursor
+fn SDL_SetCursor(cursor: *Cursor) none
 
 type Window none
 type Renderer none
@@ -239,12 +259,18 @@ type MouseWheelEvent struct {
     direction: Direction
 }
 
+type MouseButton enum(i8) {
+    LEFT: 1,
+    MIDDLE: 2,
+    RIGHT: 3
+}
+
 type MouseButtonEvent struct {
     _type: u32,
     timestamp: u32,
     windowID: u32,
     which: u32,
-    button: u8,
+    button: MouseButton,
     state: u8,
     clicks: u8,
     padding1: u8,
