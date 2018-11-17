@@ -110,7 +110,7 @@ fn draw(rect: gui.Rect!(f64)) {
     -- graph rolls
     grHeight := rect.height * 0.25;
     for gr, grIndex: context.state.playArea.graphRolls.buf {
-        graphroll.draw({0, y, rect.width, grHeight}, grIndex);
+        graphroll.draw({20, y, rect.width, grHeight}, grIndex);
         y += grHeight;
     }
 

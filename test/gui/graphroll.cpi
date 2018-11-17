@@ -78,7 +78,7 @@ fn effectiveRect(note: Note, state: GraphRollFormData) gui.Rect!(f64) {
 
     return {
         (note.rect.x - scrollOffsetX) * scaleX + offsetX,
-        state.rect.y + quantize(relativeY, state.yResolution) + quantize(offsetY, state.yResolution),
+        quantize(relativeY, state.yResolution) + quantize(offsetY, state.yResolution),
         (note.rect.width) * state.xResolution * scaleX + resizeX,
         note.rect.height * state.yResolution
     };
@@ -87,6 +87,9 @@ fn effectiveRect(note: Note, state: GraphRollFormData) gui.Rect!(f64) {
 fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
     state := &context.state.playArea.graphRolls.buf[index];
 
+    localX := context.mouse.x - state.rect.x;
+    localY := context.mouse.y - state.rect.y;
+
     if messageData.button == sdl.MouseButton.LEFT {
         didClickNote := false;
         noteClicked: *Note = nil;
@@ -94,7 +97,7 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
         -- possibly select existing notes
         i := 0;
         for note: state.notes.buf|iter.byRef {
-            if effectiveRect(^note, ^state)|gui.contains(cast() messageData.x, cast() messageData.y) {
+            if effectiveRect(^note, ^state)|gui.contains(localX, localY) {
                 didClickNote = true;
                 noteClicked = note;
 
@@ -118,8 +121,8 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
                 }
                 else {
                     state.draggingNotes = true;
-                    state.dragStartX = cast() messageData.x;
-                    state.dragStartY = cast() messageData.y;
+                    state.dragStartX = context.mouse.x;
+                    state.dragStartY = context.mouse.y;
                 }
             }
 
@@ -128,8 +131,8 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
         else if context.modifierKeys.ctrl == true {
             -- box select
             state.selecting = true;
-            state.selectStartX = cast() messageData.x;
-            state.selectStartY = cast() messageData.y;
+            state.selectStartX = context.mouse.x;
+            state.selectStartY = context.mouse.y;
 
             return;
         }
@@ -149,14 +152,14 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
         hs := &context.state.playArea.horizontalScroller;
         scaleX := hs.rect.width / (hs.right - hs.left);
 
-        noteRect: gui.Rect!(f64) = {cast() messageData.x / scaleX + hs.left, cast() messageData.y, 3, 1};
+        noteRect: gui.Rect!(f64) = {localX / scaleX + hs.left, cast() messageData.y, 3, 1};
         &context.state.playArea.graphRolls.buf[index].notes|:append({noteRect, false});
     }
     else if messageData.button == sdl.MouseButton.RIGHT {
         toDelete := false;
         i := 0;
         for note: state.notes.buf|iter.byRef {
-            if effectiveRect(^note, ^state)|gui.contains(cast() messageData.x, cast() messageData.y) {
+            if effectiveRect(^note, ^state)|gui.contains(localX, localY) {
                 if context.modifierKeys.shift == false {
                     note.selected = true;
                     toDelete = true;
@@ -187,16 +190,13 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent, index: i64) {
     state := &context.state.playArea.graphRolls.buf[index];
 
     hs := &context.state.playArea.horizontalScroller;
-    scaleX := hs.rect.width / (hs.right - hs.left);
-
-    -- noteRect: gui.Rect!(f64) = {cast() messageData.x / scaleX + hs.left, cast() messageData.y, 3, 1};
+    scaleX := (hs.right - hs.left) / hs.rect.width;
 
     if state.draggingNotes == true {
         for note: state.notes.buf|iter.byRef {
             if note.selected == true {
-                er := effectiveRect(^note, ^state);
-                note.rect.x = er.x;
-                note.rect.y = er.y;
+                note.rect.x += (context.mouse.x - state.dragStartX) * scaleX;
+                note.rect.y += quantize(context.mouse.y - state.dragStartY, state.yResolution);
             }
         }
 
@@ -206,7 +206,7 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent, index: i64) {
     if state.resizingNotes == true {
         for note: state.notes.buf|iter.byRef {
             if note.selected == true {
-                note.rect.width += (context.mouse.x - state.resizeStartX) / state.yResolution;
+                note.rect.width += (context.mouse.x - state.resizeStartX) * scaleX / state.xResolution;
             }
         }
 
@@ -223,6 +223,9 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent, index: i64) {
         return;
     }
 
+    localX := context.mouse.x - state.rect.x;
+    localY := context.mouse.y - state.rect.y;
+
     if state.selecting == false {
         for note: state.notes.buf {
             er := effectiveRect(note, ^state);
@@ -234,7 +237,7 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent, index: i64) {
                 er.height
             };
 
-            if endRect|gui.contains(context.mouse.x, context.mouse.y) {
+            if endRect|gui.contains(localX, localY) {
                 sdl.SDL_SetCursor(context.arrowCursorWE);
                 state.mouseInResizeArea = true;
                 return;
@@ -253,8 +256,14 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent, index: i64) {
     }
 
     if state.selecting == true {
+        -- convert selectArea to local coordinates
+        sa := selectArea(^state);
+        sa.x -= state.rect.x;
+        sa.y -= state.rect.y;
+
         for note: state.notes.buf|iter.byRef {
-            if effectiveRect(^note, ^state)|gui.intersects(selectArea(^state)) {
+            io.printFln("% x %", {effectiveRect(^note, ^state), sa});
+            if effectiveRect(^note, ^state)|gui.intersects(sa) {
                 note.selected = !context.modifierKeys.shift;
             }
         }
@@ -277,17 +286,21 @@ fn draw(rect: gui.Rect!(f64), index: i64) {
 
     y := rect.y + state.yResolution;
     while y < rect.y + rect.height {
-        gui.drawLine(context.cairo.layer, 0, y, rect.width, y, 0.2, 0.2, 0.2, lineWidth: 0.5);
+        gui.drawLine(context.cairo.layer, rect.x, y, rect.width, y, 0.2, 0.2, 0.2, lineWidth: 0.5);
         y += state.yResolution;
     }
 
     -- notes
     for note: state.notes.buf {
+        er := effectiveRect(note, ^state);
+        er.x += state.rect.x;
+        er.y += state.rect.y;
+
         if note.selected {
-            gui.drawRect(context.cairo.layer, effectiveRect(note, ^state), 1, 1, 0.5);
+            gui.drawRect(context.cairo.layer, er, 1, 1, 0.4);
         }
         else {
-            gui.drawRect(context.cairo.layer, effectiveRect(note, ^state), 0.8, 0.8, 0.2);
+            gui.drawRect(context.cairo.layer, er, 0.8, 0.8, 0.2);
         }
     }
 

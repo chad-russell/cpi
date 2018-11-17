@@ -66,30 +66,17 @@ fn contains(T := typeof(r.x))(r: !R/Rect, x: T, y: T) {
 }
 
 fn intersects(r1: !R/Rect, r2: R) {
-    xIntercept := false;
-    yIntercept := false;
-
-    -- left edge of r1 within r2
-    if r1.x > r2.x and r1.x < r2.x + r2.width {
-        xIntercept = true;
+    -- If one rectangle is on left side of other
+    if r1.x > r2.x + r2.width or r2.x > r1.x + r1.width {
+        return false;
     }
 
-    -- right edge of r1 within r2
-    if r1.x + r1.width > r2.x and r1.x + r1.width < r2.x + r2.width {
-        xIntercept = true;
+    -- If one rectangle is above other
+    if r1.y > r2.y + r2.height or r2.y > r1.y + r1.height {
+        return false;
     }
 
-    -- top edge of r1 within r2
-    if r1.y > r2.y and r1.y < r2.y + r2.height {
-        yIntercept = true;
-    }
-
-    -- bottom edge of r1 within r2
-    if r1.y + r1.height > r2.y and r1.y + r1.height < r2.y + r2.height {
-        yIntercept = true;
-    }
-
-    return xIntercept and yIntercept;
+    return true;
 }
 
 type Message struct {
