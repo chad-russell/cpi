@@ -65,6 +65,10 @@ fn contains(T := typeof(r.x))(r: !R/Rect, x: T, y: T) {
        and er.y + er.height >= y;
 }
 
+fn containsMouse(T := typeof(r.x))(r: !R/Rect) {
+    return contains(r, context.mouse.x, context.mouse.y);
+}
+
 fn intersects(r1: !R/Rect, r2: R) {
     -- If one rectangle is on left side of other
     if r1.x > r2.x + r2.width or r2.x > r1.x + r1.width {

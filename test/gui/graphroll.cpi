@@ -12,6 +12,8 @@ type Note struct {
 
 type GraphRollFormData struct {
     rect: gui.Rect!(f64),
+    metaMargin: f64,
+
     notes: buf.Buffer!(Note),
 
     selecting: bool,
@@ -91,6 +93,13 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
     localY := context.mouse.y - state.rect.y;
 
     if messageData.button == sdl.MouseButton.LEFT {
+        -- delete
+        metaRect: gui.Rect!(f64) = {0, state.rect.y, state.metaMargin, state.rect.height};
+        if metaRect|gui.containsMouse {
+            &context.state.playArea.graphRolls|buf.deleteInPlace(index);
+            return;
+        }
+
         didClickNote := false;
         noteClicked: *Note = nil;
 
@@ -274,11 +283,17 @@ fn quantize(origY: f64, size: f64) {
     return math.floor(origY / size) * size;
 }
 
-fn draw(rect: gui.Rect!(f64), index: i64) {
+fn draw(rect: gui.Rect!(f64), index: i64, metaMargin: f64) {
     state := &context.state.playArea.graphRolls.buf[index];
     state.rect = rect;
 
+    state.metaMargin = metaMargin;
+
     -- background
+    gui.drawRect(context.cairo.layer, rect, 0.9, 0.6, 0.6);
+
+    -- delete handle
+    rect.x += metaMargin;
     gui.drawRect(context.cairo.layer, rect, 0.6, 0.6, 0.9);
 
     -- outline

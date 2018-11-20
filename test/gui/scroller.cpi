@@ -60,7 +60,7 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, data: *Data) {
     else if data.mouseOverRightResize == true {
         data.resizingRight = true;
     }
-    else if effectiveRect(data.rect, data)|gui.contains(context.mouse.x, context.mouse.y) {
+    else if effectiveRect(data.rect, data)|gui.containsMouse {
         data.dragging = true;
         data.dragStartLeft = data.left;
         data.dragStartRight = data.right;
@@ -90,11 +90,11 @@ fn mouseMove(data: *Data) {
         leftResize: gui.Rect!(f64) = {data.left, data.rect.y, 4, data.rect.height};
         rightResize: gui.Rect!(f64) = {data.right - 4, data.rect.y, 4, data.rect.height};
 
-        if leftResize|gui.contains(context.mouse.x, context.mouse.y) {
+        if leftResize|gui.containsMouse {
             data.mouseOverLeftResize = true;
             sdl.SDL_SetCursor(context.arrowCursorWE);
         }
-        else if rightResize|gui.contains(context.mouse.x, context.mouse.y) {
+        else if rightResize|gui.containsMouse {
             data.mouseOverRightResize = true;
             sdl.SDL_SetCursor(context.arrowCursorWE);
         }

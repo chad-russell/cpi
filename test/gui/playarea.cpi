@@ -16,7 +16,8 @@ type PlayAreaFormData struct {
     playheadGrabber: f64,
     draggingPlayhead: bool,
     graphRolls: buf.Buffer!(graphroll.GraphRollFormData),
-    horizontalScroller: scroller.Data
+    horizontalScroller: scroller.Data,
+    addNewGraphRollButton: gui.Rect!(f64),
 }
 
 fn mouseButtonDown(messageData: *sdl.MouseButtonEvent) {
@@ -25,14 +26,19 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent) {
         return;
     }
 
-    if context.state.playArea.horizontalScroller.rect|gui.contains(context.mouse.x, context.mouse.y) {
+    if context.state.playArea.horizontalScroller.rect|gui.containsMouse {
         scroller.mouseButtonDown(messageData, &context.state.playArea.horizontalScroller);
     }
 
     for gr, i: context.state.playArea.graphRolls.buf {
-        if gr.rect|gui.contains(context.mouse.x, context.mouse.y) {
+        if gr.rect|gui.containsMouse {
             graphroll.mouseButtonDown(messageData, i);
         }
+    }
+
+    if context.state.playArea.addNewGraphRollButton|gui.containsMouse {
+        grfd: graphroll.GraphRollFormData;
+        &context.state.playArea.graphRolls|:append(grfd);
     }
 }
 
@@ -98,7 +104,7 @@ fn processMessages() {
 
 fn draw(rect: gui.Rect!(f64)) {
     -- background
-    gui.drawRect(context.cairo.layer, rect, cast() 0.9, cast() 0.8, cast() 0.7);
+    gui.drawRect(context.cairo.layer, rect, 0.9, 0.8, 0.7);
 
     y: f64 = 0;
 
@@ -107,12 +113,18 @@ fn draw(rect: gui.Rect!(f64)) {
     scroller.drawHorizontal({0, y, rect.width, srHeight}, &context.state.playArea.horizontalScroller);
     y += srHeight;
 
+    metaMargin := rect.width*0.05;
+
     -- graph rolls
     grHeight := rect.height * 0.25;
     for gr, grIndex: context.state.playArea.graphRolls.buf {
-        graphroll.draw({20, y, rect.width, grHeight}, grIndex);
+        graphroll.draw({0, y, rect.width, grHeight}, grIndex, metaMargin);
         y += grHeight;
     }
+
+    -- button to add graph roll
+    context.state.playArea.addNewGraphRollButton = {0, y, metaMargin, grHeight};
+    gui.drawRect(context.cairo.layer, context.state.playArea.addNewGraphRollButton, 0.4, 0.4, 1);
 
     -- playhead
     context.cairo.layer|gui.drawRect({context.state.playArea.playhead, 0, 1, rect.height}, 1, 0.2, 0.2);

@@ -80,3 +80,21 @@ fn get(b: !T/Buffer, index: i64) {
     return b.buf[index];
 }
 }
+
+fn deleteInPlace(T := typeof(^b))(b: *T, index: i64) {
+    readingIndex := 0;
+    writingIndex := 0;
+
+    while readingIndex < b.buf.count - 1 {
+        if index == readingIndex {
+            readingIndex += 1;
+        }
+
+        b.buf[writingIndex] = b.buf[readingIndex];
+
+        readingIndex += 1;
+        writingIndex += 1;
+    }
+
+    b.buf.count -= 1;
+}
