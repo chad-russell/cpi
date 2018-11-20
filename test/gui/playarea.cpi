@@ -1,5 +1,6 @@
 #import "gui/gui";
 #import "gui/graphroll";
+#import "gui/graphrollContainer";
 #import "gui/scroller";
 #import "io";
 #import "buffer": buf;
@@ -15,7 +16,7 @@ type PlayAreaFormData struct {
     playhead: f64,
     playheadGrabber: f64,
     draggingPlayhead: bool,
-    graphRolls: buf.Buffer!(graphroll.GraphRollFormData),
+    graphRolls: buf.Buffer!(graphrollContainer.GraphRollContainerFormData),
     horizontalScroller: scroller.Data,
     addNewGraphRollButton: gui.Rect!(f64),
 }
@@ -32,12 +33,12 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent) {
 
     for gr, i: context.state.playArea.graphRolls.buf {
         if gr.rect|gui.containsMouse {
-            graphroll.mouseButtonDown(messageData, i);
+            graphrollContainer.mouseButtonDown(messageData, i);
         }
     }
 
     if context.state.playArea.addNewGraphRollButton|gui.containsMouse {
-        grfd: graphroll.GraphRollFormData;
+        grfd: graphrollContainer.GraphRollContainerFormData;
         &context.state.playArea.graphRolls|:append(grfd);
     }
 }
@@ -118,7 +119,7 @@ fn draw(rect: gui.Rect!(f64)) {
     -- graph rolls
     grHeight := rect.height * 0.25;
     for gr, grIndex: context.state.playArea.graphRolls.buf {
-        graphroll.draw({0, y, rect.width, grHeight}, grIndex, metaMargin);
+        graphrollContainer.draw({0, y, rect.width, grHeight}, grIndex, metaMargin);
         y += grHeight;
     }
 

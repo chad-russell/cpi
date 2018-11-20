@@ -12,7 +12,6 @@ type Note struct {
 
 type GraphRollFormData struct {
     rect: gui.Rect!(f64),
-    metaMargin: f64,
 
     notes: buf.Buffer!(Note),
 
@@ -71,8 +70,6 @@ fn effectiveRect(note: Note, state: GraphRollFormData) gui.Rect!(f64) {
         resizeX = context.mouse.x - state.resizeStartX;
     }
 
-    relativeY := note.rect.y - state.rect.y;
-
     hs := &context.state.playArea.horizontalScroller;
     scaleX := hs.rect.width / (hs.right - hs.left);
 
@@ -80,26 +77,19 @@ fn effectiveRect(note: Note, state: GraphRollFormData) gui.Rect!(f64) {
 
     return {
         (note.rect.x - scrollOffsetX) * scaleX + offsetX,
-        quantize(relativeY, state.yResolution) + quantize(offsetY, state.yResolution),
+        quantize(note.rect.y, state.yResolution) + quantize(offsetY, state.yResolution),
         (note.rect.width) * state.xResolution * scaleX + resizeX,
         note.rect.height * state.yResolution
     };
 }
 
 fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
-    state := &context.state.playArea.graphRolls.buf[index];
+    state := &context.state.playArea.graphRolls.buf[index].gr;
 
     localX := context.mouse.x - state.rect.x;
     localY := context.mouse.y - state.rect.y;
 
     if messageData.button == sdl.MouseButton.LEFT {
-        -- delete
-        metaRect: gui.Rect!(f64) = {0, state.rect.y, state.metaMargin, state.rect.height};
-        if metaRect|gui.containsMouse {
-            &context.state.playArea.graphRolls|buf.deleteInPlace(index);
-            return;
-        }
-
         didClickNote := false;
         noteClicked: *Note = nil;
 
@@ -161,8 +151,8 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
         hs := &context.state.playArea.horizontalScroller;
         scaleX := hs.rect.width / (hs.right - hs.left);
 
-        noteRect: gui.Rect!(f64) = {localX / scaleX + hs.left, cast() messageData.y, 3, 1};
-        &context.state.playArea.graphRolls.buf[index].notes|:append({noteRect, false});
+        noteRect: gui.Rect!(f64) = {localX / scaleX + hs.left, cast() localY, 3, 1};
+        &context.state.playArea.graphRolls.buf[index].gr.notes|:append({noteRect, false});
     }
     else if messageData.button == sdl.MouseButton.RIGHT {
         toDelete := false;
@@ -196,7 +186,7 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
 }
 
 fn mouseButtonUp(messageData: *sdl.MouseButtonEvent, index: i64) {
-    state := &context.state.playArea.graphRolls.buf[index];
+    state := &context.state.playArea.graphRolls.buf[index].gr;
 
     hs := &context.state.playArea.horizontalScroller;
     scaleX := (hs.right - hs.left) / hs.rect.width;
@@ -226,7 +216,7 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent, index: i64) {
 }
 
 fn mouseMove(messageData: *sdl.MouseMotionEvent, index: i64) {
-    state := &context.state.playArea.graphRolls.buf[index];
+    state := &context.state.playArea.graphRolls.buf[index].gr;
 
     if state.resizingNotes == true {
         return;
@@ -271,7 +261,6 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent, index: i64) {
         sa.y -= state.rect.y;
 
         for note: state.notes.buf|iter.byRef {
-            io.printFln("% x %", {effectiveRect(^note, ^state), sa});
             if effectiveRect(^note, ^state)|gui.intersects(sa) {
                 note.selected = !context.modifierKeys.shift;
             }
@@ -283,17 +272,11 @@ fn quantize(origY: f64, size: f64) {
     return math.floor(origY / size) * size;
 }
 
-fn draw(rect: gui.Rect!(f64), index: i64, metaMargin: f64) {
-    state := &context.state.playArea.graphRolls.buf[index];
+fn draw(rect: gui.Rect!(f64), index: i64) {
+    state := &context.state.playArea.graphRolls.buf[index].gr;
     state.rect = rect;
 
-    state.metaMargin = metaMargin;
-
     -- background
-    gui.drawRect(context.cairo.layer, rect, 0.9, 0.6, 0.6);
-
-    -- delete handle
-    rect.x += metaMargin;
     gui.drawRect(context.cairo.layer, rect, 0.6, 0.6, 0.9);
 
     -- outline

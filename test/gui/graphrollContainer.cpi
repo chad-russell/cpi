@@ -1,0 +1,35 @@
+#import "gui/gui";
+#import "gui/graphroll";
+#import "sdl";
+#import "buffer": buf;
+
+type GraphRollContainerFormData struct {
+    rect: gui.Rect!(f64),
+    metaRect: gui.Rect!(f64),
+    gr: graphroll.GraphRollFormData
+}
+
+fn draw(rect: gui.Rect!(f64), index: i64, metaMargin: f64) {
+    state := &context.state.playArea.graphRolls.buf[index];
+    state.rect = rect;
+
+    -- delete handle
+    state.metaRect = {rect.x, rect.y, metaMargin, rect.height};
+    gui.drawRect(context.cairo.layer, state.metaRect, 0.9, 0.6, 0.6);
+
+    rect.x += metaMargin;
+    graphroll.draw(rect, index);
+}
+
+fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
+    state := &context.state.playArea.graphRolls.buf[index];
+
+    -- delete handle
+    if state.metaRect|gui.containsMouse {
+        &context.state.playArea.graphRolls|buf.deleteInPlace(index);
+        return;
+    }
+    else {
+        graphroll.mouseButtonDown(messageData, index);
+    }
+}
