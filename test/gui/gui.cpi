@@ -5,6 +5,7 @@
 #import "mem";
 #import "string";
 #import "iter";
+#import "math";
 #import "time";
 
 WIDTH   : i32 = 1000;
@@ -81,6 +82,24 @@ fn intersects(r1: !R/Rect, r2: R) {
     }
 
     return true;
+}
+
+fn clip(r1: Rect!(f64), r2: Rect!(f64)) {
+    if intersects(r1, r2) == false {
+        return {0, 0, 0, 0};
+    }
+
+    startX := math.max(r1.x, r2.x);
+    startY := math.max(r1.y, r2.y);
+    endX := math.min(r1.x + r1.width, r2.x + r2.width);
+    endY := math.min(r1.y + r1.height, r2.y + r2.height);
+
+    return {
+        startX,
+        startY,
+        endX - startX,
+        endY - startY
+    };
 }
 
 type Message struct {
@@ -250,11 +269,12 @@ fn drawOutline(layer: Layer, rect: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 
     cairo.cairo_line_to(layer.context, rect.x + rect.width, rect.y);
     cairo.cairo_line_to(layer.context, rect.x + rect.width, rect.y + rect.height);
     cairo.cairo_line_to(layer.context, rect.x, rect.y + rect.height);
+    cairo.cairo_line_to(layer.context, rect.x, rect.y);
 
     cairo.cairo_stroke(layer.context);
 }
 
-fn drawLine(layer: Layer, startX: f64, startY: f64, endX: f64, endY: f64, r: f64, g: f64, b: f64, a: f64 = 1, lineWidth: f64 = 1) {
+fn drawLine(layer: Layer, br: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1, lineWidth: f64 = 1) {
     cairo.cairo_save(layer.context);
     defer { cairo.cairo_restore(layer.context); }
 
@@ -262,8 +282,8 @@ fn drawLine(layer: Layer, startX: f64, startY: f64, endX: f64, endY: f64, r: f64
 
     cairo.cairo_set_line_width(layer.context, lineWidth);
 
-    cairo.cairo_move_to(layer.context, startX, startY);
-    cairo.cairo_line_to(layer.context, endX, endY);
+    cairo.cairo_move_to(layer.context, br.x, br.y);
+    cairo.cairo_line_to(layer.context, br.x + br.width, br.y + br.height);
 
     cairo.cairo_stroke(layer.context);
 }

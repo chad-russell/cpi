@@ -18,6 +18,7 @@ type PlayAreaFormData struct {
     draggingPlayhead: bool,
     graphRolls: buf.Buffer!(graphrollContainer.GraphRollContainerFormData),
     horizontalScroller: scroller.Data,
+    verticalScroller: scroller.Data,
     addNewGraphRollButton: gui.Rect!(f64),
 }
 
@@ -29,6 +30,9 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent) {
 
     if context.state.playArea.horizontalScroller.rect|gui.containsMouse {
         scroller.mouseButtonDown(messageData, &context.state.playArea.horizontalScroller);
+    }
+    if context.state.playArea.verticalScroller.rect|gui.containsMouse {
+        scroller.mouseButtonDown(messageData, &context.state.playArea.verticalScroller);
     }
 
     for gr, i: context.state.playArea.graphRolls.buf {
@@ -47,6 +51,7 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent) {
     context.state.playArea.draggingPlayhead = false;
 
     scroller.mouseButtonUp(&context.state.playArea.horizontalScroller);
+    scroller.mouseButtonUp(&context.state.playArea.verticalScroller);
 
     for gr, i: context.state.playArea.graphRolls.buf {
         if gr.rect|gui.contains(cast(f64) messageData.x, cast(f64) messageData.y) {
@@ -63,6 +68,7 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent) {
     }
 
     scroller.mouseMove(&context.state.playArea.horizontalScroller);
+    scroller.mouseMove(&context.state.playArea.verticalScroller);
 
     if math.abs(cast() messageData.x - context.state.playArea.playhead) < grabberRadius {
         context.state.playArea.playheadGrabber = cast() messageData.y;
@@ -114,17 +120,30 @@ fn draw(rect: gui.Rect!(f64)) {
     scroller.drawHorizontal({0, y, rect.width, srHeight}, &context.state.playArea.horizontalScroller);
     y += srHeight;
 
+    -- vertical scroll/resize bar
+    scroller.drawVertical({rect.width-srHeight, y, srHeight, rect.height}, &context.state.playArea.verticalScroller);
+
     metaMargin := rect.width*0.05;
+    grButtonHeight := rect.height * 0.1;
 
     -- graph rolls
-    grHeight := rect.height * 0.25;
+    vs := &context.state.playArea.verticalScroller;
+    yScale := vs.rect.height / (vs.end - vs.begin);
+
+    graphRollScrollViewHeight := rect.height - grButtonHeight - y;
+
+    grAreaBounds: gui.Rect!(f64) = rect;
+    grAreaBounds.y = y;
+    grAreaBounds.height -= y;
+
+    grHeight := graphRollScrollViewHeight / cast() context.state.playArea.graphRolls.buf.count * yScale;
     for gr, grIndex: context.state.playArea.graphRolls.buf {
-        graphrollContainer.draw({0, y, rect.width, grHeight}, grIndex, metaMargin);
+        graphrollContainer.draw({0, y, rect.width - metaMargin - srHeight, grHeight}, grAreaBounds, grIndex, metaMargin, -vs.begin * yScale);
         y += grHeight;
     }
 
     -- button to add graph roll
-    context.state.playArea.addNewGraphRollButton = {0, y, metaMargin, grHeight};
+    context.state.playArea.addNewGraphRollButton = {0, y - vs.begin * yScale, metaMargin, grButtonHeight};
     gui.drawRect(context.cairo.layer, context.state.playArea.addNewGraphRollButton, 0.4, 0.4, 1);
 
     -- playhead

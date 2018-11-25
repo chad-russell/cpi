@@ -9,16 +9,19 @@ type GraphRollContainerFormData struct {
     gr: graphroll.GraphRollFormData
 }
 
-fn draw(rect: gui.Rect!(f64), index: i64, metaMargin: f64) {
+fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), index: i64, metaMargin: f64, scrollOffsetY: f64) {
     state := &context.state.playArea.graphRolls.buf[index];
     state.rect = rect;
 
+    rect.y += scrollOffsetY;
+
     -- delete handle
     state.metaRect = {rect.x, rect.y, metaMargin, rect.height};
-    gui.drawRect(context.cairo.layer, state.metaRect, 0.9, 0.6, 0.6);
+    gui.drawRect(context.cairo.layer, gui.clip(state.metaRect, bounds), 0.9, 0.6, 0.6);
 
     rect.x += metaMargin;
-    graphroll.draw(rect, index);
+
+    graphroll.draw(rect, bounds, index);
 }
 
 fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
