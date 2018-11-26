@@ -29,7 +29,6 @@ type GraphRollFormData struct {
     resizeStartX: f64,
 
     xResolution: f64 = 10,
-    yResolution: f64 = 10,
 }
 
 fn selectArea(state: GraphRollFormData) gui.Rect!(f64) {
@@ -56,15 +55,25 @@ fn selectArea(state: GraphRollFormData) gui.Rect!(f64) {
     };
 }
 
+fn yResolution(state: GraphRollFormData) {
+    return state.rect.height / 20;
+}
+
 fn effectiveRect(note: Note, state: GraphRollFormData) gui.Rect!(f64) {
     offsetX: f64 = 0;
     offsetY: f64 = 0;
 
+    localX := context.mouse.x - state.rect.x;
+    localY := context.mouse.y - state.rect.y;
+
     resizeX: f64 = 0;
+
+    yr := yResolution(state);
+    noteY := math.floor(localY / yr);
 
     if note.selected == true and state.draggingNotes == true {
         offsetX = context.mouse.x - state.dragStartX;
-        offsetY = context.mouse.y - state.dragStartY;
+        offsetY = noteY - state.dragStartY;
     }
 
     if note.selected == true and state.resizingNotes == true {
@@ -78,12 +87,15 @@ fn effectiveRect(note: Note, state: GraphRollFormData) gui.Rect!(f64) {
 
     er: gui.Rect!(f64) = {
         (note.rect.x - scrollOffsetX) * scaleX + offsetX + state.rect.x,
-        quantize(note.rect.y, state.yResolution) + quantize(offsetY, state.yResolution) + state.rect.y,
+        (note.rect.y + offsetY) * yr + state.rect.y,
         (note.rect.width) * state.xResolution * scaleX + resizeX,
-        note.rect.height * state.yResolution
+        note.rect.height * yr
     };
 
-    return gui.clip(er, state.rect);
+    boundingRect := state.bounds;
+    boundingRect.x = state.rect.x;
+
+    return gui.clip(er, boundingRect);
 }
 
 fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
@@ -124,7 +136,10 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
                 else {
                     state.draggingNotes = true;
                     state.dragStartX = context.mouse.x;
-                    state.dragStartY = context.mouse.y;
+
+                    yr := yResolution(^state);
+                    noteY := math.floor(localY / yr);
+                    state.dragStartY = noteY;
                 }
             }
 
@@ -154,7 +169,10 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
         hs := &context.state.playArea.horizontalScroller;
         scaleX := hs.rect.width / (hs.end - hs.begin);
 
-        noteRect: gui.Rect!(f64) = {localX / scaleX + hs.begin, cast() localY, 3, 1};
+        yr := yResolution(^state);
+        noteY := math.floor(localY / yr);
+
+        noteRect: gui.Rect!(f64) = {localX / scaleX + hs.begin, noteY, 3, 1};
         &context.state.playArea.graphRolls.buf[index].gr.notes|:append({noteRect, false});
     }
     else if messageData.button == sdl.MouseButton.RIGHT {
@@ -194,11 +212,17 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent, index: i64) {
     hs := &context.state.playArea.horizontalScroller;
     scaleX := (hs.end - hs.begin) / hs.rect.width;
 
+    localX := context.mouse.x - state.rect.x;
+    localY := context.mouse.y - state.rect.y;
+
     if state.draggingNotes == true {
+        yr := yResolution(^state);
+        dragStopY := math.floor(localY / yr);
+
         for note: state.notes.buf|iter.byRef {
             if note.selected == true {
                 note.rect.x += (context.mouse.x - state.dragStartX) * scaleX;
-                note.rect.y += quantize(context.mouse.y - state.dragStartY, state.yResolution);
+                note.rect.y += dragStopY - state.dragStartY;
             }
         }
 
@@ -233,13 +257,13 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent, index: i64) {
             er := effectiveRect(note, ^state);
 
             endRect: gui.Rect!(f64) = {
-                er.x + er.width - 3,
+                er.x + er.width - 4,
                 er.y,
-                3,
+                4,
                 er.height
             };
 
-            if endRect|gui.contains(localX, localY) {
+            if endRect|gui.contains(context.mouse.x, context.mouse.y) {
                 sdl.SDL_SetCursor(context.arrowCursorWE);
                 state.mouseInResizeArea = true;
                 return;
@@ -284,11 +308,13 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), index: i64) {
     -- outline
     gui.drawOutline(context.cairo.layer, gui.clip(rect, bounds), 0.2, 0.2, 0.2, lineWidth: 1.5);
 
-    y := rect.y + state.yResolution;
+    yr := yResolution(^state);
+
+    y := rect.y + yr;
     while y < rect.y + rect.height {
         guideLineRect: gui.Rect!(f64) = {rect.x, y, rect.width, 0};
         gui.drawLine(context.cairo.layer, gui.clip(guideLineRect, bounds), 0.2, 0.2, 0.2, lineWidth: 0.5);
-        y += state.yResolution;
+        y += yr;
     }
 
     -- notes
