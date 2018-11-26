@@ -1,0 +1,126 @@
+#import "io";
+#import "gui/gui";
+#import "mem";
+
+fn ap(m: *bool, h: i64, a: gui.Point!(i64)) {
+    return m + a.x*h + a.y;
+}
+
+fn init() {
+    basic.initContext();
+
+    gui.init();
+
+    ad: f64 = 2;
+
+    w := cast(i64) context.sdl.windowWidth;
+    h := cast(i64) context.sdl.windowHeight;
+
+    type ba []bool
+
+    m := mem.alloc!(bool)((w + 1) * (h + 1));
+
+    dirX := 0;
+    dirY := 1;
+
+    ant: gui.Point!(i64) = {w/2, h/2};
+
+    gui.drawRect(context.cairo.layer, {0, 0, cast(f64) w, cast(f64) h}, 0.8, 0.8, 0.8);
+
+    while !context.quit {
+        gui.tick();
+
+        it := 0;
+        while it < 100 {
+            if ^ap(m, h, ant) == true {
+                -- white: turn 90 right
+                if dirX == 1 {
+                    dirX = 0;
+                    dirY = -1;
+                }
+                else if dirX == -1 {
+                    dirX = 0;
+                    dirY = 1;
+                }
+                else if dirY == 1 {
+                    dirY = 0;
+                    dirX = 1;
+                }
+                else if dirY == -1 {
+                    dirY = 0;
+                    dirX = -1;
+                }
+                else {
+                    panic();
+                }
+            }
+            else {
+                -- black: turn 90 left
+                if dirX == 1 {
+                    dirX = 0;
+                    dirY = 1;
+                }
+                else if dirX == -1 {
+                    dirX = 0;
+                    dirY = -1;
+                }
+                else if dirY == 1 {
+                    dirY = 0;
+                    dirX = -1;
+                }
+                else if dirY == -1 {
+                    dirY = 0;
+                    dirX = 1;
+                }
+                else {
+                    panic();
+                }
+            }
+
+            -- flip square, move forward one unit
+            mp := ap(m, h, ant);
+
+            ^mp = !^mp;
+            ant.x += dirX;
+            ant.y += dirY;
+
+            if ant.x >= w {
+                ant.x = 0;
+            }
+            if ant.y >= h {
+                ant.y = 0;
+            }
+            if ant.x < 0 {
+                ant.x = w - 1;
+            }
+            if ant.y < 0 {
+                ant.y = h - 1;
+            }
+
+            cr: gui.Rect!(f64) = {
+                                    cast(f64) ant.x - ad/2,
+                                    cast(f64) ant.y - ad/2,
+                                    ad,
+                                    ad
+                                 };
+
+            if ^ap(m, h, ant) == true {
+                gui.drawRect(context.cairo.layer, cr, 0.3, 0.3, 0.3);
+            }
+            else {
+                gui.drawRect(context.cairo.layer, cr, 0.8, 0.8, 0.8);
+            }
+
+            it += 1;
+        }
+
+        gui.commit();
+    }
+
+    return 0;
+}
+
+fn main() {
+    init();
+    return 0;
+}

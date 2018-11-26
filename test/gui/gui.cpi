@@ -240,7 +240,7 @@ fn init() {
 
     #import "time";
     context.start = time.clock();
-    context.lastFrameTime := context.start;
+    context.lastFrameTime = context.start;
 
     context.arrowCursor = sdl.SDL_CreateSystemCursor(sdl.CursorType.ARROW);
     context.arrowCursorWE = sdl.SDL_CreateSystemCursor(sdl.CursorType.SIZEWE);

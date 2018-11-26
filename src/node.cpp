@@ -243,6 +243,7 @@ void initParamData(Node *node) {
     node->paramData.value = nullptr;
     node->paramData.polyLink = nullptr;
     node->paramData.polyCameFrom = nullptr;
+    node->paramData.isAutoPolyParam = false;
     node->paramData.index = 0;
 }
 
