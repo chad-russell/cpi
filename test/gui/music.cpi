@@ -3,7 +3,8 @@
 #import "gui/graphrollContainer";
 
 #context state: struct {
-    playArea: playarea.PlayAreaFormData
+    playArea: playarea.PlayAreaFormData,
+    beatsPerMeasure: i16 = 4
 }
 
 fn init() {

@@ -2,9 +2,11 @@
 #import "gui/graphroll";
 #import "sdl";
 #import "buffer": buf;
+#import "io";
 
 type GraphRollContainerFormData struct {
     rect: gui.Rect!(f64),
+    bounds: gui.Rect!(f64),
     metaRect: gui.Rect!(f64),
     gr: graphroll.GraphRollFormData
 }
@@ -12,6 +14,7 @@ type GraphRollContainerFormData struct {
 fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), index: i64, metaMargin: f64, scrollOffsetY: f64) {
     state := &context.state.playArea.graphRolls.buf[index];
     state.rect = rect;
+    state.bounds = bounds;
 
     rc := rect;
     rc.y += scrollOffsetY;
@@ -21,8 +24,13 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), index: i64, metaMargin: f6
     gui.drawRect(context.cairo.layer, gui.clip(state.metaRect, bounds), 0.9, 0.6, 0.6);
 
     rc.x += metaMargin;
+    rc.width -= metaMargin;
 
-    graphroll.draw(rc, bounds, index);
+    grBounds := bounds;
+    grBounds.x = metaMargin;
+    grBounds.width -= metaMargin;
+
+    graphroll.draw(rc, grBounds, index);
 }
 
 fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
@@ -31,7 +39,6 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
     -- delete handle
     if state.metaRect|gui.containsMouse {
         &context.state.playArea.graphRolls|buf.deleteInPlace(index);
-        return;
     }
     else {
         graphroll.mouseButtonDown(messageData, index);

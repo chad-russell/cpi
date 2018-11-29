@@ -85,7 +85,7 @@ fn deleteInPlace(T := typeof(^b))(b: *T, index: i64) {
     readingIndex := 0;
     writingIndex := 0;
 
-    while readingIndex < b.buf.count - 1 {
+    while writingIndex < b.buf.count - 1 {
         if index == readingIndex {
             readingIndex += 1;
         }

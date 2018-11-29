@@ -23,10 +23,28 @@ type Data struct {
     dragStartMouse: f64
 }
 
+fn scrollMax(data: *Data) f64 {
+    if data.horizontal == true {
+        return data.rect.width - (data.end - data.begin);
+    }
+
+    return data.rect.height - (data.end - data.begin);
+}
+
+fn percScrolled(data: *Data) f64 {
+    sm := scrollMax(data);
+
+    if sm == 0 {
+        return 0;
+    }
+
+    return data.begin / sm;
+}
+
 fn effectiveRect(data: *Data) gui.Rect!(f64) {
     if data.horizontal == true {
         return {
-            data.begin,
+            data.rect.x + data.begin,
             data.rect.y,
             data.end - data.begin,
             data.rect.height
@@ -35,7 +53,7 @@ fn effectiveRect(data: *Data) gui.Rect!(f64) {
 
     return {
         data.rect.x,
-        data.begin,
+        data.rect.y + data.begin,
         data.rect.width,
         data.end - data.begin
     };
@@ -49,18 +67,18 @@ fn drawVertical(rect: gui.Rect!(f64), data: *Data) {
 
     gui.drawRect(context.cairo.layer,
         er,
-        0.9, 0.9, 0.6);
+        cast(f64) 107.0/255.0, cast(f64) 117.0/255.0, cast(f64) 123.0/255.0);
 
     -- resize lines
     gui.drawLine(context.cairo.layer,
         {er.x + 1, er.y + 4, er.width - 2, 0},
         0.2, 0.2, 0.2, 0.7,
-        lineWidth: 1);
+        width: 1);
 
     gui.drawLine(context.cairo.layer,
         {er.x + 1, er.y + er.height - 4, er.width - 2, 0},
         0.2, 0.2, 0.2, 0.7,
-        lineWidth: 1);
+        width: 1);
 }
 
 fn drawHorizontal(rect: gui.Rect!(f64), data: *Data) {
@@ -71,18 +89,18 @@ fn drawHorizontal(rect: gui.Rect!(f64), data: *Data) {
 
     gui.drawRect(context.cairo.layer,
         er,
-        0.9, 0.9, 0.6);
+        cast(f64) 107.0/255.0, cast(f64) 117.0/255.0, cast(f64) 123.0/255.0);
 
     -- resize lines
     gui.drawLine(context.cairo.layer,
         {er.x + 4, er.y + 1, 0, er.height - 2},
         0.2, 0.2, 0.2, 0.7,
-        lineWidth: 1);
+        width: 1);
 
     gui.drawLine(context.cairo.layer,
         {er.x + er.width - 4, er.y + 1, 0, er.height - 2},
         0.2, 0.2, 0.2, 0.7,
-        lineWidth: 1);
+        width: 1);
 }
 
 fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, data: *Data) {
@@ -110,20 +128,29 @@ fn mouseMove(data: *Data) {
     data.mouseOverBeginResize = false;
     data.mouseOverEndResize = false;
 
+    localX := context.mouse.x - data.rect.x;
+    localY := context.mouse.y - data.rect.y;
+
     if data.dragging == true {
         if data.horizontal == true {
             differential := context.mouse.x - data.dragStartMouse;
             if data.dragStartBegin + differential < 0 {
                 differential = -data.dragStartBegin;
             }
+            if data.dragStartEnd + differential > data.rect.width {
+                differential = data.rect.width - data.dragStartEnd;
+            }
 
-            data.begin = data.dragStartBegin + differential;
             data.end = data.dragStartEnd + differential;
+            data.begin = data.dragStartBegin + differential;
         }
         else {
             differential := context.mouse.y - data.dragStartMouse;
             if data.dragStartBegin + differential < 0 {
                 differential = -data.dragStartBegin;
+            }
+            if data.dragStartEnd + differential > data.rect.height {
+                differential = data.rect.height - data.dragStartEnd;
             }
 
             data.begin = data.dragStartBegin + differential;
@@ -132,18 +159,22 @@ fn mouseMove(data: *Data) {
     }
     else if data.resizingBegin == true {
         if data.horizontal == true {
-            data.begin = context.mouse.x;
+            data.begin = localX;
         }
         else {
-            data.begin = context.mouse.y;
+            data.begin = localY;
+        }
+
+        if data.begin < 0 {
+            data.begin = 0;
         }
     }
     else if data.resizingEnd == true {
         if data.horizontal == true {
-            data.end = context.mouse.x;
+            data.end = math.min(localX, data.rect.width);
         }
         else {
-            data.end = context.mouse.y;
+            data.end = math.min(localY, data.rect.height);
         }
     }
     else {
@@ -151,12 +182,12 @@ fn mouseMove(data: *Data) {
         endResize: gui.Rect!(f64);
 
         if data.horizontal == true {
-            beginResize = {data.begin, data.rect.y, 4, data.rect.height};
-            endResize = {data.end - 4, data.rect.y, 4, data.rect.height};
+            beginResize = {data.rect.x + data.begin, data.rect.y, 4, data.rect.height};
+            endResize = {data.rect.x + data.end - 4, data.rect.y, 4, data.rect.height};
         }
         else {
-            beginResize = {data.rect.x, data.begin, data.rect.width, 4};
-            endResize = {data.rect.x, data.end - 4, data.rect.width, 4};
+            beginResize = {data.rect.x, data.rect.y + data.begin, data.rect.width, 4};
+            endResize = {data.rect.x, data.rect.y + data.end - 4, data.rect.width, 4};
         }
 
         resizeCursor: *sdl.Cursor;

@@ -1,4 +1,5 @@
 #import "gui/gui";
+#import "gui/scroller";
 #import "io";
 #import "buffer": buf;
 #import "sdl";
@@ -59,6 +60,21 @@ fn yResolution(state: GraphRollFormData) {
     return state.rect.height / 20;
 }
 
+fn screenPixels(state: GraphRollFormData, x: f64) {
+    hs := &context.state.playArea.horizontalScroller;
+    scaleX := hs.rect.width / (hs.end - hs.begin);
+
+    scrollBeginPercent := hs.begin / hs.rect.width;
+    scrollEndPercent := hs.end / hs.rect.width;
+
+    startWindow := state.rect.width * scrollBeginPercent;
+    endWindow := state.rect.width * scrollEndPercent;
+    windowPixels := endWindow - startWindow;
+
+    pixels := x - startWindow;
+    return state.rect.x + pixels * scaleX;
+}
+
 fn effectiveRect(note: Note, state: GraphRollFormData) gui.Rect!(f64) {
     offsetX: f64 = 0;
     offsetY: f64 = 0;
@@ -80,22 +96,19 @@ fn effectiveRect(note: Note, state: GraphRollFormData) gui.Rect!(f64) {
         resizeX = context.mouse.x - state.resizeStartX;
     }
 
+    sp := screenPixels(state, note.rect.x);
+
     hs := &context.state.playArea.horizontalScroller;
     scaleX := hs.rect.width / (hs.end - hs.begin);
 
-    scrollOffsetX := hs.begin;
-
     er: gui.Rect!(f64) = {
-        (note.rect.x - scrollOffsetX) * scaleX + offsetX + state.rect.x,
-        (note.rect.y + offsetY) * yr + state.rect.y,
+        sp + offsetX,
+        state.rect.y + (note.rect.y + offsetY) * yr,
         (note.rect.width) * state.xResolution * scaleX + resizeX,
         note.rect.height * yr
     };
 
-    boundingRect := state.bounds;
-    boundingRect.x = state.rect.x;
-
-    return gui.clip(er, boundingRect);
+    return gui.clip(er, state.bounds);
 }
 
 fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
@@ -172,7 +185,18 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
         yr := yResolution(^state);
         noteY := math.floor(localY / yr);
 
-        noteRect: gui.Rect!(f64) = {localX / scaleX + hs.begin, noteY, 3, 1};
+        scrollBeginPercent := hs.begin / hs.rect.width;
+        scrollEndPercent := hs.end / hs.rect.width;
+
+        startWindow := state.rect.width * scrollBeginPercent;
+        endWindow := state.rect.width * scrollEndPercent;
+        windowPixels := endWindow - startWindow;
+
+        clickedPercent := localX / state.rect.width;
+        clickedPixels := windowPixels * clickedPercent;
+        clickedLocation := startWindow + clickedPixels;
+
+        noteRect: gui.Rect!(f64) = {clickedLocation, noteY, 4, 1};
         &context.state.playArea.graphRolls.buf[index].gr.notes|:append({noteRect, false});
     }
     else if messageData.button == sdl.MouseButton.RIGHT {
@@ -303,17 +327,56 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), index: i64) {
     state.bounds = bounds;
 
     -- background
-    gui.drawRect(context.cairo.layer, gui.clip(rect, bounds), 0.6, 0.6, 0.9);
+    gui.drawRect(context.cairo.layer, gui.clip(rect, bounds), cast(f64) 67.0/255.0, cast(f64) 84.0/255.0, cast(f64) 94.0/255.0);
 
     -- outline
     gui.drawOutline(context.cairo.layer, gui.clip(rect, bounds), 0.2, 0.2, 0.2, lineWidth: 1.5);
+
+    -- vertical lines
+    vlX: f64 = 0;
+    light := true;
+    lastX := vlX;
+
+    blockWidth := state.xResolution * cast() context.state.beatsPerMeasure;
+
+    while vlX < rect.x + rect.width {
+        if light == true {
+            pixelsStart := screenPixels(^state, vlX);
+            pixelsEnd := screenPixels(^state, vlX + blockWidth);
+            blockRect: gui.Rect!(f64) = {pixelsStart, rect.y, pixelsEnd - pixelsStart, rect.height};
+
+            gui.drawRect(context.cairo.layer, gui.clip(blockRect, bounds), cast(f64) 52.0/255.0, cast(f64) 68.0/255.0, cast(f64) 78.0/255.0);
+        }
+
+        vlX += blockWidth;
+        light = !light;
+    }
+
+    vlX = 0;
+    vlN := 0;
+    while vlX < rect.x + rect.width {
+        pixelsX := screenPixels(^state, vlX);
+        lineRect: gui.Rect!(f64) = {pixelsX, bounds.y, 0, bounds.y + bounds.height};
+
+        if pixelsX > bounds.x and pixelsX < bounds.x + bounds.width {
+            width: f64 = 1;
+            if vlN mod cast() context.state.beatsPerMeasure == 0 {
+                width = 2;
+            }
+
+            gui.drawLine(context.cairo.layer, lineRect, 0.2, 0.2, 0.2, width: width);
+        }
+
+        vlX += state.xResolution;
+        vlN += 1;
+    }
 
     yr := yResolution(^state);
 
     y := rect.y + yr;
     while y < rect.y + rect.height {
         guideLineRect: gui.Rect!(f64) = {rect.x, y, rect.width, 0};
-        gui.drawLine(context.cairo.layer, gui.clip(guideLineRect, bounds), 0.2, 0.2, 0.2, lineWidth: 0.5);
+        gui.drawLine(context.cairo.layer, gui.clip(guideLineRect, bounds), 0.2, 0.2, 0.2, width: 0.5);
         y += yr;
     }
 
@@ -322,10 +385,10 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), index: i64) {
         er := effectiveRect(note, ^state);
 
         if note.selected {
-            gui.drawRect(context.cairo.layer, er, 1, 1, 0.4);
+            gui.drawRect(context.cairo.layer, er, cast(f64) 186.0/255.0, cast(f64) 239.0/255.0, cast(f64) 194.0/255.0);
         }
         else {
-            gui.drawRect(context.cairo.layer, er, 0.8, 0.8, 0.2);
+            gui.drawRect(context.cairo.layer, er, cast(f64) 117.0/255.0, cast(f64) 144.0/255.0, cast(f64) 130.0/255.0);
         }
     }
 

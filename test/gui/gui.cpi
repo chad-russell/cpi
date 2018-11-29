@@ -274,13 +274,13 @@ fn drawOutline(layer: Layer, rect: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 
     cairo.cairo_stroke(layer.context);
 }
 
-fn drawLine(layer: Layer, br: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1, lineWidth: f64 = 1) {
+fn drawLine(layer: Layer, br: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1, width: f64 = 1) {
     cairo.cairo_save(layer.context);
     defer { cairo.cairo_restore(layer.context); }
 
     cairo.cairo_set_source_rgba(layer.context, r, g, b, a);
 
-    cairo.cairo_set_line_width(layer.context, lineWidth);
+    cairo.cairo_set_line_width(layer.context, width);
 
     cairo.cairo_move_to(layer.context, br.x, br.y);
     cairo.cairo_line_to(layer.context, br.x + br.width, br.y + br.height);

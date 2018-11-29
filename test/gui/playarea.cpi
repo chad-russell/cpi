@@ -35,15 +35,16 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent) {
         scroller.mouseButtonDown(messageData, &context.state.playArea.verticalScroller);
     }
 
+    if context.state.playArea.addNewGraphRollButton|gui.containsMouse {
+        grfd: graphrollContainer.GraphRollContainerFormData;
+        &context.state.playArea.graphRolls|:append(grfd);
+        return;
+    }
+
     for gr, i: context.state.playArea.graphRolls.buf {
         if gr.rect|gui.containsMouse {
             graphrollContainer.mouseButtonDown(messageData, i);
         }
-    }
-
-    if context.state.playArea.addNewGraphRollButton|gui.containsMouse {
-        grfd: graphrollContainer.GraphRollContainerFormData;
-        &context.state.playArea.graphRolls|:append(grfd);
     }
 }
 
@@ -54,7 +55,7 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent) {
     scroller.mouseButtonUp(&context.state.playArea.verticalScroller);
 
     for gr, i: context.state.playArea.graphRolls.buf {
-        if gr.rect|gui.contains(cast(f64) messageData.x, cast(f64) messageData.y) {
+        if gr.bounds|gui.contains(cast(f64) messageData.x, cast(f64) messageData.y) {
             graphroll.mouseButtonUp(messageData, i);
         }
     }
@@ -111,17 +112,17 @@ fn processMessages() {
 
 fn draw(rect: gui.Rect!(f64)) {
     -- background
-    gui.drawRect(context.cairo.layer, rect, 0.9, 0.8, 0.7);
+    gui.drawRect(context.cairo.layer, rect, cast(f64) 67.0/255.0, cast(f64) 77.0/255.0, cast(f64) 82.0/255.0);
 
     y: f64 = 0;
 
     -- scroll/resize bar
     srHeight: f64 = 25;
-    scroller.drawHorizontal({0, y, rect.width, srHeight}, &context.state.playArea.horizontalScroller);
+    scroller.drawHorizontal({0, y, rect.width - srHeight, srHeight}, &context.state.playArea.horizontalScroller);
     y += srHeight;
 
     -- vertical scroll/resize bar
-    scroller.drawVertical({rect.width-srHeight, y, srHeight, rect.height}, &context.state.playArea.verticalScroller);
+    scroller.drawVertical({rect.width-srHeight, srHeight, srHeight, rect.height - srHeight}, &context.state.playArea.verticalScroller);
 
     metaMargin := rect.width*0.05;
     grButtonHeight := rect.height * 0.1;
@@ -130,20 +131,26 @@ fn draw(rect: gui.Rect!(f64)) {
     vs := &context.state.playArea.verticalScroller;
     yScale := vs.rect.height / (vs.end - vs.begin);
 
-    graphRollScrollViewHeight := rect.height - grButtonHeight - y;
+    graphRollScrollViewHeight := rect.height - y;
 
     grAreaBounds: gui.Rect!(f64) = rect;
     grAreaBounds.y = y;
-    grAreaBounds.height -= y;
+    grAreaBounds.height = graphRollScrollViewHeight;
+    grAreaBounds.width -= srHeight;
 
     grHeight := graphRollScrollViewHeight / cast() context.state.playArea.graphRolls.buf.count * yScale;
+
+    percScrolled := scroller.percScrolled(vs);
+
+    maxOffset := graphRollScrollViewHeight * yScale - graphRollScrollViewHeight;
+
     for gr, grIndex: context.state.playArea.graphRolls.buf {
-        graphrollContainer.draw({0, y, rect.width - metaMargin - srHeight, grHeight}, grAreaBounds, grIndex, metaMargin, -vs.begin * yScale);
+        graphrollContainer.draw({rect.x, y, rect.width - srHeight, grHeight}, grAreaBounds, grIndex, metaMargin, -percScrolled * maxOffset);
         y += grHeight;
     }
 
     -- button to add graph roll
-    context.state.playArea.addNewGraphRollButton = {0, y - vs.begin * yScale, metaMargin, grButtonHeight};
+    context.state.playArea.addNewGraphRollButton = {10, rect.y + rect.height - grButtonHeight - 10, grButtonHeight, grButtonHeight};
     gui.drawRect(context.cairo.layer, context.state.playArea.addNewGraphRollButton, 0.4, 0.4, 1);
 
     -- playhead

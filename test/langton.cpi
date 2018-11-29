@@ -16,9 +16,7 @@ fn init() {
     w := cast(i64) context.sdl.windowWidth;
     h := cast(i64) context.sdl.windowHeight;
 
-    type ba []bool
-
-    m := mem.alloc!(bool)((w + 1) * (h + 1));
+    m := mem.alloc!(bool)(w * h);
 
     dirX := 0;
     dirY := 1;
