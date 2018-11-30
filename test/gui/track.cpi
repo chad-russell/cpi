@@ -6,33 +6,33 @@
 #import "math";
 #import "iter";
 
-type Note struct {
+type Clip struct {
     rect: gui.Rect!(f64),
     selected: bool
 }
 
-type GraphRollFormData struct {
+type TrackState struct {
     rect: gui.Rect!(f64),
     bounds: gui.Rect!(f64),
 
-    notes: buf.Buffer!(Note),
+    clips: buf.Buffer!(Clip),
 
     selecting: bool,
     selectStartX: f64,
     selectStartY: f64,
 
-    draggingNotes: bool,
+    draggingClips: bool,
     dragStartX: f64,
     dragStartY: f64,
 
     mouseInResizeArea: bool,
-    resizingNotes: bool,
+    resizingClips: bool,
     resizeStartX: f64,
 
     xResolution: f64 = 10,
 }
 
-fn selectArea(state: GraphRollFormData) gui.Rect!(f64) {
+fn selectArea(state: TrackState) gui.Rect!(f64) {
     startX := state.selectStartX;
     startY := state.selectStartY;
     endX := context.mouse.x;
@@ -56,11 +56,11 @@ fn selectArea(state: GraphRollFormData) gui.Rect!(f64) {
     };
 }
 
-fn yResolution(state: GraphRollFormData) {
-    return state.rect.height / 20;
+fn yResolution(state: TrackState) f64 {
+    return state.rect.height;
 }
 
-fn screenPixels(state: GraphRollFormData, x: f64) {
+fn screenPixels(state: TrackState, x: f64) {
     hs := &context.state.playArea.horizontalScroller;
     scaleX := hs.rect.width / (hs.end - hs.begin);
 
@@ -75,7 +75,7 @@ fn screenPixels(state: GraphRollFormData, x: f64) {
     return state.rect.x + pixels * scaleX;
 }
 
-fn effectiveRect(note: Note, state: GraphRollFormData) gui.Rect!(f64) {
+fn effectiveRect(clip: Clip, state: TrackState) gui.Rect!(f64) {
     offsetX: f64 = 0;
     offsetY: f64 = 0;
 
@@ -85,72 +85,74 @@ fn effectiveRect(note: Note, state: GraphRollFormData) gui.Rect!(f64) {
     resizeX: f64 = 0;
 
     yr := yResolution(state);
-    noteY := math.floor(localY / yr);
+    clipY := math.floor(localY / yr);
 
-    if note.selected == true and state.draggingNotes == true {
+    if clip.selected == true and state.draggingClips == true {
         offsetX = context.mouse.x - state.dragStartX;
-        offsetY = noteY - state.dragStartY;
+        offsetY = clipY - state.dragStartY;
     }
 
-    if note.selected == true and state.resizingNotes == true {
+    if clip.selected == true and state.resizingClips == true {
         resizeX = context.mouse.x - state.resizeStartX;
     }
 
-    sp := screenPixels(state, note.rect.x);
+    sp := screenPixels(state, clip.rect.x);
 
     hs := &context.state.playArea.horizontalScroller;
     scaleX := hs.rect.width / (hs.end - hs.begin);
 
     er: gui.Rect!(f64) = {
         sp + offsetX,
-        state.rect.y + (note.rect.y + offsetY) * yr,
-        (note.rect.width) * state.xResolution * scaleX + resizeX,
-        note.rect.height * yr
+        state.rect.y + (clip.rect.y + offsetY) * yr,
+        (clip.rect.width) * state.xResolution * scaleX + resizeX,
+        clip.rect.height * yr
     };
 
     return gui.clip(er, state.bounds);
 }
 
-fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, state: *GraphRollFormData) {
+fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
+    state := &context.state.playArea.tracks.buf[index].tr;
+
     localX := context.mouse.x - state.rect.x;
     localY := context.mouse.y - state.rect.y;
 
     if messageData.button == sdl.MouseButton.LEFT {
-        didClickNote := false;
-        noteClicked: *Note = nil;
+        didClickClip := false;
+        clipClicked: *Clip = nil;
 
-        -- possibly select existing notes
+        -- possibly select existing clips
         i := 0;
-        for note: state.notes.buf|iter.byRef {
-            if effectiveRect(^note, ^state)|gui.contains(context.mouse.x, context.mouse.y) {
-                didClickNote = true;
-                noteClicked = note;
+        for clip: state.clips.buf|iter.byRef {
+            if effectiveRect(^clip, ^state)|gui.contains(context.mouse.x, context.mouse.y) {
+                didClickClip = true;
+                clipClicked = clip;
 
                 i += 1;
             }
         }
 
-        if didClickNote == true {
-            if context.modifierKeys.ctrl == false and noteClicked.selected == false {
-                -- clear all selected notes
-                for note: state.notes.buf|iter.byRef {
-                    note.selected = false;
+        if didClickClip == true {
+            if context.modifierKeys.ctrl == false and clipClicked.selected == false {
+                -- clear all selected clips
+                for clip: state.clips.buf|iter.byRef {
+                    clip.selected = false;
                 }
             }
 
-            noteClicked.selected = !context.modifierKeys.shift;
-            if noteClicked.selected == true {
+            clipClicked.selected = !context.modifierKeys.shift;
+            if clipClicked.selected == true {
                 if state.mouseInResizeArea == true {
-                    state.resizingNotes = true;
+                    state.resizingClips = true;
                     state.resizeStartX = context.mouse.x;
                 }
                 else {
-                    state.draggingNotes = true;
+                    state.draggingClips = true;
                     state.dragStartX = context.mouse.x;
 
                     yr := yResolution(^state);
-                    noteY := math.floor(localY / yr);
-                    state.dragStartY = noteY;
+                    clipY := math.floor(localY / yr);
+                    state.dragStartY = clipY;
                 }
             }
 
@@ -166,14 +168,14 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, state: *GraphRollFormData
         }
 
         if context.modifierKeys.shift {
-            for note: state.notes.buf|iter.byRef {
-                note.selected = false;
+            for clip: state.clips.buf|iter.byRef {
+                clip.selected = false;
             }
             return;
         }
 
-        for note: state.notes.buf|iter.byRef {
-            note.selected = false;
+        for clip: state.clips.buf|iter.byRef {
+            clip.selected = false;
         }
 
         -- add a new one
@@ -181,7 +183,7 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, state: *GraphRollFormData
         scaleX := hs.rect.width / (hs.end - hs.begin);
 
         yr := yResolution(^state);
-        noteY := math.floor(localY / yr);
+        clipY := math.floor(localY / yr);
 
         scrollBeginPercent := hs.begin / hs.rect.width;
         scrollEndPercent := hs.end / hs.rect.width;
@@ -194,16 +196,16 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, state: *GraphRollFormData
         clickedPixels := windowPixels * clickedPercent;
         clickedLocation := startWindow + clickedPixels;
 
-        noteRect: gui.Rect!(f64) = {clickedLocation, noteY, 4, 1};
-        &state.notes|:append({noteRect, false});
+        clipRect: gui.Rect!(f64) = {clickedLocation, clipY, 16, 1};
+        &state.clips|:append({clipRect, false});
     }
     else if messageData.button == sdl.MouseButton.RIGHT {
         toDelete := false;
         i := 0;
-        for note: state.notes.buf|iter.byRef {
-            if effectiveRect(^note, ^state)|gui.contains(context.mouse.x, context.mouse.y) {
+        for clip: state.clips.buf|iter.byRef {
+            if effectiveRect(^clip, ^state)|gui.contains(context.mouse.x, context.mouse.y) {
                 if context.modifierKeys.shift == false {
-                    note.selected = true;
+                    clip.selected = true;
                     toDelete = true;
                 }
             }
@@ -214,56 +216,60 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, state: *GraphRollFormData
         if toDelete == true {
             writeIndex := 0;
             readIndex := 0;
-            while readIndex < state.notes.buf.count {
-                if state.notes.buf[readIndex].selected == false {
-                    state.notes.buf[writeIndex] = state.notes.buf[readIndex];
+            while readIndex < state.clips.buf.count {
+                if state.clips.buf[readIndex].selected == false {
+                    state.clips.buf[writeIndex] = state.clips.buf[readIndex];
                     writeIndex += 1;
                 }
 
                 readIndex += 1;
             }
 
-            state.notes.buf.count = writeIndex;
+            state.clips.buf.count = writeIndex;
         }
     }
 }
 
-fn mouseButtonUp(messageData: *sdl.MouseButtonEvent, state: *GraphRollFormData) {
+fn mouseButtonUp(messageData: *sdl.MouseButtonEvent, index: i64) {
+    state := &context.state.playArea.tracks.buf[index].tr;
+
     hs := &context.state.playArea.horizontalScroller;
     scaleX := (hs.end - hs.begin) / hs.rect.width;
 
     localX := context.mouse.x - state.rect.x;
     localY := context.mouse.y - state.rect.y;
 
-    if state.draggingNotes == true {
+    if state.draggingClips == true {
         yr := yResolution(^state);
         dragStopY := math.floor(localY / yr);
 
-        for note: state.notes.buf|iter.byRef {
-            if note.selected == true {
-                note.rect.x += (context.mouse.x - state.dragStartX) * scaleX;
-                note.rect.y += dragStopY - state.dragStartY;
+        for clip: state.clips.buf|iter.byRef {
+            if clip.selected == true {
+                clip.rect.x += (context.mouse.x - state.dragStartX) * scaleX;
+                clip.rect.y += dragStopY - state.dragStartY;
             }
         }
 
-        state.draggingNotes = false;
+        state.draggingClips = false;
     }
 
-    if state.resizingNotes == true {
-        for note: state.notes.buf|iter.byRef {
-            if note.selected == true {
-                note.rect.width += (context.mouse.x - state.resizeStartX) * scaleX / state.xResolution;
+    if state.resizingClips == true {
+        for clip: state.clips.buf|iter.byRef {
+            if clip.selected == true {
+                clip.rect.width += (context.mouse.x - state.resizeStartX) * scaleX / state.xResolution;
             }
         }
 
-        state.resizingNotes = false;
+        state.resizingClips = false;
     }
 
     state.selecting = false;
 }
 
-fn mouseMove(messageData: *sdl.MouseMotionEvent, state: *GraphRollFormData) {
-    if state.resizingNotes == true {
+fn mouseMove(messageData: *sdl.MouseMotionEvent, index: i64) {
+    state := &context.state.playArea.tracks.buf[index].tr;
+
+    if state.resizingClips == true {
         return;
     }
 
@@ -271,8 +277,8 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent, state: *GraphRollFormData) {
     localY := context.mouse.y - state.rect.y;
 
     if state.selecting == false {
-        for note: state.notes.buf {
-            er := effectiveRect(note, ^state);
+        for clip: state.clips.buf {
+            er := effectiveRect(clip, ^state);
 
             endRect: gui.Rect!(f64) = {
                 er.x + er.width - 4,
@@ -303,9 +309,9 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent, state: *GraphRollFormData) {
         -- convert selectArea to local coordinates
         sa := selectArea(^state);
 
-        for note: state.notes.buf|iter.byRef {
-            if effectiveRect(^note, ^state)|gui.intersects(sa) {
-                note.selected = !context.modifierKeys.shift;
+        for clip: state.clips.buf|iter.byRef {
+            if effectiveRect(^clip, ^state)|gui.intersects(sa) {
+                clip.selected = !context.modifierKeys.shift;
             }
         }
     }
@@ -315,7 +321,7 @@ fn quantize(origY: f64, size: f64) {
     return math.floor(origY / size) * size;
 }
 
-fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *GraphRollFormData) {
+fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *TrackState) {
     state.rect = rect;
     state.bounds = bounds;
 
@@ -349,7 +355,7 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *GraphRollFormData)
     vlN := 0;
     while vlX < rect.x + rect.width {
         pixelsX := screenPixels(^state, vlX);
-        lineRect: gui.Rect!(f64) = {pixelsX, bounds.y, 0, bounds.y + bounds.height};
+        lineRect: gui.Rect!(f64) = gui.clip({pixelsX, rect.y, 0, rect.height}, bounds);
 
         if pixelsX > bounds.x and pixelsX < bounds.x + bounds.width {
             width: f64 = 1;
@@ -373,20 +379,28 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *GraphRollFormData)
         y += yr;
     }
 
-    -- notes
-    for note: state.notes.buf {
-        er := effectiveRect(note, ^state);
-
-        if note.selected {
-            gui.drawRect(context.cairo.layer, er, cast(f64) 186.0/255.0, cast(f64) 239.0/255.0, cast(f64) 194.0/255.0);
-        }
-        else {
-            gui.drawRect(context.cairo.layer, er, cast(f64) 117.0/255.0, cast(f64) 144.0/255.0, cast(f64) 130.0/255.0);
-        }
+    -- clips
+    for clip: state.clips.buf {
+        drawClip(clip, state);
     }
 
     -- select area
     if state.selecting {
         gui.drawRect(context.cairo.layer, selectArea(^state), 0.9, 0.9, 0.9, 0.2);
     }
+}
+
+fn drawClip(clip: Clip, state: *TrackState) {
+    er := effectiveRect(clip, ^state);
+
+    if clip.selected {
+        gui.drawRect(context.cairo.layer, er, cast(f64) 186.0/255.0, cast(f64) 194.0/255.0, cast(f64) 239.0/255.0);
+    }
+    else {
+        gui.drawRect(context.cairo.layer, er, cast(f64) 117.0/255.0, cast(f64) 130.0/255.0, cast(f64) 144.0/255.0);
+    }
+
+    -- edit button
+    eb: gui.Rect!(f64) = {er.x + er.width - 12, er.y + er.height - 12, 10, 10};
+    gui.drawRect(context.cairo.layer, eb, cast(f64) 144.0/255.0, cast(f64) 130.0/255.0, cast(f64) 117.0/255.0);
 }

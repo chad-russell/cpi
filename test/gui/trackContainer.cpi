@@ -1,28 +1,30 @@
 #import "gui/gui";
-#import "gui/graphroll";
+#import "gui/track";
 #import "sdl";
 #import "buffer": buf;
 #import "io";
 
-type GraphRollContainerFormData struct {
+type Clip struct {
+    rect: gui.Rect!(f64),
+}
+
+type TrackContainerFormData struct {
     rect: gui.Rect!(f64),
     bounds: gui.Rect!(f64),
     metaRect: gui.Rect!(f64),
-    gr: graphroll.GraphRollFormData
+    tr: track.TrackState,
 }
 
-fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), index: i64, metaMargin: f64, scrollOffsetY: f64) {
-    state := &context.state.playArea.graphRolls.buf[index];
+fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), index: i64, metaMargin: f64) {
+    state := &context.state.playArea.tracks.buf[index];
     state.rect = rect;
     state.bounds = bounds;
 
-    rc := rect;
-    rc.y += scrollOffsetY;
-
     -- delete handle
-    state.metaRect = {rc.x, rc.y, metaMargin, rc.height};
+    state.metaRect = {rect.x, rect.y, metaMargin, rect.height};
     gui.drawRect(context.cairo.layer, gui.clip(state.metaRect, bounds), 0.9, 0.6, 0.6);
 
+    rc := rect;
     rc.x += metaMargin;
     rc.width -= metaMargin;
 
@@ -30,17 +32,17 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), index: i64, metaMargin: f6
     grBounds.x = metaMargin;
     grBounds.width -= metaMargin;
 
-    graphroll.draw(rc, grBounds, index);
+    track.draw(rc, grBounds, &state.tr);
 }
 
 fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
-    state := &context.state.playArea.graphRolls.buf[index];
+    state := &context.state.playArea.tracks.buf[index];
 
     -- delete handle
     if state.metaRect|gui.containsMouse {
-        &context.state.playArea.graphRolls|buf.deleteInPlace(index);
+        &context.state.playArea.tracks|buf.deleteInPlace(index);
     }
     else {
-        graphroll.mouseButtonDown(messageData, index);
+        track.mouseButtonDown(messageData, index);
     }
 }

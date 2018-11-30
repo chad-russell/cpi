@@ -1,6 +1,6 @@
 #import "gui/gui";
-#import "gui/graphroll";
-#import "gui/graphrollContainer";
+#import "gui/track";
+#import "gui/trackContainer";
 #import "gui/scroller";
 #import "io";
 #import "buffer": buf;
@@ -16,10 +16,10 @@ type PlayAreaFormData struct {
     playhead: f64,
     playheadGrabber: f64,
     draggingPlayhead: bool,
-    graphRolls: buf.Buffer!(graphrollContainer.GraphRollContainerFormData),
+    tracks: buf.Buffer!(trackContainer.TrackContainerFormData),
     horizontalScroller: scroller.Data,
     verticalScroller: scroller.Data,
-    addNewGraphRollButton: gui.Rect!(f64),
+    addNewTrackButton: gui.Rect!(f64),
 }
 
 fn mouseButtonDown(messageData: *sdl.MouseButtonEvent) {
@@ -30,20 +30,23 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent) {
 
     if context.state.playArea.horizontalScroller.rect|gui.containsMouse {
         scroller.mouseButtonDown(messageData, &context.state.playArea.horizontalScroller);
+        return;
     }
     if context.state.playArea.verticalScroller.rect|gui.containsMouse {
         scroller.mouseButtonDown(messageData, &context.state.playArea.verticalScroller);
-    }
-
-    if context.state.playArea.addNewGraphRollButton|gui.containsMouse {
-        grfd: graphrollContainer.GraphRollContainerFormData;
-        &context.state.playArea.graphRolls|:append(grfd);
         return;
     }
 
-    for gr, i: context.state.playArea.graphRolls.buf {
-        if gr.rect|gui.containsMouse {
-            graphrollContainer.mouseButtonDown(messageData, i);
+    if context.state.playArea.addNewTrackButton|gui.containsMouse {
+        tr: trackContainer.TrackContainerFormData;
+        &context.state.playArea.tracks|:append(tr);
+        return;
+    }
+
+    for tr, i: context.state.playArea.tracks.buf {
+        if tr.rect|gui.containsMouse {
+            trackContainer.mouseButtonDown(messageData, i);
+            return;
         }
     }
 }
@@ -54,9 +57,9 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent) {
     scroller.mouseButtonUp(&context.state.playArea.horizontalScroller);
     scroller.mouseButtonUp(&context.state.playArea.verticalScroller);
 
-    for gr, i: context.state.playArea.graphRolls.buf {
-        if gr.bounds|gui.contains(cast(f64) messageData.x, cast(f64) messageData.y) {
-            graphroll.mouseButtonUp(messageData, i);
+    for tr, i: context.state.playArea.tracks.buf {
+        if tr.bounds|gui.containsMouse {
+            track.mouseButtonUp(messageData, i);
         }
     }
 }
@@ -77,9 +80,9 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent) {
     else {
         context.state.playArea.playheadGrabber = -1;
 
-        for gr, i: context.state.playArea.graphRolls.buf {
-            if gr.rect|gui.contains(cast(f64) messageData.x, cast(f64) messageData.y) {
-                graphroll.mouseMove(messageData, i);
+        for tr, i: context.state.playArea.tracks.buf {
+            if tr.rect|gui.contains(cast(f64) messageData.x, cast(f64) messageData.y) {
+                track.mouseMove(messageData, i);
             }
         }
     }
@@ -131,27 +134,28 @@ fn draw(rect: gui.Rect!(f64)) {
     vs := &context.state.playArea.verticalScroller;
     yScale := vs.rect.height / (vs.end - vs.begin);
 
-    graphRollScrollViewHeight := rect.height - y;
+    trackScrollViewHeight := rect.height - y;
 
     grAreaBounds: gui.Rect!(f64) = rect;
     grAreaBounds.y = y;
-    grAreaBounds.height = graphRollScrollViewHeight;
+    grAreaBounds.height = trackScrollViewHeight;
     grAreaBounds.width -= srHeight;
 
-    grHeight := graphRollScrollViewHeight / cast() context.state.playArea.graphRolls.buf.count * yScale;
+    grHeight := trackScrollViewHeight / cast() context.state.playArea.tracks.buf.count * yScale;
 
     percScrolled := scroller.percScrolled(vs);
 
-    maxOffset := graphRollScrollViewHeight * yScale - graphRollScrollViewHeight;
+    maxOffset := trackScrollViewHeight * yScale - trackScrollViewHeight;
 
-    for gr, grIndex: context.state.playArea.graphRolls.buf {
-        graphrollContainer.draw({rect.x, y, rect.width - srHeight, grHeight}, grAreaBounds, grIndex, metaMargin, -percScrolled * maxOffset);
+    for gr, grIndex: context.state.playArea.tracks.buf {
+        scrollOffsetY := percScrolled * maxOffset;
+        trackContainer.draw({rect.x, y - scrollOffsetY, rect.width - srHeight, grHeight}, grAreaBounds, grIndex, metaMargin);
         y += grHeight;
     }
 
     -- button to add graph roll
-    context.state.playArea.addNewGraphRollButton = {10, rect.y + rect.height - grButtonHeight - 10, grButtonHeight, grButtonHeight};
-    gui.drawRect(context.cairo.layer, context.state.playArea.addNewGraphRollButton, 0.4, 0.4, 1);
+    context.state.playArea.addNewTrackButton = {10, rect.y + rect.height - grButtonHeight - 10, grButtonHeight, grButtonHeight};
+    gui.drawRect(context.cairo.layer, context.state.playArea.addNewTrackButton, 0.4, 0.4, 1);
 
     -- playhead
     context.cairo.layer|gui.drawRect({context.state.playArea.playhead, 0, 1, rect.height}, 1, 0.2, 0.2);

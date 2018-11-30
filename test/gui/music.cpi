@@ -1,6 +1,6 @@
 #import "gui/gui";
 #import "gui/playarea";
-#import "gui/graphrollContainer";
+#import "gui/trackContainer";
 
 #context state: struct {
     playArea: playarea.PlayAreaFormData,
@@ -12,9 +12,9 @@ fn init() {
 
     gui.init();
 
-    -- add a graph roll
-    grfd: graphrollContainer.GraphRollContainerFormData;
-    &context.state.playArea.graphRolls|:append(grfd);
+    -- add a track
+    tr: trackContainer.TrackContainerFormData;
+    &context.state.playArea.tracks|:append(tr);
 
     while !context.quit {
         gui.tick();
