@@ -1,5 +1,7 @@
 #import "gui/gui";
+#import "gui/graphroll";
 #import "gui/scroller";
+#import "gui/playarea";
 #import "io";
 #import "buffer": buf;
 #import "sdl";
@@ -8,7 +10,9 @@
 
 type Clip struct {
     rect: gui.Rect!(f64),
-    selected: bool
+    editButton: gui.Rect!(f64),
+    selected: bool,
+    graphRoll: graphroll.GraphRollFormData
 }
 
 type TrackState struct {
@@ -29,7 +33,7 @@ type TrackState struct {
     resizingClips: bool,
     resizeStartX: f64,
 
-    xResolution: f64 = 10,
+    xResolution: f64
 }
 
 fn selectArea(state: TrackState) gui.Rect!(f64) {
@@ -122,13 +126,16 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
         clipClicked: *Clip = nil;
 
         -- possibly select existing clips
-        i := 0;
         for clip: state.clips.buf|iter.byRef {
-            if effectiveRect(^clip, ^state)|gui.contains(context.mouse.x, context.mouse.y) {
+            if clip.editButton|gui.containsMouse {
+                context.state.playArea.screenType = playarea.ScreenType.Track;
+                context.state.playArea.screenData = clip;
+
+                return;
+            }
+            else if effectiveRect(^clip, ^state)|gui.containsMouse {
                 didClickClip = true;
                 clipClicked = clip;
-
-                i += 1;
             }
         }
 
@@ -193,11 +200,16 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
         windowPixels := endWindow - startWindow;
 
         clickedPercent := localX / state.rect.width;
-        clickedPixels := windowPixels * clickedPercent;
-        clickedLocation := startWindow + clickedPixels;
+        clickedInWindow := windowPixels * clickedPercent;
+        clickedLocation := startWindow + clickedInWindow;
 
         clipRect: gui.Rect!(f64) = {clickedLocation, clipY, 16, 1};
-        &state.clips|:append({clipRect, false});
+
+        clip: Clip;
+        clip.rect = clipRect;
+        clip.selected = false;
+
+        &state.clips|:append(clip);
     }
     else if messageData.button == sdl.MouseButton.RIGHT {
         toDelete := false;
@@ -331,6 +343,12 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *TrackState) {
     -- outline
     gui.drawOutline(context.cairo.layer, gui.clip(rect, bounds), 0.2, 0.2, 0.2, lineWidth: 1.5);
 
+    -- how many pixels per beat?
+    microsecondsPerMinute: u64 = 60000000;
+    compositionLengthInMinutes := cast(f64) context.state.playArea.compositionLengthInMicroseconds / cast(f64) microsecondsPerMinute;
+    totalBeats := compositionLengthInMinutes * cast() context.state.playArea.beatsPerMinute;
+    state.xResolution = state.rect.width / cast() totalBeats;
+
     -- vertical lines
     vlX: f64 = 0;
     light := true;
@@ -380,7 +398,7 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *TrackState) {
     }
 
     -- clips
-    for clip: state.clips.buf {
+    for clip: state.clips.buf|iter.byRef {
         drawClip(clip, state);
     }
 
@@ -390,8 +408,8 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *TrackState) {
     }
 }
 
-fn drawClip(clip: Clip, state: *TrackState) {
-    er := effectiveRect(clip, ^state);
+fn drawClip(clip: *Clip, state: *TrackState) {
+    er := effectiveRect(^clip, ^state);
 
     if clip.selected {
         gui.drawRect(context.cairo.layer, er, cast(f64) 186.0/255.0, cast(f64) 194.0/255.0, cast(f64) 239.0/255.0);
@@ -401,6 +419,6 @@ fn drawClip(clip: Clip, state: *TrackState) {
     }
 
     -- edit button
-    eb: gui.Rect!(f64) = {er.x + er.width - 12, er.y + er.height - 12, 10, 10};
-    gui.drawRect(context.cairo.layer, eb, cast(f64) 144.0/255.0, cast(f64) 130.0/255.0, cast(f64) 117.0/255.0);
+    clip.editButton = {er.x + er.width - 12, er.y + er.height - 12, 10, 10};
+    gui.drawRect(context.cairo.layer, clip.editButton, cast(f64) 144.0/255.0, cast(f64) 130.0/255.0, cast(f64) 117.0/255.0);
 }

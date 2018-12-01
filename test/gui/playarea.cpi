@@ -1,5 +1,6 @@
 #import "gui/gui";
 #import "gui/track";
+#import "gui/graphroll";
 #import "gui/trackContainer";
 #import "gui/scroller";
 #import "io";
@@ -10,8 +11,12 @@
 grabberRadius: f64 = 15;
 grabberMaxSize: f64 = 10;
 
+type ScreenType enum {
+    TrackList,
+    Track
+}
+
 type PlayAreaFormData struct {
-    compositionLength: f64,
     playing: bool,
     playhead: f64,
     playheadGrabber: f64,
@@ -20,6 +25,12 @@ type PlayAreaFormData struct {
     horizontalScroller: scroller.Data,
     verticalScroller: scroller.Data,
     addNewTrackButton: gui.Rect!(f64),
+
+    screenType: ScreenType = ScreenType.TrackList,
+    screenData: *none = nil,
+
+    compositionLengthInMicroseconds: u64 = 60000000,
+    beatsPerMinute: u32 = 120
 }
 
 fn mouseButtonDown(messageData: *sdl.MouseButtonEvent) {
@@ -37,17 +48,23 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent) {
         return;
     }
 
-    if context.state.playArea.addNewTrackButton|gui.containsMouse {
-        tr: trackContainer.TrackContainerFormData;
-        &context.state.playArea.tracks|:append(tr);
-        return;
-    }
-
-    for tr, i: context.state.playArea.tracks.buf {
-        if tr.rect|gui.containsMouse {
-            trackContainer.mouseButtonDown(messageData, i);
+    if context.state.playArea.screenType == ScreenType.TrackList {
+        if context.state.playArea.addNewTrackButton|gui.containsMouse {
+            tr: trackContainer.TrackContainerFormData;
+            &context.state.playArea.tracks|:append(tr);
             return;
         }
+
+        for tr, i: context.state.playArea.tracks.buf {
+            if tr.rect|gui.containsMouse {
+                trackContainer.mouseButtonDown(messageData, i);
+                return;
+            }
+        }
+    }
+    else if context.state.playArea.screenType == ScreenType.Track {
+        clip := cast(*track.Clip) context.state.playArea.screenData;
+        graphroll.mouseButtonDown(messageData, &clip.graphRoll);
     }
 }
 
@@ -57,10 +74,16 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent) {
     scroller.mouseButtonUp(&context.state.playArea.horizontalScroller);
     scroller.mouseButtonUp(&context.state.playArea.verticalScroller);
 
-    for tr, i: context.state.playArea.tracks.buf {
-        if tr.bounds|gui.containsMouse {
-            track.mouseButtonUp(messageData, i);
+    if context.state.playArea.screenType == ScreenType.TrackList {
+        for tr, i: context.state.playArea.tracks.buf {
+            if tr.bounds|gui.containsMouse {
+                track.mouseButtonUp(messageData, i);
+            }
         }
+    }
+    else if context.state.playArea.screenType == ScreenType.Track {
+        clip := cast(*track.Clip) context.state.playArea.screenData;
+        graphroll.mouseButtonUp(messageData, &clip.graphRoll);
     }
 }
 
@@ -77,7 +100,7 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent) {
     if math.abs(cast() messageData.x - context.state.playArea.playhead) < grabberRadius {
         context.state.playArea.playheadGrabber = cast() messageData.y;
     }
-    else {
+    else if context.state.playArea.screenType == ScreenType.TrackList {
         context.state.playArea.playheadGrabber = -1;
 
         for tr, i: context.state.playArea.tracks.buf {
@@ -85,6 +108,10 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent) {
                 track.mouseMove(messageData, i);
             }
         }
+    }
+    else if context.state.playArea.screenType == ScreenType.Track {
+        clip := cast(*track.Clip) context.state.playArea.screenData;
+        graphroll.mouseMove(messageData, &clip.graphRoll);
     }
 }
 
@@ -127,35 +154,54 @@ fn draw(rect: gui.Rect!(f64)) {
     -- vertical scroll/resize bar
     scroller.drawVertical({rect.width-srHeight, srHeight, srHeight, rect.height - srHeight}, &context.state.playArea.verticalScroller);
 
-    metaMargin := rect.width*0.05;
-    grButtonHeight := rect.height * 0.1;
-
-    -- graph rolls
-    vs := &context.state.playArea.verticalScroller;
-    yScale := vs.rect.height / (vs.end - vs.begin);
-
     trackScrollViewHeight := rect.height - y;
 
-    grAreaBounds: gui.Rect!(f64) = rect;
-    grAreaBounds.y = y;
-    grAreaBounds.height = trackScrollViewHeight;
-    grAreaBounds.width -= srHeight;
+    trAreaBounds: gui.Rect!(f64) = rect;
+    trAreaBounds.y = y;
+    trAreaBounds.height = trackScrollViewHeight;
+    trAreaBounds.width -= srHeight;
 
-    grHeight := trackScrollViewHeight / cast() context.state.playArea.tracks.buf.count * yScale;
-
+    vs := &context.state.playArea.verticalScroller;
     percScrolled := scroller.percScrolled(vs);
-
+    yScale := vs.rect.height / (vs.end - vs.begin);
     maxOffset := trackScrollViewHeight * yScale - trackScrollViewHeight;
+    scrollOffsetY := percScrolled * maxOffset;
 
-    for gr, grIndex: context.state.playArea.tracks.buf {
-        scrollOffsetY := percScrolled * maxOffset;
-        trackContainer.draw({rect.x, y - scrollOffsetY, rect.width - srHeight, grHeight}, grAreaBounds, grIndex, metaMargin);
-        y += grHeight;
+    if context.keyDownEvent != nil
+        and context.keyDownEvent.keysym.scancode == sdl.Key.ESCAPE
+        and context.state.playArea.screenType == ScreenType.Track {
+        context.state.playArea.screenType = ScreenType.TrackList;
     }
 
-    -- button to add graph roll
-    context.state.playArea.addNewTrackButton = {10, rect.y + rect.height - grButtonHeight - 10, grButtonHeight, grButtonHeight};
-    gui.drawRect(context.cairo.layer, context.state.playArea.addNewTrackButton, 0.4, 0.4, 1);
+    if context.state.playArea.screenType == ScreenType.TrackList {
+        trButtonHeight := rect.height * 0.1;
+
+        -- graph rolls
+        trHeight := trackScrollViewHeight / cast() context.state.playArea.tracks.buf.count * yScale;
+        metaMargin := rect.width*0.05;
+
+        for tr, trIndex: context.state.playArea.tracks.buf {
+            trackContainer.draw({rect.x, y - scrollOffsetY, rect.width, trHeight}, trAreaBounds, trIndex, metaMargin);
+            y += trHeight;
+        }
+
+        -- button to add track
+        context.state.playArea.addNewTrackButton = {10, rect.y + rect.height - trButtonHeight - 10, trButtonHeight, trButtonHeight};
+        gui.drawRect(context.cairo.layer, context.state.playArea.addNewTrackButton, 0.4, 0.4, 1);
+    }
+    else if context.state.playArea.screenType == ScreenType.Track {
+        clip := cast(*track.Clip) context.state.playArea.screenData;
+
+        graphRect: gui.Rect!(f64) = {rect.x, y - scrollOffsetY, rect.width - srHeight, rect.height * yScale};
+
+        -- clip.rect.width is the number of beats
+        clip.graphRoll.xResolution = graphRect.width / clip.rect.width;
+
+        graphroll.draw(graphRect, trAreaBounds, &clip.graphRoll);
+    }
+    else {
+        panic();
+    }
 
     -- playhead
     context.cairo.layer|gui.drawRect({context.state.playArea.playhead, 0, 1, rect.height}, 1, 0.2, 0.2);

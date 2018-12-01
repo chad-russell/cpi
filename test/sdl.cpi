@@ -83,6 +83,7 @@ type Key enum(i32) {
     `0`: 39,
 
     ENTER: 40,
+    ESCAPE: 41,
     BACKSPACE: 42,
     SPACE: 44,
 

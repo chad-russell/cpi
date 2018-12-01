@@ -102,7 +102,7 @@ fn effectiveRect(note: Note, state: GraphRollFormData) gui.Rect!(f64) {
     scaleX := hs.rect.width / (hs.end - hs.begin);
 
     er: gui.Rect!(f64) = {
-        sp + offsetX,
+        sp * state.xResolution + offsetX,
         state.rect.y + (note.rect.y + offsetY) * yr,
         (note.rect.width) * state.xResolution * scaleX + resizeX,
         note.rect.height * yr
@@ -193,8 +193,9 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, state: *GraphRollFormData
         clickedPercent := localX / state.rect.width;
         clickedPixels := windowPixels * clickedPercent;
         clickedLocation := startWindow + clickedPixels;
+        clickedBeat := clickedLocation / state.xResolution;
 
-        noteRect: gui.Rect!(f64) = {clickedLocation, noteY, 4, 1};
+        noteRect: gui.Rect!(f64) = {clickedBeat, noteY, 4, 1};
         &state.notes|:append({noteRect, false});
     }
     else if messageData.button == sdl.MouseButton.RIGHT {
@@ -241,7 +242,7 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent, state: *GraphRollFormData) 
 
         for note: state.notes.buf|iter.byRef {
             if note.selected == true {
-                note.rect.x += (context.mouse.x - state.dragStartX) * scaleX;
+                note.rect.x += (context.mouse.x - state.dragStartX) * scaleX / state.xResolution;
                 note.rect.y += dragStopY - state.dragStartY;
             }
         }
