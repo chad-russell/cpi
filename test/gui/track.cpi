@@ -64,6 +64,7 @@ fn yResolution(state: TrackState) f64 {
     return state.rect.height;
 }
 
+-- given an x value in terms of the full rect, where to draw it on the screen?
 fn screenPixels(state: TrackState, x: f64) {
     hs := &context.state.playArea.horizontalScroller;
     scaleX := hs.rect.width / (hs.end - hs.begin);
@@ -77,6 +78,25 @@ fn screenPixels(state: TrackState, x: f64) {
 
     pixels := x - startWindow;
     return state.rect.x + pixels * scaleX;
+}
+
+-- given an x value in terms of the screen, where is it in the full rect?
+fn rectPixels(state: TrackState, x: f64) {
+    hs := &context.state.playArea.horizontalScroller;
+    scaleX := hs.rect.width / (hs.end - hs.begin);
+
+    scrollBeginPercent := hs.begin / hs.rect.width;
+    scrollEndPercent := hs.end / hs.rect.width;
+
+    startWindow := state.rect.width * scrollBeginPercent;
+    endWindow := state.rect.width * scrollEndPercent;
+    windowPixels := endWindow - startWindow;
+
+    localX := x - state.rect.x;
+
+    pixelClicked := localX / scaleX;
+
+    return startWindow + pixelClicked;
 }
 
 fn effectiveRect(clip: Clip, state: TrackState) gui.Rect!(f64) {
@@ -344,8 +364,7 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *TrackState) {
     gui.drawOutline(context.cairo.layer, gui.clip(rect, bounds), 0.2, 0.2, 0.2, lineWidth: 1.5);
 
     -- how many pixels per beat?
-    microsecondsPerMinute: u64 = 60000000;
-    compositionLengthInMinutes := cast(f64) context.state.playArea.compositionLengthInMicroseconds / cast(f64) microsecondsPerMinute;
+    compositionLengthInMinutes := cast(f64) context.state.playArea.compositionLengthInMeasures / cast() context.state.playArea.beatsPerMinute * cast() context.state.playArea.beatsPerMeasure;
     totalBeats := compositionLengthInMinutes * cast() context.state.playArea.beatsPerMinute;
     state.xResolution = state.rect.width / cast() totalBeats;
 
@@ -418,7 +437,58 @@ fn drawClip(clip: *Clip, state: *TrackState) {
         gui.drawRect(context.cairo.layer, er, cast(f64) 117.0/255.0, cast(f64) 130.0/255.0, cast(f64) 144.0/255.0);
     }
 
+    -- draw notes
+    drawClipNotes(er, clip, state);
+
     -- edit button
     clip.editButton = {er.x + er.width - 12, er.y + er.height - 12, 10, 10};
     gui.drawRect(context.cairo.layer, clip.editButton, cast(f64) 144.0/255.0, cast(f64) 130.0/255.0, cast(f64) 117.0/255.0);
+}
+
+fn drawClipNotes(rect: gui.Rect!(f64), clip: *Clip, state: *TrackState) {
+    hs := &context.state.playArea.horizontalScroller;
+    scaleX := hs.rect.width / (hs.end - hs.begin);
+
+    clipExtraWidth: f64 = 0;
+    if state.resizingClips == true {
+        clipExtraWidth = context.mouse.x - state.resizeStartX;
+    }
+
+    beatsInClip: f64;
+    if clip.selected {
+        beatsInClip = clip.rect.width + clipExtraWidth / scaleX / state.xResolution;
+    }
+    else {
+        beatsInClip = clip.rect.width;
+    }
+
+    xResolution := rect.width / beatsInClip;
+    yResolution := rect.height / 20;
+
+    for note: clip.graphRoll.notes.buf {
+        er: gui.Rect!(f64) = {
+            rect.x + note.rect.x * xResolution, rect.y + note.rect.y * yResolution,
+            note.rect.width * xResolution, note.rect.height * yResolution
+        };
+
+        usecsPerMinute := cast(f64) 60 * 1_000_000;
+        usecsPerBeat: f64 = usecsPerMinute / cast() context.state.playArea.beatsPerMinute;
+
+        clipStartUsec: f64 = cast(f64) usecsPerBeat * cast() (clip.rect.x / state.xResolution);
+
+        noteStartUsec: f64 = clipStartUsec + usecsPerBeat * note.rect.x;
+        noteWidthUsec: f64 = usecsPerBeat * cast() note.rect.width;
+
+        playhead := cast(f64) context.state.playArea.playhead;
+
+        if playhead > noteStartUsec and playhead < noteStartUsec + noteWidthUsec {
+            gui.drawRect(context.cairo.layer, er, cast(f64) 239.0/255.0, cast(f64) 239.0/255.0, cast(f64) 186.0/255.0);
+        }
+        else if note.selected == true {
+            gui.drawRect(context.cairo.layer, er, cast(f64) 186.0/255.0, cast(f64) 239.0/255.0, cast(f64) 194.0/255.0);
+        }
+        else {
+            gui.drawRect(context.cairo.layer, er, cast(f64) 117.0/255.0, cast(f64) 144.0/255.0, cast(f64) 130.0/255.0);
+        }
+    }
 }

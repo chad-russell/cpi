@@ -3,3 +3,10 @@
 CLOCKS_PER_SEC: u64 = 1000000;
 
 fn clock() u64
+
+fn gettimeofday(tp: *TimeVal, tzp: *none) i32
+
+type TimeVal struct {
+    sec: i64,
+    usec: i32
+}

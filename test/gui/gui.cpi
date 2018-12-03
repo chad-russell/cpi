@@ -239,7 +239,10 @@ fn init() {
     context.frame = 0;
 
     #import "time";
-    context.start = time.clock();
+    tv: time.TimeVal;
+    time.gettimeofday(&tv, nil);
+    context.start = tv;
+
     context.lastFrameTime = context.start;
 
     context.arrowCursor = sdl.SDL_CreateSystemCursor(sdl.CursorType.ARROW);
@@ -338,7 +341,7 @@ fn processEvents() {
         if event._type == sdl.QUIT {
             shutdown();
             context.quit = true;
-            io.printFln("% frames/sec", {cast(f64) context.frame / (cast(f64) context.elapsed / cast(f64) time.CLOCKS_PER_SEC)});
+            io.printFln("% frames/sec", {cast(f64) context.frame / cast() context.elapsed.sec});
             return;
         }
         else if event._type == sdl.MOUSEMOTION {
@@ -384,17 +387,23 @@ fn processEvents() {
 }
 
 #context frame: u64
-#context start: u64
-#context lastFrameTime: u64
-#context dt: u64
-#context elapsed: u64
+#context start: time.TimeVal
+#context lastFrameTime: time.TimeVal
+#context dt: time.TimeVal
+#context elapsed: time.TimeVal
 
 fn tick() {
     context.frame += 1;
 
-    cur := time.clock();
-    context.dt = cur - context.lastFrameTime;
-    context.elapsed = cur - context.start;
+    cur: time.TimeVal;
+    time.gettimeofday(&cur, nil);
+
+    context.dt.sec = cur.sec - context.lastFrameTime.sec;
+    context.dt.usec = cur.usec - context.lastFrameTime.usec;
+
+    context.elapsed.sec = cur.sec - context.start.sec;
+    context.elapsed.usec = cur.usec - context.start.usec;
+
     context.lastFrameTime = cur;
 
     basic.resetTmp();

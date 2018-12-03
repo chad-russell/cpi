@@ -4,10 +4,6 @@
 #import "buffer": buf;
 #import "io";
 
-type Clip struct {
-    rect: gui.Rect!(f64),
-}
-
 type TrackContainerFormData struct {
     rect: gui.Rect!(f64),
     bounds: gui.Rect!(f64),

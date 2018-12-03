@@ -30,6 +30,7 @@ type GraphRollFormData struct {
     resizeStartX: f64,
 
     xResolution: f64 = 10,
+    xOffset: f64
 }
 
 fn selectArea(state: GraphRollFormData) gui.Rect!(f64) {
@@ -96,13 +97,13 @@ fn effectiveRect(note: Note, state: GraphRollFormData) gui.Rect!(f64) {
         resizeX = context.mouse.x - state.resizeStartX;
     }
 
-    sp := screenPixels(state, note.rect.x);
+    sp := screenPixels(state, note.rect.x * state.xResolution);
 
     hs := &context.state.playArea.horizontalScroller;
     scaleX := hs.rect.width / (hs.end - hs.begin);
 
     er: gui.Rect!(f64) = {
-        sp * state.xResolution + offsetX,
+        sp + offsetX,
         state.rect.y + (note.rect.y + offsetY) * yr,
         (note.rect.width) * state.xResolution * scaleX + resizeX,
         note.rect.height * yr
@@ -325,6 +326,9 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *GraphRollFormData)
 
     -- outline
     gui.drawOutline(context.cairo.layer, gui.clip(rect, bounds), 0.2, 0.2, 0.2, lineWidth: 1.5);
+
+    io.println(state.xOffset);
+    io.println(state.xResolution);
 
     -- vertical lines
     vlX: f64 = 0;
