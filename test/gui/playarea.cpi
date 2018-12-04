@@ -198,6 +198,10 @@ fn draw(rect: gui.Rect!(f64)) {
         -- button to add track
         context.state.playArea.addNewTrackButton = {10, rect.y + rect.height - trButtonHeight - 10, trButtonHeight, trButtonHeight};
         gui.drawRect(context.cairo.layer, context.state.playArea.addNewTrackButton, 0.4, 0.4, 1);
+
+        -- draw playhead
+        playheadPixels: f64 = usecsToPixels(context.state.playArea.playhead);
+        context.cairo.layer|gui.drawRect({playheadPixels, 0, 1, rect.height}, 1, 0.2, 0.2);
     }
     else if context.state.playArea.screenType == ScreenType.Track {
         clip := cast(*track.Clip) context.state.playArea.screenData;
@@ -206,9 +210,30 @@ fn draw(rect: gui.Rect!(f64)) {
 
         -- clip.rect.width is the number of beats
         clip.graphRoll.xResolution = graphRect.width / clip.rect.width;
-        clip.graphRoll.xOffset = clip.rect.x;
+        clip.graphRoll.xOffset = clip.rect.x / clip.resolution;
 
         graphroll.draw(graphRect, trAreaBounds, &clip.graphRoll);
+
+        -- draw playhead
+        usecsPerMinute := cast(f64) 60 * 1_000_000;
+        usecsPerBeat: f64 = usecsPerMinute / cast() context.state.playArea.beatsPerMinute;
+
+        trackStartUsecs := clip.graphRoll.xOffset * usecsPerBeat;
+        trackEndUsecs := trackStartUsecs + clip.rect.width * usecsPerBeat;
+
+        ph := cast(f64) context.state.playArea.playhead;
+
+        playheadPerc := cast(f64) (ph - trackStartUsecs) / cast() (trackEndUsecs - trackStartUsecs);
+
+        playheadPixels: f64 = graphRect.x + graphRect.width * playheadPerc;
+
+        hs := &context.state.playArea.horizontalScroller;
+        scaleX := hs.rect.width / (hs.end - hs.begin);
+
+        playheadPixels *= scaleX;
+        playheadPixels -= hs.begin * scaleX;
+
+        context.cairo.layer|gui.drawRect({playheadPixels, 0, 1, rect.height}, 1, 0.2, 0.2);
     }
     else {
         panic();
@@ -216,10 +241,6 @@ fn draw(rect: gui.Rect!(f64)) {
 
     hs := &context.state.playArea.horizontalScroller;
     scaleX := hs.rect.width / (hs.end - hs.begin);
-
-    -- draw playhead
-    playheadPixels: f64 = usecsToPixels(context.state.playArea.playhead);
-    context.cairo.layer|gui.drawRect({playheadPixels, 0, 1, rect.height}, 1, 0.2, 0.2);
 
     -- playhead grabber
     if context.state.playArea.playheadGrabber > 0 {

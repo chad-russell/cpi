@@ -327,11 +327,10 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *GraphRollFormData)
     -- outline
     gui.drawOutline(context.cairo.layer, gui.clip(rect, bounds), 0.2, 0.2, 0.2, lineWidth: 1.5);
 
-    io.println(state.xOffset);
-    io.println(state.xResolution);
-
     -- vertical lines
-    vlX: f64 = 0;
+    offsetPixels := state.xResolution * state.xOffset;
+
+    vlX: f64 = -offsetPixels;
     light := true;
     lastX := vlX;
 
@@ -350,7 +349,7 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *GraphRollFormData)
         light = !light;
     }
 
-    vlX = 0;
+    vlX = -offsetPixels;
     vlN := 0;
     while vlX < rect.x + rect.width {
         pixelsX := screenPixels(^state, vlX);

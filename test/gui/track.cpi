@@ -8,11 +8,13 @@
 #import "math";
 #import "iter";
 
+-- todo(chad): resolution should *not* be needed. Clip rect should be in terms of beats
 type Clip struct {
     rect: gui.Rect!(f64),
     editButton: gui.Rect!(f64),
     selected: bool,
-    graphRoll: graphroll.GraphRollFormData
+    graphRoll: graphroll.GraphRollFormData,
+    resolution: f64
 }
 
 type TrackState struct {
@@ -228,6 +230,7 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
         clip: Clip;
         clip.rect = clipRect;
         clip.selected = false;
+        clip.resolution = state.xResolution;
 
         &state.clips|:append(clip);
     }
