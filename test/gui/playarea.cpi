@@ -193,7 +193,7 @@ fn draw(rect: gui.Rect!(f64)) {
 
     trAreaBounds: gui.Rect!(f64) = rect;
     trAreaBounds.y = y;
-    trAreaBounds.height = trackScrollViewHeight;
+    trAreaBounds.height -= y;
     trAreaBounds.width -= srHeight;
 
     vs := &context.state.playArea.verticalScroller;
@@ -227,7 +227,8 @@ fn draw(rect: gui.Rect!(f64)) {
     else if context.state.playArea.screenType == ScreenType.Track {
         clip := cast(*track.Clip) context.state.playArea.screenData;
 
-        graphRect: gui.Rect!(f64) = {rect.x, y - scrollOffsetY, rect.width - srHeight, rect.height * yScale};
+        -- graphRect: gui.Rect!(f64) = {rect.x, y - scrollOffsetY, rect.width - srHeight, rect.height * yScale};
+        graphRect: gui.Rect!(f64) = {rect.x, y - scrollOffsetY, rect.width - srHeight, (rect.height - y) * yScale};
 
         -- clip.rect.width is the number of beats
         clip.graphRoll.xResolution = graphRect.width / clip.rect.width;
@@ -302,17 +303,31 @@ fn processNoteOnOff() {
 
                 playhead := cast(f64) context.state.playArea.playhead;
 
-                if playhead > noteStartUsec and playhead < noteStartUsec + noteWidthUsec {
+                if note.previewing == true {
                     if note.down == false {
                         note.down = true;
-                        graphroll.noteOn(^note);
+                        graphroll.noteOn(note);
+                    }
+
+                    note.previewTimer -= cast(u64) context.dt.sec * 1_000_000 + cast() context.dt.usec;
+
+                    if note.previewTimer <= 0 {
+                        note.down = false;
+                        note.previewing = false;
+                        graphroll.noteOff(note);
+                    }
+                }
+                else if playhead > noteStartUsec and playhead < noteStartUsec + noteWidthUsec {
+                    if note.down == false {
+                        note.down = true;
+                        graphroll.noteOn(note);
                     }
                     gui.drawRect(context.cairo.layer, er, cast(f64) 239.0/255.0, cast(f64) 239.0/255.0, cast(f64) 186.0/255.0);
                 }
                 else {
                     if note.down == true {
                         note.down = false;
-                        graphroll.noteOff(^note);
+                        graphroll.noteOff(note);
                     }
 
                     if note.selected == true {

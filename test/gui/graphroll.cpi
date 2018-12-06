@@ -1,5 +1,6 @@
 #import "gui/gui";
 #import "gui/scroller";
+#import "gui/graphroll";
 #import "io";
 #import "buffer": buf;
 #import "sdl";
@@ -11,6 +12,13 @@ type Note struct {
     rect: gui.Rect!(f64),
     selected: bool,
     down: bool,
+
+    offsetY: i32,
+
+    previewing: bool,
+    previewTimer: u64,
+
+    lastOn: u8 = 0,
 }
 
 type GraphRollFormData struct {
@@ -32,15 +40,18 @@ type GraphRollFormData struct {
     resizeStartX: f64,
 
     xResolution: f64 = 10,
-    xOffset: f64
+    xOffset: f64,
+
+    noteClickOffset: f64 = 0
 }
 
-fn noteOn(note: Note) {
-    rtmidi.noteOn(context.state.midiOut, cast() (20 - note.rect.y + 40));
+fn noteOn(note: *Note) {
+    note.lastOn = cast() (20 - note.rect.y + 40 - cast() note.offsetY);
+    rtmidi.noteOn(context.state.midiOut, note.lastOn);
 }
 
-fn noteOff(note: Note) {
-    rtmidi.noteOff(context.state.midiOut, cast() (20 - note.rect.y + 40));
+fn noteOff(note: *Note) {
+    rtmidi.noteOff(context.state.midiOut, note.lastOn);
 }
 
 fn selectArea(state: GraphRollFormData) gui.Rect!(f64) {
@@ -102,7 +113,7 @@ fn effectiveRect(note: Note, state: GraphRollFormData) gui.Rect!(f64) {
     scaleX := hs.rect.width / (hs.end - hs.begin);
 
     if note.selected == true and state.draggingNotes == true {
-        offsetX = context.mouse.x - state.dragStartX;
+        offsetX = context.mouse.x - state.dragStartX + state.noteClickOffset;
         offsetY = noteY - state.dragStartY;
 
         if context.state.playArea.quantizeButton.on == true {
@@ -137,9 +148,14 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, state: *GraphRollFormData
         -- possibly select existing notes
         i := 0;
         for note: state.notes.buf|iter.byRef {
-            if effectiveRect(^note, ^state)|gui.contains(context.mouse.x, context.mouse.y) {
+            er := effectiveRect(^note, ^state);
+            if er|gui.contains(context.mouse.x, context.mouse.y) {
                 didClickNote = true;
                 noteClicked = note;
+
+                if context.state.playArea.quantizeButton.on == true {
+                    state.noteClickOffset = localX - er.x;
+                }
 
                 i += 1;
             }
@@ -166,6 +182,13 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, state: *GraphRollFormData
                     yr := yResolution(^state);
                     noteY := math.floor(localY / yr);
                     state.dragStartY = noteY;
+
+                    for note: state.notes.buf|iter.byRef {
+                        if note.selected {
+                            note.previewing = true;
+                            note.previewTimer = 200_000;
+                        }
+                    }
                 }
             }
 
@@ -211,7 +234,7 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, state: *GraphRollFormData
         clickedBeat := clickedLocation / state.xResolution;
 
         noteRect: gui.Rect!(f64) = {clickedBeat, noteY, 1, 1};
-        &state.notes|:append({noteRect, false, false});
+        &state.notes|:append({noteRect, false, false, 0, true, 200_000});
     }
     else if messageData.button == sdl.MouseButton.RIGHT {
         toDelete := false;
@@ -261,13 +284,17 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent, state: *GraphRollFormData) 
                 note.rect.y += dragStopY - state.dragStartY;
 
                 if context.state.playArea.quantizeButton.on == true {
-                    note.rect.x = math.floor(note.rect.x + state.xOffset + 0.001) - state.xOffset;
+                    note.rect.x = math.floor(note.rect.x + state.noteClickOffset * scaleX / state.xResolution + state.xOffset + 0.001) - state.xOffset;
                 }
+
+                note.offsetY = 0;
             }
         }
 
         state.draggingNotes = false;
     }
+
+    state.noteClickOffset = 0;
 
     if state.resizingNotes == true {
         for note: state.notes.buf|iter.byRef {
@@ -289,6 +316,25 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent, state: *GraphRollFormData) {
 
     localX := context.mouse.x - state.rect.x;
     localY := context.mouse.y - state.rect.y;
+
+    if state.draggingNotes == true {
+        yr := yResolution(^state);
+        dragStopY := math.floor(localY / yr);
+
+        for note: state.notes.buf|iter.byRef {
+            if note.selected == true {
+                diffY := dragStopY - state.dragStartY;
+                if cast() diffY != note.offsetY {
+                    graphroll.noteOff(note);
+
+                    note.offsetY = cast() diffY;
+                    note.down = false;
+                    note.previewing = true;
+                    note.previewTimer = 200_000;
+                }
+            }
+        }
+    }
 
     if state.selecting == false {
         for note: state.notes.buf {
