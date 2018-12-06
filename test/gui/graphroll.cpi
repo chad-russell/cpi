@@ -98,9 +98,16 @@ fn effectiveRect(note: Note, state: GraphRollFormData) gui.Rect!(f64) {
     yr := yResolution(state);
     noteY := math.floor(localY / yr);
 
+    hs := &context.state.playArea.horizontalScroller;
+    scaleX := hs.rect.width / (hs.end - hs.begin);
+
     if note.selected == true and state.draggingNotes == true {
         offsetX = context.mouse.x - state.dragStartX;
         offsetY = noteY - state.dragStartY;
+
+        if context.state.playArea.quantizeButton.on == true {
+            offsetX = math.quantize(offsetX, state.xResolution * scaleX);
+        }
     }
 
     if note.selected == true and state.resizingNotes == true {
@@ -108,9 +115,6 @@ fn effectiveRect(note: Note, state: GraphRollFormData) gui.Rect!(f64) {
     }
 
     sp := screenPixels(state, note.rect.x * state.xResolution);
-
-    hs := &context.state.playArea.horizontalScroller;
-    scaleX := hs.rect.width / (hs.end - hs.begin);
 
     er: gui.Rect!(f64) = {
         sp + offsetX,
@@ -255,6 +259,10 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent, state: *GraphRollFormData) 
             if note.selected == true {
                 note.rect.x += (context.mouse.x - state.dragStartX) * scaleX / state.xResolution;
                 note.rect.y += dragStopY - state.dragStartY;
+
+                if context.state.playArea.quantizeButton.on == true {
+                    note.rect.x = math.floor(note.rect.x + state.xOffset + 0.001) - state.xOffset;
+                }
             }
         }
 
@@ -385,6 +393,10 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *GraphRollFormData)
 
     -- notes
     for note: state.notes.buf {
+        if note.selected == true and context.state.playArea.quantizeButton.on == true {
+            note.rect.x = math.floor(note.rect.x + state.xOffset + 0.001) - state.xOffset;
+        }
+
         er := effectiveRect(note, ^state);
 
         if note.down == true {
