@@ -21,3 +21,7 @@ fn abs(a: !T) {
 
     return a;
 }
+
+fn quantize(n: f64, step: f64) {
+    return floor(n / step) * step;
+}

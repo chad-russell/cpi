@@ -1,0 +1,27 @@
+#link "/Users/chadrussell/Desktop/rtmidi/rtmidi";
+
+type RtMidiOut none
+
+fn makeMidiOut() *RtMidiOut
+
+fn getPortCount(out: *RtMidiOut) u32
+
+fn openPort(out: *RtMidiOut, port: i32) none
+
+fn sendMessage(out: *RtMidiOut, data: *u8, dataCount: i32) none
+
+fn cleanup(out: *RtMidiOut) none
+
+fn sendArray(out: *RtMidiOut, data: []u8) {
+    sendMessage(out, data.data, cast() data.count);
+}
+
+fn noteOn(out: *RtMidiOut, note: u8, velocity: u8 = 90) {
+    message := []u8{144, note, velocity};
+    out|sendMessage(message.data, cast() message.count);
+}
+
+fn noteOff(out: *RtMidiOut, note: u8, velocity: u8 = 90) {
+    message := []u8{128, note, velocity};
+    out|sendMessage(message.data, cast() message.count);
+}

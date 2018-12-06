@@ -7,6 +7,7 @@
 #import "sdl";
 #import "math";
 #import "iter";
+#import "rtmidi";
 
 -- todo(chad): resolution should *not* be needed. Clip rect should be in terms of beats
 type Clip struct {
@@ -133,6 +134,12 @@ fn effectiveRect(clip: Clip, state: TrackState) gui.Rect!(f64) {
         (clip.rect.width) * state.xResolution * scaleX + resizeX,
         clip.rect.height * yr
     };
+
+    if clip.selected == true and context.state.playArea.quantizeButton.on == true {
+        er.x = math.quantize(er.x + 0.001 - sp, clip.resolution * scaleX) + sp;
+    }
+
+    if er.x < state.bounds.x { er.x = state.bounds.x; }
 
     return gui.clip(er, state.bounds);
 }
@@ -282,6 +289,13 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent, index: i64) {
             if clip.selected == true {
                 clip.rect.x += (context.mouse.x - state.dragStartX) * scaleX;
                 clip.rect.y += dragStopY - state.dragStartY;
+
+                if clip.selected == true and context.state.playArea.quantizeButton.on == true {
+                    quantizeClip(clip);
+                }
+
+                if clip.rect.x < 0 { clip.rect.x = 0; }
+                if clip.rect.y < 0 { clip.rect.y = 0; }
             }
         }
 
@@ -299,6 +313,10 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent, index: i64) {
     }
 
     state.selecting = false;
+}
+
+fn quantizeClip(clip: *Clip) {
+    clip.rect.x = math.floor((clip.rect.x + 0.001) / clip.resolution) * clip.resolution;
 }
 
 fn mouseMove(messageData: *sdl.MouseMotionEvent, index: i64) {
@@ -350,10 +368,6 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent, index: i64) {
             }
         }
     }
-}
-
-fn quantize(origY: f64, size: f64) {
-    return math.floor(origY / size) * size;
 }
 
 fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *TrackState) {
@@ -431,6 +445,10 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *TrackState) {
 }
 
 fn drawClip(clip: *Clip, state: *TrackState) {
+    if clip.selected == true and context.state.playArea.quantizeButton.on == true {
+        quantizeClip(clip);
+    }
+
     er := effectiveRect(^clip, ^state);
 
     if clip.selected {
@@ -468,23 +486,13 @@ fn drawClipNotes(rect: gui.Rect!(f64), clip: *Clip, state: *TrackState) {
     xResolution := rect.width / beatsInClip;
     yResolution := rect.height / 20;
 
-    for note: clip.graphRoll.notes.buf {
+    for note: clip.graphRoll.notes.buf|iter.byRef {
         er: gui.Rect!(f64) = {
             rect.x + note.rect.x * xResolution, rect.y + note.rect.y * yResolution,
             note.rect.width * xResolution, note.rect.height * yResolution
         };
 
-        usecsPerMinute := cast(f64) 60 * 1_000_000;
-        usecsPerBeat: f64 = usecsPerMinute / cast() context.state.playArea.beatsPerMinute;
-
-        clipStartUsec: f64 = cast(f64) usecsPerBeat * cast() (clip.rect.x / state.xResolution);
-
-        noteStartUsec: f64 = clipStartUsec + usecsPerBeat * note.rect.x;
-        noteWidthUsec: f64 = usecsPerBeat * cast() note.rect.width;
-
-        playhead := cast(f64) context.state.playArea.playhead;
-
-        if playhead > noteStartUsec and playhead < noteStartUsec + noteWidthUsec {
+        if note.down == true {
             gui.drawRect(context.cairo.layer, er, cast(f64) 239.0/255.0, cast(f64) 239.0/255.0, cast(f64) 186.0/255.0);
         }
         else if note.selected == true {

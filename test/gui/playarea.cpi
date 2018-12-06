@@ -7,6 +7,7 @@
 #import "buffer": buf;
 #import "sdl";
 #import "math";
+#import "iter";
 
 grabberRadius: f64 = 15;
 grabberMaxSize: f64 = 10;
@@ -14,6 +15,11 @@ grabberMaxSize: f64 = 10;
 type ScreenType enum {
     TrackList,
     Track
+}
+
+type Checkbox struct {
+    rect: gui.Rect!(f64),
+    on: bool,
 }
 
 type PlayAreaFormData struct {
@@ -25,6 +31,8 @@ type PlayAreaFormData struct {
     horizontalScroller: scroller.Data,
     verticalScroller: scroller.Data,
     addNewTrackButton: gui.Rect!(f64),
+
+    quantizeButton: Checkbox,
 
     screenType: ScreenType = ScreenType.TrackList,
     screenData: *none = nil,
@@ -47,6 +55,10 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent) {
     if context.state.playArea.verticalScroller.rect|gui.containsMouse {
         scroller.mouseButtonDown(messageData, &context.state.playArea.verticalScroller);
         return;
+    }
+
+    if context.state.playArea.quantizeButton.rect|gui.containsMouse {
+        context.state.playArea.quantizeButton.on = !context.state.playArea.quantizeButton.on;
     }
 
     if context.state.playArea.screenType == ScreenType.TrackList {
@@ -111,6 +123,8 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent) {
         }
     }
     else if context.state.playArea.screenType == ScreenType.Track {
+        context.state.playArea.playheadGrabber = -1;
+
         clip := cast(*track.Clip) context.state.playArea.screenData;
         graphroll.mouseMove(messageData, &clip.graphRoll);
     }
@@ -156,6 +170,17 @@ fn draw(rect: gui.Rect!(f64)) {
         context.state.playArea.playhead += usecs;
     }
 
+    -- options
+    optionHeight: f64 = 25;
+    context.state.playArea.quantizeButton.rect = {0, 0, optionHeight, optionHeight};
+    if context.state.playArea.quantizeButton.on {
+        gui.drawRect(context.cairo.layer, context.state.playArea.quantizeButton.rect, 0.9, 0.2, 0.2);
+    }
+    else {
+        gui.drawOutline(context.cairo.layer, context.state.playArea.quantizeButton.rect, 0.9, 0.2, 0.2);
+    }
+    y += optionHeight;
+
     -- scroll/resize bar
     srHeight: f64 = 25;
     scroller.drawHorizontal({0, y, rect.width - srHeight, srHeight}, &context.state.playArea.horizontalScroller);
@@ -191,17 +216,13 @@ fn draw(rect: gui.Rect!(f64)) {
         metaMargin := rect.width*0.05;
 
         for tr, trIndex: context.state.playArea.tracks.buf {
-            trackContainer.draw({rect.x, y - scrollOffsetY, rect.width, trHeight}, trAreaBounds, trIndex, metaMargin);
+            trackContainer.draw({rect.x, y - scrollOffsetY, rect.width - srHeight, trHeight}, trAreaBounds, trIndex, metaMargin);
             y += trHeight;
         }
 
         -- button to add track
         context.state.playArea.addNewTrackButton = {10, rect.y + rect.height - trButtonHeight - 10, trButtonHeight, trButtonHeight};
         gui.drawRect(context.cairo.layer, context.state.playArea.addNewTrackButton, 0.4, 0.4, 1);
-
-        -- draw playhead
-        playheadPixels: f64 = usecsToPixels(context.state.playArea.playhead);
-        context.cairo.layer|gui.drawRect({playheadPixels, 0, 1, rect.height}, 1, 0.2, 0.2);
     }
     else if context.state.playArea.screenType == ScreenType.Track {
         clip := cast(*track.Clip) context.state.playArea.screenData;
@@ -213,31 +234,14 @@ fn draw(rect: gui.Rect!(f64)) {
         clip.graphRoll.xOffset = clip.rect.x / clip.resolution;
 
         graphroll.draw(graphRect, trAreaBounds, &clip.graphRoll);
-
-        -- draw playhead
-        usecsPerMinute := cast(f64) 60 * 1_000_000;
-        usecsPerBeat: f64 = usecsPerMinute / cast() context.state.playArea.beatsPerMinute;
-
-        trackStartUsecs := clip.graphRoll.xOffset * usecsPerBeat;
-        trackEndUsecs := trackStartUsecs + clip.rect.width * usecsPerBeat;
-
-        ph := cast(f64) context.state.playArea.playhead;
-
-        playheadPerc := cast(f64) (ph - trackStartUsecs) / cast() (trackEndUsecs - trackStartUsecs);
-
-        playheadPixels: f64 = graphRect.x + graphRect.width * playheadPerc;
-
-        hs := &context.state.playArea.horizontalScroller;
-        scaleX := hs.rect.width / (hs.end - hs.begin);
-
-        playheadPixels *= scaleX;
-        playheadPixels -= hs.begin * scaleX;
-
-        context.cairo.layer|gui.drawRect({playheadPixels, 0, 1, rect.height}, 1, 0.2, 0.2);
     }
     else {
         panic();
     }
+
+    -- draw playhead
+    playheadPixels: f64 = usecsToPixels(context.state.playArea.playhead);
+    context.cairo.layer|gui.drawRect({playheadPixels, 0, 1, rect.height}, 1, 0.2, 0.2);
 
     hs := &context.state.playArea.horizontalScroller;
     scaleX := hs.rect.width / (hs.end - hs.begin);
@@ -256,25 +260,118 @@ fn draw(rect: gui.Rect!(f64)) {
             grabberSize
         }, 1, 0.2, 0.2);
     }
+
+    processNoteOnOff();
+}
+
+fn processNoteOnOff() {
+    hs := &context.state.playArea.horizontalScroller;
+    scaleX := hs.rect.width / (hs.end - hs.begin);
+
+    for track: context.state.playArea.tracks.buf {
+        clipExtraWidth: f64 = 0;
+        if track.tr.resizingClips == true {
+            clipExtraWidth = context.mouse.x - track.tr.resizeStartX;
+        }
+
+        for clip: track.tr.clips.buf {
+            beatsInClip: f64;
+            if clip.selected {
+                beatsInClip = clip.rect.width + clipExtraWidth / scaleX / track.tr.xResolution;
+            }
+            else {
+                beatsInClip = clip.rect.width;
+            }
+
+            xResolution := clip.rect.width / beatsInClip;
+            yResolution := clip.rect.height / 20;
+
+            for note: clip.graphRoll.notes.buf|iter.byRef {
+                er: gui.Rect!(f64) = {
+                    clip.rect.x + note.rect.x * xResolution, clip.rect.y + note.rect.y * yResolution,
+                    note.rect.width * xResolution, note.rect.height * yResolution
+                };
+
+                usecsPerMinute := cast(f64) 60 * 1_000_000;
+                usecsPerBeat: f64 = usecsPerMinute / cast() context.state.playArea.beatsPerMinute;
+
+                clipStartUsec: f64 = cast(f64) usecsPerBeat * cast() (clip.rect.x / track.tr.xResolution);
+
+                noteStartUsec: f64 = clipStartUsec + usecsPerBeat * note.rect.x;
+                noteWidthUsec: f64 = usecsPerBeat * cast() note.rect.width;
+
+                playhead := cast(f64) context.state.playArea.playhead;
+
+                if playhead > noteStartUsec and playhead < noteStartUsec + noteWidthUsec {
+                    if note.down == false {
+                        note.down = true;
+                        graphroll.noteOn(^note);
+                    }
+                    gui.drawRect(context.cairo.layer, er, cast(f64) 239.0/255.0, cast(f64) 239.0/255.0, cast(f64) 186.0/255.0);
+                }
+                else {
+                    if note.down == true {
+                        note.down = false;
+                        graphroll.noteOff(^note);
+                    }
+
+                    if note.selected == true {
+                        gui.drawRect(context.cairo.layer, er, cast(f64) 186.0/255.0, cast(f64) 239.0/255.0, cast(f64) 194.0/255.0);
+                    }
+                    else {
+                        gui.drawRect(context.cairo.layer, er, cast(f64) 117.0/255.0, cast(f64) 144.0/255.0, cast(f64) 130.0/255.0);
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn usecsToPixels(usecs: u64) f64 {
-    if context.state.playArea.tracks.buf.count == 0 {
+    state := &context.state.playArea;
+
+    if state.tracks.buf.count == 0 {
         return 0;
     }
 
-    state := &context.state.playArea;
+    if state.screenType == ScreenType.TrackList {
+        track0 := state.tracks.buf[0].tr;
 
-    track0 := context.state.playArea.tracks.buf[0].tr;
+        totalMinutes := state.compositionLengthInMeasures * cast() state.beatsPerMeasure / cast() state.beatsPerMinute;
+        totalUsecs := totalMinutes * 60 * 1_000_000;
+        perc := cast(f64) state.playhead / cast() totalUsecs;
+        x: f64 = track0.rect.width * perc;
 
-    totalMinutes := state.compositionLengthInMeasures * cast() state.beatsPerMeasure / cast() state.beatsPerMinute;
-    totalUsecs := totalMinutes * 60 * 1_000_000;
-    perc := cast(f64) state.playhead / cast() totalUsecs;
-    x: f64 = track0.rect.width * perc;
+        pixels := track.screenPixels(track0, x);
 
-    pixels := track.screenPixels(track0, x);
+        return pixels;
+    }
+    else if state.screenType == ScreenType.Track {
+        usecsPerMinute := cast(f64) 60 * 1_000_000;
+        usecsPerBeat: f64 = usecsPerMinute / cast() state.beatsPerMinute;
 
-    return pixels;
+        clip := cast(*track.Clip) context.state.playArea.screenData;
+
+        trackStartUsecs := clip.graphRoll.xOffset * usecsPerBeat;
+        trackEndUsecs := trackStartUsecs + clip.rect.width * usecsPerBeat;
+
+        ph := cast(f64) state.playhead;
+
+        playheadPerc := cast(f64) (ph - trackStartUsecs) / cast() (trackEndUsecs - trackStartUsecs);
+        graphRect := clip.graphRoll.rect;
+
+        pixels: f64 = graphRect.x + graphRect.width * playheadPerc;
+
+        hs := &state.horizontalScroller;
+        scaleX := hs.rect.width / (hs.end - hs.begin);
+
+        pixels *= scaleX;
+        pixels -= hs.begin * scaleX;
+
+        return pixels;
+    }
+
+    panic();
 }
 
 fn pixelsToUsecs(x: f64) f64 {
@@ -284,13 +381,40 @@ fn pixelsToUsecs(x: f64) f64 {
         return 0;
     }
 
-    track0 := state.tracks.buf[0].tr;
+    if state.screenType == ScreenType.TrackList {
+        track0 := state.tracks.buf[0].tr;
 
-    totalMinutes := state.compositionLengthInMeasures * cast() state.beatsPerMeasure / cast() state.beatsPerMinute;
-    totalUsecs := totalMinutes * 60 * 1_000_000;
+        totalMinutes := state.compositionLengthInMeasures * cast() state.beatsPerMeasure / cast() state.beatsPerMinute;
+        totalUsecs := totalMinutes * 60 * 1_000_000;
 
-    pixels := track.rectPixels(track0, x);
-    perc := pixels / track0.rect.width;
+        pixels := track.rectPixels(track0, x);
+        perc := pixels / track0.rect.width;
 
-    return perc * cast() totalUsecs;
+        return perc * cast() totalUsecs;
+    }
+    else if state.screenType == ScreenType.Track {
+        usecsPerMinute := cast(f64) 60 * 1_000_000;
+        usecsPerBeat: f64 = usecsPerMinute / cast() state.beatsPerMinute;
+
+        clip := cast(*track.Clip) context.state.playArea.screenData;
+
+        trackStartUsecs := clip.graphRoll.xOffset * usecsPerBeat;
+        trackEndUsecs := trackStartUsecs + clip.rect.width * usecsPerBeat;
+
+        trackStartPixels := clip.graphRoll.rect.x;
+
+        hs := &state.horizontalScroller;
+        scaleX := hs.rect.width / (hs.end - hs.begin);
+
+        trackStartPixels *= scaleX;
+        trackStartPixels -= hs.begin * scaleX;
+
+        trackEndPixels := trackStartPixels + clip.graphRoll.rect.width * scaleX;
+
+        playheadPerc := cast(f64) (x - trackStartPixels) / cast() (trackEndPixels - trackStartPixels);
+
+        return trackStartUsecs + playheadPerc * (trackEndUsecs - trackStartUsecs);
+    }
+
+    panic();
 }

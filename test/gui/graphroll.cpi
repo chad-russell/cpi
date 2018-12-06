@@ -5,10 +5,12 @@
 #import "sdl";
 #import "math";
 #import "iter";
+#import "rtmidi";
 
 type Note struct {
     rect: gui.Rect!(f64),
-    selected: bool
+    selected: bool,
+    down: bool,
 }
 
 type GraphRollFormData struct {
@@ -31,6 +33,14 @@ type GraphRollFormData struct {
 
     xResolution: f64 = 10,
     xOffset: f64
+}
+
+fn noteOn(note: Note) {
+    rtmidi.noteOn(context.state.midiOut, cast() (20 - note.rect.y + 40));
+}
+
+fn noteOff(note: Note) {
+    rtmidi.noteOff(context.state.midiOut, cast() (20 - note.rect.y + 40));
 }
 
 fn selectArea(state: GraphRollFormData) gui.Rect!(f64) {
@@ -196,8 +206,8 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, state: *GraphRollFormData
         clickedLocation := startWindow + clickedPixels;
         clickedBeat := clickedLocation / state.xResolution;
 
-        noteRect: gui.Rect!(f64) = {clickedBeat, noteY, 4, 1};
-        &state.notes|:append({noteRect, false});
+        noteRect: gui.Rect!(f64) = {clickedBeat, noteY, 1, 1};
+        &state.notes|:append({noteRect, false, false});
     }
     else if messageData.button == sdl.MouseButton.RIGHT {
         toDelete := false;
@@ -313,10 +323,6 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent, state: *GraphRollFormData) {
     }
 }
 
-fn quantize(origY: f64, size: f64) {
-    return math.floor(origY / size) * size;
-}
-
 fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *GraphRollFormData) {
     state.rect = rect;
     state.bounds = bounds;
@@ -381,7 +387,10 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *GraphRollFormData)
     for note: state.notes.buf {
         er := effectiveRect(note, ^state);
 
-        if note.selected {
+        if note.down == true {
+            gui.drawRect(context.cairo.layer, er, cast(f64) 239.0/255.0, cast(f64) 239.0/255.0, cast(f64) 186.0/255.0);
+        }
+        else if note.selected == true {
             gui.drawRect(context.cairo.layer, er, cast(f64) 186.0/255.0, cast(f64) 239.0/255.0, cast(f64) 194.0/255.0);
         }
         else {

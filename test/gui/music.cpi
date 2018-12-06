@@ -1,16 +1,31 @@
 #import "gui/gui";
 #import "gui/playarea";
 #import "gui/trackContainer";
+#import "rtmidi";
 
 #context state: struct {
     playArea: playarea.PlayAreaFormData,
-    beatsPerMeasure: i16 = 4
+    beatsPerMeasure: i16 = 4,
+    midiOut: *rtmidi.RtMidiOut
 }
 
 fn init() {
     basic.initContext();
 
     gui.init();
+
+    -- midi
+    context.state.midiOut = rtmidi.makeMidiOut();
+    portCount := rtmidi.getPortCount(context.state.midiOut);
+    if portCount > 0 {
+        context.state.midiOut|rtmidi.openPort(0);
+
+        -- Program change: 192, 5
+        context.state.midiOut|rtmidi.sendArray([]u8{192, 5});
+
+        -- Control Change: 176, 7, 100 (volume)
+        context.state.midiOut|rtmidi.sendArray([]u8{176, 7});
+    }
 
     -- add a track
     tr: trackContainer.TrackContainerFormData;
