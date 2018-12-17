@@ -127,10 +127,16 @@ fn effectiveRect(note: Note, state: GraphRollFormData) gui.Rect!(f64) {
 
     sp := screenPixels(state, note.rect.x * state.xResolution);
 
+    noteWidth := (note.rect.width) * state.xResolution * scaleX + resizeX;
+
+    if context.state.playArea.quantizeButton.on == true {
+        noteWidth = math.quantize(noteWidth, state.xResolution * scaleX);
+    }
+
     er: gui.Rect!(f64) = {
         sp + offsetX,
         state.rect.y + (note.rect.y + offsetY) * yr,
-        (note.rect.width) * state.xResolution * scaleX + resizeX,
+        noteWidth,
         note.rect.height * yr
     };
 

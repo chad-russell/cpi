@@ -144,18 +144,22 @@ fn effectiveRect(clip: Clip, state: *TrackState) gui.Rect!(f64) {
     hs := &context.state.playArea.horizontalScroller;
     scaleX := hs.rect.width / (hs.end - hs.begin);
 
+    width := (clip.rect.width) * state.xResolution * scaleX + resizeX;
+
+    if context.state.playArea.quantizeButton.on == true {
+        width = math.quantize(width, state.xResolution * scaleX);
+    }
+
     er: gui.Rect!(f64) = {
         sp + offsetX,
         state.rect.y + (clip.rect.y + offsetY) * yr,
-        (clip.rect.width) * state.xResolution * scaleX + resizeX,
+        width,
         clip.rect.height * yr
     };
 
     if clip.selected == true and context.state.playArea.quantizeButton.on == true {
         er.x = math.quantize(er.x + 0.001 - sp, clip.resolution * scaleX) + sp;
     }
-
-    if er.x < state.bounds.x { er.x = state.bounds.x; }
 
     return gui.clip(er, state.bounds);
 }
