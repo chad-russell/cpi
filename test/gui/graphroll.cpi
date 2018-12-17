@@ -113,11 +113,11 @@ fn effectiveRect(note: Note, state: GraphRollFormData) gui.Rect!(f64) {
     scaleX := hs.rect.width / (hs.end - hs.begin);
 
     if note.selected == true and state.draggingNotes == true {
-        offsetX = context.mouse.x - state.dragStartX + state.noteClickOffset;
+        offsetX = context.mouse.x - state.dragStartX;
         offsetY = noteY - state.dragStartY;
 
         if context.state.playArea.quantizeButton.on == true {
-            offsetX = math.quantize(offsetX, state.xResolution * scaleX);
+            offsetX = (mouseSquare(state) - state.dragStartX) * scaleX * state.xResolution;
         }
     }
 
@@ -177,7 +177,13 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, state: *GraphRollFormData
                 }
                 else {
                     state.draggingNotes = true;
-                    state.dragStartX = context.mouse.x;
+
+                    if context.state.playArea.quantizeButton.on == true {
+                        state.dragStartX = mouseSquare(^state);
+                    }
+                    else {
+                        state.dragStartX = context.mouse.x;
+                    }
 
                     yr := yResolution(^state);
                     noteY := math.floor(localY / yr);
@@ -234,7 +240,13 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, state: *GraphRollFormData
         clickedBeat := clickedLocation / state.xResolution;
 
         noteRect: gui.Rect!(f64) = {clickedBeat, noteY, 1, 1};
-        &state.notes|:append({noteRect, false, false, 0, true, 200_000});
+        note: Note = {noteRect, false, false, 0, true, 200_000};
+
+        if context.state.playArea.quantizeButton.on == true {
+            note.rect.x = math.floor(note.rect.x + state.xOffset + 0.001) - state.xOffset;
+        }
+
+        &state.notes|:append(note);
     }
     else if messageData.button == sdl.MouseButton.RIGHT {
         toDelete := false;
@@ -280,11 +292,13 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent, state: *GraphRollFormData) 
 
         for note: state.notes.buf|iter.byRef {
             if note.selected == true {
-                note.rect.x += (context.mouse.x - state.dragStartX) * scaleX / state.xResolution;
                 note.rect.y += dragStopY - state.dragStartY;
 
                 if context.state.playArea.quantizeButton.on == true {
-                    note.rect.x = math.floor(note.rect.x + state.noteClickOffset * scaleX / state.xResolution + state.xOffset + 0.001) - state.xOffset;
+                    note.rect.x += (mouseSquare(^state) - state.dragStartX);
+                }
+                else {
+                    note.rect.x += (context.mouse.x - state.dragStartX) * scaleX / state.xResolution;
                 }
 
                 note.offsetY = 0;
@@ -307,6 +321,20 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent, state: *GraphRollFormData) 
     }
 
     state.selecting = false;
+}
+
+fn mouseSquare(state: GraphRollFormData) {
+    localX := context.mouse.x - state.rect.x;
+    localY := context.mouse.y - state.rect.y;
+
+    hs := &context.state.playArea.horizontalScroller;
+    scaleX := (hs.end - hs.begin) / hs.rect.width;
+
+    offset := state.xOffset - math.floor(state.xOffset);
+    offsetInPixels := offset / scaleX * state.xResolution;
+    squareIn := (localX + offsetInPixels) * scaleX / state.xResolution;
+
+    return math.floor(squareIn);
 }
 
 fn mouseMove(messageData: *sdl.MouseMotionEvent, state: *GraphRollFormData) {

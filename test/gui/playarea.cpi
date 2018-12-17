@@ -8,6 +8,7 @@
 #import "sdl";
 #import "math";
 #import "iter";
+#import "text";
 
 grabberRadius: f64 = 15;
 grabberMaxSize: f64 = 10;
@@ -77,7 +78,10 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent) {
     }
     else if context.state.playArea.screenType == ScreenType.Track {
         clip := cast(*track.Clip) context.state.playArea.screenData;
-        graphroll.mouseButtonDown(messageData, &clip.graphRoll);
+
+        if clip.graphRoll.bounds|gui.containsMouse {
+            graphroll.mouseButtonDown(messageData, &clip.graphRoll);
+        }
     }
 }
 

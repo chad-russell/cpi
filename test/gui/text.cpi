@@ -1,0 +1,54 @@
+#import "cairo";
+#import "harfbuzz": hb;
+#import "freetype": ft;
+#import "string";
+#import "io";
+
+
+FONT_SIZE : i32 = 20;
+
+#context font: *cairo.FontFace
+
+#context hb: struct {
+    font: *hb.Font,
+    emojiFont: *hb.Font,
+    buffer: *hb.Buffer = nil,
+}
+
+fn loadFonts() {
+    -- font := "/System/Library/Fonts/Apple Color Emoji.ttc";
+    -- font := "/System/Library/Fonts/Apple Color Emoji.ttc";
+
+    -- font := "/Users/chadrussell/Projects/text/Noto-unhinted/NotoColorEmoji.ttf";
+    -- font := "/Users/chadrussell/Projects/text/emojione-apple.ttc";
+    -- font := "/Users/chadrussell/Library/Fonts/Roboto-Light.ttf";
+    font := "/Library/Fonts/Inconsolata.otf";
+    -- font := "/Users/chadrussell/Projects/text/JFWilwod.ttf";
+
+    -- emojiMonkey := "🙈";
+
+    -- FreeType
+    ftLibrary: ft.Library;
+    ft.FT_Init_FreeType(&ftLibrary);
+    ftFace: ft.Face;
+
+    err := ft.FT_New_Face(ftLibrary, font|string.cstr, 0, &ftFace);
+    if err != 0 {
+        io.println("error creating freetype font face");
+        panic();
+    }
+    context.cairo.font = cairo.cairo_ft_font_face_create_for_ft_face(ftFace, 0);
+
+    -- For Harfbuzz, load using OpenType (HarfBuzz FT does not support bitmap font)
+    blob := hb.hb_blob_create_from_file(font|string.cstr);
+    face := hb.hb_face_create(blob, 0);
+    context.hb.font = hb.hb_font_create(face);
+    hb.hb_ot_font_set_funcs(context.hb.font);
+    hb.hb_font_set_scale(context.hb.font, FONT_SIZE * 64, FONT_SIZE * 64);
+
+    context.hb.buffer = hb.hb_buffer_create();
+}
+
+fn init() {
+    loadFonts();
+}

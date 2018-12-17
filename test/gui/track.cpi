@@ -102,7 +102,15 @@ fn rectPixels(state: TrackState, x: f64) {
     return startWindow + pixelClicked;
 }
 
-fn effectiveRect(clip: Clip, state: TrackState) gui.Rect!(f64) {
+fn mouseBar(state: *TrackState) {
+    -- todo(chad): this should be a function... or stored somewhere... we are copy/pasting this ALL over the place right now!!!!
+    hs := &context.state.playArea.horizontalScroller;
+    scaleX := hs.rect.width / (hs.end - hs.begin);
+
+    return math.floor(localToAbsolute(state) / state.xResolution);
+}
+
+fn effectiveRect(clip: Clip, state: *TrackState) gui.Rect!(f64) {
     offsetX: f64 = 0;
     offsetY: f64 = 0;
 
@@ -111,11 +119,19 @@ fn effectiveRect(clip: Clip, state: TrackState) gui.Rect!(f64) {
 
     resizeX: f64 = 0;
 
-    yr := yResolution(state);
+    yr := yResolution(^state);
     clipY := math.floor(localY / yr);
 
     if clip.selected == true and state.draggingClips == true {
-        offsetX = context.mouse.x - state.dragStartX;
+        if context.state.playArea.quantizeButton.on == true {
+            hs := &context.state.playArea.horizontalScroller;
+            scaleX := (hs.end - hs.begin) / hs.rect.width;
+
+            offsetX = (mouseBar(state) - state.dragStartX) / scaleX * state.xResolution;
+        }
+        else {
+            offsetX = context.mouse.x - state.dragStartX;
+        }
         offsetY = clipY - state.dragStartY;
     }
 
@@ -123,7 +139,7 @@ fn effectiveRect(clip: Clip, state: TrackState) gui.Rect!(f64) {
         resizeX = context.mouse.x - state.resizeStartX;
     }
 
-    sp := screenPixels(state, clip.rect.x);
+    sp := screenPixels(^state, clip.rect.x);
 
     hs := &context.state.playArea.horizontalScroller;
     scaleX := hs.rect.width / (hs.end - hs.begin);
@@ -144,6 +160,30 @@ fn effectiveRect(clip: Clip, state: TrackState) gui.Rect!(f64) {
     return gui.clip(er, state.bounds);
 }
 
+fn localToAbsolute(state: *TrackState) {
+    localX := context.mouse.x - state.rect.x;
+    localY := context.mouse.y - state.rect.y;
+
+    hs := &context.state.playArea.horizontalScroller;
+    scaleX := hs.rect.width / (hs.end - hs.begin);
+
+    yr := yResolution(^state);
+    clipY := math.floor(localY / yr);
+
+    scrollBeginPercent := hs.begin / hs.rect.width;
+    scrollEndPercent := hs.end / hs.rect.width;
+
+    startWindow := state.rect.width * scrollBeginPercent;
+    endWindow := state.rect.width * scrollEndPercent;
+    windowPixels := endWindow - startWindow;
+
+    clickedPercent := localX / state.rect.width;
+    clickedInWindow := windowPixels * clickedPercent;
+    clickedLocation := startWindow + clickedInWindow;
+
+    return clickedLocation;
+}
+
 fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
     state := &context.state.playArea.tracks.buf[index].tr;
 
@@ -162,7 +202,7 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
 
                 return;
             }
-            else if effectiveRect(^clip, ^state)|gui.containsMouse {
+            else if effectiveRect(^clip, state)|gui.containsMouse {
                 didClickClip = true;
                 clipClicked = clip;
             }
@@ -184,7 +224,13 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
                 }
                 else {
                     state.draggingClips = true;
-                    state.dragStartX = context.mouse.x;
+
+                    if context.state.playArea.quantizeButton.on == true {
+                        state.dragStartX = mouseBar(state);
+                    }
+                    else {
+                        state.dragStartX = context.mouse.x;
+                    }
 
                     yr := yResolution(^state);
                     clipY := math.floor(localY / yr);
@@ -215,22 +261,10 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
         }
 
         -- add a new one
-        hs := &context.state.playArea.horizontalScroller;
-        scaleX := hs.rect.width / (hs.end - hs.begin);
+        clickedLocation := localToAbsolute(state);
 
         yr := yResolution(^state);
         clipY := math.floor(localY / yr);
-
-        scrollBeginPercent := hs.begin / hs.rect.width;
-        scrollEndPercent := hs.end / hs.rect.width;
-
-        startWindow := state.rect.width * scrollBeginPercent;
-        endWindow := state.rect.width * scrollEndPercent;
-        windowPixels := endWindow - startWindow;
-
-        clickedPercent := localX / state.rect.width;
-        clickedInWindow := windowPixels * clickedPercent;
-        clickedLocation := startWindow + clickedInWindow;
 
         clipRect: gui.Rect!(f64) = {clickedLocation, clipY, 16, 1};
 
@@ -239,13 +273,17 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
         clip.selected = false;
         clip.resolution = state.xResolution;
 
+        if context.state.playArea.quantizeButton.on == true {
+            quantizeClip(&clip);
+        }
+
         &state.clips|:append(clip);
     }
     else if messageData.button == sdl.MouseButton.RIGHT {
         toDelete := false;
         i := 0;
         for clip: state.clips.buf|iter.byRef {
-            if effectiveRect(^clip, ^state)|gui.contains(context.mouse.x, context.mouse.y) {
+            if effectiveRect(^clip, state)|gui.contains(context.mouse.x, context.mouse.y) {
                 if context.modifierKeys.shift == false {
                     clip.selected = true;
                     toDelete = true;
@@ -287,7 +325,12 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent, index: i64) {
 
         for clip: state.clips.buf|iter.byRef {
             if clip.selected == true {
-                clip.rect.x += (context.mouse.x - state.dragStartX) * scaleX;
+                if context.state.playArea.quantizeButton.on == true {
+                    clip.rect.x += (mouseBar(state) - state.dragStartX) * state.xResolution;
+                }
+                else {
+                    clip.rect.x += (context.mouse.x - state.dragStartX) * scaleX;
+                }
                 clip.rect.y += dragStopY - state.dragStartY;
 
                 if clip.selected == true and context.state.playArea.quantizeButton.on == true {
@@ -331,7 +374,7 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent, index: i64) {
 
     if state.selecting == false {
         for clip: state.clips.buf {
-            er := effectiveRect(clip, ^state);
+            er := effectiveRect(clip, state);
 
             endRect: gui.Rect!(f64) = {
                 er.x + er.width - 4,
@@ -363,7 +406,7 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent, index: i64) {
         sa := selectArea(^state);
 
         for clip: state.clips.buf|iter.byRef {
-            if effectiveRect(^clip, ^state)|gui.intersects(sa) {
+            if effectiveRect(^clip, state)|gui.intersects(sa) {
                 clip.selected = !context.modifierKeys.shift;
             }
         }
@@ -449,7 +492,7 @@ fn drawClip(clip: *Clip, state: *TrackState) {
         quantizeClip(clip);
     }
 
-    er := effectiveRect(^clip, ^state);
+    er := effectiveRect(^clip, state);
 
     if clip.selected {
         gui.drawRect(context.cairo.layer, er, cast(f64) 186.0/255.0, cast(f64) 194.0/255.0, cast(f64) 239.0/255.0);

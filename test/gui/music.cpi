@@ -1,6 +1,7 @@
 #import "gui/gui";
 #import "gui/playarea";
 #import "gui/trackContainer";
+#import "gui/text";
 #import "rtmidi";
 
 #context state: struct {
@@ -13,6 +14,8 @@ fn init() {
     basic.initContext();
 
     gui.init();
+
+    text.init();
 
     -- midi
     context.state.midiOut = rtmidi.makeMidiOut();
