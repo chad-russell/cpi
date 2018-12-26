@@ -1,7 +1,7 @@
 TODO:
     - bool should be 1 byte, not 4
 
-    - stronly consider getting rid of unions considering we haven't used them yet....
+    - strongly consider getting rid of unions considering we haven't used them yet....
 
     - #context things should be scoped -- i.e. only in the context of the module they're defined in.
         - so basically every module provides a struct to go into the master context struct, and the master context struct has
@@ -89,7 +89,7 @@ TODO:
                     foo(makeContext(), data._0, data._1);
                 }
             ```
-            - todo(chad): what about calling external functions?
+            - todo(chad): what about starting threads for external functions?
                 - in llvm should just work
                 - in interpreter, I *think* it should just be a matter of not passing the context in the calling args
             - todo(chad): what about passing parameters?

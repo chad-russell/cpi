@@ -1,11 +1,11 @@
+#import "gui/gui";
 #import "cairo";
 #import "harfbuzz": hb;
 #import "freetype": ft;
 #import "string";
 #import "io";
-
-
-FONT_SIZE : i32 = 20;
+#import "iter";
+#import "buffer": buf;
 
 #context font: *cairo.FontFace
 
@@ -44,9 +44,170 @@ fn loadFonts() {
     face := hb.hb_face_create(blob, 0);
     context.hb.font = hb.hb_font_create(face);
     hb.hb_ot_font_set_funcs(context.hb.font);
-    hb.hb_font_set_scale(context.hb.font, FONT_SIZE * 64, FONT_SIZE * 64);
 
     context.hb.buffer = hb.hb_buffer_create();
+}
+
+type CachedGlyph struct {
+    codepoint: i32,
+    size: f64,
+    extents: cairo.GlyphExtents,
+    pattern: *cairo.Pattern
+}
+
+#context glyphCache: buf.Buffer!(CachedGlyph)
+
+fn cacheGlyph(codepoint: i32, font: *cairo.FontFace, size: f64) {
+    cairoGlyph := cairo.cairo_glyph_allocate(1);
+    defer { cairo.cairo_glyph_free(cairoGlyph); }
+
+    cairoGlyph.index = cast() codepoint;
+    cairoGlyph.x = 0;
+    cairoGlyph.y = 0;
+
+    cached: CachedGlyph;
+    cached.codepoint = codepoint;
+    cached.size = size;
+
+    cairo.cairo_set_font_face(context.cairo.layer.context, font);
+    cairo.cairo_set_font_size(context.cairo.layer.context, size);
+    cairo.cairo_glyph_extents(context.cairo.layer.context, cairoGlyph, 1, &cached.extents);
+
+    glyphSurface := cairo.cairo_image_surface_create(
+            cairo.FORMAT_RGB24,
+            cast() (cached.extents.width + cached.extents.xAdvance),
+            cast() (cached.extents.height * 2 + cached.extents.yAdvance));
+
+    -- Scale cairo to use screen resolution
+    cairo.cairo_surface_set_device_scale(glyphSurface, context.sdl.xScale, context.sdl.yScale);
+
+    cached.pattern = cairo.cairo_pattern_create_for_surface(glyphSurface);
+
+    -- Get Cairo context from Cairo surface
+    glyphContext := cairo.cairo_create(glyphSurface);
+
+    cairo.cairo_set_font_face(glyphContext, font);
+    cairo.cairo_set_font_size(glyphContext, size);
+
+    -- clear the background
+    r: gui.Rect!(f64) = {0, 0, 500, 500};
+    gui.clearRect(glyphContext, r);
+
+    cairo.cairo_set_source_rgb(glyphContext, 0.965, 0.965, 0.941);
+    cairo.cairo_translate(glyphContext, 0, -cached.extents.yBearing);
+    cairo.cairo_show_glyphs(glyphContext, cairoGlyph, 1);
+
+    &context.glyphCache|:append(cached);
+    return cached;
+}
+
+fn findGlyph(codepoint: i32, font: *cairo.FontFace, size: f64) CachedGlyph {
+    for g: context.glyphCache.buf {
+        if g.codepoint == codepoint and g.size == size {
+            return g;
+        }
+    }
+
+    return cacheGlyph(codepoint, font, size);
+}
+
+fn getGlyphInfos(text: []i8, size: f64) {
+    hb.hb_font_set_scale(context.hb.font, cast() (size * 64), cast() (size * 64));
+
+    hb.hb_buffer_reset(context.hb.buffer);
+    hb.hb_buffer_set_direction(context.hb.buffer, hb.HB_DIRECTION_LTR);
+    hb.hb_buffer_set_script(context.hb.buffer, hb.HB_SCRIPT_COMMON);
+    hb.hb_buffer_set_language(context.hb.buffer, hb.hb_language_get_default());
+
+    hb.hb_buffer_add_utf8(context.hb.buffer, text.data, cast() text.count, 0, -1);
+    hb.hb_shape(context.hb.font, context.hb.buffer, nil, 0);
+
+    buffer_length_int: i32;
+    return hb.hb_buffer_get_glyph_infos(context.hb.buffer, &buffer_length_int);
+}
+
+fn textBoundary(text: []i8, size: f64) {
+    infos := getGlyphInfos(text, size);
+
+    width: f64 = 0;
+    height: f64 = 0;
+
+    bufferLength := hb.hb_buffer_get_length(context.hb.buffer);
+
+    for i: iter.range(0, cast() bufferLength) {
+        found := findGlyph((infos + i).codepoint, context.cairo.font, size);
+        width += found.extents.xAdvance;
+
+        if found.extents.height > height {
+            height = found.extents.height;
+        }
+    }
+
+    return cast(gui.Rect!(f64)) {x: 0, y: 0, width: width, height: height};
+}
+
+fn drawText(text: []i8, x: f64, y: f64, size: f64) {
+    infos := getGlyphInfos(text, size);
+
+    x_offset: f64 = 0;
+
+    for i: iter.range(0, cast() hb.hb_buffer_get_length(context.hb.buffer)) {
+        found := findGlyph((infos + i).codepoint, context.cairo.font, size);
+
+        cairo.cairo_save(context.cairo.layer.context);
+        defer { cairo.cairo_restore(context.cairo.layer.context); }
+
+        cairo.cairo_translate(context.cairo.layer.context, x + x_offset, y + found.extents.yBearing);
+
+        cairo.cairo_set_source(context.cairo.layer.context, found.pattern);
+        -- cairo.cairo_rectangle(context.cairo.layer.context,
+            -- found.extents.xBearing,
+            -- 0,
+            -- cast() (found.extents.width + 1),
+            -- cast() (found.extents.height + 1));
+        -- cairo.cairo_fill(context.cairo.layer.context);
+        cairo.cairo_paint(context.cairo.layer.context);
+
+        x_offset += found.extents.xAdvance;
+    }
+}
+
+fn drawBoundedText(text: []i8, bounds: gui.Rect!(f64)) {
+    fn fitness(rect1: gui.Rect!(f64), rect2: gui.Rect!(f64)) {
+        if rect1.width - rect2.width > 0 or rect1.height - rect2.height > 0 {
+            return cast(f64) 100;
+        }
+
+        #import "math";
+        return math.min(math.abs(rect1.width - rect2.width), math.abs(rect1.height - rect2.height));
+    }
+
+    left: f64 = 0;
+    right: f64 = 1000;
+    guess: f64 = 40;
+
+    tb := textBoundary(text, guess);
+
+    iteration := 0;
+    limit := 15;
+
+    while fitness(tb, bounds) > 0.1 and iteration < limit {
+        fits := tb.width <= bounds.width and tb.height <= bounds.height;
+
+        if fits {
+            left = guess;
+        }
+        else {
+            right = guess;
+        }
+        guess = (left + right) / 2;
+
+        tb = textBoundary(text, guess);
+
+        iteration += 1;
+    }
+
+    drawText(text, bounds.x, bounds.y + tb.height, guess);
 }
 
 fn init() {

@@ -10,6 +10,10 @@
     midiOut: *rtmidi.RtMidiOut
 }
 
+fn main() {
+    init();
+}
+
 fn init() {
     basic.initContext();
 

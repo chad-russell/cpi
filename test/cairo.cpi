@@ -82,6 +82,7 @@ fn cairo_paint(cr: *Context) none
 fn cairo_set_antialias(cr: *Context, antialias: Antialias) none
 fn cairo_pattern_create_for_surface(surface: *Surface) *Pattern
 fn cairo_translate(cr: *Context, tx: f64, ty: f64) none
+fn cairo_scale(cr: *Context, sx: f64, sy: f64) none
 fn cairo_save(cr: *Context) none
 fn cairo_restore(cr: *Context) none
 fn cairo_image_surface_get_width(surface: *Surface) i32
@@ -92,3 +93,8 @@ fn cairo_set_line_width(cr: *Context, w: f64) none
 fn cairo_move_to(cr: *Context, x: f64, y: f64) none
 fn cairo_line_to(cr: *Context, x: f64, y: f64) none
 fn cairo_stroke(cr: *Context) none
+fn cairo_new_sub_path(cr: *Context) none
+fn cairo_arc(cr: *Context, x: f64, y: f64, radius: f64, startAngle: f64, endAngle: f64) none
+fn cairo_close_path(cr: *Context) none
+fn cairo_user_to_device(cr: *Context, x: *f64, y: *f64) none
+fn cairo_device_to_user(cr: *Context, x: *f64, y: *f64) none

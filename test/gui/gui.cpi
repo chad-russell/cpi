@@ -277,6 +277,28 @@ fn drawOutline(layer: Layer, rect: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 
     cairo.cairo_stroke(layer.context);
 }
 
+fn drawRoundedRect(layer: Layer, rect: Rect!(f64), r: f64, g: f64, b: f64, radius: f64, a: f64 = 1, lineWidth: f64 = 1) {
+    degrees: f64 = math.PI / 180.0;
+
+    cairo.cairo_save(layer.context);
+    defer { cairo.cairo_restore(layer.context); }
+
+    cairo.cairo_set_source_rgba(layer.context, r, g, b, a);
+
+    cairo.cairo_set_line_width(layer.context, lineWidth);
+
+    cairo.cairo_new_sub_path (layer.context);
+
+    cairo.cairo_arc(layer.context, rect.x + rect.width - radius, rect.y + radius, radius, -90 * degrees, 0 * degrees);
+    cairo.cairo_arc(layer.context, rect.x + rect.width - radius, rect.y + rect.height - radius, radius, 0 * degrees, 90 * degrees);
+    cairo.cairo_arc(layer.context, rect.x + radius, rect.y + rect.height - radius, radius, 90 * degrees, 180 * degrees);
+    cairo.cairo_arc(layer.context, rect.x + radius, rect.y + radius, radius, 180 * degrees, 270 * degrees);
+
+    cairo.cairo_close_path(layer.context);
+
+    cairo.cairo_stroke(layer.context);
+}
+
 fn drawLine(layer: Layer, br: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1, width: f64 = 1) {
     cairo.cairo_save(layer.context);
     defer { cairo.cairo_restore(layer.context); }
@@ -306,19 +328,14 @@ fn shutdown() {
     sdl.SDL_Quit();
 }
 
-fn clearRect(layer: Layer, rect: Rect!(f64)) {
-    cairo.cairo_save(layer.context);
-    defer { cairo.cairo_restore(layer.context); }
+fn clearRect(c: *cairo.Context, rect: Rect!(f64)) {
+    cairo.cairo_save(c);
+    defer { cairo.cairo_restore(c); }
 
-    cairo.cairo_set_source_rgba(layer.context, 0, 0, 0, 0);
-    cairo.cairo_set_operator(layer.context, cairo.Operator.SOURCE);
-    if layer.context == context.cairo.layer.context {
-        cairo.cairo_rectangle(layer.context, rect.x, rect.y, rect.width, rect.height);
-    }
-    else {
-        cairo.cairo_rectangle(layer.context, 0, 0, rect.width, rect.height);
-    }
-    cairo.cairo_fill(layer.context);
+    cairo.cairo_set_source_rgba(c, 0, 0, 0, 0);
+    cairo.cairo_set_operator(c, cairo.Operator.SOURCE);
+    cairo.cairo_rectangle(c, 0, 0, rect.width, rect.height);
+    cairo.cairo_fill(c);
 }
 
 #context quit: bool

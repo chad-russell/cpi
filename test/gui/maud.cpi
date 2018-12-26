@@ -1,0 +1,88 @@
+#import "gui/gui";
+#import "gui/text";
+#import "io";
+#import "sdl";
+#import "cairo";
+#import "math";
+
+#context state: struct {
+    scale: f64,
+    hackRect: gui.Rect!(f64),
+    hackRectColor: gui.Color
+}
+
+fn init() {
+    basic.initContext();
+
+    gui.init();
+
+    text.init();
+
+    context.state.scale = 1;
+    cairo.cairo_scale(context.cairo.layer.context, context.state.scale, context.state.scale);
+
+    context.state.hackRectColor = {cast(f64) 167.0/255.0, cast(f64) 98.0/255.0, cast(f64) 82.0/255.0};
+
+    while !context.quit {
+        gui.tick();
+
+        processMessages();
+        draw(gui.windowRect());
+
+        gui.commit();
+    }
+
+    return 0;
+}
+
+fn processMessages() {
+    if context.keyDownEvent != nil {
+        keydown(context.keyDownEvent);
+    }
+    if context.mouseButtonDownEvent != nil {
+        -- mouseButtonDown(context.mouseButtonDownEvent);
+    }
+    if context.mouseButtonUpEvent != nil {
+        -- mouseButtonUp(context.mouseButtonUpEvent);
+    }
+    if context.mouseMotionEvent != nil {
+        mouseMove(context.mouseMotionEvent);
+    }
+}
+
+fn mouseMove(messageData: *sdl.MouseMotionEvent) {
+    mouse := context.mouse;
+    cairo.cairo_device_to_user(context.cairo.layer.context, &mouse.x, &mouse.y);
+
+    if context.state.hackRect|gui.contains(mouse.x, mouse.y) {
+        context.state.hackRectColor = {cast(f64) 98.0/255.0, cast(f64) 167.0/255.0, cast(f64) 82.0/255.0};
+    }
+    else {
+        context.state.hackRectColor = {cast(f64) 167.0/255.0, cast(f64) 98.0/255.0, cast(f64) 82.0/255.0};
+    }
+}
+
+fn keydown(messageData: *sdl.KeyboardEvent) {
+    if messageData.keysym.scancode == sdl.Key.SPACE {
+        io.println("space");
+    }
+    else if messageData.keysym.scancode == sdl.Key.LEFT {
+        io.println("left");
+    }
+}
+
+fn draw(rect: gui.Rect!(f64)) {
+    -- background
+    gui.drawRect(context.cairo.layer, rect, cast(f64) 67.0/255.0, cast(f64) 77.0/255.0, cast(f64) 82.0/255.0);
+
+    context.state.hackRect = {15, 15, 150, 50};
+
+    fontSize: f64 = 78;
+
+    text.drawBoundedText("hel", bounds: context.state.hackRect);
+
+    gui.drawRoundedRect(context.cairo.layer,
+        context.state.hackRect,
+        context.state.hackRectColor.r, context.state.hackRectColor.g, context.state.hackRectColor.b,
+        radius: 10, lineWidth: 5);
+}

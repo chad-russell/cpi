@@ -377,7 +377,7 @@ fn makeCursor(formData: *TextEditFormData, parentId: i64) {
             }
 
             #import "time";
-            elapsedSeconds := cast(f64) context.elapsed / cast() time.CLOCKS_PER_SEC;
+            elapsedSeconds := cast(f64) context.elapsed.sec;
 
             -- alpha := (math.sin(elapsedSeconds * 9) + 1.0) / 2.0;
             alpha: f64 = 1.0;

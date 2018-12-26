@@ -872,7 +872,8 @@ void interpretMathBitwiseshr(Interpreter *interp) {
 // convert
 void interpretConvert(Interpreter *interp) {
     auto fromType = (NodeTypekind) interp->consume<int32_t>();
-    auto fromAddr = (interp->stack.data() + interp->bp + interp->consume<int64_t>());
+    auto fromOffset = interp->consume<int64_t>();
+    auto fromAddr = (interp->stack.data() + interp->bp + fromOffset);
 
     auto toType = (NodeTypekind) interp->consume<int32_t>();
     auto toAddr = (interp->stack.data() + interp->bp + interp->consume<int64_t>());

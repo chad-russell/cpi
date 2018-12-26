@@ -1,5 +1,7 @@
 #link "libc";
 
+PI: f64 = 3.141592654;
+
 fn sin(n: f64) f64
 fn cos(n: f64) f64
 fn floor(f: f64) f64

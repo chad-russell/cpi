@@ -3,12 +3,12 @@
 #import "gui/graphroll";
 #import "gui/trackContainer";
 #import "gui/scroller";
+#import "gui/text";
 #import "io";
 #import "buffer": buf;
 #import "sdl";
 #import "math";
 #import "iter";
-#import "text";
 
 grabberRadius: f64 = 15;
 grabberMaxSize: f64 = 10;
@@ -162,6 +162,8 @@ fn processMessages() {
 fn draw(rect: gui.Rect!(f64)) {
     -- background
     gui.drawRect(context.cairo.layer, rect, cast(f64) 67.0/255.0, cast(f64) 77.0/255.0, cast(f64) 82.0/255.0);
+
+    -- text.drawText("hello!");
 
     y: f64 = 0;
 
