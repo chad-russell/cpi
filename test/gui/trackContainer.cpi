@@ -5,13 +5,13 @@
 #import "io";
 
 type TrackContainerFormData struct {
-    rect: gui.Rect!(f64),
-    bounds: gui.Rect!(f64),
-    metaRect: gui.Rect!(f64),
+    rect: gui.Rect,
+    bounds: gui.Rect,
+    metaRect: gui.Rect,
     tr: track.TrackState,
 }
 
-fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), index: i64, metaMargin: f64) {
+fn draw(rect: gui.Rect, bounds: gui.Rect, index: i64, metaMargin: f64) {
     state := &context.state.playArea.tracks.buf[index];
     state.rect = rect;
     state.bounds = bounds;

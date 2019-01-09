@@ -25,13 +25,13 @@ fn init() {
 
     loadFonts();
 
-    rect: gui.Rect!(f64) = {0, 0, 1, 0.075};
+    rect: gui.Rect = {0, 0, 1, 0.075};
     makeGlobalUndoSlider(rect);
 
     rect = {0, 0.075, 1, 0.075};
     makeUndoSlider(rect);
 
-    formRect: gui.Rect!(f64) = {
+    formRect: gui.Rect = {
         x:      0,
         y:      0.15,
         width:  1.0,
@@ -59,7 +59,7 @@ fn stressTest() {
     }
 }
 
-fn makeUndoSlider(rect: gui.Rect!(f64)) {
+fn makeUndoSlider(rect: gui.Rect) {
     sl := slider.create(rect, 50, sliderBackground, sliderForeground);
 
     sl|gui.addReceiver(
@@ -81,7 +81,7 @@ fn makeUndoSlider(rect: gui.Rect!(f64)) {
     );
 }
 
-fn makeGlobalUndoSlider(rect: gui.Rect!(f64)) {
+fn makeGlobalUndoSlider(rect: gui.Rect) {
     sl := slider.create(rect, 50, sliderBackground, sliderForeground);
 
     sl|gui.addReceiver(
@@ -112,7 +112,7 @@ type CachedGlyph struct {
 type CachedLine struct {
     low: f64,
     high: f64,
-    glyphs: *buf.Buffer!(gui.Rect!(f64))
+    glyphs: *buf.Buffer!(gui.Rect)
 }
 
 #context tc: struct {
@@ -232,7 +232,7 @@ fn tryShapeGlyphs(chars: *i8, font: *hb.Font) {
     return {glyphs: i, bytes: bytes, glyphInfo: glyphInfo};
 }
 
-fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Rect!(f64)) {
+fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Rect) {
     form := &context.forms.buf[formId];
 
     x: f64 = 5 - offset.x;
@@ -240,7 +240,7 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Re
 
     -- Try to find the cachedLine. Make a new one if it doesn't exist
     if formData.lineCache.buf.count <= line {
-        cl: CachedLine = {cast() (context.sdl.windowHeight + 10), 0, buf.make!(gui.Rect!(f64))()};
+        cl: CachedLine = {cast() (context.sdl.windowHeight + 10), 0, buf.make!(gui.Rect)()};
 
         &formData.lineCache|:set(line, cl);
         formData.lineCache.buf.count = line + 1;
@@ -308,7 +308,7 @@ fn drawLine(formId: i64, formData: *TextEditFormData, line: i64, offset: *gui.Re
 }
 
 type TextEditFormData struct {
-    highlights: buf.Buffer!(gui.Rect!(f64)),
+    highlights: buf.Buffer!(gui.Rect),
     currentMousePoint: struct{row: i64, col: i64},
 
     glyphCache: buf.Buffer!(CachedGlyph),
@@ -317,8 +317,8 @@ type TextEditFormData struct {
     textUpdated: bool,
 
     dragging: bool,
-    mouseDownRect: optional.Optional!(gui.Rect!(f64)),
-    mouseMoveRect: optional.Optional!(gui.Rect!(f64)),
+    mouseDownRect: optional.Optional!(gui.Rect),
+    mouseMoveRect: optional.Optional!(gui.Rect),
 }
 
 fn cursorIterator() {
@@ -345,7 +345,7 @@ fn cursorIterator() {
 }
 
 type CursorFormData struct {
-    parentRect: *gui.Rect!(f64),
+    parentRect: *gui.Rect,
     parentId: i64
 }
 
@@ -357,7 +357,7 @@ fn makeCursor(formData: *TextEditFormData, parentId: i64) {
         parentData := cast(*TextEditFormData) parent.data;
 
         for cursorInfo: cursorIterator() {
-            cursorRect: gui.Rect!(f64);
+            cursorRect: gui.Rect;
             hasPrevious := false;
 
             width: f64 = 20.0;
@@ -449,11 +449,11 @@ fn loadFonts() {
     context.hb.buffer = hb.hb_buffer_create();
 }
 
-fn make(rect: gui.Rect!(f64)) {
+fn make(rect: gui.Rect) {
     #import "random";
     random.seed();
 
-    fn draw(formId: i64, formData: *TextEditFormData, messageData: *gui.Rect!(f64)) {
+    fn draw(formId: i64, formData: *TextEditFormData, messageData: *gui.Rect) {
         form := &context.forms.buf[formId];
 
         -- clear
@@ -504,37 +504,37 @@ fn make(rect: gui.Rect!(f64)) {
         line := cast(i64) (cast() localY / FONT_SIZE);
 
         if line < 0 or line >= formData.lineCache.buf.count {
-            return optional.no!(gui.Rect!(f64))();
+            return optional.no!(gui.Rect)();
         }
 
         cl := formData.lineCache.buf[line];
 
         for g, i: cl.glyphs.buf {
-            boundingLeft: gui.Rect!(f64) = {form.rect.x + g.x, form.rect.y + cl.low - 1, g.width/2, cast() FONT_SIZE};
-            boundingRight: gui.Rect!(f64) = {form.rect.x + g.x + g.width/2, form.rect.y + cl.low - 1, g.width/2, cast() FONT_SIZE};
+            boundingLeft: gui.Rect = {form.rect.x + g.x, form.rect.y + cl.low - 1, g.width/2, cast() FONT_SIZE};
+            boundingRight: gui.Rect = {form.rect.x + g.x + g.width/2, form.rect.y + cl.low - 1, g.width/2, cast() FONT_SIZE};
 
             if boundingLeft|:contains(messageData.x, messageData.y) {
                 formData.currentMousePoint = {line, i};
 
                 clG := cl.glyphs.buf[i - 1];
                 if i > 0 {
-                    r: gui.Rect!(f64) = {clG.x + clG.width, cl.low - 1, 2, cast() FONT_SIZE};
+                    r: gui.Rect = {clG.x + clG.width, cl.low - 1, 2, cast() FONT_SIZE};
                     return optional.yes(r);
                 }
                 else {
-                    r: gui.Rect!(f64) = {cl.glyphs.buf[0].x, cl.low - 1, 2, cast() FONT_SIZE};
+                    r: gui.Rect = {cl.glyphs.buf[0].x, cl.low - 1, 2, cast() FONT_SIZE};
                     return optional.yes(r);
                 }
             }
             else if boundingRight|:contains(messageData.x, messageData.y) {
                 formData.currentMousePoint = {line, i + 1};
 
-                r: gui.Rect!(f64) = {g.x + g.width, cl.low - 1, 2, cast() FONT_SIZE};
+                r: gui.Rect = {g.x + g.width, cl.low - 1, 2, cast() FONT_SIZE};
                 return optional.yes(r);
             }
         }
 
-        return optional.no!(gui.Rect!(f64))();
+        return optional.no!(gui.Rect)();
     }
 
     fn mousedown(formId: i64, formData: *TextEditFormData, messageData: *gui.MouseMessageData) {

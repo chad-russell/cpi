@@ -5,6 +5,7 @@ PI: f64 = 3.141592654;
 fn sin(n: f64) f64
 fn cos(n: f64) f64
 fn floor(f: f64) f64
+fn sqrt(n: f64) f64
 
 fn max(a: !T, b: T) {
     if a >= b { return a; }
@@ -26,4 +27,11 @@ fn abs(a: !T) {
 
 fn quantize(n: f64, step: f64) {
     return floor(n / step) * step;
+}
+
+fn csqrt(t: !T) {
+    #if #iskind(T, f64) {
+        return sqrt(t);
+    }
+    panic();
 }

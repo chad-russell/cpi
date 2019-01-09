@@ -2,6 +2,4 @@
 
 fn main() {
     maud.init();
-
-    return 0;
 }

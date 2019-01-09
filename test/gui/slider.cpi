@@ -10,13 +10,13 @@ type SliderFormData struct {
     bgColor: gui.Color,
     fgColor: gui.Color,
 
-    grabberRect: gui.Rect!(f64)
+    grabberRect: gui.Rect
 }
 
 fn draw(formId: i64, formData: *SliderFormData, messageData: *none) {
     form := &context.forms.buf[formId];
 
-    localRect: gui.Rect!(f64) = {0, 0, form.rect.width, form.rect.height};
+    localRect: gui.Rect = {0, 0, form.rect.width, form.rect.height};
 
     -- background
     formId|gui.drawRect(localRect, formData.bgColor.r, formData.bgColor.g, formData.bgColor.b);
@@ -63,7 +63,7 @@ fn mouseUp(formId: i64, formData: *SliderFormData, messageData: *gui.MouseMessag
     formId|gui.removeReceiver(gui.MOUSEUP);
 }
 
-fn create(rect: gui.Rect!(f64), max: i64, bgColor: gui.Color, fgColor: gui.Color) {
+fn create(rect: gui.Rect, max: i64, bgColor: gui.Color, fgColor: gui.Color) {
     sfd: SliderFormData;
     sfd.max = max;
     sfd.bgColor = bgColor;

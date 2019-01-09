@@ -9,7 +9,7 @@
 #import "rtmidi";
 
 type Note struct {
-    rect: gui.Rect!(f64),
+    rect: gui.Rect,
     selected: bool,
     down: bool,
 
@@ -22,8 +22,8 @@ type Note struct {
 }
 
 type GraphRollFormData struct {
-    rect: gui.Rect!(f64),
-    bounds: gui.Rect!(f64),
+    rect: gui.Rect,
+    bounds: gui.Rect,
 
     notes: buf.Buffer!(Note),
 
@@ -54,7 +54,7 @@ fn noteOff(note: *Note) {
     rtmidi.noteOff(context.state.midiOut, note.lastOn);
 }
 
-fn selectArea(state: GraphRollFormData) gui.Rect!(f64) {
+fn selectArea(state: GraphRollFormData) gui.Rect {
     startX := state.selectStartX;
     startY := state.selectStartY;
     endX := context.mouse.x;
@@ -97,7 +97,7 @@ fn screenPixels(state: GraphRollFormData, x: f64) {
     return state.rect.x + pixels * scaleX;
 }
 
-fn effectiveRect(note: Note, state: GraphRollFormData) gui.Rect!(f64) {
+fn effectiveRect(note: Note, state: GraphRollFormData) gui.Rect {
     offsetX: f64 = 0;
     offsetY: f64 = 0;
 
@@ -133,7 +133,7 @@ fn effectiveRect(note: Note, state: GraphRollFormData) gui.Rect!(f64) {
         noteWidth = math.quantize(noteWidth, state.xResolution * scaleX);
     }
 
-    er: gui.Rect!(f64) = {
+    er: gui.Rect = {
         sp + offsetX,
         state.rect.y + (note.rect.y + offsetY) * yr,
         noteWidth,
@@ -245,7 +245,7 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, state: *GraphRollFormData
         clickedLocation := startWindow + clickedPixels;
         clickedBeat := clickedLocation / state.xResolution;
 
-        noteRect: gui.Rect!(f64) = {clickedBeat, noteY, 1, 1};
+        noteRect: gui.Rect = {clickedBeat, noteY, 1, 1};
         note: Note = {noteRect, false, false, 0, true, 200_000};
 
         if context.state.playArea.quantizeButton.on == true {
@@ -374,7 +374,7 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent, state: *GraphRollFormData) {
         for note: state.notes.buf {
             er := effectiveRect(note, ^state);
 
-            endRect: gui.Rect!(f64) = {
+            endRect: gui.Rect = {
                 er.x + er.width - 4,
                 er.y,
                 4,
@@ -411,7 +411,7 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent, state: *GraphRollFormData) {
     }
 }
 
-fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *GraphRollFormData) {
+fn draw(rect: gui.Rect, bounds: gui.Rect, state: *GraphRollFormData) {
     state.rect = rect;
     state.bounds = bounds;
 
@@ -434,7 +434,7 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *GraphRollFormData)
         if light == true {
             pixelsStart := screenPixels(^state, vlX);
             pixelsEnd := screenPixels(^state, vlX + blockWidth);
-            blockRect: gui.Rect!(f64) = {pixelsStart, rect.y, pixelsEnd - pixelsStart, rect.height};
+            blockRect: gui.Rect = {pixelsStart, rect.y, pixelsEnd - pixelsStart, rect.height};
 
             gui.drawRect(context.cairo.layer, gui.clip(blockRect, bounds), cast(f64) 52.0/255.0, cast(f64) 68.0/255.0, cast(f64) 78.0/255.0);
         }
@@ -447,7 +447,7 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *GraphRollFormData)
     vlN := 0;
     while vlX < rect.x + rect.width {
         pixelsX := screenPixels(^state, vlX);
-        lineRect: gui.Rect!(f64) = {pixelsX, bounds.y, 0, bounds.y + bounds.height};
+        lineRect: gui.Rect = {pixelsX, bounds.y, 0, bounds.y + bounds.height};
 
         if pixelsX > bounds.x and pixelsX < bounds.x + bounds.width {
             width: f64 = 1;
@@ -466,7 +466,7 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *GraphRollFormData)
 
     y := rect.y + yr;
     while y < rect.y + rect.height {
-        guideLineRect: gui.Rect!(f64) = {rect.x, y, rect.width, 0};
+        guideLineRect: gui.Rect = {rect.x, y, rect.width, 0};
         gui.drawLine(context.cairo.layer, gui.clip(guideLineRect, bounds), 0.2, 0.2, 0.2, width: 0.5);
         y += yr;
     }

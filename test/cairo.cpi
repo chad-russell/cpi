@@ -73,6 +73,7 @@ fn cairo_font_face_destroy(face: *FontFace) none
 fn cairo_glyph_allocate(glyphCount: i32) *Glyph
 fn cairo_glyph_free(glyphs: *Glyph) none
 fn cairo_show_glyphs(cr: *Context, glyphs: *Glyph, numGlyphs: i32) none
+fn cairo_glyph_path(cr: *Context, glyphs: *Glyph, numGlyphs: i32) none
 fn cairo_set_source_rgb(cr: *Context, r: f64, g: f64, b: f64) none
 fn cairo_set_source_surface(cr: *Context, surface: *Surface, x: f64, y: f64) none
 fn cairo_set_source(cr: *Context, pattern: *Pattern) none
@@ -92,9 +93,11 @@ fn cairo_set_operator(cr: *Context, operator: Operator) none
 fn cairo_set_line_width(cr: *Context, w: f64) none
 fn cairo_move_to(cr: *Context, x: f64, y: f64) none
 fn cairo_line_to(cr: *Context, x: f64, y: f64) none
+fn cairo_curve_to(cr: *Context, x1: f64, y1: f64, x2: f64, y2: f64, x3: f64, y3: f64) none
 fn cairo_stroke(cr: *Context) none
 fn cairo_new_sub_path(cr: *Context) none
 fn cairo_arc(cr: *Context, x: f64, y: f64, radius: f64, startAngle: f64, endAngle: f64) none
 fn cairo_close_path(cr: *Context) none
 fn cairo_user_to_device(cr: *Context, x: *f64, y: *f64) none
 fn cairo_device_to_user(cr: *Context, x: *f64, y: *f64) none
+fn cairo_device_to_user_distance(cr: *Context, x: *f64, y: *f64) none

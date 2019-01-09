@@ -11,13 +11,6 @@
 WIDTH   : i32 = 1000;
 HEIGHT  : i32 = 600;
 
-DRAW        := "draw";
-MOUSEDOWN   := "mousedown";
-MOUSEMOVE   := "mousemove";
-MOUSEUP     := "mouseup";
-MOUSESCROLL := "mousescroll";
-KEYDOWN     := "keydown";
-
 type Color struct {
     r: f64,
     g: f64,
@@ -25,10 +18,7 @@ type Color struct {
     a: f64 = 1.0
 }
 
-#context mouse: struct {
-    x: f64,
-    y: f64
-}
+#context mouse: Point!(f64)
 
 type MouseMessageData struct {
     x: f64,
@@ -45,11 +35,11 @@ type KeyboardMessageData struct {
     scancode: sdl.Key
 }
 
-type Rect(T := typeof(x)) struct {
-    x: T,
-    y: T,
-    width: T,
-    height: T
+type Rect struct {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64
 }
 
 type Point(T := typeof(x)) struct {
@@ -57,7 +47,7 @@ type Point(T := typeof(x)) struct {
     y: T
 }
 
-fn contains(T := typeof(r.x))(r: !R/Rect, x: T, y: T) {
+fn contains(r: Rect, x: f64, y: f64) {
     er := r;
 
     return er.x <= x
@@ -66,11 +56,15 @@ fn contains(T := typeof(r.x))(r: !R/Rect, x: T, y: T) {
        and er.y + er.height >= y;
 }
 
-fn containsMouse(T := typeof(r.x))(r: !R/Rect) {
+fn lerp(x: f64, y: f64, t: f64) {
+    return x + (y - x) * t;
+}
+
+fn containsMouse(r: Rect) {
     return contains(r, context.mouse.x, context.mouse.y);
 }
 
-fn intersects(r1: !R/Rect, r2: R) {
+fn intersects(r1: Rect, r2: Rect) {
     -- If one rectangle is on left side of other
     if r1.x > r2.x + r2.width or r2.x > r1.x + r1.width {
         return false;
@@ -84,7 +78,15 @@ fn intersects(r1: !R/Rect, r2: R) {
     return true;
 }
 
-fn clip(r1: Rect!(f64), r2: Rect!(f64)) {
+fn inset(r: Rect, i: f64) Rect {
+    return {r.x + i, r.y + i, r.width - i*2, r.height - i*2};
+}
+
+fn translate(r: Rect, p: Point!(f64)) Rect {
+    return {r.x + p.x, r.y + p.y, r.width, r.height};
+}
+
+fn clip(r1: Rect, r2: Rect) {
     if intersects(r1, r2) == false {
         return {0, 0, 0, 0};
     }
@@ -119,7 +121,7 @@ type Layer struct {
     context: *cairo.Context
 }
 
-fn makeLayer(rect: Rect!(f64)) {
+fn makeLayer(rect: Rect) {
     layerSurface := cairo.cairo_image_surface_create(cairo.FORMAT_ARGB32,
         cast() rect.width,
         cast() rect.height);
@@ -150,7 +152,7 @@ fn makeLayer(rect: Rect!(f64)) {
     yScale: f64,
 }
 
-fn windowRect() Rect!(f64) {
+fn windowRect() Rect {
     return {0, 0, cast(f64) context.sdl.windowWidth, cast(f64) context.sdl.windowHeight};
 }
 
@@ -178,8 +180,8 @@ fn initSdl() {
 
     context.sdl.window = window;
 
-    sdlRenderFlags: i32 = 6;
-    -- sdlRenderFlags: i32 = 0;
+    -- sdlRenderFlags: i32 = 6;
+    sdlRenderFlags: i32 = 0;
     context.sdl.renderer = sdl.SDL_CreateRenderer(context.sdl.window, -1, sdlRenderFlags);
 
     -- Compute screen resolution
@@ -225,6 +227,12 @@ fn initCairo() {
     cairo.cairo_surface_set_device_scale(context.cairo.layer.surface, context.sdl.xScale, context.sdl.yScale);
 }
 
+fn distance(p1: !P/Point, p2: P) {
+    dx := (p1.x - p2.x);
+    dy := (p1.y - p2.y);
+    return math.csqrt(dx*dx + dy*dy);
+}
+
 #context arrowCursor: *sdl.Cursor
 #context arrowCursorWE: *sdl.Cursor
 #context arrowCursorNS: *sdl.Cursor
@@ -251,7 +259,7 @@ fn init() {
     context.arrowCursorHand = sdl.SDL_CreateSystemCursor(sdl.CursorType.HAND);
 }
 
-fn drawRect(layer: Layer, rect: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1) {
+fn drawRect(layer: Layer, rect: Rect, r: f64, g: f64, b: f64, a: f64 = 1) {
     cairo.cairo_save(layer.context);
     defer { cairo.cairo_restore(layer.context); }
 
@@ -260,7 +268,7 @@ fn drawRect(layer: Layer, rect: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1) 
     cairo.cairo_fill(layer.context);
 }
 
-fn drawOutline(layer: Layer, rect: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1, lineWidth: f64 = 1) {
+fn drawOutline(layer: Layer, rect: Rect, r: f64, g: f64, b: f64, a: f64 = 1, lineWidth: f64 = 1) {
     cairo.cairo_save(layer.context);
     defer { cairo.cairo_restore(layer.context); }
 
@@ -277,7 +285,7 @@ fn drawOutline(layer: Layer, rect: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 
     cairo.cairo_stroke(layer.context);
 }
 
-fn drawRoundedRect(layer: Layer, rect: Rect!(f64), r: f64, g: f64, b: f64, radius: f64, a: f64 = 1, lineWidth: f64 = 1) {
+fn drawRoundedRect(layer: Layer, rect: Rect, r: f64, g: f64, b: f64, radius: f64, a: f64 = 1, lineWidth: f64 = 1) {
     degrees: f64 = math.PI / 180.0;
 
     cairo.cairo_save(layer.context);
@@ -299,7 +307,19 @@ fn drawRoundedRect(layer: Layer, rect: Rect!(f64), r: f64, g: f64, b: f64, radiu
     cairo.cairo_stroke(layer.context);
 }
 
-fn drawLine(layer: Layer, br: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1, width: f64 = 1) {
+fn drawCircle(layer: Layer, center: Point!(f64), radius: f64, r: f64, g: f64, b: f64, a: f64 = 1, lineWidth: f64 = 1) {
+    cairo.cairo_save(layer.context);
+    defer { cairo.cairo_restore(layer.context); }
+
+    cairo.cairo_set_source_rgba(layer.context, r, g, b, a);
+    cairo.cairo_set_line_width(layer.context, lineWidth);
+    cairo.cairo_new_sub_path (layer.context);
+    cairo.cairo_arc(layer.context, center.x, center.y, radius, 0, 2 * math.PI);
+    cairo.cairo_close_path(layer.context);
+    cairo.cairo_stroke(layer.context);
+}
+
+fn drawLine(layer: Layer, br: Rect, r: f64, g: f64, b: f64, a: f64 = 1, width: f64 = 1) {
     cairo.cairo_save(layer.context);
     defer { cairo.cairo_restore(layer.context); }
 
@@ -309,6 +329,20 @@ fn drawLine(layer: Layer, br: Rect!(f64), r: f64, g: f64, b: f64, a: f64 = 1, wi
 
     cairo.cairo_move_to(layer.context, br.x, br.y);
     cairo.cairo_line_to(layer.context, br.x + br.width, br.y + br.height);
+
+    cairo.cairo_stroke(layer.context);
+}
+
+fn drawCurve(layer: Layer, p1: Point!(f64), p2: Point!(f64), cp1: Point!(f64), cp2: Point!(f64), color: Color, width: f64 = 1) {
+    cairo.cairo_save(layer.context);
+    defer { cairo.cairo_restore(layer.context); }
+
+    cairo.cairo_set_source_rgba(layer.context, color.r, color.g, color.b, color.a);
+
+    cairo.cairo_set_line_width(layer.context, width);
+
+    cairo.cairo_move_to(layer.context, p1.x, p1.y);
+    cairo.cairo_curve_to(layer.context, cp1.x, cp1.y, cp2.x, cp2.y, p2.x, p2.y);
 
     cairo.cairo_stroke(layer.context);
 }
@@ -328,13 +362,19 @@ fn shutdown() {
     sdl.SDL_Quit();
 }
 
-fn clearRect(c: *cairo.Context, rect: Rect!(f64)) {
+fn clear(c: *cairo.Context) {
     cairo.cairo_save(c);
     defer { cairo.cairo_restore(c); }
 
-    cairo.cairo_set_source_rgba(c, 0, 0, 0, 0);
-    cairo.cairo_set_operator(c, cairo.Operator.SOURCE);
-    cairo.cairo_rectangle(c, 0, 0, rect.width, rect.height);
+    cairo.cairo_set_operator(c, cairo.Operator.CLEAR);
+    cairo.cairo_paint(c);
+}
+
+fn clearRect(c: *cairo.Context, rect: Rect) {
+    cairo.cairo_save(c);
+    defer { cairo.cairo_restore(c); }
+
+    cairo.cairo_set_operator(c, cairo.Operator.CLEAR);
     cairo.cairo_fill(c);
 }
 
@@ -437,3 +477,4 @@ fn tick() {
     -- io.println(context.frame);
     -- io.println("-------");
 }
+

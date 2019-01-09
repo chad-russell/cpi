@@ -11,16 +11,16 @@
 
 -- todo(chad): resolution should *not* be needed. Clip rect should be in terms of beats
 type Clip struct {
-    rect: gui.Rect!(f64),
-    editButton: gui.Rect!(f64),
+    rect: gui.Rect,
+    editButton: gui.Rect,
     selected: bool,
     graphRoll: graphroll.GraphRollFormData,
     resolution: f64
 }
 
 type TrackState struct {
-    rect: gui.Rect!(f64),
-    bounds: gui.Rect!(f64),
+    rect: gui.Rect,
+    bounds: gui.Rect,
 
     clips: buf.Buffer!(Clip),
 
@@ -39,7 +39,7 @@ type TrackState struct {
     xResolution: f64
 }
 
-fn selectArea(state: TrackState) gui.Rect!(f64) {
+fn selectArea(state: TrackState) gui.Rect {
     startX := state.selectStartX;
     startY := state.selectStartY;
     endX := context.mouse.x;
@@ -110,7 +110,7 @@ fn mouseBar(state: *TrackState) {
     return math.floor(localToAbsolute(state) / state.xResolution);
 }
 
-fn effectiveRect(clip: Clip, state: *TrackState) gui.Rect!(f64) {
+fn effectiveRect(clip: Clip, state: *TrackState) gui.Rect {
     offsetX: f64 = 0;
     offsetY: f64 = 0;
 
@@ -150,7 +150,7 @@ fn effectiveRect(clip: Clip, state: *TrackState) gui.Rect!(f64) {
         width = math.quantize(width, state.xResolution * scaleX);
     }
 
-    er: gui.Rect!(f64) = {
+    er: gui.Rect = {
         sp + offsetX,
         state.rect.y + (clip.rect.y + offsetY) * yr,
         width,
@@ -270,7 +270,7 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent, index: i64) {
         yr := yResolution(^state);
         clipY := math.floor(localY / yr);
 
-        clipRect: gui.Rect!(f64) = {clickedLocation, clipY, 16, 1};
+        clipRect: gui.Rect = {clickedLocation, clipY, 16, 1};
 
         clip: Clip;
         clip.rect = clipRect;
@@ -380,7 +380,7 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent, index: i64) {
         for clip: state.clips.buf {
             er := effectiveRect(clip, state);
 
-            endRect: gui.Rect!(f64) = {
+            endRect: gui.Rect = {
                 er.x + er.width - 4,
                 er.y,
                 4,
@@ -417,7 +417,7 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent, index: i64) {
     }
 }
 
-fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *TrackState) {
+fn draw(rect: gui.Rect, bounds: gui.Rect, state: *TrackState) {
     state.rect = rect;
     state.bounds = bounds;
 
@@ -443,7 +443,7 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *TrackState) {
         if light == true {
             pixelsStart := screenPixels(^state, vlX);
             pixelsEnd := screenPixels(^state, vlX + blockWidth);
-            blockRect: gui.Rect!(f64) = {pixelsStart, rect.y, pixelsEnd - pixelsStart, rect.height};
+            blockRect: gui.Rect = {pixelsStart, rect.y, pixelsEnd - pixelsStart, rect.height};
 
             gui.drawRect(context.cairo.layer, gui.clip(blockRect, bounds), cast(f64) 52.0/255.0, cast(f64) 68.0/255.0, cast(f64) 78.0/255.0);
         }
@@ -456,7 +456,7 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *TrackState) {
     vlN := 0;
     while vlX < rect.x + rect.width {
         pixelsX := screenPixels(^state, vlX);
-        lineRect: gui.Rect!(f64) = gui.clip({pixelsX, rect.y, 0, rect.height}, bounds);
+        lineRect: gui.Rect = gui.clip({pixelsX, rect.y, 0, rect.height}, bounds);
 
         if pixelsX > bounds.x and pixelsX < bounds.x + bounds.width {
             width: f64 = 1;
@@ -475,7 +475,7 @@ fn draw(rect: gui.Rect!(f64), bounds: gui.Rect!(f64), state: *TrackState) {
 
     y := rect.y + yr;
     while y < rect.y + rect.height {
-        guideLineRect: gui.Rect!(f64) = {rect.x, y, rect.width, 0};
+        guideLineRect: gui.Rect = {rect.x, y, rect.width, 0};
         gui.drawLine(context.cairo.layer, gui.clip(guideLineRect, bounds), 0.2, 0.2, 0.2, width: 0.5);
         y += yr;
     }
@@ -513,7 +513,7 @@ fn drawClip(clip: *Clip, state: *TrackState) {
     gui.drawRect(context.cairo.layer, clip.editButton, cast(f64) 144.0/255.0, cast(f64) 130.0/255.0, cast(f64) 117.0/255.0);
 }
 
-fn drawClipNotes(rect: gui.Rect!(f64), clip: *Clip, state: *TrackState) {
+fn drawClipNotes(rect: gui.Rect, clip: *Clip, state: *TrackState) {
     hs := &context.state.playArea.horizontalScroller;
     scaleX := hs.rect.width / (hs.end - hs.begin);
 
@@ -534,7 +534,7 @@ fn drawClipNotes(rect: gui.Rect!(f64), clip: *Clip, state: *TrackState) {
     yResolution := rect.height / 20;
 
     for note: clip.graphRoll.notes.buf|iter.byRef {
-        er: gui.Rect!(f64) = {
+        er: gui.Rect = {
             rect.x + note.rect.x * xResolution, rect.y + note.rect.y * yResolution,
             note.rect.width * xResolution, note.rect.height * yResolution
         };

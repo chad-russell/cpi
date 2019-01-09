@@ -19,7 +19,7 @@ type ScreenType enum {
 }
 
 type Checkbox struct {
-    rect: gui.Rect!(f64),
+    rect: gui.Rect,
     on: bool,
 }
 
@@ -31,7 +31,7 @@ type PlayAreaFormData struct {
     tracks: buf.Buffer!(trackContainer.TrackContainerFormData),
     horizontalScroller: scroller.Data,
     verticalScroller: scroller.Data,
-    addNewTrackButton: gui.Rect!(f64),
+    addNewTrackButton: gui.Rect,
 
     quantizeButton: Checkbox,
 
@@ -159,7 +159,7 @@ fn processMessages() {
     }
 }
 
-fn draw(rect: gui.Rect!(f64)) {
+fn draw(rect: gui.Rect) {
     -- background
     gui.drawRect(context.cairo.layer, rect, cast(f64) 67.0/255.0, cast(f64) 77.0/255.0, cast(f64) 82.0/255.0);
 
@@ -197,7 +197,7 @@ fn draw(rect: gui.Rect!(f64)) {
 
     trackScrollViewHeight := rect.height - y;
 
-    trAreaBounds: gui.Rect!(f64) = rect;
+    trAreaBounds: gui.Rect = rect;
     trAreaBounds.y = y;
     trAreaBounds.height -= y;
     trAreaBounds.width -= srHeight;
@@ -233,8 +233,8 @@ fn draw(rect: gui.Rect!(f64)) {
     else if context.state.playArea.screenType == ScreenType.Track {
         clip := cast(*track.Clip) context.state.playArea.screenData;
 
-        -- graphRect: gui.Rect!(f64) = {rect.x, y - scrollOffsetY, rect.width - srHeight, rect.height * yScale};
-        graphRect: gui.Rect!(f64) = {rect.x, y - scrollOffsetY, rect.width - srHeight, (rect.height - y) * yScale};
+        -- graphRect: gui.Rect = {rect.x, y - scrollOffsetY, rect.width - srHeight, rect.height * yScale};
+        graphRect: gui.Rect = {rect.x, y - scrollOffsetY, rect.width - srHeight, (rect.height - y) * yScale};
 
         -- clip.rect.width is the number of beats
         clip.graphRoll.xResolution = graphRect.width / clip.rect.width;
@@ -294,7 +294,7 @@ fn processNoteOnOff() {
             yResolution := clip.rect.height / 20;
 
             for note: clip.graphRoll.notes.buf|iter.byRef {
-                er: gui.Rect!(f64) = {
+                er: gui.Rect = {
                     clip.rect.x + note.rect.x * xResolution, clip.rect.y + note.rect.y * yResolution,
                     note.rect.width * xResolution, note.rect.height * yResolution
                 };

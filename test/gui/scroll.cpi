@@ -6,7 +6,7 @@
 #import "cairo";
 
 type CachedLayer struct {
-    rect: gui.Rect!(f64),
+    rect: gui.Rect,
     layer: gui.Layer
 }
 
@@ -17,13 +17,13 @@ type FormData struct {
     savedMouseDownFn: fn(formId: i64, formData: *none, messageData: *none) none,
     layerCache: buf.Buffer!(CachedLayer),
     scrollOffset: gui.Point!(f64),
-    effectiveRect: gui.Rect!(f64),
+    effectiveRect: gui.Rect,
     updateOnlyScroll: bool
 }
 
 #context scrollDatas: buf.Buffer!(FormData)
 
-fn takeover(rect: gui.Rect!(f64), formId: i64) {
+fn takeover(rect: gui.Rect, formId: i64) {
     form := &context.forms.buf[formId];
 
     fd: FormData;
@@ -144,7 +144,7 @@ fn findFormData(formId: i64) *FormData {
     return nil;
 }
 
-fn drawChunk(fd: *FormData, formId: i64, formData: *none, chunkRect: gui.Rect!(f64), updateOnlyScroll: bool) {
+fn drawChunk(fd: *FormData, formId: i64, formData: *none, chunkRect: gui.Rect, updateOnlyScroll: bool) {
     tmpLayer: gui.Layer;
 
     form := &context.forms.buf[formId];
@@ -159,7 +159,7 @@ fn drawChunk(fd: *FormData, formId: i64, formData: *none, chunkRect: gui.Rect!(f
             }
     }
     if found == false {
-        scaled: gui.Rect!(f64) = {
+        scaled: gui.Rect = {
             chunkRect.x * cast() context.sdl.xScale,
             chunkRect.y * cast() context.sdl.yScale,
             chunkRect.width * cast() context.sdl.xScale,
@@ -186,7 +186,7 @@ fn drawChunk(fd: *FormData, formId: i64, formData: *none, chunkRect: gui.Rect!(f
     cairo.cairo_fill(form.layer.context);
 }
 
-fn draw(formId: i64, formData: *none, messageData: *gui.Rect!(f64)) {
+fn draw(formId: i64, formData: *none, messageData: *gui.Rect) {
     found := false;
 
     fd := findFormData(formId);

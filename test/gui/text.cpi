@@ -74,7 +74,7 @@ fn cacheGlyph(codepoint: i32, font: *cairo.FontFace, size: f64) {
     cairo.cairo_glyph_extents(context.cairo.layer.context, cairoGlyph, 1, &cached.extents);
 
     glyphSurface := cairo.cairo_image_surface_create(
-            cairo.FORMAT_RGB24,
+            cairo.FORMAT_ARGB32,
             cast() (cached.extents.width + cached.extents.xAdvance),
             cast() (cached.extents.height * 2 + cached.extents.yAdvance));
 
@@ -90,8 +90,7 @@ fn cacheGlyph(codepoint: i32, font: *cairo.FontFace, size: f64) {
     cairo.cairo_set_font_size(glyphContext, size);
 
     -- clear the background
-    r: gui.Rect!(f64) = {0, 0, 500, 500};
-    gui.clearRect(glyphContext, r);
+    gui.clear(glyphContext);
 
     cairo.cairo_set_source_rgb(glyphContext, 0.965, 0.965, 0.941);
     cairo.cairo_translate(glyphContext, 0, -cached.extents.yBearing);
@@ -143,7 +142,7 @@ fn textBoundary(text: []i8, size: f64) {
         }
     }
 
-    return cast(gui.Rect!(f64)) {x: 0, y: 0, width: width, height: height};
+    return cast(gui.Rect) {x: 0, y: 0, width: width, height: height};
 }
 
 fn drawText(text: []i8, x: f64, y: f64, size: f64) {
@@ -158,22 +157,15 @@ fn drawText(text: []i8, x: f64, y: f64, size: f64) {
         defer { cairo.cairo_restore(context.cairo.layer.context); }
 
         cairo.cairo_translate(context.cairo.layer.context, x + x_offset, y + found.extents.yBearing);
-
         cairo.cairo_set_source(context.cairo.layer.context, found.pattern);
-        -- cairo.cairo_rectangle(context.cairo.layer.context,
-            -- found.extents.xBearing,
-            -- 0,
-            -- cast() (found.extents.width + 1),
-            -- cast() (found.extents.height + 1));
-        -- cairo.cairo_fill(context.cairo.layer.context);
         cairo.cairo_paint(context.cairo.layer.context);
 
         x_offset += found.extents.xAdvance;
     }
 }
 
-fn drawBoundedText(text: []i8, bounds: gui.Rect!(f64)) {
-    fn fitness(rect1: gui.Rect!(f64), rect2: gui.Rect!(f64)) {
+fn drawBoundedText(text: []i8, bounds: gui.Rect) {
+    fn fitness(rect1: gui.Rect, rect2: gui.Rect) {
         if rect1.width - rect2.width > 0 or rect1.height - rect2.height > 0 {
             return cast(f64) 100;
         }
@@ -207,7 +199,10 @@ fn drawBoundedText(text: []i8, bounds: gui.Rect!(f64)) {
         iteration += 1;
     }
 
-    drawText(text, bounds.x, bounds.y + tb.height, guess);
+    dx := (bounds.width - tb.width) / 2;
+    dy := (bounds.height - tb.height) / 2;
+
+    drawText(text, bounds.x + dx, bounds.y + tb.height + dy, guess);
 }
 
 fn init() {

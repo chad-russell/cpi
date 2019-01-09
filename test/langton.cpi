@@ -95,7 +95,7 @@ fn init() {
                 ant.y = h - 1;
             }
 
-            cr: gui.Rect!(f64) = {
+            cr: gui.Rect = {
                                     cast(f64) ant.x - ad/2,
                                     cast(f64) ant.y - ad/2,
                                     ad,

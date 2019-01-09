@@ -4,7 +4,7 @@
 #import "math";
 
 type Data struct {
-    rect: gui.Rect!(f64),
+    rect: gui.Rect,
 
     horizontal: bool,
 
@@ -41,7 +41,7 @@ fn percScrolled(data: *Data) f64 {
     return data.begin / sm;
 }
 
-fn effectiveRect(data: *Data) gui.Rect!(f64) {
+fn effectiveRect(data: *Data) gui.Rect {
     if data.horizontal == true {
         return {
             data.rect.x + data.begin,
@@ -59,7 +59,7 @@ fn effectiveRect(data: *Data) gui.Rect!(f64) {
     };
 }
 
-fn drawVertical(rect: gui.Rect!(f64), data: *Data) {
+fn drawVertical(rect: gui.Rect, data: *Data) {
     data.horizontal = false;
     data.rect = rect;
 
@@ -81,7 +81,7 @@ fn drawVertical(rect: gui.Rect!(f64), data: *Data) {
         width: 1);
 }
 
-fn drawHorizontal(rect: gui.Rect!(f64), data: *Data) {
+fn drawHorizontal(rect: gui.Rect, data: *Data) {
     data.horizontal = true;
     data.rect = rect;
 
@@ -178,8 +178,8 @@ fn mouseMove(data: *Data) {
         }
     }
     else {
-        beginResize: gui.Rect!(f64);
-        endResize: gui.Rect!(f64);
+        beginResize: gui.Rect;
+        endResize: gui.Rect;
 
         if data.horizontal == true {
             beginResize = {data.rect.x + data.begin, data.rect.y, 4, data.rect.height};
