@@ -9,32 +9,62 @@
 
 NODE_RADIUS: f64 = 3;
 
-type Node struct {
-    rect: gui.Rect,
-    color: gui.Color,
-
-    port: Port,
-}
-
-type Port struct {
-    connection: *Node,
-}
-
 #context state: struct {
     scale: f64,
 
+    entities: buf.Buffer!(EID),
     nodes: buf.Buffer!(Node),
-
-    dragging := false,
+    ports: buf.Buffer!(Port),
+    connections: buf.Buffer!(Connection),
 
     transformedMouse: gui.Point!(f64),
 
     mouseDownStart: gui.Point!(f64),
     mouseDown := false,
 
-    nodeBeingDragged: *Node = nil,
-    portBeingDragged: *Node = nil,
-    tentativeConnection: *Node = nil,
+    canvasBeingDragged := false,
+    dragging := false,
+
+    nodeBeingDragged: EID = 0,
+    portBeingDragged: EID = 0,
+    tentativeConnection: EID = 0,
+}
+
+-- todo(chad): rename me!
+type EID u64
+
+type SizeComponent struct {
+    width: f64,
+    height: f64,
+}
+
+type type PositionComponent struct {
+    x: f64,
+    y: f64,
+}
+
+type Node struct {
+    rect: gui.Rect,
+    active: bool,
+
+    inputs: buf.Buffer!(Port),
+    outputs: buf.Buffer!(Port),
+}
+
+type Port struct {
+    isInput: bool,
+    center: gui.Point!(f64),
+}
+
+type Connection struct {
+    from: EID,
+    to: EID,
+}
+
+fn makeEID() {
+    newId := cast(u64) context.state.entities.buf.count + 1;
+    &context.state.entities|:append(newId);
+    return newId;
 }
 
 fn init() {
@@ -59,6 +89,9 @@ fn init() {
 }
 
 fn processMessages() {
+    tmp_scale();
+    defer { cairo.cairo_restore(context.cairo.layer.context); }
+
     if context.keyDownEvent != nil {
         keydown(context.keyDownEvent);
     }
@@ -73,32 +106,62 @@ fn processMessages() {
     }
 }
 
-fn mouseButtonDown(messageData: *sdl.MouseButtonEvent) {
-    tmp_scale();
-    defer { cairo.cairo_restore(context.cairo.layer.context); }
+fn checkMouseDownInPort(node: *Node, port: Port) {
+    if gui.distance(port.center, context.state.transformedMouse) < magFactor(port) * 3 {
+        alreadyInConnection := false;
+        c: Connection;
+        cIndex: i64;
 
+        for connection, i: context.state.connections.buf {
+            if connection.from == node.id or connection.to == node.id {
+                alreadyInConnection = true;
+                c = connection;
+                cIndex = i;
+            }
+        }
+
+        if alreadyInConnection == true {
+            -- todo(chad): This is overkill. Just delete by reordering...
+            &context.state.connections|:buf.deleteInPlace(cIndex);
+
+            if c.from == node.id {
+                context.state.portBeingDragged = c.to;
+            }
+            else {
+                context.state.portBeingDragged = c.from;
+            }
+        }
+        else {
+            context.state.nodeBeingDragged = 0;
+            context.state.portBeingDragged = node.id;
+        }
+    }
+}
+
+fn mouseButtonDown(messageData: *sdl.MouseButtonEvent) {
     context.state.mouseDownStart = context.state.transformedMouse;
     context.state.mouseDown = true;
     context.state.dragging = false;
 
-    context.state.nodeBeingDragged = nil;
-    context.state.portBeingDragged = nil;
+    context.state.nodeBeingDragged = 0;
+    context.state.portBeingDragged = 0;
 
     for node: context.state.nodes.buf|iter.byRef {
-        if gui.distance(portCenter(node), context.state.transformedMouse) < magFactor(node) * 3 {
-            context.state.nodeBeingDragged = nil;
-            context.state.portBeingDragged = node;
+        mouseDownInPort := false;
+        for port, index: node.inputs.buf {
+            checkMouseDownInPort(node, node.inputs.buf[index]);
         }
-        else if node.rect|gui.contains(context.state.transformedMouse.x, context.state.transformedMouse.y) {
-            context.state.nodeBeingDragged = node;
+        for port, index: node.outputs.buf {
+            checkMouseDownInPort(node, node.outputs.buf[index]);
+        }
+
+        if mouseDownInPort == false and node.rect|gui.contains(context.state.transformedMouse.x, context.state.transformedMouse.y) {
+            context.state.nodeBeingDragged = node.id;
         }
     }
 }
 
 fn mouseMove(messageData: *sdl.MouseMotionEvent) {
-    tmp_scale();
-    defer { cairo.cairo_restore(context.cairo.layer.context); }
-
     context.state.transformedMouse = context.mouse;
     cairo.cairo_device_to_user(context.cairo.layer.context, &context.state.transformedMouse.x, &context.state.transformedMouse.y);
 
@@ -110,28 +173,29 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent) {
         context.state.mouseDownStart = context.state.transformedMouse;
     }
 
-    context.state.tentativeConnection = nil;
-    if context.state.portBeingDragged != nil {
+    context.state.tentativeConnection = 0;
+    if context.state.portBeingDragged != 0 {
         -- establish a connection?
-        for node: context.state.nodes.buf|iter.byRef {
-            pc := portCenter(node);
-            mf := magFactor(node);
+        -- for node: context.state.nodes.buf|iter.byRef {
+            -- pc := portCenter(node);
+            -- mf := magFactor(node);
 
-            if node != context.state.portBeingDragged and gui.distance(context.state.transformedMouse, pc) < NODE_RADIUS * mf {
-                context.state.tentativeConnection = node;
-            }
-        }
+            -- if node.id != context.state.portBeingDragged and gui.distance(context.state.transformedMouse, pc) < NODE_RADIUS * mf {
+                -- context.state.tentativeConnection = node.id;
+            -- }
+        -- }
     }
-    else if context.state.nodeBeingDragged != nil {
-        context.state.nodeBeingDragged.color = {cast(f64) 98.0/255.0, cast(f64) 167.0/255.0, cast(f64) 82.0/255.0};
+    else if context.state.nodeBeingDragged != 0 {
+        nbd := findNode(context.state.nodeBeingDragged);
 
-        context.state.nodeBeingDragged.rect.x += dx;
-        context.state.nodeBeingDragged.rect.y += dy;
+        nbd.active = true;
+        nbd.rect.x += dx;
+        nbd.rect.y += dy;
     }
     else if context.state.mouseDown {
-        for node: context.state.nodes.buf|iter.byRef {
-            node.color = {cast(f64) 98.0/255.0, cast(f64) 167.0/255.0, cast(f64) 82.0/255.0};
+        context.state.canvasBeingDragged = true;
 
+        for node: context.state.nodes.buf|iter.byRef {
             node.rect.x += dx;
             node.rect.y += dy;
         }
@@ -139,38 +203,40 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent) {
     else {
         for node: context.state.nodes.buf|iter.byRef {
             if node.rect|gui.contains(context.state.transformedMouse.x, context.state.transformedMouse.y) {
-                node.color = {cast(f64) 98.0/255.0, cast(f64) 167.0/255.0, cast(f64) 82.0/255.0};
+                node.active = true;
             }
             else {
-                node.color = {cast(f64) 167.0/255.0, cast(f64) 98.0/255.0, cast(f64) 82.0/255.0};
+                node.active = false;
             }
         }
     }
 }
 
 fn mouseButtonUp(messageData: *sdl.MouseButtonEvent) {
-    tmp_scale();
-    defer { cairo.cairo_restore(context.cairo.layer.context); }
-
     context.state.mouseDown = false;
-    context.state.nodeBeingDragged = nil;
+    context.state.nodeBeingDragged = 0;
+    context.state.canvasBeingDragged = false;
 
-    if context.state.tentativeConnection != nil {
-        context.state.portBeingDragged.port.connection = context.state.tentativeConnection;
-        context.state.tentativeConnection.port.connection = context.state.portBeingDragged;
+    if context.state.tentativeConnection != 0 {
+        &context.state.connections|:append({
+            id: makeEID(),
+            from: context.state.portBeingDragged,
+            to: context.state.tentativeConnection,
+        });
 
-        context.state.tentativeConnection = nil;
+        context.state.tentativeConnection = 0;
     }
     else if context.state.dragging == false {
         -- make a new node
         n: Node;
+        n.id = makeEID();
         n.rect = {context.state.transformedMouse.x, context.state.transformedMouse.y, 200, 100};
-        n.color = {cast(f64) 98.0/255.0, cast(f64) 167.0/255.0, cast(f64) 82.0/255.0};
+        n.active = true;
 
         &context.state.nodes|:append(n);
     }
 
-    context.state.portBeingDragged = nil;
+    context.state.portBeingDragged = 0;
 
     context.state.dragging = false;
 }
@@ -186,7 +252,7 @@ fn keydown(messageData: *sdl.KeyboardEvent) {
 
 fn tmp_scale() {
     if context.modifierKeys.shift {
-        diff := context.state.scale - 0.5;
+        diff := context.state.scale - 1.5;
         context.state.scale -= diff / 2;
     }
     else {
@@ -198,15 +264,15 @@ fn tmp_scale() {
     cairo.cairo_scale(context.cairo.layer.context, context.state.scale, context.state.scale);
 }
 
-fn portCenter(node: *Node) gui.Point!(f64) {
-    return {node.rect.x + NODE_RADIUS + 10, node.rect.y + node.rect.height/2};
+fn findNode(EID: EID) {
+    basic.assert(EID >= 0 and EID <= cast(u64) context.state.nodes.buf.count);
+    return &context.state.nodes.buf[EID - 1];
 }
 
-fn magFactor(node: *Node) {
-    pc := portCenter(node);
+fn magFactor(port: Port) {
     mf: f64 = 1.0;
 
-    dist := gui.distance(pc, context.state.transformedMouse);
+    dist := gui.distance(port.center, context.state.transformedMouse);
     if dist < 20 {
         dist /= 10;
         mf = math.min(5 - (dist * dist), 2.5);
@@ -218,42 +284,55 @@ fn magFactor(node: *Node) {
 fn drawNode(node: *Node) {
     fontSize: f64 = 78;
 
+    nodeColor: gui.Color = {cast(f64) 167.0/255.0, cast(f64) 98.0/255.0, cast(f64) 82.0/255.0};
+    if node.active == true or context.state.canvasBeingDragged == true {
+        nodeColor = {cast(f64) 98.0/255.0, cast(f64) 167.0/255.0, cast(f64) 82.0/255.0};
+    }
+
     gui.drawRoundedRect(context.cairo.layer,
         node.rect,
-        node.color.r, node.color.g, node.color.b,
+        nodeColor.r, nodeColor.g, nodeColor.b,
         radius: NODE_RADIUS, lineWidth: 5);
 
-    pc := portCenter(node);
-    mf := magFactor(node);
 
-    gui.drawCircle(context.cairo.layer,
-        pc,
-        NODE_RADIUS * mf,
-        node.color.r, node.color.g, node.color.b,
-        lineWidth: 1);
+    -- draw ports
+    for port: node.inputs.buf {
+        pc := port.center;
+        mf := magFactor(port);
 
-    text.drawBoundedText("0.5", bounds: {node.rect.x + node.rect.width/2, node.rect.y, node.rect.width/2 - 5, node.rect.height});
+        gui.drawCircle(context.cairo.layer,
+            pc,
+            NODE_RADIUS * mf,
+            nodeColor.r, nodeColor.g, nodeColor.b,
+            lineWidth: 1);
+    }
+    for port: node.outputs.buf {
+
+    }
+
+    -- text.drawBoundedText("0.5", bounds: {node.rect.x + node.rect.width/2, node.rect.y, node.rect.width/2 - 5, node.rect.height});
 }
 
-fn drawConnection(from: *Node, to: *Node) {
-    p1 := portCenter(from);
-    p2 := portCenter(to);
-
-    cp1: gui.Point!(f64) = {gui.lerp(p1.x, p2.x, 0.3), p1.y};
-    cp2: gui.Point!(f64) = {gui.lerp(p1.x, p2.x, 0.7), p2.y};
-
-    color: gui.Color = {
-        r: cast(f64) 250.0/255.0,
-        g: cast(f64) 215.0/255.0,
-        b: cast(f64) 0.0/255.0,
-    };
+fn drawConnection(connection: Connection) {
+    p1 := findNode(connection.from).inputs.buf[connection.fromIndex].center;
+    p2 := findNode(connection.to).inputs.buf[connection.toIndex].center;
 
     gui.drawCurve(context.cairo.layer,
         p1: p1,
         p2: p2,
-        cp1: cp1,
-        cp2: cp2,
-        color: color,
+        cp1: cast() {
+            x: gui.lerp(p1.x, p2.x, 0.3),
+            y: p1.y,
+        },
+        cp2: cast() {
+            x: gui.lerp(p1.x, p2.x, 0.7),
+            y: p2.y,
+        },
+        color: {
+            r: cast() 250.0/255.0,
+            g: cast() 215.0/255.0,
+            b: cast() 0.0/255.0,
+        },
         width: 4,
     );
 }
@@ -266,13 +345,12 @@ fn draw(rect: gui.Rect) {
     defer { cairo.cairo_restore(context.cairo.layer.context); }
 
     -- connections
-    for node: context.state.nodes.buf|iter.byRef {
-        if node.port.connection != nil {
-            drawConnection(from: node, to: node.port.connection);
-        }
+    for connection: context.state.connections.buf {
+        drawConnection(connection);
     }
-    if context.state.portBeingDragged != nil {
-        pc := portCenter(context.state.portBeingDragged);
+    if context.state.portBeingDragged != 0 {
+        -- todo(chad): why can't you drag from output -> input?
+        pc := findNode(context.state.portBeingDragged).inputs.buf[context.state.portBeingDraggedIndex].center;
 
         p1 := pc;
         p2 := context.state.transformedMouse;

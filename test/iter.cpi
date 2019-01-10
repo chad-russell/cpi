@@ -74,21 +74,21 @@ fn byRef(T := typeof(arr[0]))(arr: []T) {
 
 fn withIndex(r: !R) {
     type WithIndex struct{
-        r: R,
+        value: R,
         index: i64
     }
 
     #attr(WithIndex) {
         fn empty(wi: WithIndex) {
-            return wi.r|:empty;
+            return wi.value|:empty;
         }
 
         fn front(wi: WithIndex) {
-            return {it: wi.r|:front, index: wi.index};
+            return {value: wi.value|:front, index: wi.index};
         }
 
         fn popFront(wi: *WithIndex) {
-            &wi.r|:popFront;
+            &wi.value|:popFront;
             wi.index += 1;
         }
     }

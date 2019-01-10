@@ -1,5 +1,6 @@
 #import "mem";
 
+-- todo(chad): capacity should be u64
 type Buffer(T := typeof(buf[0])) struct {
     capacity: i64,
     buf: []T

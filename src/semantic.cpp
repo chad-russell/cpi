@@ -439,12 +439,12 @@ bool typesMatch(Node *desired, Node *actual, Semantic *semantic, bool reportErro
     }
     if (desired->typeData.kind == NodeTypekind::AUTOCAST && actual->typeData.kind != NodeTypekind::AUTOCAST) {
         maybeStructDefault(semantic, desired->typeData.autocastData, actual);
-        desired->typeData = actual->typeData;
+        desired->resolved = actual;
         return true;
     }
     if (actual->typeData.kind == NodeTypekind::AUTOCAST && desired->typeData.kind != NodeTypekind::AUTOCAST) {
         maybeStructDefault(semantic, actual->typeData.autocastData, desired);
-        actual->typeData = desired->typeData;
+        actual->resolved = desired;
         return true;
     }
 
@@ -1522,6 +1522,8 @@ void resolveArrayIndex(Semantic *semantic, Node *node) {
         case NodeTypekind::INT_LITERAL:
         case NodeTypekind::I32:
         case NodeTypekind::I64:
+        case NodeTypekind::U32:
+        case NodeTypekind::U64:
             break;
         default: {
             semantic->reportError({node->arrayIndexData.target},
@@ -2209,7 +2211,8 @@ void resolveBinop(Semantic *semantic, Node *node) {
 
     if (resolvedLhsType->typeData.kind == NodeTypekind::POINTER
         && (resolvedRhsType->typeData.kind == NodeTypekind::INT_LITERAL
-            || resolvedRhsType->typeData.kind == NodeTypekind::I64)) {
+            || resolvedRhsType->typeData.kind == NodeTypekind::I64
+            || resolvedRhsType->typeData.kind == NodeTypekind::U64)) {
         node->typeInfo = resolvedLhsType;
         node->binopData.rhsScale = typeSize(resolvedLhsType->typeData.pointerTypeData.underlyingType);
         return;
@@ -2217,7 +2220,8 @@ void resolveBinop(Semantic *semantic, Node *node) {
 
     if (resolvedRhsType->typeData.kind == NodeTypekind::POINTER
         && (resolvedLhsType->typeData.kind == NodeTypekind::INT_LITERAL
-            || resolvedLhsType->typeData.kind == NodeTypekind::I64)) {
+            || resolvedLhsType->typeData.kind == NodeTypekind::I64
+            || resolvedLhsType->typeData.kind == NodeTypekind::U64)) {
         node->typeInfo = resolvedRhsType;
         node->binopData.rhsScale = typeSize(resolvedRhsType->typeData.pointerTypeData.underlyingType);
         return;
@@ -2378,7 +2382,7 @@ void resolveFnCall(Semantic *semantic, Node *node) {
         }
         else if (resolvedFn->fnDeclData.name != nullptr && !resolvedFn->fnDeclData.isExternal) {
             if (resolvedFn->fnDeclData.name->type == NodeType::DOT) {
-                auto fnNameAtom = resolvedFn->fnDeclData.name->dotData.rhs->symbolData.atomId;
+//                auto fnNameAtom = resolvedFn->fnDeclData.name->dotData.rhs->symbolData.atomId;
                 shouldAddContextParam = true;
             }
             else if (resolvedFn->fnDeclData.name->type == NodeType::SYMBOL) {
