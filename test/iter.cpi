@@ -72,6 +72,29 @@ fn byRef(T := typeof(arr[0]))(arr: []T) {
     return cast(ByRef) { arr };
 }
 
+fn reversed(T := typeof(r[0]))(r: []T) {
+    type Reversed struct {
+        value: []T,
+        index: i64
+    }
+
+    #attr(Reversed) {
+        fn empty(r: Reversed) {
+            return  r.index == 0;
+        }
+
+        fn front(r: Reversed) {
+            return r.value[r.index];
+        }
+
+        fn popFront(r: *Reversed) {
+            r.index -= 1;
+        }
+    }
+
+    return cast(Reversed) {r, r.count - 1};
+}
+
 fn withIndex(r: !R) {
     type WithIndex struct{
         value: R,

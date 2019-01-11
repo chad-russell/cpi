@@ -99,3 +99,18 @@ fn deleteInPlace(T := typeof(^b))(b: *T, index: i64) {
 
     b.buf.count -= 1;
 }
+
+fn deleteByReordering(T := typeof(^b))(b: *T, index: i64) {
+    if b == nil or b.buf.count == 0 {
+        return;
+    }
+
+    if b.buf.count == 1 {
+        b.buf.count = 0;
+        return;
+    }
+    else {
+        b.buf[index] = b.buf[b.buf.count - 1];
+        b.buf.count -= 1;
+    }
+}

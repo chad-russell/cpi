@@ -2809,6 +2809,7 @@ void resolveAddressOf(Semantic *semantic, Node *node) {
     if (node->nodeData->type == NodeType::ARRAY_INDEX) {
         if (resolved->type == NodeType::BINOP) {
             node->resolved = resolved;
+            node->typeInfo = pointerTypeInfo->typeData.pointerTypeData.underlyingType;
         }
         else if (resolved->type == NodeType::DEREF) {
             node->resolved = resolved->nodeData;
