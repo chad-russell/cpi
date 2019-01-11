@@ -7,14 +7,16 @@
 #import "math";
 #import "iter";
 
-NODE_RADIUS: f64 = 3;
+PORT_RADIUS: f64 = 3;
+
+type EID i64
 
 #context state: struct {
     scale: f64,
 
-    entities: buf.Buffer!(EID),
     nodes: buf.Buffer!(Node),
     ports: buf.Buffer!(Port),
+
     connections: buf.Buffer!(Connection),
 
     transformedMouse: gui.Point!(f64),
@@ -30,28 +32,19 @@ NODE_RADIUS: f64 = 3;
     tentativeConnection: EID = 0,
 }
 
--- todo(chad): rename me!
-type EID u64
-
-type SizeComponent struct {
-    width: f64,
-    height: f64,
-}
-
-type type PositionComponent struct {
-    x: f64,
-    y: f64,
-}
-
 type Node struct {
+    id: EID,
+
     rect: gui.Rect,
     active: bool,
 
-    inputs: buf.Buffer!(Port),
-    outputs: buf.Buffer!(Port),
+    inputs: buf.Buffer!(EID),
+    outputs: buf.Buffer!(EID),
 }
 
 type Port struct {
+    id: EID,
+
     isInput: bool,
     center: gui.Point!(f64),
 }
@@ -61,10 +54,12 @@ type Connection struct {
     to: EID,
 }
 
-fn makeEID() {
-    newId := cast(u64) context.state.entities.buf.count + 1;
-    &context.state.entities|:append(newId);
-    return newId;
+fn makeNodeId() EID {
+    return cast() context.state.nodes.buf.count + 1;
+}
+
+fn makePortId() EID {
+    return cast() context.state.ports.buf.count + 1;
 }
 
 fn init() {
@@ -106,14 +101,14 @@ fn processMessages() {
     }
 }
 
-fn checkMouseDownInPort(node: *Node, port: Port) {
-    if gui.distance(port.center, context.state.transformedMouse) < magFactor(port) * 3 {
+fn checkMouseDownInPort(port: *Port) {
+    if gui.distance(port.center, context.state.transformedMouse) < magFactor(port) * PORT_RADIUS {
         alreadyInConnection := false;
         c: Connection;
         cIndex: i64;
 
         for connection, i: context.state.connections.buf {
-            if connection.from == node.id or connection.to == node.id {
+            if connection.from == port.id or connection.to == port.id {
                 alreadyInConnection = true;
                 c = connection;
                 cIndex = i;
@@ -124,7 +119,7 @@ fn checkMouseDownInPort(node: *Node, port: Port) {
             -- todo(chad): This is overkill. Just delete by reordering...
             &context.state.connections|:buf.deleteInPlace(cIndex);
 
-            if c.from == node.id {
+            if c.from == port.id {
                 context.state.portBeingDragged = c.to;
             }
             else {
@@ -133,7 +128,7 @@ fn checkMouseDownInPort(node: *Node, port: Port) {
         }
         else {
             context.state.nodeBeingDragged = 0;
-            context.state.portBeingDragged = node.id;
+            context.state.portBeingDragged = port.id;
         }
     }
 }
@@ -146,16 +141,13 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent) {
     context.state.nodeBeingDragged = 0;
     context.state.portBeingDragged = 0;
 
-    for node: context.state.nodes.buf|iter.byRef {
-        mouseDownInPort := false;
-        for port, index: node.inputs.buf {
-            checkMouseDownInPort(node, node.inputs.buf[index]);
-        }
-        for port, index: node.outputs.buf {
-            checkMouseDownInPort(node, node.outputs.buf[index]);
-        }
+    mouseDownInPort := false;
+    for port: context.state.ports.buf|iter.byRef {
+        checkMouseDownInPort(port);
+    }
 
-        if mouseDownInPort == false and node.rect|gui.contains(context.state.transformedMouse.x, context.state.transformedMouse.y) {
+    for node: context.state.nodes.buf {
+        if mouseDownInPort == false and node.rect|gui.contains(context.state.transformedMouse.x, context.state.transformedMouse.y) == true {
             context.state.nodeBeingDragged = node.id;
         }
     }
@@ -176,14 +168,13 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent) {
     context.state.tentativeConnection = 0;
     if context.state.portBeingDragged != 0 {
         -- establish a connection?
-        -- for node: context.state.nodes.buf|iter.byRef {
-            -- pc := portCenter(node);
-            -- mf := magFactor(node);
+        for port: context.state.ports.buf|iter.byRef {
+            mf := magFactor(port);
 
-            -- if node.id != context.state.portBeingDragged and gui.distance(context.state.transformedMouse, pc) < NODE_RADIUS * mf {
-                -- context.state.tentativeConnection = node.id;
-            -- }
-        -- }
+            if port.id != context.state.portBeingDragged and gui.distance(context.state.transformedMouse, port.center) < PORT_RADIUS * mf {
+                context.state.tentativeConnection = port.id;
+            }
+        }
     }
     else if context.state.nodeBeingDragged != 0 {
         nbd := findNode(context.state.nodeBeingDragged);
@@ -218,8 +209,8 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent) {
     context.state.canvasBeingDragged = false;
 
     if context.state.tentativeConnection != 0 {
+
         &context.state.connections|:append({
-            id: makeEID(),
             from: context.state.portBeingDragged,
             to: context.state.tentativeConnection,
         });
@@ -229,9 +220,16 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent) {
     else if context.state.dragging == false {
         -- make a new node
         n: Node;
-        n.id = makeEID();
+        n.id = makeNodeId();
         n.rect = {context.state.transformedMouse.x, context.state.transformedMouse.y, 200, 100};
         n.active = true;
+
+        p: Port;
+        p.id = makePortId();
+        p.isInput = true;
+        &context.state.ports|:append(p);
+
+        &n.inputs|:append(p.id);
 
         &context.state.nodes|:append(n);
     }
@@ -264,12 +262,18 @@ fn tmp_scale() {
     cairo.cairo_scale(context.cairo.layer.context, context.state.scale, context.state.scale);
 }
 
-fn findNode(EID: EID) {
-    basic.assert(EID >= 0 and EID <= cast(u64) context.state.nodes.buf.count);
-    return &context.state.nodes.buf[EID - 1];
+fn findNode(id: EID) {
+    basic.assert(id >= 0 and id <= cast() context.state.nodes.buf.count);
+    return &context.state.nodes.buf[id - 1];
 }
 
-fn magFactor(port: Port) {
+fn findPort(id: EID) {
+    basic.assert(id >= 0 and id <= cast() context.state.ports.buf.count);
+    -- todo(chad): why the FUCK do we need to cast this to a *Port??????????
+    return cast(*Port) &context.state.ports.buf[id - 1];
+}
+
+fn magFactor(port: *Port) {
     mf: f64 = 1.0;
 
     dist := gui.distance(port.center, context.state.transformedMouse);
@@ -292,30 +296,32 @@ fn drawNode(node: *Node) {
     gui.drawRoundedRect(context.cairo.layer,
         node.rect,
         nodeColor.r, nodeColor.g, nodeColor.b,
-        radius: NODE_RADIUS, lineWidth: 5);
-
+        radius: PORT_RADIUS, lineWidth: 5);
 
     -- draw ports
-    for port: node.inputs.buf {
-        pc := port.center;
+    for portId: node.inputs.buf {
+        port := findPort(portId);
+
+        port.center = {node.rect.x + 15, node.rect.y + node.rect.height/2};
+
         mf := magFactor(port);
 
         gui.drawCircle(context.cairo.layer,
-            pc,
-            NODE_RADIUS * mf,
+            port.center,
+            PORT_RADIUS * mf,
             nodeColor.r, nodeColor.g, nodeColor.b,
             lineWidth: 1);
     }
-    for port: node.outputs.buf {
+    -- for port: node.outputs.buf {
 
-    }
+    -- }
 
     -- text.drawBoundedText("0.5", bounds: {node.rect.x + node.rect.width/2, node.rect.y, node.rect.width/2 - 5, node.rect.height});
 }
 
 fn drawConnection(connection: Connection) {
-    p1 := findNode(connection.from).inputs.buf[connection.fromIndex].center;
-    p2 := findNode(connection.to).inputs.buf[connection.toIndex].center;
+    p1 := findPort(connection.from).center;
+    p2 := findPort(connection.to).center;
 
     gui.drawCurve(context.cairo.layer,
         p1: p1,
@@ -349,10 +355,9 @@ fn draw(rect: gui.Rect) {
         drawConnection(connection);
     }
     if context.state.portBeingDragged != 0 {
-        -- todo(chad): why can't you drag from output -> input?
-        pc := findNode(context.state.portBeingDragged).inputs.buf[context.state.portBeingDraggedIndex].center;
+        port := findPort(context.state.portBeingDragged);
 
-        p1 := pc;
+        p1 := port.center;
         p2 := context.state.transformedMouse;
 
         cp1: gui.Point!(f64) = {gui.lerp(p1.x, p2.x, 0.3), p1.y};

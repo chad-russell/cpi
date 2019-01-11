@@ -2807,7 +2807,15 @@ void resolveAddressOf(Semantic *semantic, Node *node) {
     }
 
     if (node->nodeData->type == NodeType::ARRAY_INDEX) {
-        node->resolved = resolve(node->nodeData)->nodeData;
+        if (resolved->type == NodeType::BINOP) {
+            node->resolved = resolved;
+        }
+        else if (resolved->type == NodeType::DEREF) {
+            node->resolved = resolved->nodeData;
+        }
+        else {
+            cpi_assert(false);
+        }
     }
 
     semantic->addressOfContext = savedAddressOf;
