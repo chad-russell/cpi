@@ -14,7 +14,6 @@ type EID i64
 #context state: struct {
     scale: f64,
 
-    entities: buf.Buffer!(EID),
     nodes: buf.Buffer!(Node),
     ports: buf.Buffer!(Port),
 
@@ -28,13 +27,13 @@ type EID i64
     canvasBeingDragged := false,
     dragging := false,
 
-    nodeBeingDragged: EID = 0,
-    portBeingDragged: EID = 0,
-    tentativeConnection: EID = 0,
+    nodeBeingDragged: EID = -1,
+    portBeingDragged: EID = -1,
+    tentativeConnection: EID = -1,
 }
 
 type Node struct {
-    id: EID,
+    valid: bool,
 
     rect: gui.Rect,
     active: bool,
@@ -43,11 +42,18 @@ type Node struct {
     outputs: buf.Buffer!(EID),
 }
 
+type NodeIterator struct {
+    index: i64
+}
+
 type Port struct {
-    id: EID,
+    valid: bool,
 
     isInput: bool,
     center: gui.Point!(f64),
+
+    connections: i32 = 0,
+    allowedConnections: i32 = 1,
 }
 
 type Connection struct {
@@ -55,14 +61,28 @@ type Connection struct {
     to: EID,
 }
 
-fn makeNodeId() EID {
-    context.state.eid += 1;
-    return cast() context.state.eid;
+fn addNode(n: Node) EID {
+    for node, index: context.state.nodes.buf {
+        if node.valid == false {
+            context.state.nodes.buf[index] = n;
+            return index;
+        }
+    }
+
+    &context.state.nodes|:append(n);
+    return context.state.nodes.buf.count - 1;
 }
 
-fn makePortId() EID {
-    context.state.eid += 1;
-    return cast() context.state.eid;
+fn addPort(p: Port) EID {
+    for port, index: context.state.ports.buf {
+        if port.valid == false {
+            context.state.ports.buf[index] = p;
+            return index;
+        }
+    }
+
+    &context.state.ports|:append(p);
+    return context.state.ports.buf.count - 1;
 }
 
 fn init() {
@@ -87,6 +107,16 @@ fn init() {
 }
 
 fn processMessages() {
+    if context.multiGestureEvent != nil {
+        context.state.scale += cast() (context.multiGestureEvent.dDist * 5);
+        if context.state.scale < 0.5 {
+            context.state.scale = 0.5;
+        }
+        if context.state.scale > 1.5 {
+            context.state.scale = 1.5;
+        }
+    }
+
     tmp_scale();
     defer { cairo.cairo_restore(context.cairo.layer.context); }
 
@@ -104,14 +134,14 @@ fn processMessages() {
     }
 }
 
-fn checkMouseDownInPort(port: *Port) {
+fn checkMouseDownInPort(port: *Port, id: EID) {
     if gui.distance(port.center, context.state.transformedMouse) < magFactor(port) * PORT_RADIUS {
         alreadyInConnection := false;
         c: Connection;
         cIndex: i64;
 
         for connection, i: context.state.connections.buf {
-            if connection.from == port.id or connection.to == port.id {
+            if connection.from == id or connection.to == id {
                 alreadyInConnection = true;
                 c = connection;
                 cIndex = i;
@@ -119,9 +149,9 @@ fn checkMouseDownInPort(port: *Port) {
         }
 
         if alreadyInConnection == true {
-            &context.state.connections|:buf.deleteByReordering(cIndex);
+            removeConnection(cIndex);
 
-            if c.from == port.id {
+            if c.from == id {
                 context.state.portBeingDragged = c.to;
             }
             else {
@@ -129,8 +159,8 @@ fn checkMouseDownInPort(port: *Port) {
             }
         }
         else {
-            context.state.nodeBeingDragged = 0;
-            context.state.portBeingDragged = port.id;
+            context.state.nodeBeingDragged = -1;
+            context.state.portBeingDragged = id;
         }
     }
 }
@@ -140,18 +170,20 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent) {
     context.state.mouseDown = true;
     context.state.dragging = false;
 
-    context.state.nodeBeingDragged = 0;
-    context.state.portBeingDragged = 0;
+    context.state.nodeBeingDragged = -1;
+    context.state.portBeingDragged = -1;
 
     mouseDownInPort := false;
-    for port: context.state.ports.buf|iter.byRef {
-        checkMouseDownInPort(port);
+    for port, index: context.state.ports.buf {
+        if port.valid == true {
+            checkMouseDownInPort(&port, index);
+        }
     }
 
     if mouseDownInPort == false {
-        for node: context.state.nodes.buf {
-            if node.rect|gui.contains(context.state.transformedMouse.x, context.state.transformedMouse.y) == true {
-                context.state.nodeBeingDragged = node.id;
+        for node, index: context.state.nodes.buf {
+            if node.valid == true and node.active == true {
+                context.state.nodeBeingDragged = index;
             }
         }
     }
@@ -169,18 +201,24 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent) {
         context.state.mouseDownStart = context.state.transformedMouse;
     }
 
-    context.state.tentativeConnection = 0;
-    if context.state.portBeingDragged != 0 {
+    context.state.tentativeConnection = -1;
+    if context.state.portBeingDragged != -1 {
         -- establish a connection?
-        for port: context.state.ports.buf|iter.byRef {
-            mf := magFactor(port);
+        for port, portIndex: context.state.ports.buf {
+            if port.valid == true {
+                mf := magFactor(&port);
 
-            if port.id != context.state.portBeingDragged and gui.distance(context.state.transformedMouse, port.center) < PORT_RADIUS * mf {
-                context.state.tentativeConnection = port.id;
+                if portIndex != context.state.portBeingDragged and gui.distance(context.state.transformedMouse, port.center) < PORT_RADIUS * mf {
+                    pbd := findPort(context.state.portBeingDragged);
+
+                    if (pbd.isInput == true and port.isInput == false) or (pbd.isInput == false and port.isInput == true) {
+                        context.state.tentativeConnection = portIndex;
+                    }
+                }
             }
         }
     }
-    else if context.state.nodeBeingDragged != 0 {
+    else if context.state.nodeBeingDragged != -1 {
         nbd := findNode(context.state.nodeBeingDragged);
 
         nbd.active = true;
@@ -191,17 +229,21 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent) {
         context.state.canvasBeingDragged = true;
 
         for node: context.state.nodes.buf|iter.byRef {
-            node.rect.x += dx;
-            node.rect.y += dy;
+            if node.valid == true {
+                node.rect.x += dx;
+                node.rect.y += dy;
+            }
         }
     }
     else {
         for node: context.state.nodes.buf|iter.byRef {
-            if node.rect|gui.contains(context.state.transformedMouse.x, context.state.transformedMouse.y) {
-                node.active = true;
-            }
-            else {
-                node.active = false;
+            if node.valid == true {
+                if node.rect|gui.contains(context.state.transformedMouse.x, context.state.transformedMouse.y) {
+                    node.active = true;
+                }
+                else {
+                    node.active = false;
+                }
             }
         }
     }
@@ -211,21 +253,41 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent) {
     context.state.mouseDown = false;
     context.state.canvasBeingDragged = false;
 
-    if context.state.tentativeConnection != 0 {
-        &context.state.connections|:append({
-            from: context.state.portBeingDragged,
-            to: context.state.tentativeConnection,
-        });
+    if context.state.tentativeConnection != -1 {
+        from := findPort(context.state.portBeingDragged);
+        to := findPort(context.state.tentativeConnection);
 
-        context.state.tentativeConnection = 0;
+        if from.connections < from.allowedConnections and to.connections < to.allowedConnections {
+            from.connections += 1;
+            to.connections += 1;
+
+            &context.state.connections|:append({
+                from: context.state.portBeingDragged,
+                to: context.state.tentativeConnection,
+            });
+        }
+
+        context.state.tentativeConnection = -1;
     }
     else if messageData.button == sdl.MouseButton.RIGHT {
         -- delete node
 
-        node := findNode(context.state.nodeBeingDragged);
-        if node != nil {
+        valid := true;
+        if context.state.nodeBeingDragged == -1 {
+            valid = false;
+        }
+
+        node: *Node;
+        if valid == true {
+            node = findNode(context.state.nodeBeingDragged);
+            valid = node.valid;
+        }
+
+        if valid {
             -- delete any connections that involve a node's inputs or outputs
-            for c: context.state.connections.buf {
+            index := context.state.connections.buf.count - 1;
+            while index >= 0 {
+                c := context.state.connections.buf[index];
                 shouldDelete := false;
 
                 for p: node.inputs.buf {
@@ -240,76 +302,66 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent) {
                 }
 
                 if shouldDelete == true {
-                    &context.state.connections|buf.deleteByReordering(cIndex);
+                    removeConnection(index);
                 }
+
+                index -= 1;
             }
 
             -- delete ports from the node
             for p: node.inputs.buf {
-                pIndex := findPortIndex(p);
-                &context.state.ports|buf.deleteByReordering(pIndex);
+                context.state.ports.buf[p].valid = false;
             }
             for p: node.outputs.buf {
-                pIndex := findPortIndex(p);
-                &context.state.ports|buf.deleteByReordering(pIndex);
+                context.state.ports.buf[p].valid = false;
             }
 
             -- delete the node
-            nodeIndex := findNodeIndex(context.state.nodeBeingDragged);
-            &context.state.nodes|buf.deleteByReordering(nodeIndex);
+            context.state.nodes.buf[context.state.nodeBeingDragged].valid = false;
         }
     }
     else if context.state.dragging == false {
         -- make a new node
         n: Node;
-        n.id = makeNodeId();
+        n.valid = true;
         n.rect = {context.state.transformedMouse.x, context.state.transformedMouse.y, 200, 100};
         n.active = true;
 
-        fn addPort(n: *Node, b: *buf.Buffer!(EID)) {
+        fn addPortToNode(n: *Node, b: *buf.Buffer!(EID), isInput: bool) {
             p: Port;
-            p.id = makePortId();
-            p.isInput = true;
-
-            &context.state.ports|:append(p);
-            b|:append(p.id);
+            p.valid = true;
+            p.isInput = isInput;
+            portId := addPort(p);
+            b|:append(portId);
         }
 
-        addPort(&n, &n.inputs);
-        addPort(&n, &n.inputs);
+        addPortToNode(&n, &n.inputs, true);
+        addPortToNode(&n, &n.inputs, true);
 
-        addPort(&n, &n.outputs);
-        addPort(&n, &n.outputs);
-        addPort(&n, &n.outputs);
-        addPort(&n, &n.outputs);
+        addPortToNode(&n, &n.outputs, false);
+        addPortToNode(&n, &n.outputs, false);
+        addPortToNode(&n, &n.outputs, false);
+        addPortToNode(&n, &n.outputs, false);
 
-        &context.state.nodes|:append(n);
+        addNode(n);
     }
 
-    context.state.nodeBeingDragged = 0;
-    context.state.portBeingDragged = 0;
+    context.state.nodeBeingDragged = -1;
+    context.state.portBeingDragged = -1;
 
     context.state.dragging = false;
 }
 
-fn findNodeIndex(id: EID) i64 {
-    for node, nIndex: context.state.nodes.buf {
-        if id == node.id {
-            return nIndex;
-        }
-    }
+fn removeConnection(index: i64) {
+    connection := context.state.connections.buf[index];
 
-    return -1;
-}
+    from := findPort(connection.from);
+    to := findPort(connection.to);
 
-fn findPortIndex(id: EID) i64 {
-    for port, pIndex: context.state.ports.buf {
-        if id == port.id {
-            return pIndex;
-        }
-    }
+    from.connections -= 1;
+    to.connections -= 1;
 
-    return -1;
+    &context.state.connections|buf.deleteByReordering(index);
 }
 
 fn keydown(messageData: *sdl.KeyboardEvent) {
@@ -322,31 +374,27 @@ fn keydown(messageData: *sdl.KeyboardEvent) {
 }
 
 fn tmp_scale() {
-    if context.modifierKeys.shift {
-        diff := context.state.scale - 1.5;
-        context.state.scale -= diff / 2;
-    }
-    else {
-        diff := 1.0 - context.state.scale;
-        context.state.scale += diff / 2;
-    }
+    -- if context.modifierKeys.shift {
+        -- diff := context.state.scale - 1.5;
+        -- context.state.scale -= diff / 2;
+    -- }
+    -- else {
+        -- diff := 1.0 - context.state.scale;
+        -- context.state.scale += diff / 2;
+    -- }
 
     cairo.cairo_save(context.cairo.layer.context);
     cairo.cairo_scale(context.cairo.layer.context, context.state.scale, context.state.scale);
 }
 
 fn findNode(id: EID) *Node {
-    for n: context.state.nodes.buf|iter.byRef {
-        if n.id == id { return n; }
-    }
-    return nil;
+    basic.assertMsg(id >= 0 and id < context.state.nodes.buf.count, "invalid node id");
+    return &context.state.nodes.buf[id];
 }
 
 fn findPort(id: EID) *Port {
-    for p: context.state.ports.buf|iter.byRef {
-        if p.id == id { return p; }
-    }
-    return nil;
+    basic.assertMsg(id >= 0 and id < context.state.ports.buf.count, "invalid port id");
+    return &context.state.ports.buf[id];
 }
 
 fn magFactor(port: *Port) {
@@ -419,9 +467,9 @@ fn drawConnection(connection: Connection) {
             y: p2.y,
         },
         color: {
-            r: cast() 250.0/255.0,
-            g: cast() 215.0/255.0,
-            b: cast() 0.0/255.0,
+            r: cast(f64) 250.0/255.0,
+            g: cast(f64) 215.0/255.0,
+            b: cast(f64) 0.0/255.0,
         },
         width: 4,
     );
@@ -438,7 +486,7 @@ fn draw(rect: gui.Rect) {
     for connection: context.state.connections.buf {
         drawConnection(connection);
     }
-    if context.state.portBeingDragged != 0 {
+    if context.state.portBeingDragged != -1 {
         port := findPort(context.state.portBeingDragged);
 
         p1 := port.center;
@@ -465,6 +513,8 @@ fn draw(rect: gui.Rect) {
 
     -- nodes
     for node: context.state.nodes.buf|iter.byRef {
-        drawNode(node);
+        if node.valid == true {
+            drawNode(node);
+        }
     }
 }

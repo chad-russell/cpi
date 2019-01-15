@@ -390,6 +390,7 @@ fn clearRect(c: *cairo.Context, rect: Rect) {
     shift: bool,
     ctrl: bool
 }
+#context multiGestureEvent: *sdl.MultiGestureEvent
 
 fn processEvents() {
     event: sdl.Event;
@@ -440,6 +441,9 @@ fn processEvents() {
                 context.modifierKeys.shift = false;
             }
         }
+        else if event._type == sdl.MULTIGESTURE {
+            context.multiGestureEvent = cast() mem.tmpHeap(event);
+        }
     }
 }
 
@@ -471,6 +475,7 @@ fn tick() {
     context.mouseButtonUpEvent = nil;
     context.keyDownEvent = nil;
     context.keyUpEvent = nil;
+    context.multiGestureEvent = nil;
 
     processEvents();
 

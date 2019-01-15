@@ -13,6 +13,7 @@ MOUSEMOTION: u32 = 0x400;
 MOUSEBUTTONDOWN: u32 = 0x401;
 MOUSEBUTTONUP: u32 = 0x402;
 MOUSEWHEEL: u32 = 0x403;
+MULTIGESTURE: u32 = 0x802;
 
 WINDOWPOS_UNDEFINED: i32 = 536805376;
 WINDOW_SHOWN: i32 = 0x00000004;
@@ -277,6 +278,18 @@ type MouseButtonEvent struct {
     padding1: u8,
     x: i32,
     y: i32
+}
+
+type MultiGestureEvent struct {
+   _type: u32,
+   timestamp: u32,
+   touchId: i64,
+   dTheta: f32,
+   dDist: f32,
+   x: f32,
+   y: f32,
+   numFingers: u16,
+   padding: u16,
 }
 
 type KeyboardEvent struct {

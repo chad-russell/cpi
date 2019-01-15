@@ -47,6 +47,15 @@ fn assert(b: bool) {
     if (b == false) { panic(); }
 }
 
+fn assertMsg(b: bool, message: []i8) {
+    #import "io";
+
+    if (b == false) {
+        io.println(message);
+        panic();
+    }
+}
+
 fn default(T: Ast)() {
     t: T;
     return t;
