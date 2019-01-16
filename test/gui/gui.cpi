@@ -135,7 +135,6 @@ fn makeLayer(rect: Rect) {
 
 #context sdl: struct {
     window: *sdl.Window,
-    surface: *sdl.Surface,
     renderer: *sdl.Renderer,
 
     texture: *sdl.Texture,
@@ -190,18 +189,6 @@ fn initSdl() {
 
     sdl.SDL_GetRendererOutputSize(context.sdl.renderer, &context.sdl.rendererWidth, &context.sdl.rendererHeight);
 
-    -- Create a SDL surface for Cairo to render onto
-    context.sdl.surface = sdl.SDL_CreateRGBSurface(
-            0,
-            context.sdl.rendererWidth,
-            context.sdl.rendererHeight,
-            32,
-            0x00ff0000,
-            0x0000ff00,
-            0x000000ff,
-            0xff000000
-    );
-
     context.sdl.texture = sdl.SDL_CreateTexture(context.sdl.renderer,
         sdl.PIXEL_FORMAT_ARGB8888,
         sdl.TextureAccess.STREAMING,
@@ -218,9 +205,9 @@ fn initCairo() {
     context.cairo.layer.surface = cairo.cairo_image_surface_create_for_data(
                 cast() context.sdl.pixels,
                 cairo.FORMAT_ARGB32,
-                context.sdl.surface.w,
-                context.sdl.surface.h,
-                context.sdl.surface.pitch);
+                context.sdl.rendererWidth,
+                context.sdl.rendererHeight,
+                context.sdl.rendererWidth * 4);
 
     context.cairo.layer.context = cairo.cairo_create(context.cairo.layer.surface);
 
@@ -358,7 +345,6 @@ fn shutdown() {
     cairo.cairo_surface_destroy(context.cairo.layer.surface);
     cairo.cairo_destroy(context.cairo.layer.context);
 
-    sdl.SDL_FreeSurface(context.sdl.surface);
     sdl.SDL_Quit();
 }
 
