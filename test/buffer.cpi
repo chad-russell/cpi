@@ -82,6 +82,14 @@ fn get(b: !T/Buffer, index: i64) {
 }
 }
 
+fn top( T := typeof(^b), E := typeof(b.buf[0]) )(b: *T/Buffer) E {
+    return b.buf[b.buf.count - 1];
+}
+
+fn pop(T := typeof(^b))(b: *T/Buffer) {
+    b.buf.count -= 1;
+}
+
 fn deleteInPlace(T := typeof(^b))(b: *T, index: i64) {
     readingIndex := 0;
     writingIndex := 0;
@@ -114,3 +122,4 @@ fn deleteByReordering(T := typeof(^b))(b: *T, index: i64) {
         b.buf.count -= 1;
     }
 }
+

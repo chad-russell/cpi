@@ -6,19 +6,24 @@
 #import "cairo";
 #import "math";
 #import "iter";
+#import "mem";
 
 PORT_RADIUS: f64 = 3;
 
 type EID i64
 
-#context state: struct {
-    scale: f64,
+type Screen struct {
+    scale: f64 = 1.0,
+    translate: gui.Point!(f64),
 
     nodes: buf.Buffer!(Node),
     ports: buf.Buffer!(Port),
-
     connections: buf.Buffer!(Connection),
+    controls: buf.Buffer!(Control),
+}
+type ScreenRef *Screen
 
+#context state: struct {
     transformedMouse: gui.Point!(f64),
 
     mouseDownStart: gui.Point!(f64),
@@ -28,8 +33,14 @@ type EID i64
     dragging := false,
 
     nodeBeingDragged: EID = -1,
+    controlBeingDragged: EID = -1,
     portBeingDragged: EID = -1,
     tentativeConnection: EID = -1,
+
+    screens: buf.Buffer!(ScreenRef),
+    topScreen: ScreenRef,
+
+    hackProofOfConcept: f32 = 440.0,
 }
 
 type Node struct {
@@ -40,10 +51,11 @@ type Node struct {
 
     inputs: buf.Buffer!(EID),
     outputs: buf.Buffer!(EID),
-}
 
-type NodeIterator struct {
-    index: i64
+    screen: Screen,
+
+    hasControl := false,
+    controlId: EID,
 }
 
 type Port struct {
@@ -56,43 +68,56 @@ type Port struct {
     allowedConnections: i32 = 1,
 }
 
+type Control struct {
+    valid: bool,
+
+    rect: gui.Rect,
+
+    value: i64,
+    min: i64,
+    max: i64,
+}
+
 type Connection struct {
     from: EID,
     to: EID,
 }
 
 fn addNode(n: Node) EID {
-    for node, index: context.state.nodes.buf {
+    for node, index: context.state.topScreen.nodes.buf {
         if node.valid == false {
-            context.state.nodes.buf[index] = n;
+            context.state.topScreen.nodes.buf[index] = n;
             return index;
         }
     }
 
-    &context.state.nodes|:append(n);
-    return context.state.nodes.buf.count - 1;
+    &context.state.topScreen.nodes|:append(n);
+    return context.state.topScreen.nodes.buf.count - 1;
 }
 
 fn addPort(p: Port) EID {
-    for port, index: context.state.ports.buf {
+    for port, index: context.state.topScreen.ports.buf {
         if port.valid == false {
-            context.state.ports.buf[index] = p;
+            context.state.topScreen.ports.buf[index] = p;
             return index;
         }
     }
 
-    &context.state.ports|:append(p);
-    return context.state.ports.buf.count - 1;
+    &context.state.topScreen.ports|:append(p);
+    return context.state.topScreen.ports.buf.count - 1;
 }
 
 fn init() {
     basic.initContext();
 
     gui.init();
-
     text.init();
 
-    context.state.scale = 1.0;
+    s: Screen;
+    &context.state.screens|:append(mem.heap(s));
+    context.state.topScreen = buf.top(&context.state.screens);
+
+    addControlNode();
 
     while !context.quit {
         gui.tick();
@@ -106,14 +131,63 @@ fn init() {
     return 0;
 }
 
+fn addControlNode() {
+    -- make a new node
+    n: Node;
+    n.valid = true;
+    n.rect = {context.state.transformedMouse.x, context.state.transformedMouse.y, 200, 100};
+    n.active = true;
+    n.hasControl = true;
+    n.controlId = addControl();
+
+    p: Port;
+    p.valid = true;
+    p.isInput = false;
+    portId := addPort(p);
+    &n.outputs|:append(portId);
+
+    addNode(n);
+}
+
+fn addControl() EID {
+    c: Control;
+    c.valid = true;
+    c.value = 678;
+    c.min = 200;
+    c.max = 800;
+
+    for control, index: context.state.topScreen.controls.buf {
+        if control.valid == false {
+            context.state.topScreen.controls.buf[index] = c;
+            return index;
+        }
+    }
+
+    &context.state.topScreen.controls|:append(c);
+    return context.state.topScreen.controls.buf.count - 1;
+}
+
 fn processMessages() {
     if context.multiGestureEvent != nil {
-        context.state.scale += cast() (context.multiGestureEvent.dDist * 5);
-        if context.state.scale < 0.5 {
-            context.state.scale = 0.5;
+        pinch := cast(f64) context.multiGestureEvent.dDist * 5;
+
+        newScale := context.state.topScreen.scale + pinch;
+        if newScale < 0.5 {
+            pinch = 0.5 - context.state.topScreen.scale;
         }
-        if context.state.scale > 1.5 {
-            context.state.scale = 1.5;
+        if newScale > 1.5 {
+            pinch = 1.5 - context.state.topScreen.scale;
+        }
+
+        context.state.topScreen.translate.x -= pinch * context.state.transformedMouse.x;
+        context.state.topScreen.translate.y -= pinch * context.state.transformedMouse.y;
+
+        context.state.topScreen.scale += pinch;
+        if context.state.topScreen.scale < 0.5 {
+            context.state.topScreen.scale = 0.5;
+        }
+        if context.state.topScreen.scale > 1.5 {
+            context.state.topScreen.scale = 1.5;
         }
     }
 
@@ -140,7 +214,7 @@ fn checkMouseDownInPort(port: *Port, id: EID) {
         c: Connection;
         cIndex: i64;
 
-        for connection, i: context.state.connections.buf {
+        for connection, i: context.state.topScreen.connections.buf {
             if connection.from == id or connection.to == id {
                 alreadyInConnection = true;
                 c = connection;
@@ -174,17 +248,33 @@ fn mouseButtonDown(messageData: *sdl.MouseButtonEvent) {
     context.state.portBeingDragged = -1;
 
     mouseDownInPort := false;
-    for port, index: context.state.ports.buf {
+    for port, index: context.state.topScreen.ports.buf {
         if port.valid == true {
             checkMouseDownInPort(&port, index);
         }
     }
 
-    if mouseDownInPort == false {
-        for node, index: context.state.nodes.buf {
+    mouseDownInControl := false;
+    for control, index: context.state.topScreen.controls.buf {
+        if control.valid == true and control.rect|gui.contains(context.state.transformedMouse.x, context.state.transformedMouse.y) == true {
+            mouseDownInControl = true;
+            context.state.controlBeingDragged = index;
+        }
+    }
+
+    if mouseDownInPort == false and mouseDownInControl == false {
+        index := 0;
+        for node: context.state.topScreen.nodes.buf|iter.byRef {
             if node.valid == true and node.active == true {
-                context.state.nodeBeingDragged = index;
+                if context.modifierKeys.ctrl == true {
+                    &context.state.screens|:append(&node.screen);
+                    context.state.topScreen = &context.state.screens|buf.top;
+                }
+                else {
+                    context.state.nodeBeingDragged = index;
+                }
             }
+            index += 1;
         }
     }
 }
@@ -204,7 +294,7 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent) {
     context.state.tentativeConnection = -1;
     if context.state.portBeingDragged != -1 {
         -- establish a connection?
-        for port, portIndex: context.state.ports.buf {
+        for port, portIndex: context.state.topScreen.ports.buf {
             if port.valid == true {
                 mf := magFactor(&port);
 
@@ -225,10 +315,19 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent) {
         nbd.rect.x += dx;
         nbd.rect.y += dy;
     }
+    else if context.state.controlBeingDragged != -1 {
+        c := findControl(context.state.controlBeingDragged);
+
+        c.value += cast() dx;
+        if c.value > c.max { c.value = c.max; }
+        if c.value < c.min { c.value = c.min; }
+
+        context.state.hackProofOfConcept = cast() c.value;
+    }
     else if context.state.mouseDown {
         context.state.canvasBeingDragged = true;
 
-        for node: context.state.nodes.buf|iter.byRef {
+        for node: context.state.topScreen.nodes.buf|iter.byRef {
             if node.valid == true {
                 node.rect.x += dx;
                 node.rect.y += dy;
@@ -236,7 +335,7 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent) {
         }
     }
     else {
-        for node: context.state.nodes.buf|iter.byRef {
+        for node: context.state.topScreen.nodes.buf|iter.byRef {
             if node.valid == true {
                 if node.rect|gui.contains(context.state.transformedMouse.x, context.state.transformedMouse.y) {
                     node.active = true;
@@ -261,7 +360,7 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent) {
             from.connections += 1;
             to.connections += 1;
 
-            &context.state.connections|:append({
+            &context.state.topScreen.connections|:append({
                 from: context.state.portBeingDragged,
                 to: context.state.tentativeConnection,
             });
@@ -271,6 +370,8 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent) {
     }
     else if messageData.button == sdl.MouseButton.RIGHT {
         -- delete node
+        -- todo(chad): recursively delete the screen associated with that node
+        -- todo(chad): delete any controls associated with that node
 
         valid := true;
         if context.state.nodeBeingDragged == -1 {
@@ -285,9 +386,9 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent) {
 
         if valid {
             -- delete any connections that involve a node's inputs or outputs
-            index := context.state.connections.buf.count - 1;
+            index := context.state.topScreen.connections.buf.count - 1;
             while index >= 0 {
-                c := context.state.connections.buf[index];
+                c := context.state.topScreen.connections.buf[index];
                 shouldDelete := false;
 
                 for p: node.inputs.buf {
@@ -310,17 +411,17 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent) {
 
             -- delete ports from the node
             for p: node.inputs.buf {
-                context.state.ports.buf[p].valid = false;
+                context.state.topScreen.ports.buf[p].valid = false;
             }
             for p: node.outputs.buf {
-                context.state.ports.buf[p].valid = false;
+                context.state.topScreen.ports.buf[p].valid = false;
             }
 
             -- delete the node
-            context.state.nodes.buf[context.state.nodeBeingDragged].valid = false;
+            context.state.topScreen.nodes.buf[context.state.nodeBeingDragged].valid = false;
         }
     }
-    else if context.state.dragging == false {
+    else if context.state.dragging == false and context.modifierKeys.ctrl == false {
         -- make a new node
         n: Node;
         n.valid = true;
@@ -348,12 +449,13 @@ fn mouseButtonUp(messageData: *sdl.MouseButtonEvent) {
 
     context.state.nodeBeingDragged = -1;
     context.state.portBeingDragged = -1;
+    context.state.controlBeingDragged = -1;
 
     context.state.dragging = false;
 }
 
 fn removeConnection(index: i64) {
-    connection := context.state.connections.buf[index];
+    connection := context.state.topScreen.connections.buf[index];
 
     from := findPort(connection.from);
     to := findPort(connection.to);
@@ -361,40 +463,37 @@ fn removeConnection(index: i64) {
     from.connections -= 1;
     to.connections -= 1;
 
-    &context.state.connections|buf.deleteByReordering(index);
+    &context.state.topScreen.connections|buf.deleteByReordering(index);
 }
 
 fn keydown(messageData: *sdl.KeyboardEvent) {
-    if messageData.keysym.scancode == sdl.Key.SPACE {
-        io.println("space");
-    }
-    else if messageData.keysym.scancode == sdl.Key.LEFT {
-        io.println("left");
+    if messageData.keysym.scancode == sdl.Key.UP {
+        if context.state.screens.buf.count > 1 {
+            &context.state.screens|buf.pop;
+            context.state.topScreen = &context.state.screens|buf.top;
+        }
     }
 }
 
 fn tmp_scale() {
-    -- if context.modifierKeys.shift {
-        -- diff := context.state.scale - 1.5;
-        -- context.state.scale -= diff / 2;
-    -- }
-    -- else {
-        -- diff := 1.0 - context.state.scale;
-        -- context.state.scale += diff / 2;
-    -- }
-
     cairo.cairo_save(context.cairo.layer.context);
-    cairo.cairo_scale(context.cairo.layer.context, context.state.scale, context.state.scale);
+    cairo.cairo_translate(context.cairo.layer.context, context.state.topScreen.translate.x, context.state.topScreen.translate.y);
+    cairo.cairo_scale(context.cairo.layer.context, context.state.topScreen.scale, context.state.topScreen.scale);
 }
 
 fn findNode(id: EID) *Node {
-    basic.assertMsg(id >= 0 and id < context.state.nodes.buf.count, "invalid node id");
-    return &context.state.nodes.buf[id];
+    basic.assertMsg(id >= 0 and id < context.state.topScreen.nodes.buf.count, "invalid node id");
+    return &context.state.topScreen.nodes.buf[id];
 }
 
 fn findPort(id: EID) *Port {
-    basic.assertMsg(id >= 0 and id < context.state.ports.buf.count, "invalid port id");
-    return &context.state.ports.buf[id];
+    basic.assertMsg(id >= 0 and id < context.state.topScreen.ports.buf.count, "invalid port id");
+    return &context.state.topScreen.ports.buf[id];
+}
+
+fn findControl(id: EID) *Control {
+    basic.assertMsg(id >= 0 and id < context.state.topScreen.controls.buf.count, "invalid connection id");
+    return &context.state.topScreen.controls.buf[id];
 }
 
 fn magFactor(port: *Port) {
@@ -426,7 +525,33 @@ fn drawNode(node: *Node) {
     drawPorts(node, nodeColor, node.inputs.buf, node.rect.x + 15);
     drawPorts(node, nodeColor, node.outputs.buf, node.rect.x + node.rect.width - 15);
 
-    -- text.drawBoundedText("0.5", bounds: {node.rect.x + 20, node.rect.y, node.rect.width/2 - 20, node.rect.height});
+    if node.hasControl == true {
+        control := findControl(node.controlId);
+
+        -- bounding rect for controls
+        maxWidth := node.rect.width/2 - 20;
+        maxHeight := node.rect.height;
+        bound := math.min(maxWidth, maxHeight);
+
+        control.rect = {node.rect.x + node.rect.width/2 - bound/2, node.rect.y + node.rect.height/2 - bound/2, bound, bound};
+
+        -- draw circle
+        gap := 2 * math.PI * 0.2;
+        start := 2 * math.PI * 0.25 + gap/2;
+        hundredPercent := 2 * math.PI - gap;
+
+        controlPercent := cast(f64) (control.value - control.min) / cast(f64) (control.max - control.min);
+
+        gui.drawArc(context.cairo.layer,
+            {control.rect.x + control.rect.width/2, control.rect.y + control.rect.height/2},
+            radius: bound/2,
+            ø1: start,
+            ø2: start + hundredPercent * controlPercent,
+            255.0, 255.0, 255.0,
+            lineWidth: 3);
+
+        text.drawBoundedText(control.value|io.toString, control.rect|gui.inset(10));
+    }
 }
 
 fn drawPorts(node: *Node, color: gui.Color, ports: []EID, x: f64) {
@@ -483,7 +608,7 @@ fn draw(rect: gui.Rect) {
     defer { cairo.cairo_restore(context.cairo.layer.context); }
 
     -- connections
-    for connection: context.state.connections.buf {
+    for connection: context.state.topScreen.connections.buf {
         drawConnection(connection);
     }
     if context.state.portBeingDragged != -1 {
@@ -512,7 +637,7 @@ fn draw(rect: gui.Rect) {
     }
 
     -- nodes
-    for node: context.state.nodes.buf|iter.byRef {
+    for node: context.state.topScreen.nodes.buf|iter.byRef {
         if node.valid == true {
             drawNode(node);
         }

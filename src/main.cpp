@@ -13,7 +13,6 @@
 #include "bytecodegen.h"
 #include "llvmgen.h"
 #include "container.h"
-#include <sdl2/sdl.h>
 
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/Optional.h"

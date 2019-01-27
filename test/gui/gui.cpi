@@ -306,6 +306,19 @@ fn drawCircle(layer: Layer, center: Point!(f64), radius: f64, r: f64, g: f64, b:
     cairo.cairo_stroke(layer.context);
 }
 
+fn drawArc(layer: Layer, center: Point!(f64), radius: f64, ø1: f64, ø2: f64, r: f64, g: f64, b: f64, a: f64 = 1, lineWidth: f64 = 1) {
+    cairo.cairo_save(layer.context);
+    defer { cairo.cairo_restore(layer.context); }
+
+    cairo.cairo_set_line_cap(layer.context, cairo.LineCap.ROUND);
+
+    cairo.cairo_set_source_rgba(layer.context, r, g, b, a);
+    cairo.cairo_set_line_width(layer.context, lineWidth);
+    cairo.cairo_new_sub_path (layer.context);
+    cairo.cairo_arc(layer.context, center.x, center.y, radius, ø1, ø2);
+    cairo.cairo_stroke(layer.context);
+}
+
 fn drawLine(layer: Layer, br: Rect, r: f64, g: f64, b: f64, a: f64 = 1, width: f64 = 1) {
     cairo.cairo_save(layer.context);
     defer { cairo.cairo_restore(layer.context); }
@@ -323,6 +336,8 @@ fn drawLine(layer: Layer, br: Rect, r: f64, g: f64, b: f64, a: f64 = 1, width: f
 fn drawCurve(layer: Layer, p1: Point!(f64), p2: Point!(f64), cp1: Point!(f64), cp2: Point!(f64), color: Color, width: f64 = 1) {
     cairo.cairo_save(layer.context);
     defer { cairo.cairo_restore(layer.context); }
+
+    cairo.cairo_set_line_cap(layer.context, cairo.LineCap.ROUND);
 
     cairo.cairo_set_source_rgba(layer.context, color.r, color.g, color.b, color.a);
 
