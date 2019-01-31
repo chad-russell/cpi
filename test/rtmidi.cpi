@@ -1,4 +1,4 @@
-#link "/Users/chadrussell/Desktop/rtmidi/rtmidi";
+#link "/Users/chadrussell/Desktop/rtmidi/librtmidi";
 
 type RtMidiOut none
 

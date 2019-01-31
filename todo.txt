@@ -1,6 +1,17 @@
 TODO:
     - bool should be 1 byte, not 4
 
+    -- this prints the same address 10 times in llvm... :(
+    i := 0;
+    while i < 10 {
+        defer { i += 1; }
+
+        s := &3;
+        io.println(s);
+    }
+
+    - sizeof should resolve to a u32, not an i32
+
     - strongly consider getting rid of unions considering we haven't used them yet....
 
     - #context things should be scoped -- i.e. only in the context of the module they're defined in.

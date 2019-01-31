@@ -1,11 +1,7 @@
-#import "gui/maud";
-#import "io";
-
-#link "/Users/chadrussell/Projects/pa/pa";
-
-fn proof_of_concept(freq: *f32) none
-
 fn main() {
-    -- proof_of_concept(&context.state.hackProofOfConcept);
-    maud.init();
+    -- #import "gui/maud";
+    -- maud.init();
+
+    #import "maud_engine": engine;
+    engine.play();
 }

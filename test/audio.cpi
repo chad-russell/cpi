@@ -1,0 +1,33 @@
+#link "libpa";
+#link "libportaudio";
+
+type TPCircularBuffer struct {
+    buffer: *none,
+    length: u32,
+    tail: u32,
+    head: u32,
+    fillCount: i32,
+    atomic: u32,
+}
+
+fn spawn(buffer: *TPCircularBuffer) none
+
+fn _TPCircularBufferInit(buffer: *TPCircularBuffer, length: u32, structSize: u64) bool
+
+fn TPCircularBufferInit(buffer: *TPCircularBuffer, length: u32) bool {
+    return _TPCircularBufferInit(buffer, length, 32);
+}
+
+fn TPCircularBufferCleanup(buffer: *TPCircularBuffer) none
+
+fn TPCircularBufferClear(buffer: *TPCircularBuffer) none
+
+fn TPCircularBufferSetAtomic(buffer: *TPCircularBuffer, atomic: bool) none
+
+fn TPCircularBufferTail(buffer: *TPCircularBuffer, availableBytes: *u32) *none
+
+fn TPCircularBufferConsume(buffer: *TPCircularBuffer, amount: u32) none
+
+fn TPCircularBufferHead(buffer: *TPCircularBuffer, availableBytes: *u32) *none
+
+fn TPCircularBufferProduce(buffer: *TPCircularBuffer, amount: u32) none

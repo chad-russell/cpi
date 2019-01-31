@@ -40,7 +40,7 @@ type ScreenRef *Screen
     screens: buf.Buffer!(ScreenRef),
     topScreen: ScreenRef,
 
-    hackProofOfConcept: f32 = 440.0,
+    -- hackProofOfConcept: f32 = 440.0,
 }
 
 type Node struct {
@@ -322,7 +322,7 @@ fn mouseMove(messageData: *sdl.MouseMotionEvent) {
         if c.value > c.max { c.value = c.max; }
         if c.value < c.min { c.value = c.min; }
 
-        context.state.hackProofOfConcept = cast() c.value;
+        -- context.state.hackProofOfConcept = cast() c.value;
     }
     else if context.state.mouseDown {
         context.state.canvasBeingDragged = true;

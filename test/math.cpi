@@ -4,8 +4,29 @@ PI: f64 = 3.141592654;
 
 fn sin(n: f64) f64
 fn cos(n: f64) f64
-fn floor(f: f64) f64
+fn floor(n: f64) f64
 fn sqrt(n: f64) f64
+
+#context sin_table: []f64
+
+fn populate_sin_table() {
+    #import "mem";
+
+    context.sin_table.data = mem.malloc(360 * sizeof(f64));
+    context.sin_table.count = 360;
+
+    i := 0;
+    while i < 360 {
+        fi := cast(f64) i;
+        context.sin_table[i] = sin(fi * PI / 180.0);
+        i += 1;
+    }
+}
+
+fn fast_sin(n: f64) {
+    degrees := cast(i64) (n * 180.0 / PI);
+    return context.sin_table[degrees];
+}
 
 fn max(a: !T, b: T) {
     if a >= b { return a; }

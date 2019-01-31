@@ -471,7 +471,7 @@ int main(int argc, char **argv) {
             system("/usr/local/Cellar/llvm/5.0.1/bin/llc --filetype=obj ./output.bc");
 
             ostringstream command;
-            command << "clang -O3 -L . -L /usr/local/lib/cpi";
+            command << "clang -O3 -L . -L /usr/local/lib/cpi -L /usr/local/lib";
             for (auto link : semantic->linkLibs) {
                 // todo(chad): make convenience fn for getting file/dir name from long path
                 lastSlash = 0;

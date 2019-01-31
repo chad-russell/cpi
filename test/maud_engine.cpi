@@ -1,0 +1,237 @@
+#import "buffer": buf;
+#import "io";
+#import "audio";
+#import "math";
+#import "mem";
+
+module nodeInfo {
+    type Osc struct {
+        freq: f32 = 440.0,
+        phase: f32 = 0,
+    }
+
+    type Volume struct {
+        volume: f32 = 1.0,
+    }
+}
+
+type NodeType enum(u8) {
+    CONSTANT,
+    VOLUME,
+    MIX_DOWN,
+    SIN,
+    SAW,
+    SQUARE,
+}
+
+type EID i64
+
+type Node struct {
+    id: EID,
+    _type: NodeType,
+    children: buf.Buffer!(EID),
+    data: *none,
+    needs_own_buf := false,
+    buf: []f32,
+}
+
+type MaudEngine struct {
+    nodes: buf.Buffer!(Node),
+    root: EID,
+    plan: buf.Buffer!(EID),
+}
+
+#context maud_engine: MaudEngine
+
+fn add_node(node_type: NodeType, data: *none) EID {
+    n: Node;
+    n.id = context.maud_engine.nodes.buf.count;
+    n._type = node_type;
+    n.data = data;
+
+    &context.maud_engine.nodes|:append(n);
+
+    return n.id;
+}
+
+fn add_connection(parent: EID, child: EID) {
+    n := findNode(parent);
+    &n.children|:append(child);
+}
+
+fn fillFrom(id: EID) {
+    n := findNode(id);
+
+    if n._type == NodeType.SIN {
+        fillFromSin(id);
+    }
+    else if n._type == NodeType.SQUARE {
+        fillFromSquare(id);
+    }
+    else if n._type == NodeType.VOLUME {
+        fillFromVolume(id);
+    }
+    else if n._type == NodeType.MIX_DOWN {
+        fillFromMixDown(id);
+    }
+    else {
+        panic();
+    }
+}
+
+fn fillFromSin(id: EID) {
+    n := findNode(id);
+
+    -- write data into the buffer
+    i := 0;
+    while i < n.buf.count {
+        defer { i += 1; }
+
+        data := cast(*nodeInfo.Osc) n.data;
+
+        channel := math.fast_sin(2.0 * math.PI * cast() data.phase);
+
+        n.buf[i] += cast() channel;
+
+        data.phase += data.freq / cast() 44100.0;
+        if (data.phase > 1) {
+            data.phase -= 1;
+        }
+    }
+}
+
+fn fillFromSquare(id: EID) {
+    n := findNode(id);
+
+    -- write data into the buffer
+    i := 0;
+    while i < n.buf.count {
+        defer { i += 1; }
+
+        data := cast(*nodeInfo.Osc) n.data;
+
+        d: f32 = -1.0;
+        if data.phase > 0.5 {
+            d = 1.0;
+        }
+
+        n.buf[i] += d;
+
+        data.phase += data.freq / cast() 44100.0;
+        if (data.phase > 1) {
+            data.phase -= 1;
+        }
+    }
+}
+
+fn fillFromVolume(id: EID) {
+    n := findNode(id);
+
+    -- write data into the buffer
+    i := 0;
+    while i < n.buf.count {
+        defer { i += 1; }
+
+        data := cast(*nodeInfo.Volume) n.data;
+        n.buf[i] *= data.volume;
+    }
+}
+
+fn fillFromMixDown(id: EID) {
+    n := findNode(id);
+
+    i := 0;
+    while i < n.buf.count {
+        n.buf[i] /= cast(f32) n.children.buf.count;
+        i += 1;
+    }
+}
+
+fn findNode(id: EID) *Node {
+    return &context.maud_engine.nodes.buf[id];
+}
+
+fn plan(node_id: EID) {
+    n := findNode(node_id);
+
+    for child: n.children.buf {
+        cn := findNode(child);
+
+        if cn.needs_own_buf {
+            b: []f32;
+            b.data = mem.alloc!(f32)(512);
+            b.count = 512;
+
+            cn.buf = b;
+        }
+        else {
+            cn.buf = n.buf;
+        }
+    }
+
+    for child: n.children.buf {
+        plan(child);
+    }
+
+    &context.maud_engine.plan|:append(node_id);
+}
+
+fn execute() {
+    for p: context.maud_engine.plan.buf {
+        fillFrom(p);
+    }
+}
+
+fn play() {
+    math.populate_sin_table();
+
+    cb: audio.TPCircularBuffer;
+    audio.TPCircularBufferInit(&cb, 64);
+
+    audio.spawn(&cb);
+
+    mix := add_node(NodeType.MIX_DOWN, nil);
+    context.maud_engine.root = mix;
+
+    osc1 := add_node(NodeType.SIN, mem.heap(cast(nodeInfo.Osc) {440.0}));
+    add_connection(parent: mix, child: osc1);
+
+    osc2 := add_node(NodeType.SIN, mem.heap(cast(nodeInfo.Osc) {659.0}));
+    add_connection(parent: mix, child: osc2);
+
+    root_buf: []f32;
+    root_buf.data = mem.alloc!(f32)(512);
+    root_buf.count = 512;
+
+    mix_node := findNode(mix);
+    mix_node.buf = root_buf;
+
+    plan(context.maud_engine.root);
+
+    osc1_node := findNode(osc1);
+    osc2_node := findNode(osc2);
+
+    execute();
+
+    while true {
+        availableBytes: u32;
+        head := cast(*f32) audio.TPCircularBufferHead(&cb, &availableBytes);
+
+        -- todo(chad): dividing by sizeof(f32) here makes availableFloats 0 in llvm-land... :(
+        availableFloats := availableBytes / 4;
+
+        while availableFloats >= 512 {
+            execute();
+
+            i := 0;
+            while i < 512 {
+                ^head = root_buf[i];
+                head += 1;
+                i += 1;
+            }
+
+            audio.TPCircularBufferProduce(&cb, cast() (512 * sizeof(f32)));
+            availableFloats -= 512;
+        }
+    }
+}
